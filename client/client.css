@@ -1,0 +1,279 @@
+@font-face {
+  font-family: 'Fixedsys';
+  src: url('fonts/Fixedsys.ttf') format('truetype');
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Fixedsys', 'Consolas', monospace;
+}
+
+.crt {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vmin;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  max-width: 1500px;
+  height: 95vh;
+  max-height: 920px;
+  background: #020a02;
+  border: 2px solid #0c2e0c;
+  border-radius: 14px;
+  box-shadow:
+    0 0 40px rgba(60, 255, 90, .18),
+    inset 0 0 60px rgba(0, 0, 0, .85);
+  padding: 22px 30px 18px;
+  display: flex;
+  flex-direction: column;
+  color: #57ff6e;
+  text-shadow: 0 0 4px rgba(87, 255, 110, .75), 0 0 12px rgba(87, 255, 110, .35);
+  animation: flicker 6s infinite;
+}
+
+@keyframes flicker {
+  0%, 96%, 100% { opacity: 1; }
+  97% { opacity: .92; }
+  98% { opacity: 1; }
+  99% { opacity: .96; }
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 1px,
+    rgba(0, 0, 0, .28) 2px,
+    rgba(0, 0, 0, .28) 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
+}
+
+/* ── Header (shared shape for normal + hack chrome) ───── */
+.term-header { flex: 0 0 auto; margin-bottom: 10px; }
+.hdr-center {
+  text-align: center;
+  font-size: clamp(24px, 4vmin, 30px);
+  letter-spacing: .5px;
+  line-height: 1.5;
+}
+.hdr-intro {
+  margin-top: 10px;
+  font-size: clamp(24px, 4vmin, 30px);
+  line-height: 1.4;
+  text-align: left;
+  white-space: pre-wrap;
+}
+.hdr-intro:empty { display: none; }
+.term-divider {
+  margin-top: 10px;
+  border-top: 1px solid #57ff6e;
+  opacity: .55;
+}
+
+/* ── Body ───────────────────────────────────────────── */
+.term-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+
+.term-idle {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(28px, 4.8vmin, 40px);
+  letter-spacing: 1px;
+  opacity: .85;
+}
+
+.blink { animation: blink 1s steps(1) infinite; }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+.term-list { padding: 6px 0 2px; }
+.term-empty { opacity: .6; font-size: clamp(24px, 4vmin, 30px); padding: 10px 4px; }
+
+.term-row {
+  padding: 4px 8px;
+  font-size: clamp(26px, 4.4vmin, 34px);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.term-row.sel {
+  background: #57ff6e;
+  color: #021002;
+  text-shadow: none;
+}
+
+/* ── Entry (record) full view ─────────────────────────── */
+.term-entry { padding: 4px; }
+.entry-title { font-size: clamp(30px, 5.2vmin, 40px); letter-spacing: 1px; }
+.entry-divider { opacity: .5; margin: 8px 0; font-size: 24px; }
+.entry-body {
+  font-size: clamp(26px, 4.4vmin, 32px);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ── Command output pane (above Back button) ─────────── */
+.term-output {
+  flex: 0 0 auto;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #144d18;
+  background: rgba(20, 77, 24, .12);
+  font-size: clamp(26px, 4.4vmin, 32px);
+  white-space: pre-wrap;
+  max-height: 30%;
+  overflow-y: auto;
+}
+
+/* ── Decorative bottom input line (normal screens) ────── */
+.term-prompt {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  font-size: clamp(26px, 4.4vmin, 32px);
+}
+
+/* ── Footer / Back button ─────────────────────────────── */
+.term-footer { flex: 0 0 auto; margin-top: 8px; min-height: 34px; }
+.back-btn {
+  background: transparent;
+  border: none;
+  color: #57ff6e;
+  font-family: inherit;
+  text-shadow: inherit;
+  font-size: clamp(24px, 4vmin, 30px);
+  padding: 6px 16px;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.back-btn:hover { background: rgba(87, 255, 110, .12); }
+.back-btn:active { background: #57ff6e; color: #021002; }
+
+/* ── Hacking minigame ──────────────────────────────────── */
+#attemptsLine { margin-top: 2px; }
+.atsq { display: inline-block; margin: 0 1px; }
+.atsq.empty { opacity: .25; }
+
+.hack-board {
+  height: 100%;
+  display: flex;
+  gap: 24px;
+  font-size: clamp(22px, 3.4vmin, 28px);
+  min-height: 0;
+}
+
+.hack-columns {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 24px;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.hack-col { flex: 1 1 0; min-width: 0; }
+.hack-row {
+  display: flex;
+  gap: 24px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+.hack-addr { opacity: .55; flex: 0 0 auto; }
+.hack-cells { flex: 1 1 auto; letter-spacing: 1px; }
+
+.hcell { cursor: pointer; }
+.hcell.word { color: #d8ffb8; }
+.hcell.filler { opacity: .8; }
+.hcell.hi {
+  background: #57ff6e;
+  color: #021002;
+  text-shadow: none;
+}
+
+.hack-log-panel {
+  flex: 0 0 34%;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  row-gap: 8px;
+  min-width: 0;
+  padding-left: 24px;
+}
+.hack-log {
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.hack-log div { padding: 1px 0; margin: 0; word-break: break-word; text-align: left; }
+.hack-input-line {
+  grid-row: 2;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+  word-break: break-all;
+}
+
+.hack-blocked {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: clamp(30px, 5.2vmin, 40px);
+  letter-spacing: .5px;
+  line-height: 1.8;
+}
+
+/* ── Connection overlay ────────────────────────────────── */
+.conn-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #57ff6e;
+  font-family: 'Fixedsys', monospace;
+  font-size: clamp(28px, 4.8vmin, 40px);
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(87,255,110,.6);
+  z-index: 10;
+}
+.conn-overlay.hidden { display: none; }
+
+/* ── Scrollbars (webkit) ───────────────────────────────── */
+.term-body::-webkit-scrollbar, .term-output::-webkit-scrollbar, .hack-log::-webkit-scrollbar, .hack-columns::-webkit-scrollbar { width: 8px; }
+.term-body::-webkit-scrollbar-thumb, .term-output::-webkit-scrollbar-thumb, .hack-log::-webkit-scrollbar-thumb, .hack-columns::-webkit-scrollbar-thumb {
+  background: #144d18;
+}
+.term-body::-webkit-scrollbar-track, .term-output::-webkit-scrollbar-track, .hack-log::-webkit-scrollbar-track, .hack-columns::-webkit-scrollbar-track {
+  background: transparent;
+}
