@@ -1,6 +1,6 @@
 'use strict';
 
-const { ipcRenderer } = require('electron');
+const desktopAPI = window.electronAPI;
 
 // ── State ─────────────────────────────────────────────────
 const state = {
@@ -50,24 +50,24 @@ const btnApplySettings  = document.getElementById('btnApplySettings');
 let serverUrl = null;
 
 // ── Server info / connection count ─────────────────────────
-ipcRenderer.on('server-info', (_e, info) => {
+desktopAPI.onServerInfo((info) => {
   serverUrl = info.url;
   serverUrlEl.textContent = info.url;
 });
-ipcRenderer.on('client-count', (_e, count) => {
+desktopAPI.onClientCount((count) => {
   clientCountEl.textContent = count;
 });
-ipcRenderer.on('hack-state', (_e, hack) => {
+desktopAPI.onHackState((hack) => {
   state.liveHack = hack;
   renderHackStatus();
 });
 serverUrlEl.addEventListener('click', () => {
-  if (serverUrl) ipcRenderer.send('open-url', serverUrl);
+  if (serverUrl) desktopAPI.openUrl(serverUrl);
 });
 
 // ── Start screen: open / new session ───────────────────────
 document.getElementById('btnOpenSession').addEventListener('click', async () => {
-  const res = await ipcRenderer.invoke('session:open');
+  const res = await desktopAPI.openSession();
   if (!res.ok) {
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
     return;
@@ -76,7 +76,7 @@ document.getElementById('btnOpenSession').addEventListener('click', async () => 
 });
 
 document.getElementById('btnNewSession').addEventListener('click', async () => {
-  const res = await ipcRenderer.invoke('session:new');
+  const res = await desktopAPI.newSession();
   if (!res.ok) {
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
     return;
@@ -102,7 +102,7 @@ function loadSession(session, filePath) {
 // ── Autosave (writes to the currently open session file) ──
 async function autosave() {
   if (!state.filePath) return;
-  const res = await ipcRenderer.invoke('session:save', state.session);
+  const res = await desktopAPI.saveSession(state.session);
   if (res.ok) {
     saveStatus.textContent = 'Сохранено ' + new Date().toLocaleTimeString();
     saveStatus.classList.remove('err');
@@ -210,7 +210,7 @@ function renderTermList() {
       const idx = state.session.terminals.findIndex(t => t.id === term.id);
       if (idx >= 0) state.session.terminals.splice(idx, 1);
       if (state.liveTerminalId === term.id) {
-        ipcRenderer.send('terminal:clear-live');
+        desktopAPI.clearLiveTerminal();
         state.liveTerminalId = null;
       }
       if (state.editTerminalId === term.id) {
@@ -520,7 +520,7 @@ btnApplySettings.addEventListener('click', () => {
   if (term.id === state.liveTerminalId) {
     // Intro text can refresh live immediately; hackLevel only takes effect
     // on the next (re)broadcast so it never disrupts an in-progress hack.
-    ipcRenderer.send('terminal:update-live', { tree: term.root, introText: term.introText });
+    desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText });
   }
 });
 
@@ -529,7 +529,7 @@ btnMakeLive.addEventListener('click', () => {
   if (!term) return;
   state.liveTerminalId = term.id;
   state.liveHack = null;
-  ipcRenderer.send('terminal:set-live', {
+  desktopAPI.setLiveTerminal({
     terminalId:   term.id,
     terminalName: term.name,
     tree:         term.root,
@@ -544,7 +544,7 @@ btnMakeLive.addEventListener('click', () => {
 btnPublish.addEventListener('click', () => {
   const term = getEditTerminal();
   if (!term || term.id !== state.liveTerminalId) return;
-  ipcRenderer.send('terminal:update-live', { tree: term.root, introText: term.introText || '' });
+  desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText || '' });
   const original = btnPublish.textContent;
   btnPublish.textContent = 'ОБНОВЛЕНО ✓';
   setTimeout(() => { btnPublish.textContent = original; }, 1200);
@@ -552,7 +552,7 @@ btnPublish.addEventListener('click', () => {
 
 btnStopBroadcast.addEventListener('click', () => {
   if (!state.liveTerminalId) return;
-  ipcRenderer.send('terminal:clear-live');
+  desktopAPI.clearLiveTerminal();
   state.liveTerminalId = null;
   state.liveHack = null;
   renderTermList();
@@ -562,5 +562,5 @@ btnStopBroadcast.addEventListener('click', () => {
 
 btnHackSuccess.addEventListener('click', () => {
   if (!state.liveHack || state.liveHack.solved || state.liveHack.failed) return;
-  ipcRenderer.send('terminal:hack-force-success');
+  desktopAPI.forceHackSuccess();
 });

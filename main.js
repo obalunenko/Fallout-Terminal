@@ -78,8 +78,10 @@ async function createWindow() {
     title: 'Fallout Terminal — Master Control',
     backgroundColor: '#0b0d0a',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
   });
 
@@ -184,5 +186,12 @@ ipcMain.on('terminal:hack-force-success', () => {
 });
 
 ipcMain.on('open-url', (event, url) => {
-  shell.openExternal(url);
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      shell.openExternal(parsed.href);
+    }
+  } catch {
+    // Ignore malformed or unsupported URLs from the renderer.
+  }
 });
