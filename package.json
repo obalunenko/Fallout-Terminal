@@ -6,6 +6,7 @@
   "author": "Vault-Tec R&D",
   "scripts": {
     "start": "electron .",
+    "start:ngrok": "electron . --ngrok",
     "build": "electron-builder --win --x64",
     "build:dir": "electron-builder --win --x64 --dir",
     "build:portable": "electron-builder --win portable --x64"

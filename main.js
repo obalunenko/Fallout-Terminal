@@ -5,6 +5,7 @@ const fs   = require('fs');
 let mainWindow;
 let serverModule;
 let currentSessionPath = null;
+let stopNgrok = null;
 
 function defaultSession(name) {
   return {
@@ -69,6 +70,7 @@ async function createWindow() {
 
   serverModule = require('./server/server');
   const serverInfo = await serverModule.startServer(3690);
+  let displayedServerInfo = serverInfo;
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -89,7 +91,7 @@ async function createWindow() {
   mainWindow.setMenuBarVisibility(false);
 
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.send('server-info', serverInfo);
+    mainWindow.webContents.send('server-info', displayedServerInfo);
   });
 
   mainWindow.webContents.on('console-message', (_e, _level, message) => {
@@ -110,12 +112,43 @@ async function createWindow() {
       mainWindow.webContents.send('hack-state', hack);
     }
   });
+
+  const ngrokEnabled = process.argv.includes('--ngrok') || process.env.NGROK_ENABLED === '1';
+  if (ngrokEnabled) {
+    const ngrok = require('./server/ngrok');
+    stopNgrok = ngrok.stopNgrok;
+    ngrok.startNgrok(serverInfo.port).then((publicUrl) => {
+      console.log(`[ngrok] Players URL: ${publicUrl}`);
+      displayedServerInfo = {
+        ...serverInfo,
+        localUrl: serverInfo.url,
+        url: publicUrl,
+        tunnel: true,
+      };
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('server-info', displayedServerInfo);
+      }
+    }).catch((error) => {
+      console.error('[ngrok] Failed to start:', error.message);
+      displayedServerInfo = {
+        ...serverInfo,
+        tunnelError: error.message,
+      };
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('server-info', displayedServerInfo);
+      }
+    });
+  }
 }
 
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  if (stopNgrok) stopNgrok();
 });
 
 // ── Session: new ──────────────────────────────────────────

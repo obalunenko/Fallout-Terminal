@@ -96,6 +96,7 @@ button {
 .server-row { font-size: 12px; margin-bottom: 2px; }
 .info-lbl { color: #6f9a5f; margin-right: 8px; letter-spacing: 1px; }
 .server-url { color: #ffe08a; cursor: pointer; text-decoration: underline dotted; }
+.server-url-error { color: #ff9a7a; }
 .conn-count { color: #d8ffb8; font-weight: bold; }
 
 .main { flex: 1 1 auto; display: flex; min-height: 0; }

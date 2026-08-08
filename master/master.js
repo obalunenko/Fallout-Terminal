@@ -53,6 +53,15 @@ let serverUrl = null;
 desktopAPI.onServerInfo((info) => {
   serverUrl = info.url;
   serverUrlEl.textContent = info.url;
+  serverUrlEl.classList.toggle('server-url-error', Boolean(info.tunnelError));
+  if (info.tunnelError) {
+    serverUrlEl.textContent = 'NGROK: ОШИБКА';
+    serverUrlEl.title = `${info.tunnelError}\nЛокальный адрес: ${info.url}`;
+  } else if (info.tunnel) {
+    serverUrlEl.title = `Публичная ссылка (нажмите, чтобы открыть)\nЛокально: ${info.localUrl}`;
+  } else {
+    serverUrlEl.title = 'Локальная ссылка (нажмите, чтобы открыть)';
+  }
 });
 desktopAPI.onClientCount((count) => {
   clientCountEl.textContent = count;
