@@ -36,5 +36,8 @@
     "nsis": {
       "oneClick": true
     }
+  },
+  "allowScripts": {
+    "electron@28.3.3": true
   }
 }
