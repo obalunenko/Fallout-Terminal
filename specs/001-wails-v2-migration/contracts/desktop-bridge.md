@@ -2,7 +2,7 @@
 
 ## Boundary
 
-Only registered Wails methods and runtime events cross between the master frontend and privileged Go services. `frontend/src/desktop-api.js` exposes the compatibility object `window.electronAPI`; `master.js` has no direct filesystem, process, environment, server, or arbitrary network access.
+Only registered Wails methods and runtime events cross between the master frontend and privileged Go services. After final cutover, `frontend/src/desktop-api.js` exposes the narrow runtime-neutral object `window.desktopAPI`; `master.js` has no direct filesystem, process, environment, server, or arbitrary network access. `window.electronAPI` is historical migration terminology and is forbidden in active production frontend source.
 
 ## Bound commands
 
@@ -44,4 +44,3 @@ The adapter's `onServerInfo`, `onClientCount`, and `onHackState` methods return 
 - Use generated Wails bindings, not arbitrary evaluation or a general command dispatcher.
 - Do not expose environment variables, raw process control, or general file read/write methods.
 - Validate external URL protocol in Go immediately before calling the platform browser API.
-

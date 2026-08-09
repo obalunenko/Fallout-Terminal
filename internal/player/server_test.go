@@ -148,7 +148,11 @@ func TestSlowClientDoesNotBlockBroadcastOrFastClient(t *testing.T) {
 		}
 		started := time.Now()
 		server.PublishUpdate()
-		if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		// The race detector makes the deliberately large JSON fixture's local
+		// marshal cost substantially slower on loaded CI hosts. A blocked socket
+		// write would take the connection write timeout, so this ceiling still
+		// proves broadcast is queue-bound without conflating instrumentation cost.
+		if elapsed := time.Since(started); elapsed > 250*time.Millisecond {
 			t.Fatalf("broadcast %d waited %s for a slow client", index, elapsed)
 		}
 	}

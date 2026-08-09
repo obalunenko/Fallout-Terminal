@@ -93,9 +93,10 @@ func (service *Service) Start(ctx context.Context) (domain.ServerInfo, error) {
 			"--log", "stdout",
 			"--log-format", "json",
 		},
-		Env:    os.Environ(),
-		Stdout: stdout,
-		Stderr: stderr,
+		Env:         os.Environ(),
+		Stdout:      stdout,
+		Stderr:      stderr,
+		CleanupPath: policy.directory,
 	}
 	if err := service.process.Start(ctx, spec); err != nil {
 		return domain.ServerInfo{}, service.redactedError("start ngrok", err.Error())

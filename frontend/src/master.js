@@ -1,6 +1,6 @@
 'use strict';
 
-const desktopAPI = window.electronAPI;
+const desktopAPI = window.desktopAPI;
 
 // ── State ─────────────────────────────────────────────────
 const state = {

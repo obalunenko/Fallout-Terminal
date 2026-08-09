@@ -69,6 +69,15 @@ listener, waits for owned goroutines, and finally releases desktop resources.
 Handled partial startup uses the same reverse-order cleanup. No owned listener,
 tunnel process, or credential directory may remain after the documented timeout.
 
+On Darwin, the ngrok launch boundary also holds an inherited owner pipe through
+a minimal guardian process. Normal shutdown still asks ngrok to terminate before
+closing the player listener. If the development supervisor terminates the Wails
+application before `OnShutdown` runs, kernel closure of the owner pipe makes the
+guardian terminate/escalate the ngrok child and remove only its generated
+`fallout-terminal-ngrok-*` policy directory. The in-process player listener is
+released by process exit. This handled path completes within 10 seconds and does
+not require an operator process kill.
+
 ## Acceptance evidence
 
 | Requirement | Evidence |
@@ -77,3 +86,4 @@ tunnel process, or credential directory may remain after the documented timeout.
 | FR-019, SC-007 | Asset-manifest and packaged-app checks prove the release contains master/player/font/sound/sample assets and launches without developer tooling |
 | FR-026, SC-009 | A prepared clean checkout reaches ready state from only root `wails dev`; an installed `.app` reaches the same state from one launch; neither flow uses a separately invoked frontend or player server |
 | SC-006 | Repeated normal, active-tunnel, connected-player, and partial-start shutdown tests leave zero owned resources |
+| FR-027, SC-011 | The Darwin real-process regression harness acquires port 3690 and a credential-policy directory under a supervised public child, simulates loss of the development application process, and requires the child, listener, and policy directory to disappear within the shutdown timeout |

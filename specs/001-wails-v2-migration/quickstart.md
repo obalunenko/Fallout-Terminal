@@ -242,11 +242,19 @@ Public-access evidence recorded on 2026-08-09 (credentials redacted):
   repository evidence.
 - A normal native application Quit invoked reverse-order shutdown: the ngrok
   child/inspector and player listener were gone and no policy directory
-  remained. An initial terminal `Ctrl+C` against the Wails development
-  supervisor did not invoke the native app's graceful tunnel shutdown and left
-  the isolated ngrok child; that test child was terminated immediately. Treat
-  supervisor-interrupt cleanup as an explicit T067/T069 acceptance item rather
-  than claiming that path passed.
+  remained. The original BUG-003 reproduction showed that the Wails development
+  supervisor could bypass that callback and orphan the isolated ngrok child;
+  the guarded run below supersedes that failed observation.
+- T078 reran the same authenticated public profile through the sole root
+  `wails dev` command after adding the Darwin owner guard. Anonymous HTTP and
+  WebSocket requests returned `401`; authenticated HTTP returned `200`; and an
+  authenticated same-origin HTTP/1.1 WebSocket request upgraded with `101`.
+  The generated traffic-policy directory had already been removed before the
+  interrupt. Sending one terminal `Ctrl+C` to the Wails supervisor produced
+  `Caught quit` and `Development mode exited`. On the first cleanup poll, port
+  3690 had zero listeners, ngrok had zero processes, the owner guardian had zero
+  processes, and zero `fallout-terminal-ngrok-*` directories remained. No
+  manual process kill was used and all credential values remained redacted.
 
 ## 9. Personal-use and optional public macOS packaging
 
@@ -441,12 +449,53 @@ T069 final post-Electron acceptance recorded on 2026-08-09:
   not player application errors.
 - Interrupting that local-only Wails supervisor produced its handled
   `Ctrl+C detected. Shutting down` path and released ports `3690`, `34115`, and
-  `5173`; no ngrok process existed. The earlier active-tunnel supervisor hard-
-  interruption observation remains a documented recovery caveat, not an
-  orderly native-Quit result; native Quit and owned-process cleanup are covered
-  by the recorded package/public run and race-enabled lifecycle tests.
+  `5173`; no ngrok process existed. T078 subsequently repeated the handled
+  supervisor interrupt with authenticated public mode active and verified zero
+  listener, ngrok/guardian process, or policy-directory residue on the first
+  bounded cleanup poll, closing the earlier BUG-003 caveat.
 - The complete session, 4–7-client convergence/reconnect, public-authentication,
   storage, port-conflict, audio-degradation, and single-launch evidence remains
   recorded in Sections 4–9 and passed the final source/test review. Developer
   ID signing, notarization, stapling, signed DMG, and Gatekeeper public-release
   checks remain `N/A (personal profile)` and public publication stays closed.
+
+## 10. Canonical personal-use acceptance record
+
+The final post-Electron candidate is the source at the current cutover commit
+and the executable produced from it by the clean personal-use command in
+Section 9. This is the only artifact identity that acceptance, rollback, and
+handoff documentation may label canonical.
+
+Canonical candidate commit: `d95e144b4f8b5629968e8c28c43eb0b0b9ff2d86`
+
+Canonical executable SHA-256: `84a99810993a952706c43a099f26be4d18c33390a0d1023096b6b09bc6eb2e29`
+
+Verified on 2026-08-09 with:
+
+```bash
+git rev-parse HEAD
+wails build -clean -platform darwin/arm64
+shasum -a 256 'build/bin/Fallout Terminal.app/Contents/MacOS/Fallout Terminal'
+codesign --verify --deep --strict --verbose=2 'build/bin/Fallout Terminal.app'
+go test ./internal/platform -run TestAcceptanceEvidenceUsesOneCanonicalPostElectronCandidate
+```
+
+The consistency test deliberately fails if either acceptance document omits
+its canonical record, records it more than once, uses malformed identifiers,
+or disagrees on the commit or executable digest. The optional public-release
+profile remains a separate future gate and must establish a new public artifact
+record before publication; it does not replace this personal-use record.
+
+### BUG-003 handled-supervisor regression harness
+
+Run the Darwin real-process lifecycle check before and after the ownership fix:
+
+```bash
+go test ./internal/tunnel -run TestDevelopmentSupervisorInterruptCleansRealOwnedResources -count=1
+```
+
+The fixture acquires the documented player port, keeps an ngrok-policy-shaped
+private directory, and runs as a real supervised child. It then simulates the
+development application process disappearing along the handled supervisor path.
+The check rejects any result that leaves the child running, port 3690 occupied,
+or policy material present after the bounded cleanup interval.

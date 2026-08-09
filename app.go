@@ -66,7 +66,9 @@ type playerPublisher interface {
 }
 
 // TunnelService owns the optional public-access process and its temporary
-// credential material.
+// credential material. The Darwin implementation additionally binds the child
+// to the application process lifetime so development-supervisor termination
+// cannot bypass cleanup by skipping the native window shutdown callback.
 type TunnelService interface {
 	Start(context.Context) (domain.ServerInfo, error)
 	Stop(context.Context) error

@@ -127,7 +127,7 @@ function subscribe(eventName, statusField, callback, project = (payload) => payl
   return unsubscribe;
 }
 
-const previousFacade = window.electronAPI;
+const previousFacade = window.desktopAPI;
 if (typeof previousFacade?.[DISPOSE] === 'function') {
   previousFacade[DISPOSE]();
 }
@@ -154,7 +154,7 @@ Object.defineProperty(desktopAPI, DISPOSE, {
   },
 });
 
-Object.defineProperty(window, 'electronAPI', {
+Object.defineProperty(window, 'desktopAPI', {
   value: Object.freeze(desktopAPI),
   configurable: true,
 });

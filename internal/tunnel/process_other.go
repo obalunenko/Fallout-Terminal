@@ -14,12 +14,13 @@ import (
 // ProcessSpec is the complete, non-shell process launch request. Output
 // writers are supplied by the tunnel service so it can parse bounded logs.
 type ProcessSpec struct {
-	Path   string
-	Args   []string
-	Env    []string
-	Dir    string
-	Stdout io.Writer
-	Stderr io.Writer
+	Path        string
+	Args        []string
+	Env         []string
+	Dir         string
+	Stdout      io.Writer
+	Stderr      io.Writer
+	CleanupPath string
 }
 
 // ProcessRunner starts one owned external process.

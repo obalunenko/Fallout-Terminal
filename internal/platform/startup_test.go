@@ -68,6 +68,62 @@ func TestQuickstartHasOneRepositoryRootStartupCommand(t *testing.T) {
 	}
 }
 
+func TestAcceptanceEvidenceUsesOneCanonicalPostElectronCandidate(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	quickstart := readAcceptanceDocument(t, filepath.Join(root, "specs", "001-wails-v2-migration", "quickstart.md"))
+	rollback := readAcceptanceDocument(t, filepath.Join(root, "docs", "wails-migration-rollback.md"))
+
+	quickstartCommit, quickstartDigest := canonicalCandidate(t, "quickstart", quickstart)
+	rollbackCommit, rollbackDigest := canonicalCandidate(t, "rollback guide", rollback)
+	if quickstartCommit != rollbackCommit {
+		t.Errorf("canonical candidate commit conflicts: quickstart=%s rollback=%s", quickstartCommit, rollbackCommit)
+	}
+	if quickstartDigest != rollbackDigest {
+		t.Errorf("canonical executable SHA-256 conflicts: quickstart=%s rollback=%s", quickstartDigest, rollbackDigest)
+	}
+}
+
+func readAcceptanceDocument(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func canonicalCandidate(t *testing.T, name, document string) (string, string) {
+	t.Helper()
+	commit := canonicalValue(t, name, document, "Canonical candidate commit: `", 40)
+	digest := canonicalValue(t, name, document, "Canonical executable SHA-256: `", 64)
+	return commit, digest
+}
+
+func canonicalValue(t *testing.T, name, document, prefix string, length int) string {
+	t.Helper()
+	if count := strings.Count(document, prefix); count != 1 {
+		t.Fatalf("%s contains %d %q records, want exactly one", name, count, strings.TrimSuffix(prefix, "`"))
+	}
+	start := strings.Index(document, prefix) + len(prefix)
+	rest := document[start:]
+	end := strings.IndexByte(rest, '`')
+	if end < 0 {
+		t.Fatalf("%s canonical record %q has no closing backtick", name, strings.TrimSuffix(prefix, "`"))
+	}
+	value := rest[:end]
+	if len(value) != length {
+		t.Fatalf("%s canonical record %q has %d characters, want %d", name, strings.TrimSuffix(prefix, "`"), len(value), length)
+	}
+	for _, character := range value {
+		if !strings.ContainsRune("0123456789abcdef", character) {
+			t.Fatalf("%s canonical record %q is not lowercase hexadecimal: %q", name, strings.TrimSuffix(prefix, "`"), value)
+		}
+	}
+	return value
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)

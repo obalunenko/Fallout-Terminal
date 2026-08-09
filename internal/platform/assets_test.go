@@ -162,6 +162,33 @@ func TestPlayerHiddenStatesStayOutOfScrollableLayout(t *testing.T) {
 	}
 }
 
+func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	adapter, err := os.ReadFile(filepath.Join(root, "frontend", "src", "desktop-api.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	master, err := os.ReadFile(filepath.Join(root, "frontend", "src", "master.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	activeSource := string(adapter) + "\n" + string(master)
+	if strings.Contains(activeSource, "window.electronAPI") || strings.Contains(activeSource, "'electronAPI'") || strings.Contains(activeSource, `"electronAPI"`) {
+		t.Error("active production frontend still defines or consumes the transitional Electron-specific bridge global")
+	}
+	for _, required := range []string{
+		"window.desktopAPI",
+		"Object.defineProperty(window, 'desktopAPI'",
+	} {
+		if !strings.Contains(activeSource, required) {
+			t.Errorf("active production frontend is missing runtime-neutral facade contract %q", required)
+		}
+	}
+}
+
 func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 	t.Parallel()
 

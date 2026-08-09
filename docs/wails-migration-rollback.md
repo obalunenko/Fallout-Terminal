@@ -27,23 +27,40 @@ The immutable Electron rollback source is commit
 `9b2dd022a724202f95766d8196cc3fdf88be9084` (`docs: Add specs for migrating to
 go server`). No independently archived Electron binary was produced for this
 checkout; that commit and its lock file are therefore the canonical rebuild
-source. The accepted personal-use Wails executable SHA-256 is
-`ec013929e5962c79edbdd633bb3986cbe271ac9f5d35fa43c5e6efe63b90509a`; the
-complete acceptance evidence is recorded in
-`specs/001-wails-v2-migration/quickstart.md`.
+source.
 
-Before T064, record all of the following in the release notes or pull request:
+The accepted Wails artifact is the final rebuild after Electron source and
+dependency removal. These two fields are the release handoff identity and must
+match the canonical personal-use acceptance record in
+`specs/001-wails-v2-migration/quickstart.md`:
+
+Canonical candidate commit: `d95e144b4f8b5629968e8c28c43eb0b0b9ff2d86`
+
+Canonical executable SHA-256: `84a99810993a952706c43a099f26be4d18c33390a0d1023096b6b09bc6eb2e29`
+
+The earlier pre-cutover package digest is historical T060 evidence only and is
+not an accepted cutover or rollback decision artifact. Run the executable
+consistency test before handoff; it fails on a missing, duplicate, malformed,
+or conflicting canonical commit or digest:
+
+```bash
+go test ./internal/platform -run TestAcceptanceEvidenceUsesOneCanonicalPostElectronCandidate -count=1
+```
+
+The release notes or pull request must link this final record and include:
 
 - the immutable Electron rollback tag or commit;
 - the last accepted Electron artifact and its SHA-256;
-- the Wails candidate commit and artifact SHA-256;
+- the canonical Wails candidate commit and executable SHA-256 above;
 - the completed sections of
   `specs/001-wails-v2-migration/quickstart.md`;
 - the location of user-owned session files used for the semantic round-trip
   comparison (never commit those files).
 
-The rollback reference must predate deletion of `main.js`, `preload.js`,
-`server/`, the root Electron package files, and duplicate legacy assets.
+The Electron rollback reference must predate deletion of `main.js`,
+`preload.js`, `server/`, the root Electron package files, and duplicate legacy
+assets. The Wails acceptance record must instead identify the final
+post-deletion rebuild; a pre-cutover Wails digest cannot be promoted at handoff.
 
 ## Roll back before source cutover
 
