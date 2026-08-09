@@ -8,6 +8,12 @@
 
 **Bugfix**: 2026-08-09 — BUG-001 Updated from bugfix patch
 
+**Bugfix**: 2026-08-09 — BUG-002 Updated from bugfix patch
+
+**Bugfix**: 2026-08-09 — BUG-003 Updated from bugfix patch
+
+**Bugfix**: 2026-08-09 — BUG-004 Updated from bugfix patch
+
 **Scope decision**: 2026-08-09 — The active macOS acceptance profile is personal use. Local/ad-hoc `.app` validation gates cutover; Developer ID signing, notarization, and DMG checks are conditional future public-release gates.
 
 ## Summary
@@ -146,7 +152,7 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 
 ### Desktop bridge
 
-[contracts/desktop-bridge.md](contracts/desktop-bridge.md) replaces Electron IPC with bound Go methods and Wails events. `frontend/src/desktop-api.js` exposes the current `window.electronAPI` method names so `master.js` needs minimal behavioral change. Commands include session new/open/save, live set/update/clear, force-success, validated URL open, and initial runtime status. Events remain `server-info`, `client-count`, and `hack-state`. User cancellations and expected failures use structured results, not unhandled promise rejection.
+[contracts/desktop-bridge.md](contracts/desktop-bridge.md) replaces Electron IPC with bound Go methods and Wails events. During staged migration, `frontend/src/desktop-api.js` exposes the current `window.electronAPI` method names so `master.js` needs minimal behavioral change. BUG-004 makes that name explicitly transitional: final active source publishes and consumes the same narrow contract as `window.desktopAPI`, with no Electron-specific global remaining. Commands include session new/open/save, live set/update/clear, force-success, validated URL open, and initial runtime status. Events remain `server-info`, `client-count`, and `hack-state`. User cancellations and expected failures use structured results, not unhandled promise rejection.
 
 ### HTTP and WebSocket
 
@@ -158,7 +164,7 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 
 ### Startup orchestration
 
-[contracts/startup.md](contracts/startup.md) defines the single entry boundary. From a prepared checkout, `wails dev` runs at the repository root and delegates frontend install/build/watch behavior through `wails.json`; users never start Vite or the player server separately. Both development and packaged launches call the same idempotent application lifecycle: acquire the player listener, publish ready status only after the listener and desktop bridge are usable, optionally start the tunnel, and unwind owned resources in reverse order on failure or shutdown.
+[contracts/startup.md](contracts/startup.md) defines the single entry boundary. From a prepared checkout, `wails dev` runs at the repository root and delegates frontend install/build/watch behavior through `wails.json`; users never start Vite or the player server separately. Both development and packaged launches call the same idempotent application lifecycle: acquire the player listener, publish ready status only after the listener and desktop bridge are usable, optionally start the tunnel, and unwind owned resources in reverse order on failure or shutdown. BUG-003 extends this boundary to handled supervisor interruption: tunnel ownership cannot depend solely on the native window shutdown callback, and the regression harness must prove that interrupting the sole development command removes the tunnel, listener, and policy material within the shutdown timeout.
 
 ## Implementation Phases
 
@@ -192,7 +198,7 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 ### Phase 3: Game-master and player integration
 
 - Migrate the master assets into the Wails frontend.
-- Add generated bindings and the compatibility adapter.
+- Add generated bindings and the compatibility adapter; retain the transitional Electron-specific global only until final cutover, then expose the same facade under a runtime-neutral name.
 - Implement native dialogs, initial status retrieval, Wails events, external URL validation, and lifecycle wiring.
 - Exercise unchanged player rendering, reconnect, audio degradation, and multi-client convergence against the Go server.
 - Preserve one authoritative player-state visibility mechanism so inactive idle, normal, hacking, and blocked containers are excluded from layout even when the terminal body overflows and scrolls.
@@ -201,6 +207,7 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 
 - Port credential validation, temporary policy creation, URL discovery, timeout, diagnostics, and cleanup.
 - Add Darwin-specific process-group/termination behavior and bounded graceful/forced shutdown.
+- Add a handled development-supervisor interruption harness and an ownership strategy that removes the active tunnel, player listener, and temporary policy material even when the native window shutdown callback is bypassed.
 - Configure macOS Apple Silicon assets and application metadata; produce and validate the local/ad-hoc personal-use `.app` as the current required candidate.
 - Preserve hardened runtime, Developer ID signing, `notarytool` submission, stapling, and DMG creation as an optional public-release profile that fails closed when selected without credentials.
 - Run all automated and manual parity gates required by the selected distribution profile.
@@ -209,7 +216,9 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 
 - Update README and rollback guidance to identify personal use as the current accepted profile and public distribution as conditional.
 - Remove Electron orchestration, preload, Express/`ws`, electron-builder dependencies, and obsolete root npm files.
+- Replace the transitional `window.electronAPI` facade name with `window.desktopAPI` in active source while preserving the narrow command/event contract.
 - Re-run clean-checkout tests, production builds, session round trips, four-to-seven-browser tests, public-access checks, and packaged shutdown checks.
+- After the last post-Electron build, designate one canonical candidate commit and executable SHA-256 and synchronize that identity across quickstart evidence, rollback guidance, and release handoff.
 - Retain the last Electron release artifact as rollback until the personal-use Wails candidate is accepted; public-profile acceptance is required only before later public publication.
 
 ## Verification Plan
@@ -219,14 +228,22 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 | Models, navigation, hacking | `go test ./internal/domain ./internal/nav ./internal/hack` | Compare representative scenarios with existing specs | Exact transitions and sanitized projections |
 | Session persistence | `go test ./internal/session` | Create/open/edit/reopen version-1 fixtures | Latest revision round-trips without semantic loss |
 | Live and protocol | `go test -race ./internal/live ./internal/player` | 4, 5, 6, and 7 browsers; 25 actions; reconnect | Race-free identical state after every action |
-| Desktop facade | `go test ./...` with fake dialog/storage/server/process seams | `wails dev` master authoring journey | Narrow methods/events and actionable failures |
-| Startup orchestration | Application lifecycle tests in `app_test.go` with fake player/tunnel/event seams | From a prepared clean checkout run only `wails dev`; separately launch the packaged `.app` once | Workspace and player address are ready within 5 seconds; no separate frontend or player-server command is required |
+| Desktop facade | `go test ./...` with fake dialog/storage/server/process seams plus an active-source bridge-name contract check | `wails dev` master authoring journey | Narrow methods/events and actionable failures through `window.desktopAPI`; no active `window.electronAPI` remains |
+| Startup orchestration | Application lifecycle tests in `app_test.go` with fake player/tunnel/event seams plus the handled-supervisor-interrupt harness | From a prepared clean checkout run only `wails dev`; interrupt a public-mode development run; separately launch the packaged `.app` once | Workspace and player address are ready within 5 seconds; no separate frontend or player-server command is required; handled interrupt leaves zero owned resources |
 | Player presentation | Server integration tests, HTTP asset checks, and the player-state visibility contract test | Pointer, keyboard, reveal, missing-audio, and full overflow-scroll journey in every presentation state | Existing player behavior remains usable and inactive state messages never enter the scrollable layout |
-| Public tunnel | `go test ./internal/tunnel` with fake process | Authenticated HTTP/WSS ngrok smoke when credentials are supplied | Fail-closed startup and deterministic cleanup |
+| Public tunnel | `go test ./internal/tunnel` with fake process and handled development-interrupt coverage | Authenticated HTTP/WSS ngrok smoke followed by native Quit and supervisor interrupt when credentials are supplied | Fail-closed startup and deterministic cleanup without manual process termination |
 | Static analysis | `go vet ./...` and `gofmt -l .` | Inspect CSP and generated package contents | No vet issues or unformatted Go files |
 | Packaging | Required: `wails build -clean -platform darwin/arm64`, bundle/architecture/ad-hoc-signature checks; conditional public profile: Developer ID, `xcrun notarytool`, stapling | Required: personal-use `.app` single-launch and P1 smoke; conditional: DMG and Gatekeeper smoke | Personal-use app contains all assets and launches on the owner's Mac; a public candidate, when selected, launches without bypass |
+| Acceptance evidence | Compare the canonical candidate commit and SHA-256 across quickstart, rollback guidance, and release handoff | Verify the named artifact is the final post-Electron candidate | Exactly one accepted artifact identity and digest are recorded |
 | Legacy regression | Existing `npm start` before cutover | Baseline session and player journey | Rollback path stays usable until final deletion |
 
 ## Complexity Tracking
 
 No unresolved constitution deviations remain. Constitution v2.0.0 explicitly governs the parallel migration, Go/Wails boundaries, macOS-first packaging, and final Electron cutover.
+
+BUG-002 adds an ordering constraint between the final post-Electron build and
+rollback-document synchronization. BUG-003 adds a development-supervisor
+process-ownership edge case that requires real-process verification in addition
+to service-level fakes. BUG-004 adds a low-risk frontend compatibility rename;
+the method/event contract remains unchanged while the transitional global name
+is removed.

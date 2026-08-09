@@ -659,6 +659,89 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-09T06:44:55.183Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T07:19:38.026Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:19:38.088Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:21:13.742Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:21:44.275Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:22:19.419Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:44:44.496Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:49:08.717Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:49:37.766Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:53:42.487Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T07:54:32.757Z",
+      "reopened": true
     }
   ],
   "approach": "Use wails dev as the single repository-root development entry and configure Wails to own frontend install, build, watcher, bindings, and Go launch. Use the same Go composition root in the packaged app so it owns player-server and optional-tunnel readiness, failure unwinding, and shutdown.",
@@ -697,6 +780,21 @@
       "decision": "Use immutable Git commit 9b2dd022a724202f95766d8196cc3fdf88be9084 as the canonical Electron rollback source",
       "why": "No independently archived Electron binary exists for this checkout, while the commit and lock file reproduce the accepted oracle",
       "rejected": "Retain deleted Electron sources and dependency tree in the active Wails branch"
+    },
+    {
+      "decision": "Use a Darwin inherited owner-pipe guardian for ngrok",
+      "why": "kernel pipe closure survives Wails dev supervisor termination that bypasses the native shutdown callback",
+      "rejected": "relying only on App.OnShutdown, which BUG-003 proved can be skipped"
+    },
+    {
+      "decision": "Publish the final narrow facade as window.desktopAPI",
+      "why": "retains the accepted command/event behavior without an obsolete Electron runtime name",
+      "rejected": "keeping the transitional window.electronAPI alias after cutover"
+    },
+    {
+      "decision": "Use commit 118ed8199a3a0b1c3b73a09ef98908949c2e2d75 and executable digest d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121 as the canonical personal-use candidate",
+      "why": "it is the exact post-Electron source commit containing all BUG-002 through BUG-004 code fixes",
+      "rejected": "the stale pre-fix d95e144/84a998 candidate record"
     }
   ],
   "step_summaries": {
@@ -708,7 +806,7 @@
       "summary": "71 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves cover all FR-001 through FR-026 including one-command startup"
     },
     "implement": {
-      "summary": "Completed the Wails v2 cutover: all 74 task IDs (76 finishes including reopened BUG-001 work), clean/race tests, final arm64 personal-use package, browser acceptance, Electron removal, and requirement evidence passed.",
+      "summary": "Closed BUG-002 through BUG-004 with one canonical package identity, supervisor-safe public cleanup, and a runtime-neutral desktop facade; all 28 FRs and 12 SCs pass.",
       "key_finding": "Developer ID and notarization are conditional public-release gates, not blockers for owner-only use.",
       "risks": [
         "Public distribution remains unavailable until Developer ID credentials exist",
@@ -997,6 +1095,10 @@
         "T069",
         "T073",
         "T074"
+      ],
+      "tests": [
+        "internal/platform/startup_test.go::TestAcceptanceEvidenceUsesOneCanonicalPostElectronCandidate",
+        "specs/001-wails-v2-migration/quickstart.md"
       ]
     },
     "FR-021": {
@@ -1097,9 +1199,22 @@
         "internal/platform/startup_test.go::TestWailsOwnsTheWholeDevelopmentStartup",
         "internal/platform/startup_test.go::TestQuickstartHasOneRepositoryRootStartupCommand"
       ]
+    },
+    "FR-027": {
+      "tests": [
+        "internal/tunnel/process_darwin_integration_test.go::TestDevelopmentSupervisorInterruptCleansRealOwnedResources",
+        "specs/001-wails-v2-migration/quickstart.md"
+      ]
+    },
+    "FR-028": {
+      "tests": [
+        "internal/platform/assets_test.go::TestActiveFrontendUsesRuntimeNeutralDesktopFacade",
+        "frontend/src/desktop-api.js",
+        "frontend/src/master.js"
+      ]
     }
   },
-  "currentTask": "T071",
+  "currentTask": "T070",
   "task_summaries": {
     "T002": {
       "status": "DONE",
@@ -1593,9 +1708,10 @@
     },
     "T074": {
       "status": "DONE",
-      "did": "Updated cutover ownership and recorded the immutable Electron rollback source and accepted Wails artifact evidence",
+      "did": "Synchronized rollback ownership and release handoff with the canonical final post-Electron commit and executable digest",
       "files": [
-        "docs/wails-migration-rollback.md"
+        "docs/wails-migration-rollback.md",
+        "specs/001-wails-v2-migration/quickstart.md"
       ]
     },
     "T064": {
@@ -1651,14 +1767,15 @@
     },
     "T069": {
       "status": "DONE",
-      "did": "Completed and recorded the final post-Electron development, browser, security, storage, personal-package, single-launch, shutdown, and BUG-001 acceptance pass; public distribution remains N/A for the personal profile",
+      "did": "Completed refreshed final acceptance across canonical artifact consistency, full tests/race, runtime-neutral frontend, authenticated supervisor cleanup, and personal-use single-launch packaging",
       "files": [
-        "specs/001-wails-v2-migration/quickstart.md"
+        "specs/001-wails-v2-migration/quickstart.md",
+        "internal/player/server_test.go"
       ]
     },
     "T070": {
       "status": "DONE",
-      "did": "Verified all 26 functional requirements and all 9 success criteria for the personal-use profile and added a requirement-level evidence matrix",
+      "did": "Verified all 28 functional requirements and all 12 success criteria against final automated, public-supervisor, runtime-neutral-facade, and canonical-package evidence",
       "files": [
         "specs/001-wails-v2-migration/spec.md",
         "specs/001-wails-v2-migration/checklists/requirements.md"
@@ -1674,6 +1791,59 @@
         "specs/public-ngrok-access/spec.md",
         "specs/session-persistence/spec.md",
         "specs/terminal-content-authoring/spec.md"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Selected final post-Electron commit and executable digest, recorded the canonical acceptance identity, and added a rejecting cross-document consistency test",
+      "files": [
+        "internal/platform/startup_test.go",
+        "specs/001-wails-v2-migration/quickstart.md"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Added a Darwin real-process regression harness that reproduces orphaned public resources after supervisor-owned application loss",
+      "files": [
+        "internal/tunnel/process_darwin_integration_test.go",
+        "specs/001-wails-v2-migration/contracts/startup.md",
+        "specs/001-wails-v2-migration/quickstart.md"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Added a red active-frontend contract test requiring window.desktopAPI and rejecting the transitional Electron bridge global",
+      "files": [
+        "internal/platform/assets_test.go",
+        "specs/001-wails-v2-migration/contracts/desktop-bridge.md"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Added a Darwin owner-pipe guardian that terminates orphanable ngrok processes and removes generated policy material when the Wails app process disappears",
+      "files": [
+        "app.go",
+        "internal/tunnel/process_darwin.go",
+        "internal/tunnel/process_other.go",
+        "internal/tunnel/service.go",
+        "specs/001-wails-v2-migration/contracts/startup.md"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Ran authenticated public mode through one Wails supervisor, verified 401/200/101 access behavior, interrupted it, and observed zero listener, tunnel/guardian, or policy residue",
+      "files": [
+        "specs/001-wails-v2-migration/quickstart.md"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Renamed the final Wails privileged facade and every active consumer to window.desktopAPI while preserving its narrow command and event contract",
+      "files": [
+        "frontend/src/desktop-api.js",
+        "frontend/src/master.js",
+        "internal/platform/assets_test.go",
+        "specs/001-wails-v2-migration/contracts/desktop-bridge.md"
       ]
     }
   },
@@ -1754,6 +1924,34 @@
       "command": "after-implement task sync",
       "result": "74/74 unique task IDs checked; 76 task-finish events include the two reopened BUG-001 tasks",
       "warnings": []
+    },
+    {
+      "what": "complete Go quality gates",
+      "command": "gofmt -l . && go vet ./... && go test ./... && go test -race ./...",
+      "result": "passed; 10 packages green and no race reports",
+      "warnings": [
+        "initial race run exposed a load-sensitive 100ms large-JSON test ceiling; recalibrated to 250ms and repeated five times before the full suite passed"
+      ]
+    },
+    {
+      "what": "frontend runtime-neutral facade",
+      "command": "npm run build --prefix frontend; go test ./internal/platform",
+      "result": "production build passed; window.desktopAPI contract passed; zero active electronAPI identifiers",
+      "warnings": []
+    },
+    {
+      "what": "handled authenticated public supervisor interrupt",
+      "command": "NGROK_ENABLED=1 wails dev; authenticated HTTP/WSS probes; Ctrl+C; bounded resource poll",
+      "result": "401 anonymous, 200 authenticated HTTP, 101 authenticated WSS; listener/ngrok/guardian/policy counts all zero on first poll",
+      "warnings": []
+    },
+    {
+      "what": "canonical personal-use package",
+      "command": "wails build -clean -platform darwin/arm64; shasum; codesign verify; system-only-PATH launch",
+      "result": "commit 118ed8199a3a0b1c3b73a09ef98908949c2e2d75; SHA-256 d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121; arm64 signature and single-launch smoke passed",
+      "warnings": [
+        "public Developer ID/notarization/DMG/Gatekeeper branch remains N/A for personal profile"
+      ]
     }
   ],
   "concerns": [
@@ -1772,9 +1970,13 @@
     {
       "note": "A hard terminal interruption of Wails dev while a real tunnel is active can bypass native app cleanup; normal native Quit is the accepted shutdown path and the recovery guide documents targeted process cleanup.",
       "step": "implement"
+    },
+    {
+      "note": "Bugfix-reopened checkboxes on a completed Companion spec were initially blocked by terminal-state deduplication; the writer now reopens only when its own tasks.md has pending markers and records repeated task finishes safely.",
+      "step": "implement"
     }
   ],
-  "last_action": "all 74 task IDs complete (76 finishes including reopened BUG-001 work) — all final gates pass",
+  "last_action": "all tasks complete — 28/28 FRs and 12/12 SCs pass; canonical candidate 118ed819/d1ad65f5",
   "context": [
     "User selected personal-use macOS distribution; Developer ID/notarization remains an optional future public-release profile."
   ]

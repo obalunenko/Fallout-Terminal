@@ -10,6 +10,12 @@
 
 **Bugfix**: 2026-08-09 — BUG-001 clarified that inactive player presentation states must be excluded from layout and remain unreachable through overflow scrolling.
 
+**Bugfix**: 2026-08-09 — BUG-002 requires one canonical post-cutover Wails artifact identity and SHA-256 across acceptance and rollback evidence.
+
+**Bugfix**: 2026-08-09 — BUG-003 requires handled interruption of the documented development supervisor to remove every owned tunnel, listener, and temporary policy resource.
+
+**Bugfix**: 2026-08-09 — BUG-004 resolves the transitional Electron bridge-name conflict by requiring a runtime-neutral facade after final cutover.
+
 **Scope decision**: 2026-08-09 — Current macOS acceptance targets personal use on the owner's Apple Silicon Mac. Developer ID signing, notarization, and DMG distribution remain a documented optional public-release profile and do not block personal-use migration acceptance.
 
 ## Clarifications
@@ -37,6 +43,7 @@ As a game master, I can launch the migrated desktop application, create or open 
 4. **Given** a terminal being edited separately from the live terminal, **When** the game master changes ordinary content, **Then** connected players see no change until the game master explicitly publishes it.
 5. **Given** malformed session data or an unavailable destination, **When** an open or save operation fails, **Then** the game master receives a useful error and the previous active session and save target remain intact.
 6. **Given** the documented development prerequisites are installed, **When** a user runs the single documented command from the repository root, **Then** the desktop workspace, player server, and required frontend assets start together without separate component-start commands.
+7. **Given** the Electron runtime has been removed at final cutover, **When** the game-master frontend initializes its privileged adapter, **Then** it exposes and consumes a runtime-neutral desktop facade without an Electron-specific global name while preserving the accepted method and event behavior.
 
 ---
 
@@ -74,6 +81,7 @@ As a game master, I can use local-only operation by default or explicitly start 
 3. **Given** valid public configuration, **When** the tunnel becomes ready, **Then** the game master sees both public and local address context and anonymous HTTP and WebSocket access is rejected.
 4. **Given** an active public tunnel, **When** the application closes, **Then** the tunnel is asked to terminate and temporary credential-bearing policy material is removed on every handled completion or failure path.
 5. **Given** a displayed address containing a malformed or unsupported protocol, **When** the game master selects it, **Then** no external application is opened.
+6. **Given** public mode is active under the documented development command, **When** the development supervisor receives a handled interrupt, **Then** the owned tunnel, player listener, and temporary credential policy material are gone after the documented shutdown timeout without a manual process kill.
 
 ---
 
@@ -92,6 +100,7 @@ As the application owner, I can build the migrated application for my macOS Appl
 3. **Given** representative version-1 session fixtures and protocol scenarios, **When** the parity suite runs against the migration candidate, **Then** session serialization, domain transitions, public projections, browser messages, and shutdown behavior match the documented contracts.
 4. **Given** a migration candidate that fails any acceptance scenario required by the selected distribution profile, **When** readiness is assessed, **Then** the old runtime remains the rollback application and user session files require no rollback transformation.
 5. **Given** an installed personal-use application, **When** the owner launches it once, **Then** the desktop workspace and player server start together without requiring a terminal or a separately launched frontend or server process.
+6. **Given** the final post-Electron candidate has passed acceptance, **When** the owner follows the validation or rollback documentation, **Then** every cutover record identifies the same candidate commit, executable, and SHA-256 rather than an earlier intermediate build.
 
 ### Edge Cases
 
@@ -102,6 +111,7 @@ As the application owner, I can build the migrated application for my macOS Appl
 - A session is valid JSON but has an unsupported version, malformed recursive nodes, duplicate identifiers, excessive nesting, or fields outside documented bounds.
 - Autosaves arrive faster than disk writes complete, the file is externally modified, or the destination becomes unavailable.
 - The player server or public tunnel is still active when the desktop window closes or startup partially fails.
+- The Wails development supervisor is interrupted while public mode owns an active tunnel and the native shutdown callback is delayed or bypassed.
 - The tunnel executable is missing, exits early, writes mixed log formats, times out, or ignores the first termination request.
 - The `.app` bundle is read-only, the user declines Documents access, or the selected session destination becomes unavailable.
 - Fonts, sounds, demonstration data, or generated frontend bindings are missing from a production package.
@@ -132,17 +142,20 @@ As the application owner, I can build the migrated application for my macOS Appl
 - **FR-018**: External addresses MUST be opened only after validating that their final parsed protocol is HTTP or HTTPS.
 - **FR-019**: Production packages MUST contain the desktop frontend, player frontend, fonts, sounds, sample session, and all runtime integration assets required for offline application startup.
 - **FR-020**: The current macOS process MUST provide an Apple Silicon `.app` that is locally built or ad-hoc signed, passes bundle integrity and single-launch checks, and is acceptable for personal use on the owner's Mac. Developer ID signing, notarization, stapling, DMG creation, and Gatekeeper-without-bypass validation MUST be required only when the optional public-distribution profile is selected; unavailable credentials MUST NOT block personal-use acceptance.
+  - **Clarification (BUG-002)**: After the final post-Electron acceptance build, the validation guide, rollback guide, and release handoff MUST identify one canonical candidate commit and executable SHA-256; an earlier intermediate candidate MUST NOT remain labeled as the accepted cutover artifact.
 - **FR-021**: On macOS, new user session dialogs MUST default to `~/Documents/Fallout Terminal/Sessions/`; bundled demo data MUST remain read-only until explicitly copied; app-managed metadata MUST use `~/Library/Application Support/com.vaulttec.fallout-terminal/`; and autosave MUST retain the explicitly selected path.
 - **FR-022**: The migration MUST provide automated tests for session compatibility, navigation and hacking domain transitions, player protocol projections, multi-client convergence, privileged-interface validation, tunnel credential handling, and owned-resource shutdown.
 - **FR-023**: The migration MUST provide a runnable end-to-end validation guide covering game-master authoring, four-to-seven-browser synchronization, reconnect, optional audio degradation, local/public access, session reopen, macOS storage, personal-use app packaging, and the conditional public-distribution path.
 - **FR-024**: The existing runtime and build path MUST remain available until all P1 scenarios, security checks, session-compatibility checks, and package checks required by the selected distribution profile pass for the migration candidate. Public signing/notarization checks are not part of the current personal-use gate.
 - **FR-025**: Removing the old runtime, its bridge, and its dependency tree MUST be the final migration action and MUST NOT remove browser assets still used by the game-master or player experiences.
 - **FR-026**: The migration MUST provide one documented repository-root command that starts the complete development system after prerequisites are installed, and the packaged release MUST start all required runtime components from one application launch; neither path may require separate frontend or player-server start commands.
+- **FR-027**: A handled interrupt of the documented development supervisor while public mode is active MUST remove the owned tunnel process, player listener, and temporary credential policy material within the documented shutdown timeout without a manual process kill. Uncatchable termination such as `SIGKILL` is outside this guarantee.
+- **FR-028**: After final cutover, the active game-master frontend MUST expose and consume its narrow privileged facade under a runtime-neutral name and MUST contain no Electron-specific bridge global or active-source dependency; historical migration and rollback documentation MAY retain Electron references.
 
 ### Impacted Application Surfaces *(mandatory)*
 
 - **Electron main (`main.js`)**: Affected — its lifecycle, native dialogs, filesystem persistence, player-server startup, tunnel startup, external URL opening, and renderer notifications move behind the replacement desktop runtime.
-- **Preload IPC (`preload.js`)**: Affected — the existing narrow contract is replaced by an equivalently narrow privileged interface and event bridge; a compatibility adapter may preserve the renderer-facing method names during migration.
+- **Preload IPC (`preload.js`)**: Affected — the existing narrow contract is replaced by an equivalently narrow privileged interface and event bridge; ~~a compatibility adapter may preserve the renderer-facing method names during migration~~ a compatibility adapter may preserve those names only before final cutover, after which the facade name is runtime-neutral while its method and event behavior remain compatible (superseded by BUG-004 because the transitional `window.electronAPI` name survived final cutover).
 - **Master UI (`master/`)**: Affected — behavior and presentation remain stable, while startup integration and privileged calls are adapted and revalidated under the replacement webview.
 - **Server (`server/`)**: Affected — HTTP, WebSocket, authoritative live state, navigation, hacking, sound discovery, and tunnel integration are replaced while retaining their public behavior.
 - **Player UI (`client/`)**: Affected by compatibility validation — its protocol, rendering, audio, and reconnect behavior remain stable; changes are limited to defects required for parity or packaging.
@@ -190,14 +203,26 @@ As the application owner, I can build the migrated application for my macOS Appl
 - **SC-007**: The personal-use macOS `.app` launches on the owner's Apple Silicon Mac, contains every required asset category, passes bundle integrity and ad-hoc-signature checks, and completes the P1 smoke scenarios without a separately installed developer toolchain. If the optional public profile is selected, its DMG also passes Developer ID, notarization, stapling, and Gatekeeper checks.
 - **SC-008**: All required automated migration checks pass repeatedly on a clean checkout, and the end-to-end validation guide can be completed without undocumented setup or manual file repair.
 - **SC-009**: On a clean checkout with documented prerequisites, one documented repository-root command reaches a usable development workspace and player address; in an installed release, one application launch reaches the same state, with zero separately started frontend or player-server processes in either case.
+- **SC-010**: The final acceptance guide, rollback guide, and release handoff identify the same post-Electron candidate commit and executable SHA-256, with zero conflicting accepted-artifact digests.
+- **SC-011**: In a real public-mode development run, a handled interrupt of the sole `wails dev` command leaves zero owned ngrok processes, player listeners, or credential-policy directories after the shutdown timeout.
+- **SC-012**: Active production frontend source contains zero `window.electronAPI` definitions or consumers and passes the existing desktop-command/event contract checks through the runtime-neutral facade.
 
 ### Implementation Verification
 
-Implementation verification completed on 2026-08-09. All FR-001–FR-026 and
-SC-001–SC-009 pass for the selected personal-use profile; the conditional
-Developer ID/notarization/DMG/Gatekeeper branch is correctly recorded as
-`N/A (personal profile)` and remains closed for public distribution. The
-requirement-by-requirement evidence index is maintained in
+Implementation verification completed on 2026-08-09 and was refreshed after
+BUG-002 through BUG-004 remediation. All FR-001–FR-028 and SC-001–SC-012 pass
+for the selected personal-use profile. The final evidence names canonical
+candidate commit `118ed8199a3a0b1c3b73a09ef98908949c2e2d75` and executable
+SHA-256 `d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121`;
+the consistency test rejects conflicting records. A real authenticated public
+`wails dev` run returned 401/200/101 for the expected access cases and its
+handled interrupt left zero listener, tunnel/guardian, or policy resources.
+Active frontend source exposes only `window.desktopAPI` and passes the retained
+narrow command/event contract checks.
+
+The conditional Developer ID/notarization/DMG/Gatekeeper branch is correctly
+recorded as `N/A (personal profile)` and remains closed for public distribution.
+The requirement-by-requirement evidence index is maintained in
 [`checklists/requirements.md`](checklists/requirements.md), with executable and
 manual results in [`quickstart.md`](quickstart.md).
 

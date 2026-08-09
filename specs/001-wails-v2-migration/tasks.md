@@ -10,6 +10,12 @@
 
 **Bugfix**: 2026-08-09 — BUG-001 Updated from bugfix patch
 
+**Bugfix**: 2026-08-09 — BUG-002 Updated from bugfix patch
+
+**Bugfix**: 2026-08-09 — BUG-003 Updated from bugfix patch
+
+**Bugfix**: 2026-08-09 — BUG-004 Updated from bugfix patch
+
 **Scope decision**: 2026-08-09 — Personal-use `.app` acceptance is the active cutover gate; public Developer ID/notarization work is conditional and does not block migration completion.
 
 ## Phase 1: Setup and governed migration baseline
@@ -264,9 +270,9 @@
 **⟶ Wait for T063 to finish, then Wave 2 — independent (different files):**
 
 - [x] **T073** [P] [US4] Update the user guide so the personal-use `.app` is the active acceptance profile and public Developer ID signing is conditional · `README.md`
-- [x] **T074** [P] [US4] Update acceptance ownership and rollback guidance so personal-use evidence permits cutover while public publication remains separately gated · `docs/wails-migration-rollback.md`
+- [x] **T074** [P] [US4] ⚠️ Reopened — Synchronize acceptance ownership and rollback guidance with the canonical final post-Electron candidate commit and executable SHA-256 while public publication remains separately gated (reopened — BUG-002) · `docs/wails-migration-rollback.md`, `specs/001-wails-v2-migration/quickstart.md`
 
-**⟶ Wait for T073 and T074 to finish, then:**
+**Historical cutover ordering (already satisfied by the original T073/T074 completions):** ~~Wait for T073 and T074 to finish, then~~ T064 ran only after those original documentation gates; reopened T074 is now a post-cutover BUG-002 refresh and does not gate or rerun T064.
 
 - [x] **T064** [US4] Remove Electron orchestration, preload, server, root npm files, and build configuration only after T073/T074 and personal-use package acceptance; do not wait for optional public credentials · `main.js`, `preload.js`, `server/`, `package.json`, `package-lock.json`
 
@@ -275,6 +281,34 @@
 - [x] **T065** [US4] Remove unreferenced master duplicates, tighten ignores, and verify the final source/asset manifest · `master/`, `.gitignore`, `main.go`, `frontend/`
 
 **Checkpoint**: The Wails candidate is accepted for personal use, one app launch starts the complete system, session data needs no rollback transform, and legacy deletion occurs only after personal-use package acceptance. Public distribution remains prohibited until its conditional trust gates pass.
+
+---
+
+## Bugfix Remediation Phase: Final migration cleanup
+
+**Wave 1 — independent failing checks and evidence selection:**
+
+- [x] **T075** [P] [US4] Establish the canonical final post-Electron candidate from the current cutover source, record its commit and executable SHA-256 in one acceptance record, and add a consistency check that rejects conflicting accepted-artifact digests (BUG-002) · `specs/001-wails-v2-migration/quickstart.md`, `docs/wails-migration-rollback.md`
+- [x] **T076** [P] [US3] Add a failing real-process lifecycle harness that starts public mode through the documented development supervisor, sends a handled interrupt, and asserts zero owned ngrok processes, port-3690 listeners, and credential-policy directories after the shutdown timeout (BUG-003) · `internal/tunnel/`, `internal/platform/`, `specs/001-wails-v2-migration/contracts/startup.md`, `specs/001-wails-v2-migration/quickstart.md`
+- [x] **T079** [P] [US1] Add a failing frontend/static contract test that requires the active privileged facade to be `window.desktopAPI` and rejects `window.electronAPI` definitions or consumers outside historical migration and rollback documentation (BUG-004) · `internal/platform/assets_test.go`, `frontend/src/desktop-api.js`, `frontend/src/master.js`, `specs/001-wails-v2-migration/contracts/desktop-bridge.md`
+
+**⟶ Wait for T075 to finish, then complete reopened documentation:**
+
+- Reopened **T074** synchronizes the canonical T075 identity and digest across rollback guidance and acceptance evidence.
+
+**⟶ Wait for T076 to finish, then:**
+
+- [x] **T077** [US3] Implement handled development-supervisor interruption ownership so an active tunnel, player listener, and temporary policy material are removed without relying solely on the native window shutdown callback; update the startup contract with the bounded handled-interrupt guarantee (BUG-003) · `main.go`, `app.go`, `internal/tunnel/`, `internal/platform/`, `specs/001-wails-v2-migration/contracts/startup.md`
+
+**⟶ Wait for T077 to finish, then:**
+
+- [x] **T078** [US3] Run the authenticated public-mode development journey, interrupt the sole supervisor command through the handled path, and record redacted zero-resource cleanup evidence (BUG-003) · `specs/001-wails-v2-migration/quickstart.md`
+
+**⟶ Wait for T079 to finish, then:**
+
+- [x] **T080** [US1] Rename the active compatibility facade and every consumer from `window.electronAPI` to `window.desktopAPI` without changing command, event, validation, or unsubscribe behavior; update the desktop-bridge contract and verify Electron bridge references remain only in historical documentation (BUG-004) · `frontend/src/desktop-api.js`, `frontend/src/master.js`, `internal/platform/assets_test.go`, `specs/001-wails-v2-migration/contracts/desktop-bridge.md`
+
+**Checkpoint**: T074, T075, T078, and T080 are complete; acceptance evidence names one final artifact, handled public-mode development interruption leaves zero owned resources, and active frontend source uses only the runtime-neutral bridge name.
 
 ---
 
@@ -294,13 +328,13 @@
 
 **⟶ Wait for T068 to finish, then:**
 
-- [x] **T069** Run the complete one-command development, browser, public-access, storage, personal-use packaging, and single-launch acceptance guide, including BUG-001 player-state exclusivity across full overflow scrolling; record conditional public-distribution checks as not applicable unless that profile is selected · `specs/001-wails-v2-migration/quickstart.md`
+- [x] **T069** ⚠️ Reopened — Run the complete one-command development, browser, public-access, storage, personal-use packaging, and single-launch acceptance guide, including BUG-001 player-state exclusivity, BUG-002 canonical artifact consistency, BUG-003 handled active-tunnel supervisor cleanup, and BUG-004 runtime-neutral bridge verification; record conditional public-distribution checks as not applicable unless that profile is selected (reopened — BUG-003; coverage extended — BUG-002, BUG-004) · `specs/001-wails-v2-migration/quickstart.md`
 
 **⟶ Wait for T069 to finish, then:**
 
-- [x] **T070** Verify every functional requirement and success criterion against completed tests/evidence and update the quality checklist · `specs/001-wails-v2-migration/spec.md`, `specs/001-wails-v2-migration/checklists/requirements.md`
+- [x] **T070** ⚠️ Reopened — Verify every functional requirement and success criterion, including FR-027–FR-028 and SC-010–SC-012, against completed tests/evidence and update the quality checklist (reopened — BUG-003; coverage extended — BUG-002, BUG-004) · `specs/001-wails-v2-migration/spec.md`, `specs/001-wails-v2-migration/checklists/requirements.md`
 
-**⟶ Wait for T070 to finish, then:**
+**Historical governed-spec ordering (already satisfied before the bugfix patch):** ~~Wait for T070 to finish, then~~ T071 remains complete because BUG-002–BUG-004 add migration-handoff requirements without changing the six inherited gameplay behavior contracts; reopened T070 verifies the new migration requirements separately.
 
 - [x] **T071** Update the six migrated behavioral specs only where runtime-specific wording changed, without altering behavior contracts · `specs/hacking-game/`, `specs/live-broadcast-shared-navigation/`, `specs/player-terminal-presentation/`, `specs/public-ngrok-access/`, `specs/session-persistence/`, `specs/terminal-content-authoring/`
 
@@ -316,7 +350,11 @@
 - US3 depends on US1 RuntimeStatus/events and the US2 player listener.
 - US4 depends on US1–US3 because personal-use packaging must exercise the complete runtime; public-signing checks are a conditional branch, not a dependency of cutover.
 - BUG-001 remediation requires T072 before reopened T040, reopened T040 before reopened T044, and reopened T044 before T064, T069, and T070 can complete.
-- T064 depends on T073/T074 plus the completed personal-use evidence T060–T063; it does not depend on Developer ID credentials.
+- T064 depended on the original pre-cutover completion of T073/T074 plus T060–T063 and remains historically satisfied; reopened T074 is a post-cutover BUG-002 refresh that depends on T075 and does not require rerunning legacy deletion.
+- BUG-002 remediation requires T075 before reopened T074, and both before reopened T069 and T070.
+- BUG-003 remediation requires T076 before T077, T077 before T078, and T078 before reopened T069 and T070.
+- BUG-004 remediation requires T079 before T080, and T080 before reopened T069 and T070.
+- Reopened T069 depends on reopened T074, T075, T078, and T080; reopened T070 depends on reopened T069.
 - Polish depends on US4 cutover and revalidates the clean post-Electron tree.
 
 ### Wave restatement
@@ -327,7 +365,8 @@
 - US2: independent HTTP/protocol/server tests → independent HTTP/protocol code → connection code → server code → independent client/embed/app wiring → race gate → BUG-001 failing visibility contract test → corrected player-state visibility → repeated browser evidence including full overflow scrolling.
 - US3: independent tunnel/application tests → independent configuration/platform process code → tunnel service → independent app/frontend integration → public-access evidence.
 - US4: independent manifest/CI/docs work → package configuration → personal-use build and optional public-release script → personal-use build evidence → single-launch evidence → storage/shutdown evidence → parity comparison → parallel profile/rollback doc updates (T073/T074) → personal-use-gated Electron deletion → final manifest cleanup.
-- Polish: security review → resource review → automated suites → full acceptance → traceability check → governed spec updates.
+- Bugfix remediation: parallel canonical-artifact selection (T075), supervisor-interrupt regression (T076), and neutral-facade regression (T079) → reopened rollback sync (T074), supervisor cleanup implementation/evidence (T077/T078), and facade rename (T080) → reopened full acceptance (T069) → reopened traceability (T070).
+- Polish: retained security/resource/automated gates → bugfix remediation → reopened full acceptance → reopened traceability → governed spec updates.
 
 ## Implementation Strategy
 
