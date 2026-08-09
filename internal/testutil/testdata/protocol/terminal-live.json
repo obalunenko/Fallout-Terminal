@@ -1,0 +1,54 @@
+{
+  "type": "TERMINAL_LIVE",
+  "terminalId": "t_demo1",
+  "terminalName": "Терминал у входа в убежище",
+  "tree": {
+    "id": "root",
+    "type": "folder",
+    "name": "ROOT",
+    "children": [
+      {
+        "id": "n_folder_1",
+        "type": "folder",
+        "name": "1",
+        "children": []
+      },
+      {
+        "id": "n_folder_2",
+        "type": "folder",
+        "name": "2",
+        "children": [
+          {
+            "id": "n_entry_1",
+            "type": "entry",
+            "name": "запись",
+            "description": "Здесь может быть любое описание, которое мастер захочет показать игрокам."
+          }
+        ]
+      },
+      {
+        "id": "n_folder_3",
+        "type": "folder",
+        "name": "3",
+        "children": []
+      },
+      {
+        "id": "n_cmd_1",
+        "type": "command",
+        "name": "Открыть дверь",
+        "text": "Дверь открыта"
+      }
+    ]
+  },
+  "hackLevel": 0,
+  "introText": "Добро пожаловать, дорогой житель Убежища 76.\n  Приятного вам дня.",
+  "hack": null,
+  "nav": {
+    "path": [
+      "root"
+    ],
+    "mode": "list",
+    "viewEntryId": null,
+    "commandNodeId": null
+  }
+}

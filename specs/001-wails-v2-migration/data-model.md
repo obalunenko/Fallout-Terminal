@@ -151,14 +151,19 @@ Validated ephemeral values: enabled flag, executable path, endpoint domain, Basi
 
 | Field | Type | Meaning |
 |---|---|---|
+| `acceptanceProfile` | `personal` or `public` | Selects required validation gates |
 | `architecture` | `arm64` | Initial supported macOS architecture |
 | `appPath` | path | Built `.app` validation candidate |
-| `dmgPath` | path or empty | Distribution image after packaging |
-| `signed` | boolean | Developer ID signature verified |
+| `dmgPath` | path or empty | Optional public-profile distribution image |
+| `signatureKind` | `adhoc` or `developer-id` | Signature evidence appropriate to the selected profile |
+| `localLaunchVerified` | boolean | Personal-use single-launch and P1 smoke evidence recorded |
+| `signed` | boolean | Selected signature kind verified; Developer ID is required only for `public` |
 | `hardenedRuntime` | boolean | Hardened-runtime flag verified |
 | `notarizationId` | string or empty | Non-secret submission identifier |
 | `stapled` | boolean | Accepted notarization ticket attached |
 | `sha256` | string | Recorded artifact digest |
+
+For `personal`, `appPath`, `architecture=arm64`, `signatureKind=adhoc`, bundle/asset integrity, `localLaunchVerified`, storage, and shutdown evidence are mandatory; DMG, Developer ID, notarization, stapling, and Gatekeeper-without-bypass fields may remain empty or false. For `public`, all personal checks plus Developer ID, hardened runtime, DMG, notarization, stapling, and Gatekeeper acceptance are mandatory.
 
 ### TunnelState
 

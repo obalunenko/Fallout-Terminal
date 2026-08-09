@@ -9,6 +9,10 @@ source: existing implementation
 **Migration status**: Reverse-engineered from the existing implementation on 2026-08-09  
 **Scope**: Browser-rendered Fallout terminal shell, presentation states, local input affordances, reveal effects, and audio feedback
 
+**Current runtime**: The static player behavior is unchanged. The same
+HTML/CSS/JavaScript and assets are now embedded and served by the in-process Go
+HTTP/WebSocket server rather than the removed Electron/Node runtime.
+
 ## Purpose
 
 The player terminal turns server-owned live state into a themed browser experience for tabletop players. It presents connection and idle states, terminal folders, entries, command output, and the hacking gate with a green RobCo-style CRT treatment. Players can operate the shared terminal with pointer or keyboard input, while visual and audio feedback reinforces state changes without owning canonical navigation or hacking state.
@@ -96,7 +100,7 @@ As a player, I receive CRT styling, progressive text reveal, terminal effects, a
 
 ## Functional Requirements
 
-- **FR-001**: The player experience MUST run as static browser HTML, CSS, and JavaScript without Electron or Node.js APIs.
+- **FR-001**: The player experience MUST run as static browser HTML, CSS, and JavaScript without desktop-runtime or Node.js APIs.
 - **FR-002**: The page MUST expose distinct connection, idle, normal list, record, hacking, and blocked presentation states.
 - **FR-003**: WebSocket connection loss MUST display a reconnecting overlay and MUST trigger repeated reconnect attempts using the existing three-second delay.
 - **FR-004**: Normal terminal presentation MUST show the RobCo heading, a display-only server number from 1 through 9, optional introduction text, content body, and prompt.

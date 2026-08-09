@@ -1,0 +1,166 @@
+package live
+
+import (
+	"encoding/json"
+	"reflect"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+)
+
+func TestSetSnapshotIsDetachedAndSecretFree(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	tree := testTree()
+
+	first := service.Set("terminal-1", "Overseer", tree, 1, "WELCOME")
+	if first == nil || first.Hack == nil {
+		t.Fatalf("Set() = %#v, want live terminal with puzzle", first)
+	}
+
+	tree.Name = "MUTATED INPUT"
+	first.Tree.Name = "MUTATED RESULT"
+	first.Nav.Path[0] = "mutated"
+	first.Hack.Log = append(first.Hack.Log, "private mutation")
+
+	snapshot := service.Snapshot()
+	if snapshot == nil {
+		t.Fatal("Snapshot() returned nil")
+	}
+	if snapshot.Tree.Name != "ROOT" || !reflect.DeepEqual(snapshot.Nav.Path, []string{"root"}) || len(snapshot.Hack.Log) != 0 {
+		t.Fatalf("canonical state was mutated through a boundary: %#v", snapshot)
+	}
+
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, privateField := range []string{"secretWord", "wordsById"} {
+		if strings.Contains(string(raw), privateField) {
+			t.Errorf("public snapshot leaked %q: %s", privateField, raw)
+		}
+	}
+}
+
+func TestUpdateRevalidatesNavigationAndPreservesPuzzle(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	service.Set("terminal-1", "Overseer", testTree(), 1, "OLD")
+	if _, ok := service.ApplyNav("enter", "docs"); !ok {
+		t.Fatal("ApplyNav() rejected active live terminal")
+	}
+	if _, ok := service.ApplyNav("entry", "report"); !ok {
+		t.Fatal("ApplyNav() rejected active entry")
+	}
+	before := service.Snapshot()
+	intro := "NEW"
+
+	updated, ok := service.Update(treeWithoutReport(), &intro)
+	if !ok {
+		t.Fatal("Update() rejected active live terminal")
+	}
+	if updated.IntroText != intro || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil {
+		t.Fatalf("Update() did not revalidate navigation: %#v", updated)
+	}
+	if !reflect.DeepEqual(updated.Hack, before.Hack) {
+		t.Fatal("Update() reset or changed the active puzzle")
+	}
+}
+
+func TestClearAndAbsentActions(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	if service.Snapshot() != nil {
+		t.Fatal("new service unexpectedly has live state")
+	}
+	if _, ok := service.Update(testTree(), nil); ok {
+		t.Fatal("Update() succeeded without live state")
+	}
+	if _, ok := service.ApplyNav("back", ""); ok {
+		t.Fatal("ApplyNav() succeeded without live state")
+	}
+	if _, ok := service.ApplyHackGuess("A1"); ok {
+		t.Fatal("ApplyHackGuess() succeeded without a puzzle")
+	}
+
+	service.Set("terminal-1", "Overseer", testTree(), 0, "")
+	service.Clear()
+	service.Clear()
+	if service.Snapshot() != nil {
+		t.Fatal("Clear() left stale live state")
+	}
+}
+
+func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
+
+	var workers sync.WaitGroup
+	for worker := 0; worker < 8; worker++ {
+		workers.Add(1)
+		go func(worker int) {
+			defer workers.Done()
+			for iteration := 0; iteration < 100; iteration++ {
+				switch worker % 4 {
+				case 0:
+					service.ApplyNav("enter", "docs")
+					service.ApplyNav("back", "")
+				case 1:
+					service.ApplyHackGuess("missing")
+				case 2:
+					service.ApplyHackAdmin()
+				case 3:
+					snapshot := service.Snapshot()
+					if snapshot != nil {
+						snapshot.Tree.Name = "external"
+					}
+				}
+			}
+		}(worker)
+	}
+	workers.Wait()
+
+	snapshot := service.Snapshot()
+	if snapshot == nil || snapshot.Tree.Name != "ROOT" || len(snapshot.Nav.Path) == 0 || snapshot.Nav.Path[0] != "root" {
+		t.Fatalf("concurrent use corrupted canonical state: %#v", snapshot)
+	}
+}
+
+type constantRandom struct{}
+
+func (*constantRandom) Intn(limit int) int {
+	if limit <= 1 {
+		return 0
+	}
+	return 1
+}
+
+type fixedWords struct{}
+
+func (fixedWords) PickWords(length, count int) []string {
+	pools := map[int][]string{
+		4: {"CODE", "CAVE", "DUST", "IRON", "GATE", "BOLT", "RAMP", "CORE", "FUSE", "GRID", "LAMP", "MASK", "NODE", "PIPE", "RING", "RUST"},
+		5: {"ALLOY", "ARMOR", "ATLAS", "BASIN", "BLAST", "BRICK", "CABLE", "CACHE", "CARGO", "CLIFF", "CLOCK", "CRANE", "CRATE", "CREEK", "DRAIN", "DRONE"},
+	}
+	return append([]string(nil), pools[length][:count]...)
+}
+
+func testTree() domain.ContentNode {
+	return domain.ContentNode{
+		ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+		Children: []domain.ContentNode{
+			{
+				ID: "docs", Type: domain.NodeFolder, Name: "DOCS",
+				Children: []domain.ContentNode{
+					{ID: "report", Type: domain.NodeEntry, Name: "REPORT", Description: "Report"},
+					{ID: "read", Type: domain.NodeCommand, Name: "READ", Text: "Reading"},
+				},
+			},
+		},
+	}
+}
+
+func treeWithoutReport() domain.ContentNode {
+	tree := testTree()
+	tree.Children[0].Children = tree.Children[0].Children[1:]
+	return tree
+}

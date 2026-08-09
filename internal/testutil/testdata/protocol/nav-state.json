@@ -1,0 +1,11 @@
+{
+  "type": "NAV_STATE",
+  "nav": {
+    "path": [
+      "root"
+    ],
+    "mode": "list",
+    "viewEntryId": null,
+    "commandNodeId": "n_cmd_1"
+  }
+}

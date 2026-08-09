@@ -134,15 +134,16 @@
 
 ## Decision 11: Package macOS Apple Silicon first
 
-**Decision**: Build an Apple Silicon `.app` first. For distribution, enable the hardened runtime, sign nested code and the application with a Developer ID Application identity, submit a DMG with `xcrun notarytool`, staple the accepted ticket, and validate it through Gatekeeper. Windows/WebView2 and Intel/universal macOS packaging are deferred from the initial release.
+**Decision**: Build an Apple Silicon `.app` first. ~~Treat Developer ID signing, notarization, stapling, and a Gatekeeper-accepted DMG as mandatory for the current migration cutover.~~ For the current personal-use profile, accept a locally built/ad-hoc-signed `.app` after bundle integrity, asset, architecture, single-launch, P1, storage, and shutdown checks on the owner's Mac. Preserve the hardened-runtime, Developer ID, `notarytool`, stapling, DMG, and Gatekeeper workflow as an optional public-distribution profile. Windows/WebView2 and Intel/universal macOS packaging remain deferred.
 
-**Rationale**: The user explicitly prioritized macOS. Wails uses the system WebKit runtime on macOS, so the initial packaging risks are application-bundle composition, architecture, signing, hardened runtime, notarization, stapling, and Gatekeeper—not WebView2 installation. Apple requires Developer ID signing and notarization for trusted distribution outside the Mac App Store.
+**Rationale**: The user explicitly prioritized macOS and currently needs the application only for personal use. Wails uses the system WebKit runtime on macOS, so local acceptance can establish application-bundle composition, architecture, assets, lifecycle, storage, and behavioral parity without third-party trust credentials. Apple still requires Developer ID signing and notarization for a frictionless trusted distribution outside the Mac App Store, so that stronger workflow remains intact but does not block personal-use cutover.
 
 **Alternatives considered**:
 
 - Windows-first packaging: explicitly deprioritized by the user.
 - Universal binary in the first release: broader reach, but adds Intel validation and signing scope before Apple Silicon parity is established.
-- Unsigned release distribution: useful only for local development and does not provide an acceptable Gatekeeper path for users.
+- Local/ad-hoc personal-use application: selected for the current owner-only scope; it is not presented as a public release and may require one-time manual approval if quarantine applies.
+- Making the personal-use gate depend on unavailable Developer ID credentials: rejected because it adds no protection against the owner's already-tested local build and indefinitely blocks the requested migration.
 
 **Sources**: [Apple: Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution), [Apple: Distributing your app for beta testing and releases](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
 

@@ -11,7 +11,7 @@ source: existing implementation
 
 ## Purpose
 
-Terminal content authoring gives a game master a desktop workspace for preparing the terminals players will later explore. A session may contain multiple terminals. Each terminal has a name, optional introduction text, hacking configuration, and a recursive tree made from folders, commands, and entries. The editor keeps preparation state separate from the currently broadcast terminal and saves supported mutations through the sandboxed Electron bridge.
+Terminal content authoring gives a game master a desktop workspace for preparing the terminals players will later explore. A session may contain multiple terminals. Each terminal has a name, optional introduction text, hacking configuration, and a recursive tree made from folders, commands, and entries. The editor keeps preparation state separate from the currently broadcast terminal and saves supported mutations through the sandboxed Wails compatibility facade.
 
 Session file selection and filesystem behavior are specified by the migrated Session Persistence feature. Hacking rules and live transport are specified separately. This feature documents the authoring behavior that produces and changes terminal content.
 
@@ -87,7 +87,7 @@ As a game master, I can set terminal-wide introduction text and decide when live
 3. **Given** the edited terminal is not live, **when** settings or content change, **then** no player update is emitted.
 4. **Given** the edited terminal is live, **when** introduction settings are applied, **then** the current tree and introduction text are sent as a live update without restarting the hacking puzzle.
 5. **Given** the edited terminal is live, **when** ordinary tree content changes, **then** changes remain in the authoring model until the game master explicitly selects the publish action.
-6. **Given** the edited terminal is live, **when** Publish is selected, **then** the current tree and introduction text are sent through the narrow preload API and the control briefly reports completion.
+6. **Given** the edited terminal is live, **when** Publish is selected, **then** the current tree and introduction text are sent through the narrow bound desktop API and the control briefly reports completion.
 7. **Given** a terminal is renamed while live, **when** the rename is saved, **then** the active broadcast is not restarted and the new name reaches players only on the next full broadcast.
 8. **Given** a hacking level changes during a live puzzle, **when** settings are applied, **then** the active puzzle is not regenerated and the new level takes effect on the next full broadcast.
 
@@ -126,7 +126,7 @@ As a game master, I can set terminal-wide introduction text and decide when live
 - **FR-020**: Ordinary content edits MUST NOT implicitly publish the current tree to players.
 - **FR-021**: Explicit live publication MUST send the current root tree and introduction text without changing the selected editing terminal.
 - **FR-022**: Applying introduction text to the live terminal MAY update players immediately, but changing hacking difficulty or terminal name MUST NOT restart an in-progress puzzle.
-- **FR-023**: The master renderer MUST access filesystem and broadcast capabilities only through the preload API and MUST NOT gain direct Node.js access.
+- **FR-023**: The master frontend MUST access filesystem and broadcast capabilities only through the bound desktop API and MUST NOT gain direct Node.js access.
 
 ## Data Model
 
@@ -156,8 +156,8 @@ The root uses the special ID `root` within each terminal. Generated terminal and
 
 | Boundary | Contract |
 |---|---|
-| Master renderer → preload | `saveSession(session)`, `updateLiveTerminal(payload)`, `clearLiveTerminal()` |
-| Master renderer local state | Editing terminal, selected node, expanded folder IDs, live terminal ID, last known hacking state |
+| Master frontend → bound Go methods | `saveSession(session)`, `updateLiveTerminal(payload)`, `clearLiveTerminal()` through the compatibility facade |
+| Master frontend local state | Editing terminal, selected node, expanded folder IDs, live terminal ID, last known hacking state |
 | Durable session state | Terminal IDs, names, hacking levels, introduction text, and recursive content trees |
 | Server live state | Published snapshot and player navigation; not directly mutated by ordinary authoring operations |
 
@@ -171,7 +171,7 @@ There is no database or schema migration for this feature. The authored model is
 - **SC-004**: Root deletion is unavailable, while confirmed deletion of any non-root leaf or subtree removes only that selected branch.
 - **SC-005**: Text containing `<`, `>`, `&`, or quotes renders as authored text in the master editor and does not create executable markup.
 - **SC-006**: Editing a live terminal's ordinary content does not change connected player views until explicit publication, while publishing sends the current tree and introduction text.
-- **SC-007**: All authoring actions operate with Electron sandboxing, context isolation, and disabled renderer Node integration preserved.
+- **SC-007**: All authoring actions operate inside the Wails webview with no direct Node.js, filesystem, or process access.
 
 ## Assumptions
 
@@ -194,4 +194,3 @@ There is no database or schema migration for this feature. The authored model is
 8. Autosave requests are asynchronous and are not serialized by the renderer, so rapid mutations may complete out of order.
 9. The delete prompt reports only a folder's direct child count rather than the complete descendant count.
 10. The README does not document the editor workflow or content-node model.
-

@@ -8,11 +8,16 @@
 
 **Input**: User description: "Prepare the migration of Fallout Terminal from its current Electron/Node desktop runtime to Go and Wails v2 while preserving the behavior documented by the existing Spec Kit artifacts."
 
+**Bugfix**: 2026-08-09 — BUG-001 clarified that inactive player presentation states must be excluded from layout and remain unreachable through overflow scrolling.
+
+**Scope decision**: 2026-08-09 — Current macOS acceptance targets personal use on the owner's Apple Silicon Mac. Developer ID signing, notarization, and DMG distribution remain a documented optional public-release profile and do not block personal-use migration acceptance.
+
 ## Clarifications
 
 ### Session 2026-08-09
 
 - Q: In which context must the entire system start through one user action? → A: Both development and packaged release
+- Q: Which macOS distribution profile is required for the current migration? → A: Personal use; a locally built/ad-hoc-signed `.app` is sufficient, while Developer ID distribution is deferred until credentials exist
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -50,6 +55,7 @@ As a player, I can open the displayed player address in a normal browser, see th
 3. **Given** a player disconnects during an active, solved, or failed hacking puzzle, **When** the browser reconnects, **Then** it receives the current sanitized live snapshot rather than a newly generated puzzle.
 4. **Given** malformed, stale, unsupported, or tampered browser input, **When** the server receives it, **Then** canonical navigation and hacking state remain valid and the application continues serving other clients.
 5. **Given** optional sound assets are missing or playback is denied, **When** a player uses the terminal, **Then** all visual states and gameplay inputs remain usable.
+6. **Given** a live terminal menu overflows the player viewport, **When** a player scrolls from the beginning to the end of the menu, **Then** only the active presentation state occupies layout space and neither the idle waiting message nor the blocked-access message is revealed.
 
 ---
 
@@ -71,21 +77,21 @@ As a game master, I can use local-only operation by default or explicitly start 
 
 ---
 
-### User Story 4 - Install, validate, and roll back the migrated release (Priority: P2)
+### User Story 4 - Install, validate, and roll back the personal-use application (Priority: P2)
 
-As a release operator, I can build and package the migrated application for the supported macOS Apple Silicon target, validate behavioral parity against repeatable checks, and retain the previous application until the migrated release passes its acceptance gate.
+As the application owner, I can build the migrated application for my macOS Apple Silicon computer, validate behavioral parity against repeatable checks, and retain the previous application until the personal-use candidate passes its acceptance gate.
 
 **Why this priority**: A runtime replacement changes startup, packaging, filesystem, process, and browser-engine boundaries. A staged release and explicit rollback point reduce the chance of losing campaign data or live-session capability.
 
-**Independent Test**: Produce a development `.app` and a signed, notarized DMG candidate on a supported macOS Apple Silicon environment, run the documented migration validation suite, and demonstrate that the existing release remains runnable until the new candidate passes.
+**Independent Test**: Produce a locally built/ad-hoc-signed `.app` on a supported macOS Apple Silicon environment, launch it without developer tooling, run the documented migration validation suite, and demonstrate that the existing application remains runnable until the new candidate passes. If Developer ID credentials are later supplied, validate the optional public-release DMG separately.
 
 **Acceptance Scenarios**:
 
-1. **Given** a supported macOS Apple Silicon build environment, **When** the release operator creates the required distributions, **Then** each candidate launches without a developer runtime and includes all master, player, font, sound, and sample-session assets.
-2. **Given** a release candidate with valid Developer ID and notarization credentials, **When** it is packaged for distribution, **Then** it uses the hardened runtime, passes notarization, has the ticket stapled, and opens through Gatekeeper without bypass instructions.
+1. **Given** a supported macOS Apple Silicon build environment, **When** the owner builds the personal-use application, **Then** the `.app` launches without a developer runtime and includes all master, player, font, sound, and sample-session assets.
+2. **Given** the owner launches a trusted local/ad-hoc-signed personal-use candidate, **When** macOS requires a one-time manual approval, **Then** the documented system Privacy & Security flow is sufficient and the absence of Developer ID credentials does not fail personal-use acceptance. **Given instead** that the application is intentionally prepared for public distribution and valid Developer ID credentials exist, **Then** the public candidate uses the hardened runtime, passes notarization, has the ticket stapled, and opens through Gatekeeper without bypass instructions.
 3. **Given** representative version-1 session fixtures and protocol scenarios, **When** the parity suite runs against the migration candidate, **Then** session serialization, domain transitions, public projections, browser messages, and shutdown behavior match the documented contracts.
-4. **Given** a migration candidate that fails any required acceptance scenario, **When** release readiness is assessed, **Then** the old runtime remains the distributable version and user session files require no rollback transformation.
-5. **Given** an installed migration release, **When** the user launches the packaged application once, **Then** the desktop workspace and player server start together without requiring a terminal or a separately launched frontend or server process.
+4. **Given** a migration candidate that fails any acceptance scenario required by the selected distribution profile, **When** readiness is assessed, **Then** the old runtime remains the rollback application and user session files require no rollback transformation.
+5. **Given** an installed personal-use application, **When** the owner launches it once, **Then** the desktop workspace and player server start together without requiring a terminal or a separately launched frontend or server process.
 
 ### Edge Cases
 
@@ -99,7 +105,7 @@ As a release operator, I can build and package the migrated application for the 
 - The tunnel executable is missing, exits early, writes mixed log formats, times out, or ignores the first termination request.
 - The `.app` bundle is read-only, the user declines Documents access, or the selected session destination becomes unavailable.
 - Fonts, sounds, demonstration data, or generated frontend bindings are missing from a production package.
-- The host WebKit engine has rendering or audio differences, or signing/notarization credentials are unavailable in a non-release environment.
+- The host WebKit engine has rendering or audio differences, or Developer ID credentials are unavailable; credential absence must be reported as public-distribution checks not applicable rather than as a personal-use blocker.
 
 ## Requirements *(mandatory)*
 
@@ -120,15 +126,16 @@ As a release operator, I can build and package the migrated application for the 
 - **FR-013**: Concurrent player actions and desktop control requests MUST be serialized or synchronized so canonical state, client registration, and outbound broadcasts remain race-free.
 - **FR-014**: The game-master workspace MUST receive current player-address, client-count, and public hacking-status changes without polling and without direct access to server internals.
 - **FR-015**: The existing master and player visual, keyboard, pointer, reveal-animation, and optional-audio behaviors MUST remain usable on the supported macOS Apple Silicon target.
+  - **Clarification (BUG-001)**: Player presentation states MUST be layout-exclusive: inactive connection, idle, normal list, record, hacking, and blocked containers MUST occupy no layout space and MUST NOT become visible through scrolling, regardless of class-level `display` declarations.
 - **FR-016**: Public tunneling MUST remain opt-in, fail closed before process creation when credentials are absent or invalid, enforce authentication for both HTTP and WebSocket access, and avoid exposing credentials in UI or diagnostic output.
 - **FR-017**: Temporary credential policy material MUST use private filesystem permissions where supported and MUST be removed after successful tunnel discovery, handled startup failure, and application shutdown.
 - **FR-018**: External addresses MUST be opened only after validating that their final parsed protocol is HTTP or HTTPS.
 - **FR-019**: Production packages MUST contain the desktop frontend, player frontend, fonts, sounds, sample session, and all runtime integration assets required for offline application startup.
-- **FR-020**: The macOS release process MUST provide an unpacked `.app` for validation; the distributable app MUST be Developer ID signed with the hardened runtime and delivered in a notarized, stapled DMG for Apple Silicon.
+- **FR-020**: The current macOS process MUST provide an Apple Silicon `.app` that is locally built or ad-hoc signed, passes bundle integrity and single-launch checks, and is acceptable for personal use on the owner's Mac. Developer ID signing, notarization, stapling, DMG creation, and Gatekeeper-without-bypass validation MUST be required only when the optional public-distribution profile is selected; unavailable credentials MUST NOT block personal-use acceptance.
 - **FR-021**: On macOS, new user session dialogs MUST default to `~/Documents/Fallout Terminal/Sessions/`; bundled demo data MUST remain read-only until explicitly copied; app-managed metadata MUST use `~/Library/Application Support/com.vaulttec.fallout-terminal/`; and autosave MUST retain the explicitly selected path.
 - **FR-022**: The migration MUST provide automated tests for session compatibility, navigation and hacking domain transitions, player protocol projections, multi-client convergence, privileged-interface validation, tunnel credential handling, and owned-resource shutdown.
-- **FR-023**: The migration MUST provide a runnable end-to-end validation guide covering game-master authoring, four-to-seven-browser synchronization, reconnect, optional audio degradation, local/public access, session reopen, macOS storage, and macOS packaging.
-- **FR-024**: The existing runtime and build path MUST remain available until all P1 scenarios, security checks, session-compatibility checks, and supported-platform package checks pass for the migration candidate.
+- **FR-023**: The migration MUST provide a runnable end-to-end validation guide covering game-master authoring, four-to-seven-browser synchronization, reconnect, optional audio degradation, local/public access, session reopen, macOS storage, personal-use app packaging, and the conditional public-distribution path.
+- **FR-024**: The existing runtime and build path MUST remain available until all P1 scenarios, security checks, session-compatibility checks, and package checks required by the selected distribution profile pass for the migration candidate. Public signing/notarization checks are not part of the current personal-use gate.
 - **FR-025**: Removing the old runtime, its bridge, and its dependency tree MUST be the final migration action and MUST NOT remove browser assets still used by the game-master or player experiences.
 - **FR-026**: The migration MUST provide one documented repository-root command that starts the complete development system after prerequisites are installed, and the packaged release MUST start all required runtime components from one application launch; neither path may require separate frontend or player-server start commands.
 
@@ -140,7 +147,7 @@ As a release operator, I can build and package the migrated application for the 
 - **Server (`server/`)**: Affected — HTTP, WebSocket, authoritative live state, navigation, hacking, sound discovery, and tunnel integration are replaced while retaining their public behavior.
 - **Player UI (`client/`)**: Affected by compatibility validation — its protocol, rendering, audio, and reconnect behavior remain stable; changes are limited to defects required for parity or packaging.
 - **Session data (`sessions/`)**: Compatibility-critical but shape-unaffected — version-1 examples and user-owned files remain readable and writable without migration.
-- **Packaging/public access**: Affected — the build toolchain, application-bundle layout, code signing/notarization, DMG output, session locations, and tunnel process ownership change.
+- **Packaging/public access**: Affected — the build toolchain, application-bundle layout, personal-use ad-hoc signing, optional public signing/notarization and DMG output, session locations, and tunnel process ownership change.
 
 ### State and Contract Requirements
 
@@ -168,7 +175,7 @@ As a release operator, I can build and package the migrated application for the 
 - **Player connection**: A registered browser WebSocket that receives canonical broadcasts and contributes validated action requests.
 - **Server information**: The local address and optional public address or non-secret tunnel failure displayed to the game master.
 - **Tunnel configuration**: Ephemeral, validated public-access settings and short-lived credential policy material used to start one owned tunnel process.
-- **Distribution candidate**: A macOS `.app` and DMG containing all required runtime and browser assets, with recorded architecture, signing, hardened-runtime, notarization, stapling, and Gatekeeper evidence.
+- **Distribution candidate**: A macOS Apple Silicon `.app` containing all required runtime and browser assets, with recorded architecture, integrity, ad-hoc signature, asset, single-launch, and personal-use evidence; when the optional public profile is selected, it additionally includes a DMG and Developer ID, hardened-runtime, notarization, stapling, and Gatekeeper evidence.
 
 ## Success Criteria *(mandatory)*
 
@@ -180,9 +187,19 @@ As a release operator, I can build and package the migrated application for the 
 - **SC-004**: Application startup either presents a usable workspace and player address within 5 seconds on the supported reference machine or presents a clear actionable failure without leaving a listener or child process running.
 - **SC-005**: Invalid public credentials result in zero tunnel process starts; valid credentials reject all anonymous HTTP and WebSocket attempts in the public-access validation scenario.
 - **SC-006**: Closing the application during local-only operation, active player connections, active public access, and partial startup leaves zero owned player listeners, tunnel processes, or credential-policy directories after the documented shutdown timeout.
-- **SC-007**: Both the validation build and end-user macOS package launch on Apple Silicon, contain every required asset category, pass the operating system's trust checks, and complete the P1 smoke scenarios without a separately installed developer toolchain.
+- **SC-007**: The personal-use macOS `.app` launches on the owner's Apple Silicon Mac, contains every required asset category, passes bundle integrity and ad-hoc-signature checks, and completes the P1 smoke scenarios without a separately installed developer toolchain. If the optional public profile is selected, its DMG also passes Developer ID, notarization, stapling, and Gatekeeper checks.
 - **SC-008**: All required automated migration checks pass repeatedly on a clean checkout, and the end-to-end validation guide can be completed without undocumented setup or manual file repair.
 - **SC-009**: On a clean checkout with documented prerequisites, one documented repository-root command reaches a usable development workspace and player address; in an installed release, one application launch reaches the same state, with zero separately started frontend or player-server processes in either case.
+
+### Implementation Verification
+
+Implementation verification completed on 2026-08-09. All FR-001–FR-026 and
+SC-001–SC-009 pass for the selected personal-use profile; the conditional
+Developer ID/notarization/DMG/Gatekeeper branch is correctly recorded as
+`N/A (personal profile)` and remains closed for public distribution. The
+requirement-by-requirement evidence index is maintained in
+[`checklists/requirements.md`](checklists/requirements.md), with executable and
+manual results in [`quickstart.md`](quickstart.md).
 
 ## Assumptions
 
@@ -192,7 +209,8 @@ As a release operator, I can build and package the migrated application for the 
 - Player devices continue using standards-compliant browsers with WebSocket, Web Audio, and current CSS support.
 - Valid version-1 session files remain the compatibility baseline; no new session fields are required by this runtime migration.
 - Existing player message names and payloads remain internal to the bundled player client but are preserved to minimize simultaneous frontend changes.
-- The release operator can validate signing and notarization on macOS with appropriate Developer ID credentials; unsigned local `.app` builds remain sufficient for development-only checks.
+- The current acceptance owner has no Developer ID identity and needs the application only for personal use; a locally built/ad-hoc-signed `.app` is therefore a valid installed candidate, not merely a development artifact.
+- If public distribution is selected later, the release operator can supply appropriate Developer ID and notarization credentials and run the preserved public-release profile before publishing.
 - The previous application remains available on a separate branch or release artifact until migration acceptance is complete.
 
 ## Out of Scope
@@ -204,3 +222,4 @@ As a release operator, I can build and package the migrated application for the 
 - Visual redesign, frontend framework adoption, localization, or broad accessibility remediation unrelated to migration parity.
 - Changing the shared-navigation model into per-player navigation.
 - Supporting Intel/universal macOS, Windows, Linux, or other desktop architectures in the initial migration release.
+- Public distribution to unrelated users while Developer ID credentials are unavailable; the documented signing/notarization automation is retained for a future profile switch.

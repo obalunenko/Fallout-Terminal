@@ -6,9 +6,13 @@
 
 **Note**: This plan prepares the migration but does not authorize deleting the working Electron runtime before parity gates pass.
 
+**Bugfix**: 2026-08-09 — BUG-001 Updated from bugfix patch
+
+**Scope decision**: 2026-08-09 — The active macOS acceptance profile is personal use. Local/ad-hoc `.app` validation gates cutover; Developer ID signing, notarization, and DMG checks are conditional future public-release gates.
+
 ## Summary
 
-Replace the Electron/Node runtime with a Go 1.26 modular desktop monolith hosted by Wails v2.13.0 while preserving the existing master and player browser experiences, version-1 session files, WebSocket messages, server-authoritative live state, optional authenticated ngrok access, and a macOS Apple Silicon distribution. The master UI moves into a vanilla-JavaScript Wails frontend behind a compatibility adapter; the player UI remains an independent browser application served by a dedicated embedded Go HTTP/WebSocket server because the Wails v2 asset server does not support WebSockets.
+Replace the Electron/Node runtime with a Go 1.26 modular desktop monolith hosted by Wails v2.13.0 while preserving the existing master and player browser experiences, version-1 session files, WebSocket messages, server-authoritative live state, optional authenticated ngrok access, and a personal-use macOS Apple Silicon application. The master UI moves into a vanilla-JavaScript Wails frontend behind a compatibility adapter; the player UI remains an independent browser application served by a dedicated embedded Go HTTP/WebSocket server because the Wails v2 asset server does not support WebSockets. Existing Developer ID/notarization automation remains available as an optional public-distribution profile but is not a cutover dependency.
 
 The complete development system starts with one repository-root command, `wails dev`: Wails runs the configured frontend install/build/watcher steps and launches the Go composition root, which acquires the player listener before reporting the desktop ready. The packaged `.app` uses the same composition root so one application launch starts every required runtime component without Node, npm, a frontend command, or a separate server process.
 
@@ -22,7 +26,7 @@ The implementation follows a strangler sequence: add tested Go services beside t
 
 **Storage**: Backward-compatible version-1 JSON session files at user-selected paths; new/save dialogs default to `~/Documents/Fallout Terminal/Sessions/`; bundled demo remains read-only until explicitly copied; app metadata uses `~/Library/Application Support/com.vaulttec.fallout-terminal/`; ephemeral live/navigation/hacking/client state remains in Go memory
 
-**Testing**: Go `testing`, `httptest`, and race detector with colocated `*_test.go` files; deterministic fakes for dialogs/filesystem/process seams; manual Wails/WebKit, real-browser, macOS storage, Gatekeeper, and notarization scenarios from `quickstart.md`
+**Testing**: Go `testing`, `httptest`, and race detector with colocated `*_test.go` files; deterministic fakes for dialogs/filesystem/process seams; manual Wails/WebKit, real-browser, macOS storage, bundle-integrity, ad-hoc-signature, and single-launch scenarios from `quickstart.md`; conditional Gatekeeper/notarization scenarios only for the public profile
 
 **Target Platform**: macOS 13+ on Apple Silicon, with current browser clients on local HTTP/WebSocket or authenticated ngrok HTTPS/WSS; Intel/universal macOS and Windows are deferred
 
@@ -48,7 +52,7 @@ The implementation follows a strangler sequence: add tested Go services beside t
 | IV. Preserve Session Data Compatibility | PASS | Version-1 JSON remains user-owned, runtime state stays process-local, and macOS storage paths follow the governed policy. |
 | V. Match Established Code Conventions | PASS | Go code uses standard package/test conventions; retained browser files keep existing JavaScript, CSS, JSON, and protocol naming. |
 | Dependency Rules | PASS | Domain packages stay transport-independent and the player server remains independent of the master frontend. |
-| Testing and Quality Gates | PASS | The plan includes formatting, vet, unit/integration/race checks, `wails dev`, packaged app, signing, notarization, and rollback gates. |
+| Testing and Quality Gates | PASS | The plan includes formatting, vet, unit/integration/race checks, `wails dev`, personal-use packaged-app and rollback gates, plus conditional signing/notarization checks for future public distribution. |
 | Development Workflow | PASS | Electron remains the behavioral oracle until the Wails package and one-command startup gates pass. |
 
 ### Governance amendment
@@ -191,20 +195,22 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 - Add generated bindings and the compatibility adapter.
 - Implement native dialogs, initial status retrieval, Wails events, external URL validation, and lifecycle wiring.
 - Exercise unchanged player rendering, reconnect, audio degradation, and multi-client convergence against the Go server.
+- Preserve one authoritative player-state visibility mechanism so inactive idle, normal, hacking, and blocked containers are excluded from layout even when the terminal body overflows and scrolls.
 
-### Phase 4: Public access and packaging
+### Phase 4: Public access and profile-aware packaging
 
 - Port credential validation, temporary policy creation, URL discovery, timeout, diagnostics, and cleanup.
 - Add Darwin-specific process-group/termination behavior and bounded graceful/forced shutdown.
-- Configure macOS Apple Silicon assets, application metadata, hardened runtime, Developer ID signing, `notarytool` submission, stapling, and DMG creation.
-- Run all automated and manual parity gates on the packaged candidate.
+- Configure macOS Apple Silicon assets and application metadata; produce and validate the local/ad-hoc personal-use `.app` as the current required candidate.
+- Preserve hardened runtime, Developer ID signing, `notarytool` submission, stapling, and DMG creation as an optional public-release profile that fails closed when selected without credentials.
+- Run all automated and manual parity gates required by the selected distribution profile.
 
 ### Phase 5: Cutover
 
-- Update README and operational commands only after the Wails path is verified.
+- Update README and rollback guidance to identify personal use as the current accepted profile and public distribution as conditional.
 - Remove Electron orchestration, preload, Express/`ws`, electron-builder dependencies, and obsolete root npm files.
 - Re-run clean-checkout tests, production builds, session round trips, four-to-seven-browser tests, public-access checks, and packaged shutdown checks.
-- Retain the last Electron release artifact as rollback until the Wails release is accepted.
+- Retain the last Electron release artifact as rollback until the personal-use Wails candidate is accepted; public-profile acceptance is required only before later public publication.
 
 ## Verification Plan
 
@@ -215,10 +221,10 @@ The persisted schema remains version 1 and is documented in [contracts/session-v
 | Live and protocol | `go test -race ./internal/live ./internal/player` | 4, 5, 6, and 7 browsers; 25 actions; reconnect | Race-free identical state after every action |
 | Desktop facade | `go test ./...` with fake dialog/storage/server/process seams | `wails dev` master authoring journey | Narrow methods/events and actionable failures |
 | Startup orchestration | Application lifecycle tests in `app_test.go` with fake player/tunnel/event seams | From a prepared clean checkout run only `wails dev`; separately launch the packaged `.app` once | Workspace and player address are ready within 5 seconds; no separate frontend or player-server command is required |
-| Player presentation | Server integration tests plus HTTP asset checks | Pointer, keyboard, reveal and missing-audio journey | Existing player behavior remains usable |
+| Player presentation | Server integration tests, HTTP asset checks, and the player-state visibility contract test | Pointer, keyboard, reveal, missing-audio, and full overflow-scroll journey in every presentation state | Existing player behavior remains usable and inactive state messages never enter the scrollable layout |
 | Public tunnel | `go test ./internal/tunnel` with fake process | Authenticated HTTP/WSS ngrok smoke when credentials are supplied | Fail-closed startup and deterministic cleanup |
 | Static analysis | `go vet ./...` and `gofmt -l .` | Inspect CSP and generated package contents | No vet issues or unformatted Go files |
-| Packaging | `wails build -clean -platform darwin/arm64`, signing checks, `xcrun notarytool`, and stapling | `.app`, DMG, and Gatekeeper smoke tests | All assets included; signed/notarized release launches without bypass |
+| Packaging | Required: `wails build -clean -platform darwin/arm64`, bundle/architecture/ad-hoc-signature checks; conditional public profile: Developer ID, `xcrun notarytool`, stapling | Required: personal-use `.app` single-launch and P1 smoke; conditional: DMG and Gatekeeper smoke | Personal-use app contains all assets and launches on the owner's Mac; a public candidate, when selected, launches without bypass |
 | Legacy regression | Existing `npm start` before cutover | Baseline session and player journey | Rollback path stays usable until final deletion |
 
 ## Complexity Tracking
