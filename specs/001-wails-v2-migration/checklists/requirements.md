@@ -70,6 +70,8 @@ trust checks are explicitly conditional and remain `N/A`, not failed.
 | FR-024 | PASS | Electron oracle remained until P1/security/session/package acceptance and rollback evidence were complete. |
 | FR-025 | PASS | Electron sources/root dependencies were removed only after acceptance; final asset manifest passed. |
 | FR-026 | PASS | Final root `wails dev` and packaged single-launch runs owned every required runtime component. |
+| FR-027 | PASS | Darwin owner-pipe regression plus the real authenticated T078 `wails dev` interrupt left zero ngrok/guardian processes, port-3690 listeners, or policy directories on the first bounded poll, without a manual kill. |
+| FR-028 | PASS | `TestActiveFrontendUsesRuntimeNeutralDesktopFacade`, frontend production build, and source scan require `window.desktopAPI` and found zero active `electronAPI` definitions or consumers. |
 
 | Success criterion | Result | Evidence |
 | --- | --- | --- |
@@ -82,3 +84,11 @@ trust checks are explicitly conditional and remain `N/A`, not failed.
 | SC-007 | PASS | Personal arm64 bundle integrity, assets, ad-hoc signature, P1, and tool-free launch passed; public DMG branch N/A. |
 | SC-008 | PASS | Fresh source snapshot passed gofmt, vet, normal tests, and race tests; the guide required no source repair. |
 | SC-009 | PASS | One root `wails dev` restored the player and one packaged launch served it with no separately invoked component. |
+| SC-010 | PASS | The executable consistency test requires exactly one matching canonical record in quickstart and rollback/handoff guidance: commit `118ed8199a3a0b1c3b73a09ef98908949c2e2d75`, executable SHA-256 `d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121`. |
+| SC-011 | PASS | Authenticated public mode returned anonymous `401`, authenticated HTTP `200`, authenticated WSS `101`, then one handled supervisor interrupt left all four resource counts at zero. |
+| SC-012 | PASS | Active frontend source and built assets use the runtime-neutral facade; static contract and frontend build passed with no Electron bridge global. |
+
+Final verification passed all 28 functional requirements and all 12 success
+criteria for the selected personal-use profile. Developer ID signing,
+notarization, stapling, signed DMG, and public Gatekeeper checks remain
+`N/A (personal profile)` and are still required before public publication.

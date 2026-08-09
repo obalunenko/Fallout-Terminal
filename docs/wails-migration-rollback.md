@@ -34,9 +34,9 @@ dependency removal. These two fields are the release handoff identity and must
 match the canonical personal-use acceptance record in
 `specs/001-wails-v2-migration/quickstart.md`:
 
-Canonical candidate commit: `d95e144b4f8b5629968e8c28c43eb0b0b9ff2d86`
+Canonical candidate commit: `118ed8199a3a0b1c3b73a09ef98908949c2e2d75`
 
-Canonical executable SHA-256: `84a99810993a952706c43a099f26be4d18c33390a0d1023096b6b09bc6eb2e29`
+Canonical executable SHA-256: `d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121`
 
 The earlier pre-cutover package digest is historical T060 evidence only and is
 not an accepted cutover or rollback decision artifact. Run the executable

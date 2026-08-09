@@ -423,13 +423,14 @@ closed but do not reopen or invalidate an accepted personal-use cutover.
 
 After legacy removal, rerun Sections 2–9 from a clean checkout.
 
-T069 final post-Electron acceptance recorded on 2026-08-09:
+T069 final post-Electron acceptance recorded on 2026-08-09 and refreshed after
+BUG-002 through BUG-004 remediation:
 
-- A fresh `wails build -clean -platform darwin/arm64` completed in 3.009 s
+- A fresh `wails build -clean -platform darwin/arm64` completed in 2.595 s
   after the Electron sources, root npm metadata, and dependency tree were
   removed. The rebuilt app is a thin Mach-O `arm64` bundle, passed
   `codesign --verify --deep --strict`, and has executable SHA-256
-  `84a99810993a952706c43a099f26be4d18c33390a0d1023096b6b09bc6eb2e29`.
+  `d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121`.
   The packaged demo and icon retained their recorded hashes.
 - The packaged executable launched once with only the system `PATH`, owned
   `*:3690`, served player HTTP with status `200`, and had no listeners on the
@@ -458,6 +459,20 @@ T069 final post-Electron acceptance recorded on 2026-08-09:
   recorded in Sections 4–9 and passed the final source/test review. Developer
   ID signing, notarization, stapling, signed DMG, and Gatekeeper public-release
   checks remain `N/A (personal profile)` and public publication stays closed.
+- The refreshed source gates passed with no `gofmt` output, clean `go vet
+  ./...`, clean `go test ./...`, and clean `go test -race ./...`. The
+  race-instrumented slow-client fixture was repeated five times after its local
+  large-JSON timing ceiling was calibrated to 250 ms; no broadcast blocked on
+  network I/O and no race was reported. `npm run build --prefix frontend`
+  passed, the active-source contract found `window.desktopAPI`, and active
+  frontend source contained zero `electronAPI` identifiers.
+- The final `d1ad65f5…` personal-use bundle launched once with only
+  `/usr/bin:/bin:/usr/sbin:/sbin` on `PATH`, acquired `*:3690` on the first
+  readiness poll, served player HTTP `200` with the restrictive CSP and
+  `nosniff`, and opened no listeners on 34115 or 5173. The packaged process
+  then exited with status 0 and released port 3690. Developer ID signing,
+  notarization, stapling, signed DMG, and public Gatekeeper checks remain
+  `N/A (personal profile)`.
 
 ## 10. Canonical personal-use acceptance record
 
@@ -466,9 +481,9 @@ and the executable produced from it by the clean personal-use command in
 Section 9. This is the only artifact identity that acceptance, rollback, and
 handoff documentation may label canonical.
 
-Canonical candidate commit: `d95e144b4f8b5629968e8c28c43eb0b0b9ff2d86`
+Canonical candidate commit: `118ed8199a3a0b1c3b73a09ef98908949c2e2d75`
 
-Canonical executable SHA-256: `84a99810993a952706c43a099f26be4d18c33390a0d1023096b6b09bc6eb2e29`
+Canonical executable SHA-256: `d1ad65f5e5a80f3471e2d551d0ca5d1e55a8d2447cef58091a37cb35276cc121`
 
 Verified on 2026-08-09 with:
 
