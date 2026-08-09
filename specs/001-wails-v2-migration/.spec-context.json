@@ -1,0 +1,357 @@
+{
+  "workflow": "speckit",
+  "specName": "Wails v2 Runtime Migration",
+  "branch": "001-wails-v2-migration",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-08T23:46:09.131Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-08T23:52:52.692Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-08T23:56:07.786Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T00:37:05.715Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T00:38:17.811Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T00:44:36.417Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T00:48:34.882Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T00:49:15.495Z"
+    }
+  ],
+  "approach": "Use wails dev as the single repository-root development entry and configure Wails to own frontend install, build, watcher, bindings, and Go launch. Use the same Go composition root in the packaged app so it owns player-server and optional-tunnel readiness, failure unwinding, and shutdown.",
+  "decisions": [
+    {
+      "decision": "Use wails dev as the sole development startup command and the packaged app launch as the sole release entry",
+      "why": "Wails project configuration already orchestrates frontend tooling, while one Go composition root can own the player listener and tunnel in both modes",
+      "rejected": "Make/npm wrapper or separately launched frontend and player-server commands"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Refreshed the full migration plan and design artifacts for one-command development and single-launch packaged startup",
+      "key_finding": "The existing quickstart required manual frontend setup even though wails.json can make root wails dev own the entire development startup"
+    },
+    "tasks": {
+      "summary": "71 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves cover all FR-001 through FR-026 including one-command startup"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Preserve every accepted user-visible behavior and public contract unless explicitly changed",
+      "tasks": [
+        "T006",
+        "T008",
+        "T063",
+        "T069",
+        "T071"
+      ]
+    },
+    "FR-002": {
+      "title": "Start the player server before readiness and stop owned resources on shutdown or partial failure",
+      "tasks": [
+        "T019",
+        "T020",
+        "T031",
+        "T039",
+        "T042",
+        "T067",
+        "T069"
+      ]
+    },
+    "FR-003": {
+      "title": "Retain window constraints, dark presentation, restrictive content policy, and privilege isolation",
+      "tasks": [
+        "T022",
+        "T026",
+        "T031",
+        "T066"
+      ]
+    },
+    "FR-004": {
+      "title": "Expose privileged desktop capabilities only through a narrow validating interface",
+      "tasks": [
+        "T022",
+        "T025",
+        "T028",
+        "T029",
+        "T066"
+      ]
+    },
+    "FR-005": {
+      "title": "Create, open, and save compatible version-1 session JSON",
+      "tasks": [
+        "T010",
+        "T011",
+        "T012",
+        "T021",
+        "T027",
+        "T063",
+        "T070"
+      ]
+    },
+    "FR-006": {
+      "title": "Never overwrite, relocate, or transform a selected session without explicit action",
+      "tasks": [
+        "T021",
+        "T024",
+        "T027"
+      ]
+    },
+    "FR-007": {
+      "title": "Order saves so the latest accepted revision is durable and reported",
+      "tasks": [
+        "T021",
+        "T027",
+        "T030"
+      ]
+    },
+    "FR-008": {
+      "title": "Bind the player server to all interfaces on port 3690 and serve assets and sounds",
+      "tasks": [
+        "T033",
+        "T037",
+        "T039",
+        "T041"
+      ]
+    },
+    "FR-009": {
+      "title": "Keep player HTTP and WebSocket service independent of desktop asset loading",
+      "tasks": [
+        "T009",
+        "T039",
+        "T041",
+        "T061"
+      ]
+    },
+    "FR-010": {
+      "title": "Preserve WebSocket names, fields, validation, reconnect, and broadcast semantics",
+      "tasks": [
+        "T006",
+        "T034",
+        "T036",
+        "T063"
+      ]
+    },
+    "FR-011": {
+      "title": "Keep live navigation connection and hacking state server-authoritative and process-local",
+      "tasks": [
+        "T017",
+        "T018",
+        "T039",
+        "T043"
+      ]
+    },
+    "FR-012": {
+      "title": "Never expose private hacking fields to players",
+      "tasks": [
+        "T014",
+        "T016",
+        "T017",
+        "T018",
+        "T034",
+        "T066"
+      ]
+    },
+    "FR-013": {
+      "title": "Synchronize concurrent actions and broadcasts without races",
+      "tasks": [
+        "T017",
+        "T018",
+        "T035",
+        "T038",
+        "T039",
+        "T043",
+        "T067",
+        "T068"
+      ]
+    },
+    "FR-014": {
+      "title": "Push current player address count and public hacking status to the master without polling",
+      "tasks": [
+        "T022",
+        "T028",
+        "T029",
+        "T031",
+        "T042"
+      ]
+    },
+    "FR-015": {
+      "title": "Preserve master and player visual input animation and optional-audio behavior",
+      "tasks": [
+        "T026",
+        "T040",
+        "T044",
+        "T069"
+      ]
+    },
+    "FR-016": {
+      "title": "Keep public tunneling opt-in authenticated fail-closed and secret-safe",
+      "tasks": [
+        "T045",
+        "T047",
+        "T048",
+        "T050",
+        "T051",
+        "T053"
+      ]
+    },
+    "FR-017": {
+      "title": "Protect and remove temporary credential policy material on every path",
+      "tasks": [
+        "T045",
+        "T048",
+        "T050",
+        "T067"
+      ]
+    },
+    "FR-018": {
+      "title": "Open external addresses only after final HTTP or HTTPS protocol validation",
+      "tasks": [
+        "T022",
+        "T025",
+        "T028",
+        "T052",
+        "T066"
+      ]
+    },
+    "FR-019": {
+      "title": "Package all master player font sound sample and runtime assets for offline startup",
+      "tasks": [
+        "T004",
+        "T054",
+        "T058",
+        "T060"
+      ]
+    },
+    "FR-020": {
+      "title": "Produce an Apple Silicon app and signed hardened notarized stapled DMG",
+      "tasks": [
+        "T004",
+        "T055",
+        "T058",
+        "T059",
+        "T060"
+      ]
+    },
+    "FR-021": {
+      "title": "Use governed macOS Documents demo Application Support and autosave paths",
+      "tasks": [
+        "T021",
+        "T024",
+        "T027",
+        "T062"
+      ]
+    },
+    "FR-022": {
+      "title": "Provide automated tests for compatibility domain protocol convergence security and shutdown",
+      "tasks": [
+        "T010",
+        "T013",
+        "T014",
+        "T017",
+        "T019",
+        "T021",
+        "T022",
+        "T023",
+        "T033",
+        "T034",
+        "T035",
+        "T045",
+        "T046",
+        "T047",
+        "T054",
+        "T055",
+        "T068"
+      ]
+    },
+    "FR-023": {
+      "title": "Provide a runnable end-to-end validation guide for authoring players access storage and packaging",
+      "tasks": [
+        "T032",
+        "T044",
+        "T053",
+        "T059",
+        "T061",
+        "T062",
+        "T069"
+      ]
+    },
+    "FR-024": {
+      "title": "Retain the existing runtime and build path until migration acceptance passes",
+      "tasks": [
+        "T008",
+        "T057",
+        "T064"
+      ]
+    },
+    "FR-025": {
+      "title": "Remove the old runtime only as the final migration action without deleting shared assets",
+      "tasks": [
+        "T064",
+        "T065",
+        "T068",
+        "T069"
+      ]
+    },
+    "FR-026": {
+      "title": "Use one repository-root development command and one packaged application launch for the complete system",
+      "tasks": [
+        "T009",
+        "T019",
+        "T020",
+        "T023",
+        "T031",
+        "T032",
+        "T055",
+        "T056",
+        "T058",
+        "T061",
+        "T069"
+      ]
+    }
+  }
+}
