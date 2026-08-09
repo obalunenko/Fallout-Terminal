@@ -162,6 +162,54 @@ func TestPlayerHiddenStatesStayOutOfScrollableLayout(t *testing.T) {
 	}
 }
 
+func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	html := read("client/index.html")
+	if !strings.Contains(html, `content="width=device-width, initial-scale=1.0"`) {
+		t.Error("player viewport must follow the browser width at the default zoom")
+	}
+	if strings.Contains(html, "maximum-scale") {
+		t.Error("player viewport must not prevent accessibility zoom")
+	}
+	for _, fragment := range []string{
+		`class="term-header" id="normalHeader"`,
+		`class="term-body" id="termBody"`,
+		`class="term-footer"`,
+		`class="term-prompt" id="termPrompt"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("player markup is missing persistent responsive region %q", fragment)
+		}
+	}
+
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+	for _, fragment := range []string{
+		"--font-body:clamp(16px,min(2.2vw,3.5vh),32px);",
+		".screen{position:relative;width:100%;max-width:1500px;height:100%;max-height:920px;min-width:0;min-height:0;overflow:hidden;",
+		".term-body{overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;}",
+		".hdr-intro{max-height:min(18vh,8rem);overflow-y:auto;overflow-wrap:anywhere;}",
+		".term-footer:has(.back-btn[hidden]){min-height:0;margin-top:0;}",
+		"@media(max-height:720px){:root{--screen-pad-y:8px;}",
+		"@media(max-width:700px),(max-height:360px){.hack-board{height:auto;min-height:100%;flex-direction:column;}",
+	} {
+		if !strings.Contains(compactCSS, fragment) {
+			t.Errorf("player stylesheet is missing responsive layout contract %q", fragment)
+		}
+	}
+}
+
 func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 	t.Parallel()
 

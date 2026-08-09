@@ -7,6 +7,16 @@
 
 [hidden] { display: none !important; }
 
+:root {
+  --screen-pad-y: clamp(8px, 2vh, 22px);
+  --screen-pad-x: clamp(12px, 2.5vw, 30px);
+  --font-chrome: clamp(16px, min(2.1vw, 3.1vh), 30px);
+  --font-body: clamp(16px, min(2.2vw, 3.5vh), 32px);
+  --font-menu: clamp(16px, min(2.4vw, 3.9vh), 34px);
+  --font-title: clamp(18px, min(2.6vw, 3.8vh), 40px);
+  --font-hack: clamp(16px, min(2vw, 3vh), 28px);
+}
+
 html, body {
   margin: 0;
   height: 100%;
@@ -21,22 +31,26 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3vmin;
+  min-height: 0;
+  padding: clamp(4px, 1.5vmin, 24px);
 }
 
 .screen {
   position: relative;
   width: 100%;
   max-width: 1500px;
-  height: 95vh;
+  height: 100%;
   max-height: 920px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   background: #020a02;
   border: 2px solid #0c2e0c;
-  border-radius: 14px;
+  border-radius: clamp(8px, 1.4vmin, 14px);
   box-shadow:
     0 0 40px rgba(60, 255, 90, .18),
     inset 0 0 60px rgba(0, 0, 0, .85);
-  padding: 22px 30px 18px;
+  padding: var(--screen-pad-y) var(--screen-pad-x) max(6px, calc(var(--screen-pad-y) - 4px));
   display: flex;
   flex-direction: column;
   color: #57ff6e;
@@ -75,36 +89,47 @@ html, body {
 }
 
 /* ── Header (shared shape for normal + hack chrome) ───── */
-.term-header { flex: 0 0 auto; margin-bottom: 10px; }
+.term-header { flex: 0 0 auto; margin-bottom: clamp(4px, 1.2vh, 10px); min-width: 0; }
 .hdr-center {
   text-align: center;
-  font-size: clamp(24px, 4vmin, 30px);
+  font-size: var(--font-chrome);
   letter-spacing: .5px;
-  line-height: 1.5;
+  line-height: 1.25;
 }
 .hdr-intro {
-  margin-top: 10px;
-  font-size: clamp(24px, 4vmin, 30px);
-  line-height: 1.4;
+  margin-top: clamp(4px, 1vh, 10px);
+  font-size: var(--font-chrome);
+  line-height: 1.25;
   text-align: left;
   white-space: pre-wrap;
 }
 .hdr-intro:empty { display: none; }
 .term-divider {
-  margin-top: 10px;
+  margin-top: clamp(4px, 1vh, 10px);
   border-top: 1px solid #57ff6e;
   opacity: .55;
 }
 
 /* ── Body ───────────────────────────────────────────── */
 .term-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
+.term-body {
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.hdr-intro {
+  max-height: min(18vh, 8rem);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
 
 .term-idle {
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(28px, 4.8vmin, 40px);
+  font-size: var(--font-title);
   letter-spacing: 1px;
   opacity: .85;
 }
@@ -112,16 +137,16 @@ html, body {
 .blink { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
-.term-list { padding: 6px 0 2px; }
-.term-empty { opacity: .6; font-size: clamp(24px, 4vmin, 30px); padding: 10px 4px; }
+.term-list { padding: clamp(2px, .8vh, 6px) 0 2px; }
+.term-empty { opacity: .6; font-size: var(--font-chrome); padding: clamp(4px, 1vh, 10px) 4px; }
 
 .term-row {
-  padding: 4px 8px;
-  font-size: clamp(26px, 4.4vmin, 34px);
+  padding: clamp(2px, .7vh, 4px) 8px;
+  font-size: var(--font-menu);
+  line-height: 1.15;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .term-row.sel {
   background: #57ff6e;
@@ -130,24 +155,29 @@ html, body {
 }
 
 /* ── Entry (record) full view ─────────────────────────── */
-.term-entry { padding: 4px; }
-.entry-title { font-size: clamp(30px, 5.2vmin, 40px); letter-spacing: 1px; }
-.entry-divider { opacity: .5; margin: 8px 0; font-size: 24px; }
+.term-entry { padding: clamp(2px, .7vh, 4px); }
+.entry-title { font-size: var(--font-title); letter-spacing: 1px; line-height: 1.2; }
+.entry-divider { opacity: .5; margin: clamp(4px, 1vh, 8px) 0; font-size: var(--font-chrome); }
 .entry-body {
-  font-size: clamp(26px, 4.4vmin, 32px);
-  line-height: 1.5;
+  font-size: var(--font-body);
+  line-height: 1.3;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
+.entry-title { overflow-wrap: anywhere; }
+.entry-divider { max-width: 100%; overflow: hidden; white-space: nowrap; }
 
 /* ── Command output pane (above Back button) ─────────── */
 .term-output {
   flex: 0 0 auto;
-  margin-top: 10px;
-  padding: 10px 12px;
+  margin-top: clamp(4px, 1vh, 10px);
+  padding: clamp(5px, 1vh, 10px) clamp(7px, 1vw, 12px);
   border: 1px solid #144d18;
   background: rgba(20, 77, 24, .12);
-  font-size: clamp(26px, 4.4vmin, 32px);
+  font-size: var(--font-body);
+  line-height: 1.25;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   max-height: 30%;
   overflow-y: auto;
 }
@@ -155,25 +185,31 @@ html, body {
 /* ── Decorative bottom input line (normal screens) ────── */
 .term-prompt {
   flex: 0 0 auto;
-  margin-top: 8px;
-  font-size: clamp(26px, 4.4vmin, 32px);
+  margin-top: clamp(3px, .8vh, 8px);
+  font-size: var(--font-body);
 }
 
 /* ── Footer / Back button ─────────────────────────────── */
-.term-footer { flex: 0 0 auto; margin-top: 8px; min-height: 34px; }
+.term-footer { flex: 0 0 auto; margin-top: clamp(3px, .8vh, 8px); min-height: clamp(24px, 4.4vh, 34px); }
 .back-btn {
   background: transparent;
   border: none;
   color: #57ff6e;
   font-family: inherit;
   text-shadow: inherit;
-  font-size: clamp(24px, 4vmin, 30px);
-  padding: 6px 16px;
+  font-size: var(--font-chrome);
+  padding: clamp(3px, .7vh, 6px) clamp(8px, 1.5vw, 16px);
   cursor: pointer;
   letter-spacing: 1px;
 }
 .back-btn:hover { background: rgba(87, 255, 110, .12); }
 .back-btn:active { background: #57ff6e; color: #021002; }
+.back-btn:focus-visible {
+  outline: 2px solid #d8ffb8;
+  outline-offset: 2px;
+  background: rgba(87, 255, 110, .12);
+}
+.term-footer:has(.back-btn[hidden]) { min-height: 0; margin-top: 0; }
 
 /* ── Hacking minigame ──────────────────────────────────── */
 #attemptsLine { margin-top: 2px; }
@@ -183,15 +219,15 @@ html, body {
 .hack-board {
   height: 100%;
   display: flex;
-  gap: 24px;
-  font-size: clamp(22px, 3.4vmin, 28px);
+  gap: clamp(10px, 2vw, 24px);
+  font-size: var(--font-hack);
   min-height: 0;
 }
 
 .hack-columns {
   flex: 1 1 auto;
   display: flex;
-  gap: 24px;
+  gap: clamp(8px, 1.6vw, 24px);
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -199,9 +235,9 @@ html, body {
 .hack-col { flex: 1 1 0; min-width: 0; }
 .hack-row {
   display: flex;
-  gap: 24px;
+  gap: clamp(6px, 1.3vw, 24px);
   white-space: nowrap;
-  line-height: 1.5;
+  line-height: 1.2;
 }
 .hack-addr { opacity: .55; flex: 0 0 auto; }
 .hack-cells { flex: 1 1 auto; letter-spacing: 1px; }
@@ -219,9 +255,9 @@ html, body {
   flex: 0 0 34%;
   display: grid;
   grid-template-rows: 1fr auto;
-  row-gap: 8px;
+  row-gap: clamp(4px, 1vh, 8px);
   min-width: 0;
-  padding-left: 24px;
+  padding-left: clamp(8px, 1.6vw, 24px);
 }
 .hack-log {
   grid-row: 1;
@@ -242,6 +278,8 @@ html, body {
   word-break: break-all;
 }
 
+.hack-cells, .hack-log-panel, .hack-input-line { overflow-wrap: anywhere; }
+
 .hack-blocked {
   height: 100%;
   display: flex;
@@ -249,9 +287,29 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: clamp(30px, 5.2vmin, 40px);
+  font-size: var(--font-title);
   letter-spacing: .5px;
-  line-height: 1.8;
+  line-height: 1.4;
+}
+
+@media (max-width: 700px), (max-height: 360px) {
+  .hack-board {
+    height: auto;
+    min-height: 100%;
+    flex-direction: column;
+  }
+
+  .hack-columns {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .hack-log-panel {
+    flex: 0 0 auto;
+    min-height: 7rem;
+    padding: 8px 0 0;
+    border-top: 1px solid #144d18;
+  }
 }
 
 /* ── Connection overlay ────────────────────────────────── */
@@ -270,6 +328,15 @@ html, body {
   z-index: 10;
 }
 .conn-overlay.hidden { display: none; }
+
+@media (max-height: 720px) {
+  :root { --screen-pad-y: 8px; }
+  .hdr-center { line-height: 1.15; }
+  .hdr-intro { line-height: 1.15; max-height: 16vh; }
+  .term-divider { margin-top: 3px; }
+  .term-output { max-height: 25%; }
+  .term-footer { min-height: 24px; }
+}
 
 /* ── Scrollbars (webkit) ───────────────────────────────── */
 .term-body::-webkit-scrollbar, .term-output::-webkit-scrollbar, .hack-log::-webkit-scrollbar, .hack-columns::-webkit-scrollbar { width: 8px; }
