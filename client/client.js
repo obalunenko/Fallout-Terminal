@@ -24,6 +24,16 @@ let lastRenderedFolderKey  = null;
 let lastRenderedEntryId    = null;
 let lastRenderedCommandKey = null;
 
+let pagedView = {
+  kind: null,
+  key: null,
+  text: '',
+  container: null,
+  pages: [''],
+  index: 0,
+};
+let paginationFrame = null;
+
 let hackLevel        = 0;
 let hack              = null;  // public hack state from server, or null
 let hackSolvedTimer   = null;
@@ -41,6 +51,7 @@ const hackHeader   = document.getElementById('hackHeader');
 const attemptsLine = document.getElementById('attemptsLine');
 
 const termIdle   = document.getElementById('termIdle');
+const termBody   = document.getElementById('termBody');
 const termList   = document.getElementById('termList');
 const termEntry  = document.getElementById('termEntry');
 const entryTitle = document.getElementById('entryTitle');
@@ -55,6 +66,10 @@ const hackBlocked      = document.getElementById('hackBlocked');
 const termOutput  = document.getElementById('termOutput');
 const termPrompt  = document.getElementById('termPrompt');
 const backBtn     = document.getElementById('backBtn');
+const pageNav     = document.getElementById('pageNav');
+const pagePrev    = document.getElementById('pagePrev');
+const pageNext    = document.getElementById('pageNext');
+const pageIndicator = document.getElementById('pageIndicator');
 const connOverlay = document.getElementById('connOverlay');
 const connText    = document.getElementById('connText');
 
@@ -234,6 +249,8 @@ function goBack() {
 }
 
 backBtn.addEventListener('click', goBack);
+pagePrev.addEventListener('click', () => changePage(-1));
+pageNext.addEventListener('click', () => changePage(1));
 
 // ════════════════════════════════════════════════════
 // MENU HOVER: highlight the entry under the cursor + focus sound
@@ -325,8 +342,36 @@ document.addEventListener('keydown', (e) => {
   }
 
   if (mode === MODE.ENTRY) {
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Enter') { goBack(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      changePage(-1);
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      changePage(1);
+      e.preventDefault();
+    } else if (e.key === 'Home') {
+      changePage(-pagedView.index);
+      e.preventDefault();
+    } else if (e.key === 'End') {
+      changePage(pagedView.pages.length - pagedView.index - 1);
+      e.preventDefault();
+    } else if (e.key === 'Escape' || e.key === 'Backspace') {
+      goBack();
+      e.preventDefault();
+    }
     return;
+  }
+
+  if (pagedView.kind === 'command') {
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      changePage(-1);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      changePage(1);
+      e.preventDefault();
+      return;
+    }
   }
 
   const kids = (currentFolderNode().children || []);
@@ -395,8 +440,152 @@ function lineToDiv(text) {
   return d;
 }
 
+function replaceWithText(container, text) {
+  if (container._revealTimer) {
+    clearTimeout(container._revealTimer);
+    container._revealTimer = null;
+  }
+  container.innerHTML = '';
+  String(text).split('\n').forEach(line => container.appendChild(lineToDiv(line)));
+}
+
+function textFits(container, text) {
+  replaceWithText(container, text);
+  return container.scrollHeight <= container.clientHeight + 1 &&
+    container.scrollWidth <= container.clientWidth + 1;
+}
+
+function naturalPageBreak(text, start, fittedEnd) {
+  if (fittedEnd >= text.length) return text.length;
+
+  const minimumBreak = start + Math.floor((fittedEnd - start) * .6);
+  for (let i = fittedEnd; i > minimumBreak; i--) {
+    if (/\s/.test(text[i - 1])) return i;
+  }
+  return fittedEnd;
+}
+
+function paginateText(container, text) {
+  const source = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+  if (!source) return [''];
+  if (container.clientHeight <= 0 || container.clientWidth <= 0) return [source];
+
+  const pages = [];
+  let start = 0;
+  while (start < source.length) {
+    let low = start + 1;
+    let high = source.length;
+    let fittedEnd = start;
+
+    while (low <= high) {
+      const midpoint = Math.floor((low + high) / 2);
+      if (textFits(container, source.slice(start, midpoint))) {
+        fittedEnd = midpoint;
+        low = midpoint + 1;
+      } else {
+        high = midpoint - 1;
+      }
+    }
+
+    if (fittedEnd === start) fittedEnd = start + 1;
+    const end = naturalPageBreak(source, start, fittedEnd);
+    pages.push(source.slice(start, end));
+    start = end;
+  }
+  return pages;
+}
+
+function updatePageControls() {
+  if (pagedView.kind === null) {
+    pageNav.hidden = true;
+    return;
+  }
+
+  pageNav.hidden = false;
+  pagePrev.hidden = pagedView.index === 0;
+  pageNext.hidden = pagedView.index >= pagedView.pages.length - 1;
+  pageIndicator.value = `${pagedView.index + 1} / ${pagedView.pages.length}`;
+  pageIndicator.textContent = pageIndicator.value;
+}
+
+function renderPagedView(animate) {
+  if (!pagedView.container) return;
+  const page = pagedView.pages[pagedView.index] || '';
+  const lines = page.split('\n').map(lineToDiv);
+  revealInto(pagedView.container, lines, animate);
+  updatePageControls();
+}
+
+function recalculatePagination(resetPage, animate) {
+  if (pagedView.kind === null || !pagedView.container) return;
+  const previousIndex = resetPage ? 0 : pagedView.index;
+  pagedView.pages = paginateText(pagedView.container, pagedView.text);
+  pagedView.index = Math.min(previousIndex, pagedView.pages.length - 1);
+  renderPagedView(animate && pagedView.index === 0);
+}
+
+function activatePagination(kind, key, text, container, animate) {
+  const source = String(text == null ? '' : text);
+  const identityChanged = pagedView.kind !== kind || pagedView.key !== key;
+  const contentChanged = pagedView.text !== source || pagedView.container !== container;
+
+  pagedView.kind = kind;
+  pagedView.key = key;
+  pagedView.text = source;
+  pagedView.container = container;
+
+  if (identityChanged || contentChanged) {
+    recalculatePagination(identityChanged, animate);
+  } else {
+    renderPagedView(false);
+  }
+}
+
+function deactivatePagination() {
+  if (paginationFrame !== null) {
+    cancelAnimationFrame(paginationFrame);
+    paginationFrame = null;
+  }
+  pagedView = {
+    kind: null,
+    key: null,
+    text: '',
+    container: null,
+    pages: [''],
+    index: 0,
+  };
+  updatePageControls();
+}
+
+function changePage(delta) {
+  if (pagedView.kind === null || !delta) return;
+  const activeControl = document.activeElement;
+  const nextIndex = Math.max(0, Math.min(pagedView.pages.length - 1, pagedView.index + delta));
+  if (nextIndex === pagedView.index) return;
+
+  pagedView.index = nextIndex;
+  playEnter();
+  renderPagedView(false);
+
+  if (activeControl === pagePrev && pagePrev.hidden) {
+    (pageNext.hidden ? backBtn : pageNext).focus();
+  } else if (activeControl === pageNext && pageNext.hidden) {
+    (pagePrev.hidden ? backBtn : pagePrev).focus();
+  }
+}
+
+function scheduleRepagination() {
+  if (pagedView.kind === null) return;
+  if (paginationFrame !== null) cancelAnimationFrame(paginationFrame);
+  paginationFrame = requestAnimationFrame(() => {
+    paginationFrame = null;
+    recalculatePagination(false, false);
+  });
+}
+
 function render() {
   if (!hasLive) {
+    deactivatePagination();
     normalHeader.hidden = true;
     hackHeader.hidden   = true;
     termIdle.hidden     = false;
@@ -442,8 +631,7 @@ function renderNormalScreen() {
     lastRenderedFolderKey = null;
     lastRenderedCommandKey = null;
 
-    const lines = (node ? (node.description || '') : '').split('\n').map(lineToDiv);
-    revealInto(entryBody, lines, isNewEntry);
+    activatePagination('entry', viewEntryId, node ? (node.description || '') : '', entryBody, isNewEntry);
     return;
   }
 
@@ -486,11 +674,11 @@ function renderNormalScreen() {
     termOutput.hidden = false;
     const isNewCommand = currentCommandNodeId !== lastRenderedCommandKey;
     lastRenderedCommandKey = currentCommandNodeId;
-    const outLines = String(commandOutput).split('\n').map(lineToDiv);
-    revealInto(termOutput, outLines, isNewCommand);
+    activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
   } else {
     termOutput.hidden = true;
     lastRenderedCommandKey = null;
+    deactivatePagination();
   }
 }
 
@@ -510,6 +698,7 @@ function attemptsLineHtml(h) {
 }
 
 function renderHackScreen() {
+  deactivatePagination();
   normalHeader.hidden = true;
   termList.hidden     = true;
   termEntry.hidden    = true;
@@ -576,7 +765,6 @@ function renderHackColumns() {
 
 function renderHackLog() {
   hackLog.innerHTML = hack.log.map(line => `<div>${esc(line)}</div>`).join('');
-  hackLog.scrollTop = hackLog.scrollHeight;
 }
 
 function renderHackInputPreview() {
@@ -586,5 +774,13 @@ function renderHackInputPreview() {
 // ════════════════════════════════════════════════════
 // BOOT
 // ════════════════════════════════════════════════════
+window.addEventListener('resize', scheduleRepagination);
+if ('ResizeObserver' in window) {
+  const paginationObserver = new ResizeObserver(scheduleRepagination);
+  paginationObserver.observe(termBody);
+}
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(scheduleRepagination);
+}
 render();
 connect();

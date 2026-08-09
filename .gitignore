@@ -1,5 +1,11 @@
 __pycache__/
 
+# Node/Vite artifacts and local configuration
+node_modules/
+dist/
+*.log
+.env*
+
 # Go/Wails build output
 build/bin/
 frontend/dist/*
@@ -8,9 +14,19 @@ frontend/node_modules/
 frontend/wailsjs/
 
 # Go test/build artifacts
+*.exe
 *.test
+*.out
 *.prof
 coverage.out
+vendor/
 
 # macOS metadata
 .DS_Store
+
+# Editor and temporary files
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

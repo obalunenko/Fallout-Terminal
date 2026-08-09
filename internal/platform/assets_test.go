@@ -120,7 +120,7 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 	}
 }
 
-func TestPlayerHiddenStatesStayOutOfScrollableLayout(t *testing.T) {
+func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -148,17 +148,18 @@ func TestPlayerHiddenStatesStayOutOfScrollableLayout(t *testing.T) {
 	css := read("client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
-		".term-body{flex:11auto;overflow-y:auto;min-height:0;}",
+		".term-body{flex:11auto;display:flex;flex-direction:column;min-height:0;overflow:hidden;}",
 		".term-idle{height:100%;display:flex;",
+		".term-entry{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;",
 		".hack-board{height:100%;display:flex;",
 		".hack-blocked{height:100%;display:flex;",
 	} {
 		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet no longer exercises the overflow/display regression fixture %q", fragment)
+			t.Errorf("player stylesheet no longer exercises the hidden-layout regression fixture %q", fragment)
 		}
 	}
 	if !strings.Contains(compactCSS, "[hidden]{display:none!important;}") {
-		t.Error("player stylesheet must make the hidden attribute authoritative so inactive state containers occupy no scrollable layout space")
+		t.Error("player stylesheet must make the hidden attribute authoritative so inactive state containers occupy no layout space")
 	}
 }
 
@@ -186,6 +187,10 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		`class="term-header" id="normalHeader"`,
 		`class="term-body" id="termBody"`,
 		`class="term-footer"`,
+		`class="page-nav" id="pageNav"`,
+		`class="page-btn" id="pagePrev"`,
+		`class="page-indicator" id="pageIndicator"`,
+		`class="page-btn" id="pageNext"`,
 		`class="term-prompt" id="termPrompt"`,
 	} {
 		if !strings.Contains(html, fragment) {
@@ -196,17 +201,53 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 	css := read("client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
-		"--font-body:clamp(16px,min(2.2vw,3.5vh),32px);",
+		"--terminal-scale:clamp(8px,min(1.5625vw,2.6667vh),24px);",
+		"--font-chrome:calc(var(--terminal-scale)*.875);",
+		"--font-body:var(--terminal-scale);",
+		"--font-menu:calc(var(--terminal-scale)*1.0625);",
+		"--font-title:calc(var(--terminal-scale)*1.1875);",
+		"--font-hack:calc(var(--terminal-scale)*.875);",
 		".screen{position:relative;width:100%;max-width:1500px;height:100%;max-height:920px;min-width:0;min-height:0;overflow:hidden;",
-		".term-body{overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;}",
-		".hdr-intro{max-height:min(18vh,8rem);overflow-y:auto;overflow-wrap:anywhere;}",
-		".term-footer:has(.back-btn[hidden]){min-height:0;margin-top:0;}",
-		"@media(max-height:720px){:root{--screen-pad-y:8px;}",
-		"@media(max-width:700px),(max-height:360px){.hack-board{height:auto;min-height:100%;flex-direction:column;}",
+		".hdr-intro{max-height:min(18vh,8rem);overflow:hidden;overflow-wrap:anywhere;}",
+		".term-output{flex:0030%;min-height:calc(var(--terminal-scale)*2.8);",
+		".page-nav{min-width:0;display:flex;align-items:center;justify-content:flex-end;",
+		".term-footer:has(.back-btn[hidden]):has(.page-nav[hidden]){min-height:0;margin-top:0;}",
+		"@media(max-height:720px){:root{--screen-pad-y:max(4px,calc(var(--terminal-scale)*.5));",
+		"@media(max-width:700px),(max-height:360px){.hack-board{height:100%;min-height:0;flex-direction:column;}",
 	} {
 		if !strings.Contains(compactCSS, fragment) {
 			t.Errorf("player stylesheet is missing responsive layout contract %q", fragment)
 		}
+	}
+
+	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
+		if strings.Contains(compactCSS, forbidden) {
+			t.Errorf("player stylesheet must not expose browser or localized scrolling; found %q", forbidden)
+		}
+	}
+
+	js := read("client/client.js")
+	for _, fragment := range []string{
+		"function paginateText(container, text)",
+		"function naturalPageBreak(text, start, fittedEnd)",
+		"pagedView.index = Math.min(previousIndex, pagedView.pages.length - 1)",
+		"pagePrev.hidden = pagedView.index === 0",
+		"pageNext.hidden = pagedView.index >= pagedView.pages.length - 1",
+		"pageIndicator.value = `${pagedView.index + 1} / ${pagedView.pages.length}`",
+		"activatePagination('entry', viewEntryId",
+		"activatePagination('command', currentCommandNodeId",
+		"e.key === 'ArrowLeft' || e.key === 'PageUp'",
+		"e.key === 'ArrowRight' || e.key === 'PageDown'",
+		"window.addEventListener('resize', scheduleRepagination)",
+		"new ResizeObserver(scheduleRepagination)",
+		"document.fonts.ready.then(scheduleRepagination)",
+	} {
+		if !strings.Contains(js, fragment) {
+			t.Errorf("player script is missing pagination contract %q", fragment)
+		}
+	}
+	if strings.Contains(js, ".scrollTop") || strings.Contains(js, ".scrollTo(") {
+		t.Error("player script must not navigate terminal content through scrolling")
 	}
 }
 

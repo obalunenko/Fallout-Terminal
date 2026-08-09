@@ -10,11 +10,12 @@
 :root {
   --screen-pad-y: clamp(8px, 2vh, 22px);
   --screen-pad-x: clamp(12px, 2.5vw, 30px);
-  --font-chrome: clamp(16px, min(2.1vw, 3.1vh), 30px);
-  --font-body: clamp(16px, min(2.2vw, 3.5vh), 32px);
-  --font-menu: clamp(16px, min(2.4vw, 3.9vh), 34px);
-  --font-title: clamp(18px, min(2.6vw, 3.8vh), 40px);
-  --font-hack: clamp(16px, min(2vw, 3vh), 28px);
+  --terminal-scale: clamp(8px, min(1.5625vw, 2.6667vh), 24px);
+  --font-chrome: calc(var(--terminal-scale) * .875);
+  --font-body: var(--terminal-scale);
+  --font-menu: calc(var(--terminal-scale) * 1.0625);
+  --font-title: calc(var(--terminal-scale) * 1.1875);
+  --font-hack: calc(var(--terminal-scale) * .875);
 }
 
 html, body {
@@ -111,16 +112,17 @@ html, body {
 }
 
 /* ── Body ───────────────────────────────────────────── */
-.term-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .term-body {
-  overflow-x: hidden;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .hdr-intro {
   max-height: min(18vh, 8rem);
-  overflow-y: auto;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 
@@ -137,7 +139,12 @@ html, body {
 .blink { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
-.term-list { padding: clamp(2px, .8vh, 6px) 0 2px; }
+.term-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  padding: clamp(2px, .8vh, 6px) 0 2px;
+}
 .term-empty { opacity: .6; font-size: var(--font-chrome); padding: clamp(4px, 1vh, 10px) 4px; }
 
 .term-row {
@@ -155,21 +162,32 @@ html, body {
 }
 
 /* ── Entry (record) full view ─────────────────────────── */
-.term-entry { padding: clamp(2px, .7vh, 4px); }
+.term-entry {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(2px, .7vh, 4px);
+}
 .entry-title { font-size: var(--font-title); letter-spacing: 1px; line-height: 1.2; }
 .entry-divider { opacity: .5; margin: clamp(4px, 1vh, 8px) 0; font-size: var(--font-chrome); }
 .entry-body {
+  flex: 1 1 auto;
+  min-height: 0;
   font-size: var(--font-body);
   line-height: 1.3;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  overflow: hidden;
 }
 .entry-title { overflow-wrap: anywhere; }
 .entry-divider { max-width: 100%; overflow: hidden; white-space: nowrap; }
 
 /* ── Command output pane (above Back button) ─────────── */
 .term-output {
-  flex: 0 0 auto;
+  flex: 0 0 30%;
+  min-height: calc(var(--terminal-scale) * 2.8);
   margin-top: clamp(4px, 1vh, 10px);
   padding: clamp(5px, 1vh, 10px) clamp(7px, 1vw, 12px);
   border: 1px solid #144d18;
@@ -178,8 +196,7 @@ html, body {
   line-height: 1.25;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 30%;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* ── Decorative bottom input line (normal screens) ────── */
@@ -189,9 +206,16 @@ html, body {
   font-size: var(--font-body);
 }
 
-/* ── Footer / Back button ─────────────────────────────── */
-.term-footer { flex: 0 0 auto; margin-top: clamp(3px, .8vh, 8px); min-height: clamp(24px, 4.4vh, 34px); }
-.back-btn {
+/* ── Footer / navigation controls ─────────────────────── */
+.term-footer {
+  flex: 0 0 auto;
+  min-height: clamp(24px, 4.4vh, 34px);
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.5vw, 18px);
+  margin-top: clamp(3px, .8vh, 8px);
+}
+.back-btn, .page-btn {
   background: transparent;
   border: none;
   color: #57ff6e;
@@ -202,14 +226,29 @@ html, body {
   cursor: pointer;
   letter-spacing: 1px;
 }
-.back-btn:hover { background: rgba(87, 255, 110, .12); }
-.back-btn:active { background: #57ff6e; color: #021002; }
-.back-btn:focus-visible {
+.back-btn:hover, .page-btn:hover { background: rgba(87, 255, 110, .12); }
+.back-btn:active, .page-btn:active { background: #57ff6e; color: #021002; }
+.back-btn:focus-visible, .page-btn:focus-visible {
   outline: 2px solid #d8ffb8;
   outline-offset: 2px;
   background: rgba(87, 255, 110, .12);
 }
-.term-footer:has(.back-btn[hidden]) { min-height: 0; margin-top: 0; }
+.page-nav {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(4px, 1vw, 12px);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.page-indicator {
+  min-width: 4.5ch;
+  color: #57ff6e;
+  font-size: var(--font-chrome);
+  text-align: center;
+}
+.term-footer:has(.back-btn[hidden]):has(.page-nav[hidden]) { min-height: 0; margin-top: 0; }
 
 /* ── Hacking minigame ──────────────────────────────────── */
 #attemptsLine { margin-top: 2px; }
@@ -229,8 +268,7 @@ html, body {
   display: flex;
   gap: clamp(8px, 1.6vw, 24px);
   min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 .hack-col { flex: 1 1 0; min-width: 0; }
 .hack-row {
@@ -263,7 +301,7 @@ html, body {
   grid-row: 1;
   width: 100%;
   min-width: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -294,20 +332,20 @@ html, body {
 
 @media (max-width: 700px), (max-height: 360px) {
   .hack-board {
-    height: auto;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     flex-direction: column;
   }
 
   .hack-columns {
     flex: 0 0 auto;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .hack-log-panel {
-    flex: 0 0 auto;
-    min-height: 7rem;
-    padding: 8px 0 0;
+    flex: 1 1 auto;
+    min-height: calc(var(--terminal-scale) * 4.5);
+    padding: max(3px, calc(var(--terminal-scale) * .5)) 0 0;
     border-top: 1px solid #144d18;
   }
 }
@@ -322,7 +360,7 @@ html, body {
   justify-content: center;
   color: #57ff6e;
   font-family: 'Fixedsys', monospace;
-  font-size: clamp(28px, 4.8vmin, 40px);
+  font-size: calc(var(--terminal-scale) * 1.5);
   letter-spacing: 1px;
   text-shadow: 0 0 6px rgba(87,255,110,.6);
   z-index: 10;
@@ -330,19 +368,13 @@ html, body {
 .conn-overlay.hidden { display: none; }
 
 @media (max-height: 720px) {
-  :root { --screen-pad-y: 8px; }
+  :root {
+    --screen-pad-y: max(4px, calc(var(--terminal-scale) * .5));
+    --screen-pad-x: max(6px, calc(var(--terminal-scale) * .75));
+  }
   .hdr-center { line-height: 1.15; }
   .hdr-intro { line-height: 1.15; max-height: 16vh; }
   .term-divider { margin-top: 3px; }
   .term-output { max-height: 25%; }
   .term-footer { min-height: 24px; }
-}
-
-/* ── Scrollbars (webkit) ───────────────────────────────── */
-.term-body::-webkit-scrollbar, .term-output::-webkit-scrollbar, .hack-log::-webkit-scrollbar, .hack-columns::-webkit-scrollbar { width: 8px; }
-.term-body::-webkit-scrollbar-thumb, .term-output::-webkit-scrollbar-thumb, .hack-log::-webkit-scrollbar-thumb, .hack-columns::-webkit-scrollbar-thumb {
-  background: #144d18;
-}
-.term-body::-webkit-scrollbar-track, .term-output::-webkit-scrollbar-track, .hack-log::-webkit-scrollbar-track, .hack-columns::-webkit-scrollbar-track {
-  background: transparent;
 }
