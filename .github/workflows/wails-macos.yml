@@ -1,0 +1,140 @@
+name: Wails macOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wails-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: 1.26.x
+  NODE_VERSION: 20.19.0
+  WAILS_VERSION: v2.13.0
+
+jobs:
+  go-quality:
+    name: Go test and vet
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Run Go vet
+        run: go vet ./...
+
+  frontend-build:
+    name: Frontend clean install and build
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Build frontend
+        run: npm run build --prefix frontend
+
+  startup-contract:
+    name: One-command startup contract
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Verify repository-root startup configuration
+        run: >-
+          go test ./internal/platform
+          -run '^(TestWailsOwnsTheWholeDevelopmentStartup|TestQuickstartHasOneRepositoryRootStartupCommand)$'
+          -count=1
+
+  unsigned-arm64-app:
+    name: Unsigned Apple Silicon app
+    needs:
+      - go-quality
+      - frontend-build
+      - startup-contract
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "13.0"
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install pinned Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
+          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
+      - name: Build clean unsigned arm64 application
+        run: wails build -clean -platform darwin/arm64
+
+      - name: Verify Apple Silicon application gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_path="build/bin/Fallout Terminal.app"
+          executable_path="${app_path}/Contents/MacOS/Fallout Terminal"
+          test -d "${app_path}"
+          test -x "${executable_path}"
+          lipo -archs "${executable_path}" | grep -qw arm64
+          if codesign -dv --verbose=4 "${app_path}" 2>&1 | grep -q "Authority=Developer ID Application"; then
+            echo "Unexpected Developer ID signature on unsigned CI candidate" >&2
+            exit 1
+          fi
+
+      - name: Upload unsigned Apple Silicon app
+        uses: actions/upload-artifact@v4
+        with:
+          name: fallout-terminal-macos-arm64-unsigned
+          path: build/bin/Fallout Terminal.app
+          if-no-files-found: error
+          retention-days: 14

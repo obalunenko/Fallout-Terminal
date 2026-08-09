@@ -62,29 +62,43 @@ const connText    = document.getElementById('connText');
 // WEBSOCKET
 // ════════════════════════════════════════════════════
 let ws;
-let reconnectTimer;
+let reconnectTimer = null;
+const RECONNECT_DELAY_MS = 3000;
+
+function playerWebSocketURL() {
+  const url = new URL('/', window.location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.href;
+}
 
 function connect() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${proto}//${location.host}`);
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
 
-  ws.addEventListener('open', () => {
+  const socket = new WebSocket(playerWebSocketURL());
+  ws = socket;
+
+  socket.addEventListener('open', () => {
+    if (ws !== socket) return;
     clearTimeout(reconnectTimer);
+    reconnectTimer = null;
     connOverlay.classList.add('hidden');
   });
 
-  ws.addEventListener('message', ev => {
+  socket.addEventListener('message', ev => {
+    if (ws !== socket) return;
     try { dispatch(JSON.parse(ev.data)); }
     catch (e) { console.warn('WS parse error', e); }
   });
 
-  ws.addEventListener('close', () => {
+  socket.addEventListener('close', () => {
+    if (ws !== socket) return;
     connOverlay.classList.remove('hidden');
     connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
-    reconnectTimer = setTimeout(connect, 3000);
+    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
   });
 
-  ws.addEventListener('error', () => ws.close());
+  socket.addEventListener('error', () => socket.close());
 }
 
 function send(msg) {
@@ -383,20 +397,20 @@ function lineToDiv(text) {
 
 function render() {
   if (!hasLive) {
-    normalHeader.style.display = 'none';
-    hackHeader.style.display   = 'none';
-    termIdle.style.display     = '';
-    termList.style.display     = 'none';
-    termEntry.style.display    = 'none';
-    hackBoard.style.display    = 'none';
-    hackBlocked.style.display  = 'none';
-    termOutput.style.display   = 'none';
-    termPrompt.style.display   = 'none';
-    backBtn.style.display      = 'none';
+    normalHeader.hidden = true;
+    hackHeader.hidden   = true;
+    termIdle.hidden     = false;
+    termList.hidden     = true;
+    termEntry.hidden    = true;
+    hackBoard.hidden    = true;
+    hackBlocked.hidden  = true;
+    termOutput.hidden   = true;
+    termPrompt.hidden   = true;
+    backBtn.hidden      = true;
     return;
   }
 
-  termIdle.style.display = 'none';
+  termIdle.hidden = true;
 
   if (mode === MODE.HACK) {
     renderHackScreen();
@@ -406,21 +420,21 @@ function render() {
 }
 
 function renderNormalScreen() {
-  hackHeader.style.display  = 'none';
-  hackBoard.style.display   = 'none';
-  hackBlocked.style.display = 'none';
+  hackHeader.hidden  = true;
+  hackBoard.hidden   = true;
+  hackBlocked.hidden = true;
 
-  normalHeader.style.display = '';
+  normalHeader.hidden         = false;
   serverLine.textContent     = `-Server ${serverNum}-`;
   introTextEl.textContent    = introText;
-  termPrompt.style.display   = '';
+  termPrompt.hidden          = false;
 
   if (mode === MODE.ENTRY) {
     const node = findNodeById(tree, viewEntryId);
-    termList.style.display  = 'none';
-    termEntry.style.display = '';
-    termOutput.style.display = 'none';
-    backBtn.style.display   = '';
+    termList.hidden   = true;
+    termEntry.hidden  = false;
+    termOutput.hidden = true;
+    backBtn.hidden    = false;
     entryTitle.textContent  = node ? node.name : '';
 
     const isNewEntry = viewEntryId !== lastRenderedEntryId;
@@ -434,9 +448,9 @@ function renderNormalScreen() {
   }
 
   // MODE.LIST
-  termEntry.style.display = 'none';
-  termList.style.display  = '';
-  backBtn.style.display   = navStack.length > 1 ? '' : 'none';
+  termEntry.hidden = true;
+  termList.hidden  = false;
+  backBtn.hidden   = navStack.length <= 1;
   lastRenderedEntryId = null;
   lastMenuHoverIdx = null;
 
@@ -469,13 +483,13 @@ function renderNormalScreen() {
   revealInto(termList, rows, isNewFolder);
 
   if (commandOutput !== null) {
-    termOutput.style.display = '';
+    termOutput.hidden = false;
     const isNewCommand = currentCommandNodeId !== lastRenderedCommandKey;
     lastRenderedCommandKey = currentCommandNodeId;
     const outLines = String(commandOutput).split('\n').map(lineToDiv);
     revealInto(termOutput, outLines, isNewCommand);
   } else {
-    termOutput.style.display = 'none';
+    termOutput.hidden = true;
     lastRenderedCommandKey = null;
   }
 }
@@ -496,30 +510,30 @@ function attemptsLineHtml(h) {
 }
 
 function renderHackScreen() {
-  normalHeader.style.display = 'none';
-  termList.style.display     = 'none';
-  termEntry.style.display    = 'none';
-  termOutput.style.display   = 'none';
-  termPrompt.style.display   = 'none';
-  backBtn.style.display      = 'none';
-  hackHeader.style.display   = '';
+  normalHeader.hidden = true;
+  termList.hidden     = true;
+  termEntry.hidden    = true;
+  termOutput.hidden   = true;
+  termPrompt.hidden   = true;
+  backBtn.hidden      = true;
+  hackHeader.hidden   = false;
 
   if (!hack) {
-    hackBoard.style.display   = 'none';
-    hackBlocked.style.display = 'none';
+    hackBoard.hidden   = true;
+    hackBlocked.hidden = true;
     return;
   }
 
   attemptsLine.innerHTML = attemptsLineHtml(hack);
 
   if (hack.failed) {
-    hackBoard.style.display   = 'none';
-    hackBlocked.style.display = '';
+    hackBoard.hidden   = true;
+    hackBlocked.hidden = false;
     return;
   }
 
-  hackBlocked.style.display = 'none';
-  hackBoard.style.display   = '';
+  hackBlocked.hidden = true;
+  hackBoard.hidden   = false;
   renderHackColumns();
   renderHackLog();
   renderHackInputPreview();

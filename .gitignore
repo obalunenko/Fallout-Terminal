@@ -1,2 +1,16 @@
-node_modules/
-dist/
+__pycache__/
+
+# Go/Wails build output
+build/bin/
+frontend/dist/*
+!frontend/dist/.keep
+frontend/node_modules/
+frontend/wailsjs/
+
+# Go test/build artifacts
+*.test
+*.prof
+coverage.out
+
+# macOS metadata
+.DS_Store
