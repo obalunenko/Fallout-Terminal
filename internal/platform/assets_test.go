@@ -206,14 +206,15 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"--font-body:var(--terminal-scale);",
 		"--font-menu:calc(var(--terminal-scale)*1.0625);",
 		"--font-title:calc(var(--terminal-scale)*1.1875);",
-		"--font-hack:calc(var(--terminal-scale)*.875);",
+		"--font-hack:var(--terminal-scale);",
 		".screen{position:relative;width:100%;max-width:1500px;height:100%;max-height:920px;min-width:0;min-height:0;overflow:hidden;",
 		".hdr-intro{max-height:min(18vh,8rem);overflow:hidden;overflow-wrap:anywhere;}",
 		".term-output{flex:0030%;min-height:calc(var(--terminal-scale)*2.8);",
 		".page-nav{min-width:0;display:flex;align-items:center;justify-content:flex-end;",
 		".term-footer:has(.back-btn[hidden]):has(.page-nav[hidden]){min-height:0;margin-top:0;}",
 		"@media(max-height:720px){:root{--screen-pad-y:max(4px,calc(var(--terminal-scale)*.5));",
-		"@media(max-width:700px),(max-height:360px){.hack-board{height:100%;min-height:0;flex-direction:column;}",
+		".hack-board.hack-compact.hack-stacked{",
+		".hack-board.hack-stacked{flex-direction:column;",
 	} {
 		if !strings.Contains(compactCSS, fragment) {
 			t.Errorf("player stylesheet is missing responsive layout contract %q", fragment)
@@ -241,6 +242,11 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"window.addEventListener('resize', scheduleRepagination)",
 		"new ResizeObserver(scheduleRepagination)",
 		"document.fonts.ready.then(scheduleRepagination)",
+		"function scheduleHackFit()",
+		"hackBoard.classList.toggle('hack-stacked'",
+		"hackBoard.classList.toggle('hack-compact'",
+		"function renderHackScreen() {\n  deactivatePagination();",
+		"renderHackInputPreview();\n  scheduleHackFit();",
 	} {
 		if !strings.Contains(js, fragment) {
 			t.Errorf("player script is missing pagination contract %q", fragment)
@@ -248,6 +254,138 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 	}
 	if strings.Contains(js, ".scrollTop") || strings.Contains(js, ".scrollTo(") {
 		t.Error("player script must not navigate terminal content through scrolling")
+	}
+}
+
+func TestPlayerHackingSingleScreenContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	html := read("client/index.html")
+	for _, fragment := range []string{
+		`class="term-header" id="hackHeader" hidden`,
+		`class="hack-board" id="hackBoard" hidden`,
+		`class="hack-columns" id="hackColumns"`,
+		`class="hack-log" id="hackLog"`,
+		`class="hack-input-line"`,
+		`class="page-nav" id="pageNav" aria-label="Навигация по страницам" hidden`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("player markup is missing single-screen hacking region %q", fragment)
+		}
+	}
+
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+	for _, fragment := range []string{
+		"--font-body:var(--terminal-scale);",
+		"--font-hack:var(--terminal-scale);",
+		".hack-board{height:100%;display:flex;align-items:stretch;",
+		".hack-columns{flex:11auto;display:flex;",
+		".hack-log-panel{flex:0132%;display:grid;grid-template-rows:1frauto;",
+		".hack-board.hack-tight.hack-stacked{gap:0;}",
+		".hack-board.hack-tight.hack-stacked.hack-columns{flex-shrink:0;}",
+		".hack-board.hack-tight.hack-stacked.hack-log-panel{min-height:0;row-gap:0;padding-top:0;}",
+	} {
+		if !strings.Contains(compactCSS, fragment) {
+			t.Errorf("player stylesheet is missing single-screen hacking contract %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
+		if strings.Contains(compactCSS, forbidden) {
+			t.Errorf("hacking layout must not rely on scrolling; found %q", forbidden)
+		}
+	}
+
+	js := read("client/client.js")
+	start := strings.Index(js, "function renderHackScreen()")
+	end := strings.Index(js, "function buildColumnHtml")
+	if start < 0 || end <= start {
+		t.Fatal("player script is missing the hacking render boundary")
+	}
+	hackingRender := js[start:end]
+	if !strings.Contains(hackingRender, "deactivatePagination();") {
+		t.Error("hacking render must disable information-view pagination")
+	}
+	if strings.Contains(hackingRender, "\n  activatePagination(") || strings.Contains(hackingRender, "\n  paginateText(") {
+		t.Error("hacking render must not paginate the board or activity log")
+	}
+	for _, fragment := range []string{
+		"function regionContains(parent, child)",
+		"hackColumns.querySelectorAll('.hack-row')",
+		"Array.from(hackLog.children)",
+		"regions.some(regionOverflows)",
+		"containedRegions.some(([parent, child]) => !regionContains(parent, child))",
+		"hackBoard.classList.add('hack-tight')",
+	} {
+		if !strings.Contains(js, fragment) {
+			t.Errorf("player script is missing rendered hacking geometry contract %q", fragment)
+		}
+	}
+}
+
+func TestPlayerHackingColumnFontFitContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+	for _, fragment := range []string{
+		"--font-hack:var(--terminal-scale);",
+		"--hack-row-font:var(--font-hack);",
+		".hack-row{display:flex;gap:clamp(4px,.8vw,12px);font-size:var(--hack-row-font);",
+	} {
+		if !strings.Contains(compactCSS, fragment) {
+			t.Errorf("player stylesheet is missing shared hacking-row fit contract %q", fragment)
+		}
+	}
+	if !strings.Contains(css, "'Fixedsys', 'Consolas', monospace") {
+		t.Error("hacking-row fit must retain the production fallback font stack for metric remeasurement")
+	}
+
+	js := read("client/client.js")
+	for _, fragment := range []string{
+		"function hackRowsFitColumns()",
+		"const tolerance = 0.5",
+		"finalBounds.right <= columnBounds.right + tolerance",
+		"rowBounds.bottom <= columnBounds.bottom + tolerance",
+		"function fitHackRowFont()",
+		"hackBoard.style.removeProperty('--hack-row-font')",
+		"let low = baseSize",
+		"Math.min(...columns.map(column => column.getBoundingClientRect().width))",
+		"hackRowsFitColumns() && !hackContentOverflows()",
+		"while (high - low > 0.25)",
+		"hackBoard.style.setProperty('--hack-row-font', `${size}px`)",
+		"fitHackRowFont();",
+		"window.addEventListener('resize', scheduleHackFit)",
+		"hackFitObserver.observe(termBody)",
+		"document.fonts.ready.then(scheduleHackFit)",
+		"if (hackFitFrame !== null) cancelAnimationFrame(hackFitFrame)",
+	} {
+		if !strings.Contains(js, fragment) {
+			t.Errorf("player script is missing column-aware hacking-row fit contract %q", fragment)
+		}
+	}
+	if strings.Contains(js, "hackFitObserver.observe(hackBoard)") || strings.Contains(js, "hackFitObserver.observe(hackColumns)") {
+		t.Error("hacking-row fit must not observe its own font-sized descendants and create a resize feedback loop")
 	}
 }
 

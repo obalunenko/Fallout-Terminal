@@ -33,6 +33,7 @@ let pagedView = {
   index: 0,
 };
 let paginationFrame = null;
+let hackFitFrame = null;
 
 let hackLevel        = 0;
 let hack              = null;  // public hack state from server, or null
@@ -62,6 +63,9 @@ const hackColumns      = document.getElementById('hackColumns');
 const hackLog          = document.getElementById('hackLog');
 const hackInputPreview = document.getElementById('hackInputPreview');
 const hackBlocked      = document.getElementById('hackBlocked');
+const hackLogPanel     = hackLog.closest('.hack-log-panel');
+const hackInputLine    = hackInputPreview.closest('.hack-input-line');
+const screen           = document.getElementById('screen');
 
 const termOutput  = document.getElementById('termOutput');
 const termPrompt  = document.getElementById('termPrompt');
@@ -583,6 +587,125 @@ function scheduleRepagination() {
   });
 }
 
+function regionOverflows(region) {
+  return region.scrollHeight > region.clientHeight + 1 ||
+    region.scrollWidth > region.clientWidth + 1;
+}
+
+function regionContains(parent, child) {
+  const tolerance = 1;
+  const parentBounds = parent.getBoundingClientRect();
+  const childBounds = child.getBoundingClientRect();
+  return childBounds.top >= parentBounds.top - tolerance &&
+    childBounds.left >= parentBounds.left - tolerance &&
+    childBounds.right <= parentBounds.right + tolerance &&
+    childBounds.bottom <= parentBounds.bottom + tolerance;
+}
+
+function hackContentOverflows() {
+  const columns = Array.from(hackColumns.children);
+  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
+  const logLines = Array.from(hackLog.children);
+  const regions = [hackBoard, hackColumns, hackLogPanel, hackLog, hackInputLine, ...columns, ...rows, ...logLines];
+  if (regions.some(regionOverflows)) return true;
+
+  const containedRegions = [
+    [screen, hackHeader],
+    [screen, hackBoard],
+    [hackBoard, hackColumns],
+    [hackBoard, hackLogPanel],
+    [hackLogPanel, hackLog],
+    [hackLogPanel, hackInputLine],
+    ...columns.map(column => [hackColumns, column]),
+    ...rows.map(row => [hackColumns, row]),
+    ...logLines.map(line => [hackLog, line]),
+  ];
+  return containedRegions.some(([parent, child]) => !regionContains(parent, child));
+}
+
+function hackRowsFitColumns() {
+  const tolerance = 0.5;
+  return Array.from(hackColumns.children).every(column => {
+    const columnBounds = column.getBoundingClientRect();
+    return Array.from(column.querySelectorAll('.hack-row')).every(row => {
+      const addressBounds = row.querySelector('.hack-addr').getBoundingClientRect();
+      const cells = row.querySelectorAll('.hcell');
+      const finalBounds = cells.length
+        ? cells[cells.length - 1].getBoundingClientRect()
+        : row.querySelector('.hack-cells').getBoundingClientRect();
+      const rowBounds = row.getBoundingClientRect();
+      return addressBounds.left >= columnBounds.left - tolerance &&
+        finalBounds.right <= columnBounds.right + tolerance &&
+        rowBounds.top >= columnBounds.top - tolerance &&
+        rowBounds.bottom <= columnBounds.bottom + tolerance;
+    });
+  });
+}
+
+function fitHackRowFont() {
+  hackBoard.style.removeProperty('--hack-row-font');
+  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
+  const columns = Array.from(hackColumns.children);
+  if (!rows.length || !columns.length) return;
+
+  const baseSize = Number.parseFloat(getComputedStyle(hackBoard).fontSize);
+  if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+
+  const applySize = size => hackBoard.style.setProperty('--hack-row-font', `${size}px`);
+  const fitsAt = size => {
+    applySize(size);
+    return hackRowsFitColumns() && !hackContentOverflows();
+  };
+
+  if (!fitsAt(baseSize)) {
+    applySize(baseSize);
+    return;
+  }
+
+  let low = baseSize;
+  const narrowerColumnWidth = Math.min(...columns.map(column => column.getBoundingClientRect().width));
+  let high = Math.max(baseSize * 2, narrowerColumnWidth);
+  for (let attempt = 0; attempt < 8 && fitsAt(high); attempt++) {
+    low = high;
+    high *= 2;
+  }
+
+  while (high - low > 0.25) {
+    const candidate = (low + high) / 2;
+    if (fitsAt(candidate)) low = candidate;
+    else high = candidate;
+  }
+  applySize(low);
+}
+
+function fitHackLayout() {
+  hackFitFrame = null;
+  if (mode !== MODE.HACK || hackBoard.hidden) {
+    hackBoard.style.removeProperty('--hack-row-font');
+    hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+    return;
+  }
+
+  hackBoard.style.removeProperty('--hack-row-font');
+  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+  const preferStacked = hackBoard.clientWidth <= 700 || hackBoard.clientHeight <= 300;
+  hackBoard.classList.toggle('hack-stacked', preferStacked);
+  hackBoard.classList.toggle('hack-compact', preferStacked || hackContentOverflows());
+
+  if (!preferStacked && hackContentOverflows()) {
+    hackBoard.classList.add('hack-compact', 'hack-stacked');
+  }
+  if (hackContentOverflows()) {
+    hackBoard.classList.add('hack-tight');
+  }
+  fitHackRowFont();
+}
+
+function scheduleHackFit() {
+  if (hackFitFrame !== null) cancelAnimationFrame(hackFitFrame);
+  hackFitFrame = requestAnimationFrame(fitHackLayout);
+}
+
 function render() {
   if (!hasLive) {
     deactivatePagination();
@@ -726,6 +849,7 @@ function renderHackScreen() {
   renderHackColumns();
   renderHackLog();
   renderHackInputPreview();
+  scheduleHackFit();
 }
 
 function buildColumnHtml(col, colIndex) {
@@ -775,12 +899,16 @@ function renderHackInputPreview() {
 // BOOT
 // ════════════════════════════════════════════════════
 window.addEventListener('resize', scheduleRepagination);
+window.addEventListener('resize', scheduleHackFit);
 if ('ResizeObserver' in window) {
   const paginationObserver = new ResizeObserver(scheduleRepagination);
   paginationObserver.observe(termBody);
+  const hackFitObserver = new ResizeObserver(scheduleHackFit);
+  hackFitObserver.observe(termBody);
 }
 if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(scheduleRepagination);
+  document.fonts.ready.then(scheduleHackFit);
 }
 render();
 connect();

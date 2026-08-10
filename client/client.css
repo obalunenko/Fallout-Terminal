@@ -15,7 +15,7 @@
   --font-body: var(--terminal-scale);
   --font-menu: calc(var(--terminal-scale) * 1.0625);
   --font-title: calc(var(--terminal-scale) * 1.1875);
-  --font-hack: calc(var(--terminal-scale) * .875);
+  --font-hack: var(--terminal-scale);
 }
 
 html, body {
@@ -258,27 +258,34 @@ html, body {
 .hack-board {
   height: 100%;
   display: flex;
-  gap: clamp(10px, 2vw, 24px);
+  align-items: stretch;
+  --hack-row-font: var(--font-hack);
+  gap: clamp(8px, 1.5vw, 20px);
   font-size: var(--font-hack);
+  line-height: 1.1;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .hack-columns {
   flex: 1 1 auto;
   display: flex;
-  gap: clamp(8px, 1.6vw, 24px);
+  gap: clamp(6px, 1vw, 16px);
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
-.hack-col { flex: 1 1 0; min-width: 0; }
+.hack-col { flex: 1 1 0; min-width: 0; overflow: hidden; }
 .hack-row {
   display: flex;
-  gap: clamp(6px, 1.3vw, 24px);
+  gap: clamp(4px, .8vw, 12px);
+  font-size: var(--hack-row-font);
   white-space: nowrap;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 .hack-addr { opacity: .55; flex: 0 0 auto; }
-.hack-cells { flex: 1 1 auto; letter-spacing: 1px; }
+.hack-cells { flex: 1 1 auto; letter-spacing: clamp(0px, .08em, 1px); }
 
 .hcell { cursor: pointer; }
 .hcell.word { color: #d8ffb8; }
@@ -290,12 +297,14 @@ html, body {
 }
 
 .hack-log-panel {
-  flex: 0 0 34%;
+  flex: 0 1 32%;
   display: grid;
   grid-template-rows: 1fr auto;
-  row-gap: clamp(4px, 1vh, 8px);
+  row-gap: clamp(3px, .7vh, 6px);
   min-width: 0;
-  padding-left: clamp(8px, 1.6vw, 24px);
+  min-height: 0;
+  padding-left: clamp(6px, 1vw, 16px);
+  border-left: 1px solid #144d18;
 }
 .hack-log {
   grid-row: 1;
@@ -306,7 +315,7 @@ html, body {
   flex-direction: column;
   justify-content: flex-end;
 }
-.hack-log div { padding: 1px 0; margin: 0; word-break: break-word; text-align: left; }
+.hack-log div { padding: 1px 0; margin: 0; line-height: 1.1; word-break: break-word; text-align: left; }
 .hack-input-line {
   grid-row: 2;
   width: 100%;
@@ -318,6 +327,57 @@ html, body {
 
 .hack-cells, .hack-log-panel, .hack-input-line { overflow-wrap: anywhere; }
 
+.hack-board.hack-compact {
+  gap: max(4px, calc(var(--terminal-scale) * .5));
+}
+.hack-board.hack-compact .hack-columns {
+  gap: max(3px, calc(var(--terminal-scale) * .4));
+}
+.hack-board.hack-compact .hack-row {
+  gap: max(2px, calc(var(--terminal-scale) * .25));
+  line-height: 1.02;
+}
+.hack-board.hack-compact .hack-cells { letter-spacing: 0; }
+.hack-board.hack-compact .hack-log-panel {
+  flex-basis: 30%;
+  row-gap: 2px;
+  padding-left: max(3px, calc(var(--terminal-scale) * .4));
+}
+.hack-board.hack-compact .hack-log div {
+  padding: 0;
+  line-height: 1.02;
+}
+
+.hack-board.hack-stacked {
+  flex-direction: column;
+  gap: max(3px, calc(var(--terminal-scale) * .4));
+}
+.hack-board.hack-stacked .hack-columns {
+  flex: 0 1 auto;
+}
+.hack-board.hack-stacked .hack-log-panel {
+  flex: 1 1 auto;
+  min-height: calc(var(--terminal-scale) * 3.5);
+  padding: max(3px, calc(var(--terminal-scale) * .4)) 0 0;
+  border-top: 1px solid #144d18;
+  border-left: 0;
+}
+.hack-board.hack-compact.hack-stacked {
+  gap: 2px;
+}
+.hack-board.hack-compact.hack-stacked .hack-log-panel {
+  min-height: calc(var(--terminal-scale) * 3);
+  padding-top: 2px;
+}
+
+.hack-board.hack-tight.hack-stacked { gap: 0; }
+.hack-board.hack-tight.hack-stacked .hack-columns { flex-shrink: 0; }
+.hack-board.hack-tight.hack-stacked .hack-log-panel {
+  min-height: 0;
+  row-gap: 0;
+  padding-top: 0;
+}
+
 .hack-blocked {
   height: 100%;
   display: flex;
@@ -328,26 +388,6 @@ html, body {
   font-size: var(--font-title);
   letter-spacing: .5px;
   line-height: 1.4;
-}
-
-@media (max-width: 700px), (max-height: 360px) {
-  .hack-board {
-    height: 100%;
-    min-height: 0;
-    flex-direction: column;
-  }
-
-  .hack-columns {
-    flex: 0 0 auto;
-    overflow: hidden;
-  }
-
-  .hack-log-panel {
-    flex: 1 1 auto;
-    min-height: calc(var(--terminal-scale) * 4.5);
-    padding: max(3px, calc(var(--terminal-scale) * .5)) 0 0;
-    border-top: 1px solid #144d18;
-  }
 }
 
 /* ── Connection overlay ────────────────────────────────── */
