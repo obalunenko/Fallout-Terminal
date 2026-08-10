@@ -2,31 +2,36 @@
 
 ## Project Identity
 
-Fallout Terminal is a JavaScript Electron desktop application for tabletop RPG
-game masters. The desktop master interface edits and publishes Fallout-style
-terminal content, while an embedded Express and WebSocket server synchronizes
-that content with browser-based player clients. Saved campaign state is stored
-as versioned JSON session files; live terminal, navigation, and hacking state is
-held in memory by the server.
+Fallout Terminal is a desktop application for tabletop RPG game masters. The
+desktop master interface edits and publishes Fallout-style terminal content,
+while an embedded HTTP and WebSocket server synchronizes that content with
+browser-based player clients. Saved campaign state is stored as versioned JSON
+session files; live terminal, navigation, and hacking state is process-local.
 
-The repository is a modular monolith: Electron, the master renderer, the local
-server, and player client are parts of one deployable application rather than
-independent packages or services.
+The repository is a modular monolith. During the approved Wails v2 migration,
+the existing Electron/Node application remains the behavioral oracle and
+rollback release while equivalent Go/Wails components are added beside it. The
+legacy runtime MUST be removed only after the migration acceptance gates pass.
 
 ## Core Principles
 
 ### I. Preserve Runtime Boundaries
 
-- `main.js` owns Electron lifecycle, native dialogs, filesystem-backed session
-  persistence, server startup, and optional tunnel startup.
-- `preload.js` is the only bridge between the sandboxed master renderer and
-  Electron APIs. Renderer code MUST NOT gain direct Node.js access.
-- `master/` owns the game-master interface and editing state.
-- `server/` owns HTTP/WebSocket transport and server-authoritative live state.
-  Domain logic for navigation and hacking remains separated in `nav.js` and
-  `hack.js` rather than moving into transport or renderer code.
-- `client/` owns the browser player experience and MUST operate without
-  Electron or Node.js APIs.
+- The desktop composition root owns application lifecycle, native dialogs,
+  filesystem-backed persistence, player-server startup, and optional tunnel
+  startup. It is `main.js` during the Electron baseline and `main.go`/`app.go`
+  in the Wails candidate.
+- The master browser frontend MUST access privileged operations only through a
+  narrow registered bridge. It MUST NOT gain direct Node, Go filesystem,
+  process, or environment access.
+- `master/` owns the Electron game-master frontend during transition;
+  `frontend/` owns the Wails game-master frontend.
+- `server/` owns the Electron HTTP/WebSocket implementation during transition;
+  Go packages under `internal/` own the Wails player server and domain services.
+- Navigation and hacking logic MUST remain transport-independent and
+  server-authoritative.
+- `client/` owns the browser player experience and MUST operate without desktop
+  runtime APIs.
 - `sessions/` contains versioned JSON examples/data, not executable logic.
 
 Changes crossing these boundaries MUST identify every affected surface in the
@@ -35,112 +40,124 @@ feature specification and implementation plan.
 ### II. Keep Shared State Server-Authoritative
 
 Player navigation and hacking actions are requests, not local state changes.
-The server MUST validate actions, mutate the canonical live state, and broadcast
-the resulting state to all connected clients. Clients MUST converge on server
+The server MUST validate actions, mutate canonical live state, and broadcast the
+resulting state to all connected clients. Clients MUST converge on server
 messages such as `TERMINAL_LIVE`, `TERMINAL_UPDATE`, `NAV_STATE`, and
-`HACK_STATE`; optimistic client-only transitions that can diverge are prohibited.
+`HACK_STATE`; divergent optimistic client-only transitions are prohibited.
 
-Protocol changes MUST document message direction, payload shape, validation,
-reconnection behavior, and compatibility impact. Secret hacking data MUST remain
+Protocol changes MUST document direction, payload shape, validation,
+reconnection behavior, and compatibility impact. Secret hacking data MUST stay
 server-side and MUST NOT be included in public state payloads.
 
 ### III. Protect Desktop and Public-Access Boundaries
 
-Electron windows MUST retain `nodeIntegration: false`, `contextIsolation: true`,
-and `sandbox: true`. New privileged operations MUST be exposed as narrow,
-explicit preload methods and validated again in the main process. The master
-page's Content Security Policy MUST remain restrictive. External URL handling
-MUST allowlist supported protocols.
+The Electron baseline MUST retain `nodeIntegration: false`,
+`contextIsolation: true`, and `sandbox: true`. The Wails candidate MUST register
+only the Go methods needed by the master frontend. Both bridges MUST validate
+untrusted inputs again at the privileged boundary. Content Security Policy MUST
+remain restrictive, and external URL handling MUST allowlist HTTP and HTTPS.
 
 Public ngrok mode MUST fail closed without valid credentials. Credentials and
-generated traffic-policy files MUST NOT be committed or persisted in project
-data, and temporary policy material MUST be cleaned up on success, failure, and
-shutdown paths.
+generated traffic-policy files MUST NOT be committed, stored in session data,
+or disclosed through UI/log output. Temporary policy material MUST be private
+and cleaned up on success, failure, and shutdown paths.
 
 ### IV. Preserve Session Data Compatibility
 
 Session files are user-owned persistent data. Specifications that change the
-session shape MUST define versioning, validation, defaults for missing fields,
-and migration or backward-compatibility behavior before implementation. Saving
-MUST remain explicit about the target file and MUST NOT silently overwrite
-unrelated user data. Bundled sample sessions may seed an empty writable session
-directory but MUST NOT replace existing files.
+session shape MUST define versioning, validation, defaults, and migration or
+backward-compatibility behavior before implementation. Saving MUST remain
+explicit about the target file and MUST NOT silently overwrite, relocate, or
+transform unrelated user data.
 
-Runtime-only live, navigation, connection, or hacking state MUST NOT be added to
-session JSON unless the feature explicitly changes the persistence contract.
+On macOS, user-created sessions SHOULD default to
+`~/Documents/Fallout Terminal/Sessions/` after explicit confirmation. Bundled
+samples inside the read-only application bundle MUST be copied only after an
+explicit user action. App-managed metadata belongs in
+`~/Library/Application Support/com.vaulttec.fallout-terminal/`. Autosave MUST
+continue targeting the explicitly selected session path.
+
+Runtime-only live, navigation, connection, hacking, and application metadata
+MUST NOT be added to session JSON unless a feature explicitly changes the
+persistence contract.
 
 ### V. Match Established Code Conventions
 
-JavaScript files use lowercase filenames, camelCase variables and functions,
+Browser JavaScript uses lowercase filenames, camelCase variables/functions,
 `UPPER_SNAKE_CASE` constants, two-space indentation, semicolons, and primarily
-single-quoted strings. CSS classes use kebab-case. JSON property names use
-camelCase. WebSocket message types use uppercase snake case.
+single-quoted strings. CSS classes use kebab-case. JSON properties use camelCase.
+WebSocket message types use uppercase snake case.
 
-Main/server modules use CommonJS; renderer files use browser scripts and globals.
-There is no detected branch naming convention and no repository-wide Conventional
-Commits requirement; plans MUST NOT claim either convention exists.
+Go code follows standard package naming, `gofmt`, exported-name documentation,
+and small interfaces at integration boundaries. Renderer files remain browser
+code. The migration MAY introduce a root Go module and a frontend-scoped npm
+package; it MUST NOT retain Node as an application runtime after cutover.
+
+There is no repository-wide Conventional Commits requirement. Migration work
+uses a dedicated feature branch based on `develop` and targets `develop` for
+integration.
 
 ## Dependency Rules
 
-- `main.js` MAY depend on Electron, Node built-ins, `server/server.js`, and the
-  optional `server/ngrok.js` integration.
-- `preload.js` MAY depend only on the Electron bridge APIs required to expose its
-  narrow contract.
-- `master/` MAY call only the API exposed by `preload.js`; it MUST NOT import
-  server or Node modules.
-- `server/server.js` MAY depend on Express, `ws`, Node built-ins, and domain
-  modules within `server/`.
-- `server/hack.js` and `server/nav.js` SHOULD remain transport-independent.
-- `client/` MAY use browser APIs, the server's HTTP endpoints, static assets, and
-  the WebSocket protocol; it MUST NOT depend on Electron or filesystem APIs.
-- New runtime dependencies MUST have a concrete need documented in the plan and
-  MUST preserve the single-package npm structure unless a structural change is
-  explicitly approved.
+- Root `main.go`/`app.go` MAY depend on Wails and internal application services.
+- `internal/domain`, `internal/nav`, and `internal/hack` MUST remain independent
+  of Wails, HTTP, WebSocket, and frontend code.
+- `internal/player` MAY depend on HTTP/WebSocket libraries and domain services,
+  but MUST NOT depend on the master frontend.
+- `frontend/` MAY call only generated Wails bindings and runtime events exposed
+  by the registered bridge.
+- `client/` MAY use browser APIs, player HTTP endpoints, static assets, and the
+  WebSocket protocol; it MUST NOT depend on Electron, Wails, or filesystem APIs.
+- During transition, legacy Electron dependency rules remain applicable to
+  `main.js`, `preload.js`, `master/`, and `server/` until those paths are removed.
+- Every new runtime dependency MUST have a concrete need recorded in the plan
+  and be pinned reproducibly.
 
 ## Testing and Quality Gates
 
-No automated test framework, canonical test directory, coverage threshold,
-linter, formatter, or CI workflow is currently configured. This absence MUST be
-stated in plans and handoffs; contributors MUST NOT claim those checks passed.
+The Go/Wails candidate MUST use colocated Go tests and deterministic fakes at
+filesystem, dialog, process, clock, network, and event boundaries. Concurrency
+code MUST pass the race detector. Browser, native-dialog, audio, public-tunnel,
+and packaged-application checks MAY remain documented manual gates where robust
+automation is not yet present; unavailable checks MUST be reported, not claimed.
 
-Every feature specification MUST contain independently verifiable acceptance
-scenarios. Every implementation plan MUST define proportionate verification for
-the affected surfaces, including manual Electron/browser checks where automation
-does not exist. Changes to pure server domain logic, session validation, IPC
-contracts, WebSocket contracts, or ngrok credential handling SHOULD introduce
-focused automated tests; the plan MUST name the proposed framework, location,
-and npm command before adding them. No numeric coverage target exists until one
-is explicitly adopted.
+Applicable migration commands MUST succeed before cutover:
 
-Existing applicable project commands MUST succeed:
+- `gofmt -l .` produces no Go source paths.
+- `go vet ./...` succeeds.
+- `go test ./...` and `go test -race ./...` succeed.
+- `wails dev` passes the affected interactive journeys.
+- A clean macOS Apple Silicon `wails build` produces a self-contained `.app`.
+- Release candidates pass signing, hardened-runtime, notarization, stapling, and
+  DMG smoke checks when release credentials are available.
 
-- `npm start` for an interactive development smoke check when UI/runtime behavior
-  changes.
-- `npm run build:dir` for Windows packaging-sensitive changes when the required
-  build environment is available.
-
-Reviews MUST additionally verify module boundaries, session compatibility,
-server/client synchronization, and Electron/public-access security as applicable.
+Until cutover, `npm start` remains the Electron behavioral smoke check and
+rollback proof. Reviews MUST additionally verify module boundaries, session
+compatibility, server/client synchronization, privileged-interface exposure,
+public-access security, macOS storage behavior, and owned-resource shutdown.
 
 ## Development Workflow
 
-1. Specify user-visible behavior and independently testable scenarios.
-2. Identify affected runtime surfaces and contracts.
-3. Plan session compatibility, synchronization, security, and packaging impacts.
-4. Implement the smallest coherent vertical slice without unrelated restructuring.
-5. Run the verification defined in the plan and record checks that could not run.
-6. Update README or sample session documentation when setup, operation, or data
-   shape changes.
+1. Branch from `develop` into a dedicated feature branch.
+2. Specify user-visible behavior and independently testable scenarios.
+3. Identify affected runtime surfaces and freeze compatibility contracts.
+4. Plan persistence, synchronization, security, packaging, and rollback impacts.
+5. Implement the smallest coherent vertical slice while retaining the Electron
+   behavioral oracle.
+6. Run the verification defined in the plan and record unavailable checks.
+7. Remove the old runtime only after all migration and package gates pass.
+8. Update README and compatibility specifications when setup, operation, or
+   governed paths change.
 
 ## Governance
 
 This constitution governs Spec Kit artifacts and feature work in this repository.
 Amendments MUST reflect an intentional project decision, document their rationale,
-and update the version below. Existing application behavior is evidence, but an
-accidental inconsistency does not automatically become a new standard.
+and update the version below. Existing behavior is evidence, but an accidental
+inconsistency does not automatically become a new standard.
 
 Constitution checks are required during planning and after design. Any violation
 MUST be listed in the plan's Complexity Tracking table with a concrete rationale
 and a rejected simpler alternative.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09
+**Version**: 2.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09

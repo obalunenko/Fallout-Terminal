@@ -13,8 +13,17 @@ const decodedBufs = new Map(); // url -> AudioBuffer
 let audioCtx = null;
 
 function getCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  try {
+    if (!audioCtx) audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') {
+      const resumed = audioCtx.resume();
+      if (resumed && typeof resumed.catch === 'function') resumed.catch(() => {});
+    }
+  } catch {
+    return null;
+  }
   return audioCtx;
 }
 
@@ -27,24 +36,28 @@ async function prefetch(url) {
 }
 
 async function playBuf(url, volume) {
-  let buffer = decodedBufs.get(url);
-  if (!buffer) {
-    const raw = rawBufs.get(url);
-    if (!raw) return;
-    try {
+  try {
+    let buffer = decodedBufs.get(url);
+    if (!buffer) {
+      const raw = rawBufs.get(url);
+      if (!raw) return;
       const c = getCtx();
+      if (!c) return;
       buffer = await c.decodeAudioData(raw.slice(0));
       decodedBufs.set(url, buffer);
-    } catch { return; }
+    }
+    const c = getCtx();
+    if (!c) return;
+    const src = c.createBufferSource();
+    const gain = c.createGain();
+    src.buffer = buffer;
+    gain.gain.value = volume;
+    src.connect(gain);
+    gain.connect(c.destination);
+    src.start();
+  } catch {
+    // Audio is optional: decode, autoplay, and device failures are non-fatal.
   }
-  const c = getCtx();
-  const src = c.createBufferSource();
-  const gain = c.createGain();
-  src.buffer = buffer;
-  gain.gain.value = volume;
-  src.connect(gain);
-  gain.connect(c.destination);
-  src.start();
 }
 
 async function loadFolder(name) {
@@ -52,8 +65,9 @@ async function loadFolder(name) {
     const res = await fetch(`/api/sounds/${name}`);
     if (!res.ok) return;
     const files = await res.json();
-    folderFiles[name] = files;
-    files.forEach(f => prefetch(`/sounds/${name}/${encodeURIComponent(f)}`));
+    if (!Array.isArray(files)) return;
+    folderFiles[name] = files.filter(file => typeof file === 'string');
+    folderFiles[name].forEach(file => prefetch(`/sounds/${name}/${encodeURIComponent(file)}`));
   } catch { /* sound folder missing — silently skip */ }
 }
 
@@ -85,24 +99,34 @@ let ambientReady = false;
 let userGestured = false;
 
 async function setupAmbient() {
-  await loadFolder('ambient');
-  const files = folderFiles.ambient;
-  if (!files || !files.length) return;
-  ambientAudio = new Audio(`/sounds/ambient/${encodeURIComponent(files[0])}`);
-  ambientAudio.loop = true;
-  ambientAudio.volume = 0.25;
-  ambientReady = true;
-  tryStartAmbient();
+  try {
+    await loadFolder('ambient');
+    const files = folderFiles.ambient;
+    if (!files || !files.length || typeof window.Audio !== 'function') return;
+    ambientAudio = new window.Audio(`/sounds/ambient/${encodeURIComponent(files[0])}`);
+    ambientAudio.loop = true;
+    ambientAudio.volume = 0.25;
+    ambientReady = true;
+    tryStartAmbient();
+  } catch {
+    ambientAudio = null;
+    ambientReady = false;
+  }
 }
 
 function tryStartAmbient() {
   if (ambientReady && userGestured && ambientAudio && ambientAudio.paused) {
-    ambientAudio.play().catch(() => {});
+    try {
+      const playing = ambientAudio.play();
+      if (playing && typeof playing.catch === 'function') playing.catch(() => {});
+    } catch { /* autoplay or device failure — silently skip */ }
   }
 }
 
 function stopAmbient() {
-  if (ambientAudio) ambientAudio.pause();
+  try {
+    if (ambientAudio) ambientAudio.pause();
+  } catch { /* optional audio must not interrupt terminal state */ }
 }
 
 document.addEventListener('click', () => {
@@ -114,4 +138,4 @@ document.addEventListener('click', () => {
 
 // ── Boot: prefetch everything up front ─────────────────
 ['single', 'multiple', 'enter', 'hack-good', 'hack-bad', 'menu-focus', 'charscroll'].forEach(loadFolder);
-setupAmbient();
+setupAmbient().catch(() => {});

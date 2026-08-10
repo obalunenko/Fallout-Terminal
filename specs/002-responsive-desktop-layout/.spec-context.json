@@ -1,0 +1,632 @@
+{
+  "workflow": "companion",
+  "specName": "responsive desktop layout",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T08:12:34.086Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-09T08:15:25.809Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T08:15:25.866Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-09T08:15:25.925Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T08:15:25.982Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-09T08:15:26.039Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-09T08:17:14.355Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:17:47.507Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:18:23.952Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:18:56.714Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:19:26.829Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:19:40.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T08:20:19.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-09T17:30:48.868Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-09T17:30:48.932Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-10T10:24:04.414Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:30:49.345Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:31:48.422Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:36:10.104Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:37:15.461Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:43:57.416Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T10:51:31.004Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T10:52:47.452Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T10:52:47.453Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-10T11:35:32.263Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T11:38:45.103Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T11:51:05.275Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T11:52:02.112Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-10T11:56:23.760Z"
+    }
+  ],
+  "last_action": "BUG-004 complete — 16/16 tasks, 42/42 player states, 12/12 hacking geometry cases, all builds and automated checks pass",
+  "coverage": {
+    "FR-001": {
+      "title": "The player interface MUST provide a responsive layout for viewport sizes from 1024×600 through 2560×1440 at 100% browser zoom.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser production-player state matrix"
+      ]
+    },
+    "FR-002": {
+      "title": "Every player presentation state MUST fit within the browser viewport without horizontal or vertical browser-page scrolling when populated with representative content.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser production-player state matrix"
+      ]
+    },
+    "FR-003": {
+      "title": "The terminal header, active content region, and available navigation controls MUST remain simultaneously visible at every supported desktop viewport.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser persistent-region geometry matrix"
+      ]
+    },
+    "FR-004": {
+      "title": "Responsive changes MUST prevent interface text and controls from overlapping, being clipped, or extending outside the viewport.",
+      "tests": [
+        "browser production-player state matrix",
+        "browser BUG-003 descendant-bound matrix"
+      ]
+    },
+    "FR-005": {
+      "title": "The hacking state MUST keep the board data, attempts, activity log, input preview, and available interactions visible and usable at every supported desktop viewport.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser BUG-003 descendant-bound matrix"
+      ]
+    },
+    "FR-006": {
+      "title": "Text size and spacing MUST adapt across the supported desktop range while keeping primary terminal text at least 16 pixels at 100% zoom.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser computed-font matrix"
+      ]
+    },
+    "FR-007": {
+      "title": "The terminal frame and decorative presentation MUST remain wholly contained within the viewport without reducing the usable content region below what the active state requires.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser screen-boundary matrix"
+      ]
+    },
+    "FR-008": {
+      "title": "Content that exceeds the available content region MUST use localized overflow without causing browser-page scrolling or hiding the terminal header or available navigation controls.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser pagination and hacking matrices"
+      ]
+    },
+    "FR-009": {
+      "title": "Long or unbroken authored values MUST remain fully accessible without widening the browser page or covering another control.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser pagination fixtures"
+      ]
+    },
+    "FR-010": {
+      "title": "At 200% browser zoom, all information and controls MUST remain reachable and usable without overlap or content loss, although localized scrolling MAY be used.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser 512x300 effective zoom matrix"
+      ]
+    },
+    "FR-011": {
+      "title": "Keyboard focus MUST remain visible whenever a player moves among interactive terminal controls.",
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser keyboard pagination boundaries"
+      ]
+    },
+    "FR-012": {
+      "title": "Responsive presentation changes MUST preserve existing connection, navigation, hacking, reveal, and audio behavior.",
+      "tests": [
+        "go test ./...",
+        "go test -race ./...",
+        "packaged Wails production build"
+      ]
+    },
+    "FR-013": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser multi-page keyboard fixture"
+      ]
+    },
+    "FR-014": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerDesktopResponsiveLayoutContract",
+        "browser resize repagination clamp fixture"
+      ]
+    },
+    "FR-015": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser bundled and fallback font geometry matrix"
+      ]
+    },
+    "FR-016": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingSingleScreenContract",
+        "browser dense BUG-003 geometry matrix"
+      ]
+    },
+    "FR-017": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingColumnFontFitContract",
+        "browser BUG-004 bundled/fallback geometry matrix"
+      ]
+    }
+  },
+  "size": "simple",
+  "classification": {
+    "projectedFiles": 3,
+    "projectedTasks": 7,
+    "scopeSignal": "none",
+    "verdict": "simple"
+  },
+  "context": [
+    "area: player-facing browser terminal in client/",
+    "area: embedded player presentation checks in internal/platform/assets_test.go",
+    "constraint: no browser-page scrolling on supported desktop viewports",
+    "constraint: preserve the existing CRT identity and player behavior"
+  ],
+  "intent": "Keep the complete player terminal visible, readable, and operable across desktop browser viewports without page scrolling.",
+  "expectations": [
+    "Game-master Wails desktop layout is out of scope.",
+    "Mobile and tablet layouts are out of scope.",
+    "Server, protocol, persistence, and gameplay behavior changes are out of scope."
+  ],
+  "approach": "Refine the player layout and responsive sizing, retain the existing document structure where possible, and verify the desktop viewport matrix with regression checks.",
+  "currentTask": "T016",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added viewport-aware shell dimensions, spacing, and typography scales for desktop layouts.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Made normal terminal chrome, content, output, prompt, and navigation size coherently with desktop viewport height and width.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added a tight stacked hacking geometry that preserves full-height board rows while reclaiming gaps and log padding for dense compact histories.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Contained long content locally, prevented width expansion, preserved navigation space, and added visible keyboard focus.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Kept the responsive viewport declaration while removing the zoom cap so enlarged layouts remain accessible.",
+      "files": [
+        "client/index.html"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added asset-level contracts for hacking-to-primary font parity, zero scrolling, persistent required regions, tight compact geometry, and pagination exclusion from hacking mode.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Passed frontend and packaged Wails production builds, 42 rendered state/viewport cases, exact-boundary and five-page keyboard pagination, BUG-003/fallback geometry, vet, full tests, and race tests.",
+      "files": [
+        "specs/002-responsive-desktop-layout/spec.md"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Reproduced BUG-003 at the 512x300 effective 200% zoom viewport and recorded the masked 2.88px final-row clipping with full font and geometry evidence.",
+      "files": [
+        "specs/002-responsive-desktop-layout/spec.md"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Implemented descendant-bound-aware hacking fit detection and a tight stacked fallback that restores full rows and dense logs without shrinking text or invoking pagination.",
+      "files": [
+        "client/client.css",
+        "client/client.js"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added descendant-bound regression contracts and passed the full production-rendered viewport matrix, 200% zoom case, dense 32-row/13-log fixture, and Courier New fallback geometry.",
+      "files": [
+        "internal/platform/assets_test.go",
+        "specs/002-responsive-desktop-layout/spec.md"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Measured the BUG-004 production-rendered bundled/fallback font matrix and recorded useful column width, row glyph width, base/computed size, 16-row height, and residual space.",
+      "files": [
+        "specs/002-responsive-desktop-layout/spec.md"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Implemented a stable shared hacking-row font fit bounded by the base role, narrower rendered column, 16-row height, and full hacking-region containment, with render/resize/font-ready recalculation.",
+      "files": [
+        "client/client.css",
+        "client/client.js"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Added embedded-asset regression coverage for the shared row font, base floor, narrower-column and descendant bounds, 0.5px containment, 0.25px maximal-fit search, fallback stack, recalculation triggers, and observer-loop avoidance.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Passed the full BUG-004 production matrix: 42 player-state cases, 12 bundled/fallback hacking fits, maximal-fit bounds, pagination checks, Vite/Wails builds, static checks, full tests, and race tests.",
+      "files": [
+        "specs/002-responsive-desktop-layout/spec.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "frontend production build",
+      "command": "npm run build (frontend)",
+      "result": "passed; Vite built 7 modules",
+      "warnings": []
+    },
+    {
+      "what": "full Go test suite",
+      "command": "go test ./...",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "production Go build",
+      "command": "go build ./...",
+      "result": "passed with embedded player assets",
+      "warnings": []
+    },
+    {
+      "what": "responsive browser QA",
+      "command": "local WebSocket state fixture with 1024x600, 2560x1440, and 512x300 effective zoom viewports",
+      "result": "all player states fit at the minimum desktop viewport; no page overflow; hacking board has 32 visible rows without column overflow; large layout and localized zoom overflow passed; keyboard focus remained visible",
+      "warnings": [
+        "Chrome extension message-channel errors appeared during discarded fixture reconnections and were unrelated to application scripts"
+      ]
+    },
+    {
+      "what": "packaged Wails production build",
+      "command": "wails build",
+      "result": "passed; packaged and self-signed darwin/arm64 application",
+      "warnings": []
+    },
+    {
+      "what": "BUG-003 production-rendered geometry matrix",
+      "command": "production client fixture across 1024x600 through 2560x1440 plus 512x300 with Fixedsys and Courier New",
+      "result": "passed; 32 rows and 13 log lines visible; required bounds contained; zero overflow; font parity; no hacking pagination",
+      "warnings": []
+    },
+    {
+      "what": "all player-state and pagination browser QA",
+      "command": "42 state/viewport cases plus one-page exact-boundary multi-page keyboard and resize checks",
+      "result": "passed; 42/42 states; 200 and 1815 character single pages; 7560 characters exact across 5 pages; resize clamped 5/5 to 4/4",
+      "warnings": []
+    },
+    {
+      "what": "JavaScript syntax",
+      "command": "node --check client/client.js",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Go formatting",
+      "command": "gofmt -l .",
+      "result": "passed with no unformatted files",
+      "warnings": []
+    },
+    {
+      "what": "Go static analysis",
+      "command": "go vet ./...",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Go race test suite",
+      "command": "go test -race ./...",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "production browser state matrix",
+      "command": "42 production-player state/viewport cases",
+      "result": "passed 42/42 across seven states and six viewport/effective-zoom sizes with required bounds contained and zero overflow",
+      "warnings": []
+    },
+    {
+      "what": "BUG-004 hacking geometry matrix",
+      "command": "12 bundled/fallback dense hacking cases",
+      "result": "passed 12/12 with 32 rows, 13 log lines, common fitted size, base floor, descendant containment, no pagination, and maximal-fit headroom <= 0.181 CSS pixels",
+      "warnings": []
+    },
+    {
+      "what": "information pagination regression",
+      "command": "512x300 one-page, exact-boundary, five-page keyboard, and 1024x600 resize checks",
+      "result": "passed; 200 and 1815 characters stayed 1/1, 7560 characters were preserved across 5 pages, boundaries held, and resize clamped to 4/4",
+      "warnings": []
+    },
+    {
+      "what": "frontend and packaged production builds",
+      "command": "npm run build; wails build",
+      "result": "passed; Vite production bundle and self-signed darwin/arm64 application produced",
+      "warnings": []
+    },
+    {
+      "what": "static and automated checks",
+      "command": "node --check client/client.js; gofmt -l .; go vet ./...; go test ./...; go test -race ./...",
+      "result": "all passed; gofmt reported no files",
+      "warnings": []
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Interpret no scrolling as no browser-page scrolling while allowing bounded local overflow for exceptional authored content and enlarged views.",
+      "why": "The interface must stay fully visible while arbitrary user-authored content has no finite maximum length.",
+      "rejected": "Clipping or shrinking unbounded content below a readable size."
+    },
+    {
+      "decision": "Remove the maximum viewport scale cap and reflow the hacking view at enlarged effective widths.",
+      "why": "Players must retain browser zoom and reach every state at 200% enlargement.",
+      "rejected": "Locking the viewport to 100% zoom."
+    },
+    {
+      "decision": "Detect hacking fit from actual descendant bounds as well as scroll extents.",
+      "why": "overflow:hidden can report equal scroll and client extents while child rows are visibly displaced outside their allocated columns.",
+      "rejected": "Treating scroll-extent equality alone as proof that every required region fits."
+    },
+    {
+      "decision": "Use a conditional tight stacked geometry that removes compact gaps and preserves the columns natural height.",
+      "why": "The exact dense-history case needs a few pixels of reclaimed spacing while FR-015 forbids shrinking hacking text and FR-016 forbids scrolling or pagination.",
+      "rejected": "Reducing the hacking font or paginating/clipping the board or activity log."
+    },
+    {
+      "decision": "Fit every hacking row through one rendered CSS variable using a base-to-failure binary search with a 0.25 CSS-pixel interval.",
+      "why": "Actual column width, 16-row height, fallback glyph metrics, and required-region containment can impose different maxima; rendered measurement satisfies all bounds and the 0.5-pixel acceptance tolerance.",
+      "rejected": "A viewport-only formula or unbounded width fill that could clip rows or starve the activity log."
+    },
+    {
+      "decision": "Choose compact/stacked/tight geometry before row-font fitting and observe only the stable terminal body size.",
+      "why": "This keeps layout orientation deterministic and recalculates on render, resize, and font readiness without observing font-sized descendants.",
+      "rejected": "Observing the hacking rows or columns themselves, which could create a resize feedback loop."
+    }
+  ],
+  "concerns": [
+    {
+      "note": "A repeated single-tab WebSocket fixture matrix became unstable during rapid reconnects; independent fixed-state fixture ports and focused state checks were used for trustworthy visual evidence.",
+      "step": "implement"
+    },
+    {
+      "note": "The temporary browser state fixture reused cached query URLs during an early matrix attempt; the final 42-case run used unique cache-busting URLs and produced clean state-specific evidence.",
+      "step": "implement"
+    },
+    {
+      "note": "The first post-edit browser pass reused cached player assets; the temporary production fixture was cache-busted and every final matrix was rerun against the edited CSS and JavaScript.",
+      "step": "implement"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Shipped BUG-004 column-aware hacking-row fitting with production-verified maximal sizing across the full viewport, zoom, and font matrix."
+    }
+  }
+}

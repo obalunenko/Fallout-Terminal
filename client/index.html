@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fallout Terminal</title>
   <link rel="stylesheet" href="client.css">
 </head>
@@ -12,7 +12,7 @@
   <div class="screen" id="screen">
 
     <!-- Normal chrome: shown on every screen except the hacking minigame -->
-    <div class="term-header" id="normalHeader" style="display:none">
+    <div class="term-header" id="normalHeader" hidden>
       <div class="hdr-center">
         <div>ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM</div>
         <div>COPYRIGHT 2075-2077 ROBCO INDUSTRIES</div>
@@ -23,7 +23,7 @@
     </div>
 
     <!-- Hacking protocol chrome -->
-    <div class="term-header" id="hackHeader" style="display:none">
+    <div class="term-header" id="hackHeader" hidden>
       <div class="hdr-center">
         <div>ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL</div>
         <div>ВВЕДИТЕ ПАРОЛЬ</div>
@@ -36,15 +36,15 @@
         <div>ОЖИДАНИЕ ТРАНСЛЯЦИИ<span class="blink">_</span></div>
       </div>
 
-      <div class="term-list" id="termList" style="display:none"></div>
+      <div class="term-list" id="termList" hidden></div>
 
-      <div class="term-entry" id="termEntry" style="display:none">
+      <div class="term-entry" id="termEntry" hidden>
         <div class="entry-title" id="entryTitle"></div>
         <div class="entry-divider">════════════════════════════</div>
         <div class="entry-body" id="entryBody"></div>
       </div>
 
-      <div class="hack-board" id="hackBoard" style="display:none">
+      <div class="hack-board" id="hackBoard" hidden>
         <div class="hack-columns" id="hackColumns"></div>
         <div class="hack-log-panel">
           <div class="hack-log" id="hackLog"></div>
@@ -52,19 +52,24 @@
         </div>
       </div>
 
-      <div class="hack-blocked" id="hackBlocked" style="display:none">
+      <div class="hack-blocked" id="hackBlocked" hidden>
         <div>Вход заблокирован.</div>
         <div>Обратитесь к администратору.</div>
       </div>
     </div>
 
-    <div class="term-output" id="termOutput" style="display:none"></div>
+    <div class="term-output" id="termOutput" hidden></div>
 
     <div class="term-footer">
-      <button class="back-btn" id="backBtn" style="display:none">[ НАЗАД ]</button>
+      <button class="back-btn" id="backBtn" hidden>[ НАЗАД ]</button>
+      <nav class="page-nav" id="pageNav" aria-label="Навигация по страницам" hidden>
+        <button class="page-btn" id="pagePrev" type="button" aria-label="Предыдущая страница" hidden>[ ПРЕД. ]</button>
+        <output class="page-indicator" id="pageIndicator" aria-live="polite">1 / 1</output>
+        <button class="page-btn" id="pageNext" type="button" aria-label="Следующая страница" hidden>[ СЛЕД. ]</button>
+      </nav>
     </div>
 
-    <div class="term-prompt" id="termPrompt" style="display:none">
+    <div class="term-prompt" id="termPrompt" hidden>
       <span>&gt; </span><span class="blink">_</span>
     </div>
 

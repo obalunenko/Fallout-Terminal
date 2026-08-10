@@ -1,0 +1,144 @@
+{
+  "type": "HACK_STATE",
+  "hack": {
+    "level": 2,
+    "wordLength": 5,
+    "attemptsMax": 4,
+    "attemptsLeft": 4,
+    "solved": false,
+    "failed": false,
+    "log": [],
+    "columns": [
+      {
+        "addresses": [
+          "0xEF27",
+          "0xEF3F",
+          "0xEF57",
+          "0xEF6F",
+          "0xEF87",
+          "0xEF9F",
+          "0xEFB7",
+          "0xEFCF",
+          "0xEFE7",
+          "0xEFFF",
+          "0xF017",
+          "0xF02F",
+          "0xF047",
+          "0xF05F",
+          "0xF077",
+          "0xF08F"
+        ],
+        "text": "$@+SPIKE[}?&ROVER%^[@$!-{%?@{#?<}$]=-]\"(~|\"\"-@BRICK}<>&[*[',}$+<?]@BLAST^~:'(>(/?$;>~>!@&\"!#})$[&)>%(++*{'{&;.~'}';?[++&VAULT/([\";{||SWORD.,@'\"'=-!})|++.|}@?@*(}>:?'>~~)+[$TRACE,]*\\=/~)#,,*%!\"",
+        "words": [
+          {
+            "id": "A1",
+            "start": 67,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A2",
+            "start": 133,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A3",
+            "start": 46,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A4",
+            "start": 12,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A5",
+            "start": 172,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A6",
+            "start": 120,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "A7",
+            "start": 3,
+            "length": 5,
+            "isAdmin": false
+          }
+        ]
+      },
+      {
+        "addresses": [
+          "0xF46B",
+          "0xF477",
+          "0xF483",
+          "0xF48F",
+          "0xF49B",
+          "0xF4A7",
+          "0xF4B3",
+          "0xF4BF",
+          "0xF4CB",
+          "0xF4D7",
+          "0xF4E3",
+          "0xF4EF",
+          "0xF4FB",
+          "0xF507",
+          "0xF513",
+          "0xF51F"
+        ],
+        "text": "SUCCESS_+)),\"!$&>)_'BASIN:/{!*,\\,-%)>|<?||@@-\"&'?^+#({@FLARE+:^!({&>(ATLAS^=?=/?%,%%;CRATE+}|&~=^^',\"?:~~)$|]$<~;|;!)-/(,)/;{&^%,@=^)~^\\{,;!;)%\\:'\\_)](?>+.&-,][\"(~FUMES$-#<]\\/]^{#'()(/<SIREN<=",
+        "words": [
+          {
+            "id": "B1",
+            "start": 0,
+            "length": 7,
+            "isAdmin": true
+          },
+          {
+            "id": "B2",
+            "start": 85,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "B3",
+            "start": 55,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "B4",
+            "start": 20,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "B5",
+            "start": 163,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "B6",
+            "start": 185,
+            "length": 5,
+            "isAdmin": false
+          },
+          {
+            "id": "B7",
+            "start": 69,
+            "length": 5,
+            "isAdmin": false
+          }
+        ]
+      }
+    ]
+  }
+}

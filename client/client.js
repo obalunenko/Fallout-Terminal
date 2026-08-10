@@ -24,6 +24,17 @@ let lastRenderedFolderKey  = null;
 let lastRenderedEntryId    = null;
 let lastRenderedCommandKey = null;
 
+let pagedView = {
+  kind: null,
+  key: null,
+  text: '',
+  container: null,
+  pages: [''],
+  index: 0,
+};
+let paginationFrame = null;
+let hackFitFrame = null;
+
 let hackLevel        = 0;
 let hack              = null;  // public hack state from server, or null
 let hackSolvedTimer   = null;
@@ -41,6 +52,7 @@ const hackHeader   = document.getElementById('hackHeader');
 const attemptsLine = document.getElementById('attemptsLine');
 
 const termIdle   = document.getElementById('termIdle');
+const termBody   = document.getElementById('termBody');
 const termList   = document.getElementById('termList');
 const termEntry  = document.getElementById('termEntry');
 const entryTitle = document.getElementById('entryTitle');
@@ -51,10 +63,17 @@ const hackColumns      = document.getElementById('hackColumns');
 const hackLog          = document.getElementById('hackLog');
 const hackInputPreview = document.getElementById('hackInputPreview');
 const hackBlocked      = document.getElementById('hackBlocked');
+const hackLogPanel     = hackLog.closest('.hack-log-panel');
+const hackInputLine    = hackInputPreview.closest('.hack-input-line');
+const screen           = document.getElementById('screen');
 
 const termOutput  = document.getElementById('termOutput');
 const termPrompt  = document.getElementById('termPrompt');
 const backBtn     = document.getElementById('backBtn');
+const pageNav     = document.getElementById('pageNav');
+const pagePrev    = document.getElementById('pagePrev');
+const pageNext    = document.getElementById('pageNext');
+const pageIndicator = document.getElementById('pageIndicator');
 const connOverlay = document.getElementById('connOverlay');
 const connText    = document.getElementById('connText');
 
@@ -62,29 +81,43 @@ const connText    = document.getElementById('connText');
 // WEBSOCKET
 // ════════════════════════════════════════════════════
 let ws;
-let reconnectTimer;
+let reconnectTimer = null;
+const RECONNECT_DELAY_MS = 3000;
+
+function playerWebSocketURL() {
+  const url = new URL('/', window.location.href);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  return url.href;
+}
 
 function connect() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${proto}//${location.host}`);
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
 
-  ws.addEventListener('open', () => {
+  const socket = new WebSocket(playerWebSocketURL());
+  ws = socket;
+
+  socket.addEventListener('open', () => {
+    if (ws !== socket) return;
     clearTimeout(reconnectTimer);
+    reconnectTimer = null;
     connOverlay.classList.add('hidden');
   });
 
-  ws.addEventListener('message', ev => {
+  socket.addEventListener('message', ev => {
+    if (ws !== socket) return;
     try { dispatch(JSON.parse(ev.data)); }
     catch (e) { console.warn('WS parse error', e); }
   });
 
-  ws.addEventListener('close', () => {
+  socket.addEventListener('close', () => {
+    if (ws !== socket) return;
     connOverlay.classList.remove('hidden');
     connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
-    reconnectTimer = setTimeout(connect, 3000);
+    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
   });
 
-  ws.addEventListener('error', () => ws.close());
+  socket.addEventListener('error', () => socket.close());
 }
 
 function send(msg) {
@@ -220,6 +253,8 @@ function goBack() {
 }
 
 backBtn.addEventListener('click', goBack);
+pagePrev.addEventListener('click', () => changePage(-1));
+pageNext.addEventListener('click', () => changePage(1));
 
 // ════════════════════════════════════════════════════
 // MENU HOVER: highlight the entry under the cursor + focus sound
@@ -311,8 +346,36 @@ document.addEventListener('keydown', (e) => {
   }
 
   if (mode === MODE.ENTRY) {
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Enter') { goBack(); e.preventDefault(); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      changePage(-1);
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      changePage(1);
+      e.preventDefault();
+    } else if (e.key === 'Home') {
+      changePage(-pagedView.index);
+      e.preventDefault();
+    } else if (e.key === 'End') {
+      changePage(pagedView.pages.length - pagedView.index - 1);
+      e.preventDefault();
+    } else if (e.key === 'Escape' || e.key === 'Backspace') {
+      goBack();
+      e.preventDefault();
+    }
     return;
+  }
+
+  if (pagedView.kind === 'command') {
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      changePage(-1);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      changePage(1);
+      e.preventDefault();
+      return;
+    }
   }
 
   const kids = (currentFolderNode().children || []);
@@ -381,22 +444,285 @@ function lineToDiv(text) {
   return d;
 }
 
-function render() {
-  if (!hasLive) {
-    normalHeader.style.display = 'none';
-    hackHeader.style.display   = 'none';
-    termIdle.style.display     = '';
-    termList.style.display     = 'none';
-    termEntry.style.display    = 'none';
-    hackBoard.style.display    = 'none';
-    hackBlocked.style.display  = 'none';
-    termOutput.style.display   = 'none';
-    termPrompt.style.display   = 'none';
-    backBtn.style.display      = 'none';
+function replaceWithText(container, text) {
+  if (container._revealTimer) {
+    clearTimeout(container._revealTimer);
+    container._revealTimer = null;
+  }
+  container.innerHTML = '';
+  String(text).split('\n').forEach(line => container.appendChild(lineToDiv(line)));
+}
+
+function textFits(container, text) {
+  replaceWithText(container, text);
+  return container.scrollHeight <= container.clientHeight + 1 &&
+    container.scrollWidth <= container.clientWidth + 1;
+}
+
+function naturalPageBreak(text, start, fittedEnd) {
+  if (fittedEnd >= text.length) return text.length;
+
+  const minimumBreak = start + Math.floor((fittedEnd - start) * .6);
+  for (let i = fittedEnd; i > minimumBreak; i--) {
+    if (/\s/.test(text[i - 1])) return i;
+  }
+  return fittedEnd;
+}
+
+function paginateText(container, text) {
+  const source = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+  if (!source) return [''];
+  if (container.clientHeight <= 0 || container.clientWidth <= 0) return [source];
+
+  const pages = [];
+  let start = 0;
+  while (start < source.length) {
+    let low = start + 1;
+    let high = source.length;
+    let fittedEnd = start;
+
+    while (low <= high) {
+      const midpoint = Math.floor((low + high) / 2);
+      if (textFits(container, source.slice(start, midpoint))) {
+        fittedEnd = midpoint;
+        low = midpoint + 1;
+      } else {
+        high = midpoint - 1;
+      }
+    }
+
+    if (fittedEnd === start) fittedEnd = start + 1;
+    const end = naturalPageBreak(source, start, fittedEnd);
+    pages.push(source.slice(start, end));
+    start = end;
+  }
+  return pages;
+}
+
+function updatePageControls() {
+  if (pagedView.kind === null) {
+    pageNav.hidden = true;
     return;
   }
 
-  termIdle.style.display = 'none';
+  pageNav.hidden = false;
+  pagePrev.hidden = pagedView.index === 0;
+  pageNext.hidden = pagedView.index >= pagedView.pages.length - 1;
+  pageIndicator.value = `${pagedView.index + 1} / ${pagedView.pages.length}`;
+  pageIndicator.textContent = pageIndicator.value;
+}
+
+function renderPagedView(animate) {
+  if (!pagedView.container) return;
+  const page = pagedView.pages[pagedView.index] || '';
+  const lines = page.split('\n').map(lineToDiv);
+  revealInto(pagedView.container, lines, animate);
+  updatePageControls();
+}
+
+function recalculatePagination(resetPage, animate) {
+  if (pagedView.kind === null || !pagedView.container) return;
+  const previousIndex = resetPage ? 0 : pagedView.index;
+  pagedView.pages = paginateText(pagedView.container, pagedView.text);
+  pagedView.index = Math.min(previousIndex, pagedView.pages.length - 1);
+  renderPagedView(animate && pagedView.index === 0);
+}
+
+function activatePagination(kind, key, text, container, animate) {
+  const source = String(text == null ? '' : text);
+  const identityChanged = pagedView.kind !== kind || pagedView.key !== key;
+  const contentChanged = pagedView.text !== source || pagedView.container !== container;
+
+  pagedView.kind = kind;
+  pagedView.key = key;
+  pagedView.text = source;
+  pagedView.container = container;
+
+  if (identityChanged || contentChanged) {
+    recalculatePagination(identityChanged, animate);
+  } else {
+    renderPagedView(false);
+  }
+}
+
+function deactivatePagination() {
+  if (paginationFrame !== null) {
+    cancelAnimationFrame(paginationFrame);
+    paginationFrame = null;
+  }
+  pagedView = {
+    kind: null,
+    key: null,
+    text: '',
+    container: null,
+    pages: [''],
+    index: 0,
+  };
+  updatePageControls();
+}
+
+function changePage(delta) {
+  if (pagedView.kind === null || !delta) return;
+  const activeControl = document.activeElement;
+  const nextIndex = Math.max(0, Math.min(pagedView.pages.length - 1, pagedView.index + delta));
+  if (nextIndex === pagedView.index) return;
+
+  pagedView.index = nextIndex;
+  playEnter();
+  renderPagedView(false);
+
+  if (activeControl === pagePrev && pagePrev.hidden) {
+    (pageNext.hidden ? backBtn : pageNext).focus();
+  } else if (activeControl === pageNext && pageNext.hidden) {
+    (pagePrev.hidden ? backBtn : pagePrev).focus();
+  }
+}
+
+function scheduleRepagination() {
+  if (pagedView.kind === null) return;
+  if (paginationFrame !== null) cancelAnimationFrame(paginationFrame);
+  paginationFrame = requestAnimationFrame(() => {
+    paginationFrame = null;
+    recalculatePagination(false, false);
+  });
+}
+
+function regionOverflows(region) {
+  return region.scrollHeight > region.clientHeight + 1 ||
+    region.scrollWidth > region.clientWidth + 1;
+}
+
+function regionContains(parent, child) {
+  const tolerance = 1;
+  const parentBounds = parent.getBoundingClientRect();
+  const childBounds = child.getBoundingClientRect();
+  return childBounds.top >= parentBounds.top - tolerance &&
+    childBounds.left >= parentBounds.left - tolerance &&
+    childBounds.right <= parentBounds.right + tolerance &&
+    childBounds.bottom <= parentBounds.bottom + tolerance;
+}
+
+function hackContentOverflows() {
+  const columns = Array.from(hackColumns.children);
+  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
+  const logLines = Array.from(hackLog.children);
+  const regions = [hackBoard, hackColumns, hackLogPanel, hackLog, hackInputLine, ...columns, ...rows, ...logLines];
+  if (regions.some(regionOverflows)) return true;
+
+  const containedRegions = [
+    [screen, hackHeader],
+    [screen, hackBoard],
+    [hackBoard, hackColumns],
+    [hackBoard, hackLogPanel],
+    [hackLogPanel, hackLog],
+    [hackLogPanel, hackInputLine],
+    ...columns.map(column => [hackColumns, column]),
+    ...rows.map(row => [hackColumns, row]),
+    ...logLines.map(line => [hackLog, line]),
+  ];
+  return containedRegions.some(([parent, child]) => !regionContains(parent, child));
+}
+
+function hackRowsFitColumns() {
+  const tolerance = 0.5;
+  return Array.from(hackColumns.children).every(column => {
+    const columnBounds = column.getBoundingClientRect();
+    return Array.from(column.querySelectorAll('.hack-row')).every(row => {
+      const addressBounds = row.querySelector('.hack-addr').getBoundingClientRect();
+      const cells = row.querySelectorAll('.hcell');
+      const finalBounds = cells.length
+        ? cells[cells.length - 1].getBoundingClientRect()
+        : row.querySelector('.hack-cells').getBoundingClientRect();
+      const rowBounds = row.getBoundingClientRect();
+      return addressBounds.left >= columnBounds.left - tolerance &&
+        finalBounds.right <= columnBounds.right + tolerance &&
+        rowBounds.top >= columnBounds.top - tolerance &&
+        rowBounds.bottom <= columnBounds.bottom + tolerance;
+    });
+  });
+}
+
+function fitHackRowFont() {
+  hackBoard.style.removeProperty('--hack-row-font');
+  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
+  const columns = Array.from(hackColumns.children);
+  if (!rows.length || !columns.length) return;
+
+  const baseSize = Number.parseFloat(getComputedStyle(hackBoard).fontSize);
+  if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+
+  const applySize = size => hackBoard.style.setProperty('--hack-row-font', `${size}px`);
+  const fitsAt = size => {
+    applySize(size);
+    return hackRowsFitColumns() && !hackContentOverflows();
+  };
+
+  if (!fitsAt(baseSize)) {
+    applySize(baseSize);
+    return;
+  }
+
+  let low = baseSize;
+  const narrowerColumnWidth = Math.min(...columns.map(column => column.getBoundingClientRect().width));
+  let high = Math.max(baseSize * 2, narrowerColumnWidth);
+  for (let attempt = 0; attempt < 8 && fitsAt(high); attempt++) {
+    low = high;
+    high *= 2;
+  }
+
+  while (high - low > 0.25) {
+    const candidate = (low + high) / 2;
+    if (fitsAt(candidate)) low = candidate;
+    else high = candidate;
+  }
+  applySize(low);
+}
+
+function fitHackLayout() {
+  hackFitFrame = null;
+  if (mode !== MODE.HACK || hackBoard.hidden) {
+    hackBoard.style.removeProperty('--hack-row-font');
+    hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+    return;
+  }
+
+  hackBoard.style.removeProperty('--hack-row-font');
+  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+  const preferStacked = hackBoard.clientWidth <= 700 || hackBoard.clientHeight <= 300;
+  hackBoard.classList.toggle('hack-stacked', preferStacked);
+  hackBoard.classList.toggle('hack-compact', preferStacked || hackContentOverflows());
+
+  if (!preferStacked && hackContentOverflows()) {
+    hackBoard.classList.add('hack-compact', 'hack-stacked');
+  }
+  if (hackContentOverflows()) {
+    hackBoard.classList.add('hack-tight');
+  }
+  fitHackRowFont();
+}
+
+function scheduleHackFit() {
+  if (hackFitFrame !== null) cancelAnimationFrame(hackFitFrame);
+  hackFitFrame = requestAnimationFrame(fitHackLayout);
+}
+
+function render() {
+  if (!hasLive) {
+    deactivatePagination();
+    normalHeader.hidden = true;
+    hackHeader.hidden   = true;
+    termIdle.hidden     = false;
+    termList.hidden     = true;
+    termEntry.hidden    = true;
+    hackBoard.hidden    = true;
+    hackBlocked.hidden  = true;
+    termOutput.hidden   = true;
+    termPrompt.hidden   = true;
+    backBtn.hidden      = true;
+    return;
+  }
+
+  termIdle.hidden = true;
 
   if (mode === MODE.HACK) {
     renderHackScreen();
@@ -406,21 +732,21 @@ function render() {
 }
 
 function renderNormalScreen() {
-  hackHeader.style.display  = 'none';
-  hackBoard.style.display   = 'none';
-  hackBlocked.style.display = 'none';
+  hackHeader.hidden  = true;
+  hackBoard.hidden   = true;
+  hackBlocked.hidden = true;
 
-  normalHeader.style.display = '';
+  normalHeader.hidden         = false;
   serverLine.textContent     = `-Server ${serverNum}-`;
   introTextEl.textContent    = introText;
-  termPrompt.style.display   = '';
+  termPrompt.hidden          = false;
 
   if (mode === MODE.ENTRY) {
     const node = findNodeById(tree, viewEntryId);
-    termList.style.display  = 'none';
-    termEntry.style.display = '';
-    termOutput.style.display = 'none';
-    backBtn.style.display   = '';
+    termList.hidden   = true;
+    termEntry.hidden  = false;
+    termOutput.hidden = true;
+    backBtn.hidden    = false;
     entryTitle.textContent  = node ? node.name : '';
 
     const isNewEntry = viewEntryId !== lastRenderedEntryId;
@@ -428,15 +754,14 @@ function renderNormalScreen() {
     lastRenderedFolderKey = null;
     lastRenderedCommandKey = null;
 
-    const lines = (node ? (node.description || '') : '').split('\n').map(lineToDiv);
-    revealInto(entryBody, lines, isNewEntry);
+    activatePagination('entry', viewEntryId, node ? (node.description || '') : '', entryBody, isNewEntry);
     return;
   }
 
   // MODE.LIST
-  termEntry.style.display = 'none';
-  termList.style.display  = '';
-  backBtn.style.display   = navStack.length > 1 ? '' : 'none';
+  termEntry.hidden = true;
+  termList.hidden  = false;
+  backBtn.hidden   = navStack.length <= 1;
   lastRenderedEntryId = null;
   lastMenuHoverIdx = null;
 
@@ -469,14 +794,14 @@ function renderNormalScreen() {
   revealInto(termList, rows, isNewFolder);
 
   if (commandOutput !== null) {
-    termOutput.style.display = '';
+    termOutput.hidden = false;
     const isNewCommand = currentCommandNodeId !== lastRenderedCommandKey;
     lastRenderedCommandKey = currentCommandNodeId;
-    const outLines = String(commandOutput).split('\n').map(lineToDiv);
-    revealInto(termOutput, outLines, isNewCommand);
+    activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
   } else {
-    termOutput.style.display = 'none';
+    termOutput.hidden = true;
     lastRenderedCommandKey = null;
+    deactivatePagination();
   }
 }
 
@@ -496,33 +821,35 @@ function attemptsLineHtml(h) {
 }
 
 function renderHackScreen() {
-  normalHeader.style.display = 'none';
-  termList.style.display     = 'none';
-  termEntry.style.display    = 'none';
-  termOutput.style.display   = 'none';
-  termPrompt.style.display   = 'none';
-  backBtn.style.display      = 'none';
-  hackHeader.style.display   = '';
+  deactivatePagination();
+  normalHeader.hidden = true;
+  termList.hidden     = true;
+  termEntry.hidden    = true;
+  termOutput.hidden   = true;
+  termPrompt.hidden   = true;
+  backBtn.hidden      = true;
+  hackHeader.hidden   = false;
 
   if (!hack) {
-    hackBoard.style.display   = 'none';
-    hackBlocked.style.display = 'none';
+    hackBoard.hidden   = true;
+    hackBlocked.hidden = true;
     return;
   }
 
   attemptsLine.innerHTML = attemptsLineHtml(hack);
 
   if (hack.failed) {
-    hackBoard.style.display   = 'none';
-    hackBlocked.style.display = '';
+    hackBoard.hidden   = true;
+    hackBlocked.hidden = false;
     return;
   }
 
-  hackBlocked.style.display = 'none';
-  hackBoard.style.display   = '';
+  hackBlocked.hidden = true;
+  hackBoard.hidden   = false;
   renderHackColumns();
   renderHackLog();
   renderHackInputPreview();
+  scheduleHackFit();
 }
 
 function buildColumnHtml(col, colIndex) {
@@ -562,7 +889,6 @@ function renderHackColumns() {
 
 function renderHackLog() {
   hackLog.innerHTML = hack.log.map(line => `<div>${esc(line)}</div>`).join('');
-  hackLog.scrollTop = hackLog.scrollHeight;
 }
 
 function renderHackInputPreview() {
@@ -572,5 +898,17 @@ function renderHackInputPreview() {
 // ════════════════════════════════════════════════════
 // BOOT
 // ════════════════════════════════════════════════════
+window.addEventListener('resize', scheduleRepagination);
+window.addEventListener('resize', scheduleHackFit);
+if ('ResizeObserver' in window) {
+  const paginationObserver = new ResizeObserver(scheduleRepagination);
+  paginationObserver.observe(termBody);
+  const hackFitObserver = new ResizeObserver(scheduleHackFit);
+  hackFitObserver.observe(termBody);
+}
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(scheduleRepagination);
+  document.fonts.ready.then(scheduleHackFit);
+}
 render();
 connect();

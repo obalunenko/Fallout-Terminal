@@ -11,7 +11,7 @@ source: existing implementation
 
 ## Purpose
 
-Live broadcast turns one game-master-selected terminal into a shared browser experience. The Electron main process starts an embedded HTTP and WebSocket server, the game master controls which terminal is live, and every connected player observes one canonical navigation position. Player input is sent as a request; only state returned by the server changes the shared folder, entry, or command view.
+Live broadcast turns one game-master-selected terminal into a shared browser experience. The Wails/Go application starts an embedded HTTP and WebSocket server, the game master controls which terminal is live, and every connected player observes one canonical navigation position. Player input is sent as a request; only state returned by the server changes the shared folder, entry, or command view.
 
 The hacking rules and player-facing visual treatment are documented by their own migrated features. This specification describes only how those systems attach to the live snapshot where necessary for compatibility.
 
@@ -95,19 +95,19 @@ As a game master, I can see where players should connect and how many player Web
 
 1. **Given** the embedded server starts successfully, **when** the master window loads, **then** it receives the selected non-internal IPv4 address and port as the player URL.
 2. **Given** no non-internal IPv4 interface is found, **when** the URL is constructed, **then** `localhost` is used as the host fallback.
-3. **Given** a player WebSocket connects, **when** it is registered, **then** the connected-client count increases and is reported to the master renderer.
-4. **Given** a registered WebSocket closes or errors, **when** it is removed, **then** the current connected-client count is reported to the master renderer.
-5. **Given** the game master selects the displayed HTTP or HTTPS address, **when** the Electron main process accepts it, **then** the address opens externally; malformed and unsupported protocols are ignored.
+3. **Given** a player WebSocket connects, **when** it is registered, **then** the connected-client count increases and is reported to the master frontend.
+4. **Given** a registered WebSocket closes or errors, **when** it is removed, **then** the current connected-client count is reported to the master frontend.
+5. **Given** the game master selects the displayed HTTP or HTTPS address, **when** the bound desktop method accepts it, **then** the address opens externally; malformed and unsupported protocols are ignored.
 
 ## Functional Requirements
 
 ### Server startup and connection lifecycle
 
-- **FR-001**: The Electron main process MUST start the embedded server before presenting the master interface.
+- **FR-001**: The Wails/Go application MUST start the embedded server before presenting the master interface.
 - **FR-002**: The server MUST listen on port `3690` by default and bind to `0.0.0.0`.
 - **FR-003**: The HTTP application MUST serve the browser player application from `client/`.
 - **FR-004**: The server MUST report a player URL using the first detected non-internal IPv4 address, falling back to `localhost`.
-- **FR-005**: The server MUST maintain the set of registered player WebSockets and notify the Electron layer of count changes on connection, close, and error.
+- **FR-005**: The server MUST maintain the set of registered player WebSockets and notify the desktop event layer of count changes on connection, close, and error.
 - **FR-006**: A newly connected player MUST receive the current public live snapshot when one exists.
 - **FR-007**: The player client MUST reconnect approximately three seconds after a WebSocket close and MUST select `ws` or `wss` from the page protocol.
 
@@ -132,12 +132,12 @@ As a game master, I can see where players should connect and how many player Web
 - **FR-021**: Player clients MUST replace their mirrored path, viewed entry, and active command from server state and MUST reset their local selection index.
 - **FR-022**: A hacking gate MAY prevent the displayed mode from changing immediately, but incoming navigation fields MUST still mirror the server state for use after the gate resolves.
 
-### Update revalidation and Electron boundary
+### Update revalidation and desktop boundary
 
 - **FR-023**: Revalidation MUST preserve only the contiguous valid folder prefix beginning at `root`.
 - **FR-024**: Revalidation MUST clear an invalid entry reference and MUST clear a command that is not a direct child of the revalidated current folder.
-- **FR-025**: The sandboxed master renderer MUST control broadcast operations only through explicit preload methods.
-- **FR-026**: The main process MUST route make-live, update-live, and clear-live IPC messages to the server module.
+- **FR-025**: The sandboxed master frontend MUST control broadcast operations only through explicit bound methods exposed by the compatibility facade.
+- **FR-026**: The Go composition root MUST route make-live, update-live, and clear-live calls to the authoritative live/player services.
 - **FR-027**: Runtime live, navigation, and connection state MUST remain in memory and MUST NOT be added to saved session JSON.
 
 ## Protocol Contract
@@ -171,14 +171,13 @@ The existing protocol has no version field. This migration documents current beh
 - Renaming a live terminal is intentionally deferred until the next full broadcast because a full broadcast also resets runtime state.
 - Authentication and public tunneling are outside this feature and are documented separately when migrated.
 
-## Identified Gaps
+## Migration Status of Previously Identified Gaps
 
-1. No automated tests cover the pure navigation domain, WebSocket protocol, IPC contract, reconnect snapshot, or multi-client convergence.
-2. Broadcast IPC payloads are forwarded without structural validation in the Electron main process.
+1. Automated tests now cover the pure navigation domain, WebSocket protocol, desktop bridge contract, reconnect snapshot, and multi-client convergence.
+2. Bound broadcast payloads are structurally validated at the privileged Go boundary.
 3. `setLiveTerminal` assumes a valid payload and content tree.
-4. `TERMINAL_UPDATE` and its IPC request carry no terminal ID; the master renderer's local state is the only guard against updating an unintended live terminal.
+4. `TERMINAL_UPDATE` intentionally carries no terminal ID; the master frontend's local state and the live service's active-state check guard the update boundary.
 5. Unknown string navigation actions produce a redundant unchanged `NAV_STATE` instead of an explicit rejection.
 6. WebSocket `error` and `close` can both remove the same socket and emit redundant count notifications.
 7. The connection-count callback is registered after server startup, so a connection in that narrow interval is not reported until another count change.
 8. The HTTP/WebSocket server exposes no explicit graceful-shutdown operation.
-

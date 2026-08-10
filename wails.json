@@ -1,0 +1,25 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Fallout Terminal",
+  "outputfilename": "Fallout Terminal",
+  "frontend:dir": "frontend",
+  "frontend:install": "npm ci",
+  "frontend:dev:install": "npm ci",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "postBuildHooks": {
+    "darwin/*": "sh ../darwin/postbuild.sh ${bin}"
+  },
+  "author": {
+    "name": "Vault-Tec R&D",
+    "email": ""
+  },
+  "info": {
+    "companyName": "Vault-Tec R&amp;D",
+    "productName": "Fallout Terminal",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 Vault-Tec R&amp;D",
+    "comments": "Fallout Terminal — Master Control"
+  }
+}

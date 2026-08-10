@@ -11,7 +11,7 @@ source: existing implementation
 
 ## Purpose
 
-Public ngrok access lets a game master expose the application's existing local HTTP and WebSocket server to remote players through a configured ngrok endpoint. The mode is opt-in and fails closed: a tunnel is not started without valid Basic Auth credentials. The Electron main process coordinates startup and shutdown, while `server/ngrok.js` owns credential validation, temporary traffic-policy creation, child-process management, and public URL discovery.
+Public ngrok access lets a game master expose the application's existing local HTTP and WebSocket server to remote players through a configured ngrok endpoint. The mode is opt-in and fails closed: a tunnel is not started without valid Basic Auth credentials. The Wails composition root coordinates startup and shutdown, while `internal/tunnel/` owns credential validation, temporary traffic-policy creation, child-process management, and public URL discovery.
 
 ## User Scenarios and Acceptance
 
@@ -19,7 +19,7 @@ Public ngrok access lets a game master expose the application's existing local H
 
 As a game master, I can deliberately start the application in public mode with credentials so that remote players can use the same terminal experience without exposing it anonymously.
 
-**Independent verification**: Configure ngrok and valid Basic Auth credentials, run `npm run start:ngrok`, open the displayed public URL anonymously and with credentials, and attempt both the player page and its WebSocket connection.
+**Independent verification**: Configure ngrok and valid Basic Auth credentials, run the single root `wails dev` command with `NGROK_ENABLED=1`, open the displayed public URL anonymously and with credentials, and attempt both the player page and its WebSocket connection.
 
 **Acceptance scenarios**:
 
@@ -57,9 +57,9 @@ As a game master, I can distinguish the public player address from the local add
 **Acceptance scenarios**:
 
 1. **Given** the local server has started and the tunnel is still pending, **when** the master window loads, **then** the local player URL is initially available.
-2. **Given** ngrok reports an HTTPS public URL, **when** the main process receives it, **then** the master header changes to the public URL and retains the local URL in its explanatory tooltip.
-3. **Given** tunnel startup fails, **when** the failure reaches the master renderer, **then** the header shows `NGROK: ОШИБКА`, exposes the error and local address in its tooltip, and retains the local URL as its click target.
-4. **Given** a displayed local or public URL uses HTTP or HTTPS, **when** the game master clicks it, **then** the Electron main process may open that validated URL externally.
+2. **Given** ngrok reports an HTTPS public URL, **when** the Go runtime receives it, **then** the master header changes to the public URL and retains the local URL in its explanatory tooltip.
+3. **Given** tunnel startup fails, **when** the failure reaches the master frontend, **then** the header shows `NGROK: ОШИБКА`, exposes the error and local address in its tooltip, and retains the local URL as its click target.
+4. **Given** a displayed local or public URL uses HTTP or HTTPS, **when** the game master clicks it, **then** the bound desktop method may open that validated URL externally.
 
 ---
 
@@ -74,7 +74,7 @@ As a game master, I can close the application or encounter a failed startup with
 1. **Given** valid credentials, **when** tunnel startup begins, **then** they are written into a private temporary traffic-policy file rather than a project or session file.
 2. **Given** the traffic-policy file was created successfully, **when** startup succeeds or later fails, **then** the temporary policy directory is removed on a best-effort basis.
 3. **Given** tunnel startup fails before success, **when** the failure is handled, **then** the child is terminated if necessary and the active-process reference is cleared.
-4. **Given** a tunnel process is active, **when** Electron begins quitting, **then** the application asks the ngrok process to terminate and clears its active-process reference.
+4. **Given** a tunnel process is active, **when** Wails begins quitting, **then** the application asks the ngrok process group to terminate and clears its active-process reference.
 5. **Given** a tunnel process is already active, **when** another start is requested in the same process, **then** the second request is rejected.
 
 ## Edge Cases and Observed Behavior
@@ -106,17 +106,17 @@ As a game master, I can close the application or encounter a failed startup with
 - **FR-012**: The tunnel child MUST receive the local port, endpoint URL, traffic-policy path, stdout logging, and JSON log-format arguments.
 - **FR-013**: Startup MUST resolve only after an HTTPS public URL is recognized in ngrok output.
 - **FR-014**: Startup MUST reject on invalid credentials, policy preparation failure, missing binary, premature child exit, other spawn errors, or URL-discovery timeout.
-- **FR-015**: A startup failure MUST preserve local server operation and MUST be reported to the master renderer without exposing the configured credential.
-- **FR-016**: Successful startup MUST report both the public URL and the retained local URL to the master renderer.
-- **FR-017**: Electron shutdown MUST request termination of the active ngrok process.
+- **FR-015**: A startup failure MUST preserve local server operation and MUST be reported to the master frontend without exposing the configured credential.
+- **FR-016**: Successful startup MUST report both the public URL and the retained local URL to the master frontend.
+- **FR-017**: Wails shutdown MUST request termination of the active ngrok process group.
 - **FR-018**: The master UI MUST distinguish local, public, and failed-tunnel address states and MUST open only main-process-validated HTTP(S) addresses.
 
 ### Impacted Application Surfaces
 
-- **Electron main (`main.js`)**: Affected — detects opt-in mode, starts ngrok after the local server, forwards success/failure information, and stops the child during shutdown.
-- **Preload IPC (`preload.js`)**: Affected through the existing narrow `server-info` listener and validated `openUrl` request; it does not receive credentials or process control.
-- **Master UI (`master/`)**: Affected — displays local, public, and error states and provides the click target.
-- **Server (`server/`)**: Affected through the dedicated `server/ngrok.js` integration; the Express/WebSocket server itself has no tunnel-specific routes or messages.
+- **Wails composition root (`main.go`, `app.go`)**: Detects opt-in mode, starts ngrok after the local server, forwards success/failure information, and stops the child during shutdown.
+- **Bound desktop facade (`frontend/src/desktop-api.js`)**: Uses the narrow `server-info` listener and validated `OpenURL` request; it receives neither credentials nor process control.
+- **Master UI (`frontend/src/`)**: Displays local, public, and error states and provides the click target.
+- **Go tunnel/player services (`internal/tunnel/`, `internal/player/`)**: Own tunnel process policy and the HTTP/WebSocket server; the player protocol has no tunnel-specific messages.
 - **Player UI (`client/`)**: Not directly affected — it is served unchanged through ngrok and derives secure WebSocket transport from the HTTPS page.
 - **Session data (`sessions/`)**: Not affected — no credential, tunnel setting, URL, or process state is persisted.
 - **Packaging/public access**: Affected — packaged runs may opt in with `--ngrok`, and the ngrok executable must be available separately through the configured binary path or environment.
@@ -137,7 +137,7 @@ Programmatic `startNgrok` options override the corresponding environment-derived
 ### State and Contract Requirements
 
 - **Session compatibility**: No session schema impact; tunnel state remains process-local.
-- **IPC contract**: Main → master `server-info` carries the ordinary local server object, or adds `{ localUrl, url, tunnel: true }` after success, or adds `{ tunnelError }` after failure. Master → main `open-url` carries a string that is reparsed and restricted to HTTP(S).
+- **Desktop bridge contract**: Go runtime → master `server-info` carries the ordinary local server object, or adds `{ localUrl, url, tunnel: true }` after success, or adds `{ tunnelError }` after failure. Master → bound `OpenURL` carries a string that is reparsed and restricted to HTTP(S).
 - **WebSocket contract**: No application message change. Authentication is applied by ngrok before requests and upgrades reach the existing WebSocket server.
 - **Reconnect behavior**: After authenticating at the public endpoint, player reconnection follows the existing live-broadcast behavior. Tunnel process recovery itself is not implemented.
 - **HTTP/static contract**: No route change. The same Express application is exposed behind ngrok's Basic Auth ingress policy.
@@ -148,14 +148,14 @@ Programmatic `startNgrok` options override the corresponding environment-derived
 - Credentials MUST NOT enter session JSON, renderer messages, UI text, logs emitted by this feature, or repository files.
 - Temporary policy material MUST be private to the creating user where filesystem permissions are honored and MUST be cleaned up after ngrok has consumed it.
 - The sandboxed renderer MUST receive only status and addresses; it MUST NOT control child processes or read environment credentials.
-- External address opening MUST remain restricted to HTTP and HTTPS in the Electron main process.
+- External address opening MUST remain restricted to HTTP and HTTPS in the bound Go method.
 
 ## Key Entities
 
 - **Tunnel configuration**: Enablement, Basic Auth credential, executable, domain, and startup timeout resolved from options, CLI arguments, defaults, and environment variables.
 - **Temporary traffic policy**: Ephemeral JSON containing one enforced Basic Auth action and the configured credential.
 - **Tunnel process**: At most one tracked ngrok child process with stdout/stderr and lifecycle listeners.
-- **Displayed server information**: The local server address plus optional public URL, tunnel marker, or tunnel error sent to the master renderer.
+- **Displayed server information**: The local server address plus optional public URL, tunnel marker, or tunnel error sent to the master frontend.
 
 ## Success Criteria
 
@@ -163,9 +163,9 @@ Programmatic `startNgrok` options override the corresponding environment-derived
 - **SC-002**: Anonymous HTTP access and WebSocket connection attempts through the public endpoint are rejected, while the configured credential permits both.
 - **SC-003**: Every invalid or absent credential case prevents an unprotected ngrok process from being started.
 - **SC-004**: After successful traffic-policy creation, successful URL discovery and later handled startup failures leave no feature-created traffic-policy directory behind when best-effort removal succeeds.
-- **SC-005**: Closing Electron while the tunnel is active requests child-process termination.
+- **SC-005**: Closing the Wails application while the tunnel is active requests child-process termination.
 - **SC-006**: Missing binary, policy creation failure, early exit, and timeout leave the local server usable and produce a visible tunnel-error state.
-- **SC-007**: Normal `npm start` behavior, session files, application WebSocket messages, and player rendering remain unchanged when public mode is not enabled.
+- **SC-007**: Normal `wails dev` behavior, session files, application WebSocket messages, and player rendering remain unchanged when public mode is not enabled.
 
 ## Assumptions
 

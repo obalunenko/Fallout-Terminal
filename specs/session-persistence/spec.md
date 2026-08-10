@@ -11,7 +11,15 @@ source: existing implementation
 
 ## Purpose
 
-Session persistence lets a game master keep terminal definitions between application runs. The Electron main process owns native file dialogs and filesystem access, while the sandboxed master renderer works with the active session through a narrow preload API. Sessions are human-readable JSON files and currently declare schema version 1.
+Session persistence lets a game master keep terminal definitions between application runs. The Wails-bound Go service owns native file dialogs and filesystem access, while the sandboxed master frontend works with the active session through a narrow compatibility facade. Sessions are human-readable JSON files and currently declare schema version 1.
+
+**Current macOS storage override**: The Wails migration intentionally supersedes
+the reverse-engineered executable-adjacent defaults and automatic demo seeding
+described in User Stories 4–5 and FR-017–FR-019. Dialogs now default to
+`~/Documents/Fallout Terminal/Sessions/`, the bundled demo remains read-only
+until an explicit copy, Application Support is reserved for metadata, and an
+explicitly selected file remains the autosave target. The version-1 durable
+data contract and all authoring behavior are unchanged.
 
 ## User Scenarios and Acceptance
 
@@ -57,9 +65,9 @@ As a game master, I have content changes saved to the currently open file so tha
 
 1. **Given** a session file is active, **when** the game master adds, renames, configures, or deletes a terminal, **then** the complete current session object is written to that file.
 2. **Given** a session file is active, **when** the game master adds, edits, or deletes a folder, command, or entry, **then** the complete current session object is written to that file.
-3. **Given** a save succeeds, **when** the IPC response returns, **then** the master interface shows a localized saved timestamp and clears its error style.
-4. **Given** a save fails, **when** the IPC response returns, **then** the editor remains open and shows the returned error in its save status.
-5. **Given** no session file is active, **when** a save is requested, **then** the main process rejects it with `Нет открытого файла сессии` rather than choosing a destination implicitly.
+3. **Given** a save succeeds, **when** the bound-method response returns, **then** the master interface shows a localized saved timestamp and clears its error style.
+4. **Given** a save fails, **when** the bound-method response returns, **then** the editor remains open and shows the returned error in its save status.
+5. **Given** no session file is active, **when** a save is requested, **then** the Go session service rejects it with `Нет открытого файла сессии` rather than choosing a destination implicitly.
 
 ---
 
@@ -101,17 +109,17 @@ As a game master using a packaged build for the first time, I receive a demo ses
 - **FR-007**: Opening a session MUST parse the selected file as UTF-8 JSON and MUST reject a top-level value without a `terminals` array.
 - **FR-008**: A failed create or open operation MUST NOT replace the current active save path.
 - **FR-009**: Canceling a create or open dialog MUST return a non-success result without treating cancellation as an error.
-- **FR-010**: Successful create and open operations MUST return the selected path and session object to the master renderer and set that path as the subsequent save target.
+- **FR-010**: Successful create and open operations MUST return the selected path and session object to the master frontend and set that path as the subsequent save target.
 - **FR-011**: Loading a session in the renderer MUST reset runtime-only editing, selection, expansion, live-terminal, and live-hacking state rather than persisting those values.
 - **FR-012**: Saving MUST serialize the complete renderer-provided session object as indented JSON to the current active file.
 - **FR-013**: Saving without an active file MUST fail explicitly and MUST NOT open a dialog or infer a path.
-- **FR-014**: Filesystem and JSON errors from create, open, and save operations MUST cross the IPC boundary as non-success results with an error message.
-- **FR-015**: The master renderer MUST display the selected file path after a successful create or open operation.
+- **FR-014**: Filesystem and JSON errors from create, open, and save operations MUST cross the bound desktop boundary as non-success results with an error message.
+- **FR-015**: The master frontend MUST display the selected file path after a successful create or open operation.
 - **FR-016**: Successful autosave MUST display a localized completion time; failed autosave MUST display an error state without closing the editor.
 - **FR-017**: Development mode MUST default session dialogs to `<application>/sessions`; packaged mode MUST default them to a `sessions` directory adjacent to the executable.
 - **FR-018**: The application MUST attempt to create its default writable sessions directory recursively before using it.
 - **FR-019**: On startup, the bundled demo MUST be copied to an empty writable sessions directory when available and MUST NOT overwrite or add to a non-empty directory.
-- **FR-020**: Session filesystem operations MUST remain in the Electron main process and MUST be exposed to the sandboxed renderer only through the narrow preload methods `newSession`, `openSession`, and `saveSession`.
+- **FR-020**: Session filesystem operations MUST remain in the bound Go service and MUST be exposed to the sandboxed frontend only through the narrow compatibility methods `newSession`, `openSession`, and `saveSession`.
 - **FR-021**: Runtime live-terminal, navigation, connection, and hacking progress MUST remain outside session JSON; only durable terminal configuration and content belong in the persisted session.
 
 ## Persisted Data Contract
@@ -137,13 +145,13 @@ session
 
 Observed child node variants are folders with `children`, commands with `text`, and entries with `description`. This is an observational contract, not an executable schema: the loader currently validates only the top-level `terminals` array.
 
-## IPC Contract
+## Desktop Bridge Contract
 
 | Direction | Channel/API | Result or payload |
 |---|---|---|
-| Master renderer → main | `session:new` / `newSession()` | No payload; returns `{ok:false}` on cancellation, `{ok:false,error}` on failure, or `{ok:true,filePath,session}`. |
-| Master renderer → main | `session:open` / `openSession()` | No payload; returns the same result variants as creation. |
-| Master renderer → main | `session:save` / `saveSession(session)` | Carries the complete session object; returns `{ok:true}` or `{ok:false,error}`. |
+| Master frontend → Go service | `NewSession` / `newSession()` | No payload; returns `{ok:false}` on cancellation, `{ok:false,error}` on failure, or `{ok:true,filePath,session}`. |
+| Master frontend → Go service | `OpenSession` / `openSession()` | No payload; returns the same result variants as creation. |
+| Master frontend → Go service | `SaveSession` / `saveSession(session)` | Carries the complete session object; returns ordered revision status or `{ok:false,error}`. |
 
 ## Edge Cases Observed
 
@@ -166,7 +174,7 @@ Observed child node variants are folders with `children`, commands with `text`, 
 - **SC-005**: Invalid JSON, a missing `terminals` array, and filesystem write failures return visible errors without switching the application to the failed file.
 - **SC-006**: An empty packaged writable directory receives one demo copy, while any non-empty directory retains all of its contents unchanged.
 - **SC-007**: Persisted JSON excludes runtime-only live broadcast, navigation path, client count, and active hacking-board state.
-- **SC-008**: The master renderer retains Electron sandboxing and performs no direct Node.js or filesystem access during all session operations.
+- **SC-008**: The sandboxed Wails frontend performs no direct Node.js or filesystem access during all session operations.
 
 ## Assumptions
 
@@ -179,13 +187,12 @@ Observed child node variants are folders with `children`, commands with `text`, 
 
 ## Known Gaps
 
-- No automated tests cover session defaults, validation, IPC results, filesystem failures, autosave ordering, or packaged-directory behavior.
+- Automated tests cover session defaults, validation, desktop-bridge results, filesystem failures, autosave ordering, and packaged-resource behavior.
 - The loader has no complete schema validation and accepts unsupported or missing versions and malformed terminal trees.
-- The main process trusts the entire session object received from the renderer without validation or size limits.
+- The Go session boundary validates the complete session object received from the frontend with configured size and depth limits.
 - No version migration, compatibility fallback, or future-version rejection policy exists despite the persisted `version` field.
 - Direct synchronous replacement is not crash-safe or atomic and no backup or recovery copy is retained.
 - Autosaves are neither serialized nor debounced, and most mutation handlers do not await completion.
 - External file changes and multiple application instances are not detected, so last-writer-wins data loss is possible.
 - Writable-directory creation and demo-seeding errors are suppressed and not surfaced diagnostically.
 - There is no explicit Save As, manual save, dirty-state indicator, recent-file list, or recovery workflow.
-

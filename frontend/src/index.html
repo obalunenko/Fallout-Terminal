@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:*; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Fallout Terminal — Master Control</title>
+  <link rel="stylesheet" href="./master.css">
+</head>
+<body>
+
+<!-- ── START SCREEN ─────────────────────────────────────── -->
+<div class="start-screen" id="startScreen">
+  <div class="start-box">
+    <div class="start-title">FALLOUT TERMINAL</div>
+    <div class="start-sub">MASTER CONTROL — VAULT-TEC R&amp;D</div>
+    <div class="start-actions">
+      <button class="btn btn-primary" id="btnOpenSession">ОТКРЫТЬ СЕССИЮ</button>
+      <button class="btn btn-secondary" id="btnNewSession">НОВАЯ СЕССИЯ</button>
+    </div>
+    <div class="start-status" id="startStatus"></div>
+  </div>
+</div>
+
+<!-- ── MAIN LAYOUT ──────────────────────────────────────── -->
+<div class="layout" id="mainLayout" style="display:none">
+
+  <header class="topbar">
+    <div class="title-block">
+      <span class="title-main">FALLOUT TERMINAL</span>
+      <span class="title-sub" id="sessionFileLabel">—</span>
+    </div>
+    <div class="server-block">
+      <div class="server-row">
+        <span class="info-lbl">АДРЕС ДЛЯ ИГРОКОВ</span>
+        <span class="server-url" id="serverUrl" title="Открыть в браузере">—</span>
+      </div>
+      <div class="server-row">
+        <span class="info-lbl">ПОДКЛЮЧЕНО</span>
+        <span class="conn-count" id="clientCount">0</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- LEFT: terminal list -->
+    <aside class="term-panel">
+      <div class="panel-hdr">ТЕРМИНАЛЫ СЕССИИ</div>
+      <div class="term-list" id="termList"></div>
+      <div class="term-footer">
+        <button class="btn btn-secondary full-w" id="btnAddTerminal">+ НОВЫЙ ТЕРМИНАЛ</button>
+        <button class="btn btn-danger full-w" id="btnStopBroadcast">ОСТАНОВИТЬ ТРАНСЛЯЦИЮ</button>
+        <div class="hack-status" id="hackStatus" style="display:none">
+          <div class="hack-status-line" id="hackStatusLine">ВЗЛОМ: —</div>
+          <button class="btn btn-accent full-w" id="btnHackSuccess">ВЗЛОМ УСПЕШЕН</button>
+        </div>
+      </div>
+      <div class="save-status" id="saveStatus"></div>
+    </aside>
+
+    <!-- CENTER: tree editor -->
+    <main class="tree-panel">
+      <div class="panel-hdr tree-hdr">
+        <span id="editingTermName">—</span>
+        <div class="tree-hdr-actions">
+          <span class="live-flag" id="liveFlag" style="display:none">● В ЭФИРЕ</span>
+          <button class="btn btn-primary" id="btnMakeLive">СДЕЛАТЬ АКТИВНЫМ</button>
+          <button class="btn btn-accent" id="btnPublish" style="display:none">ОБНОВИТЬ У ИГРОКОВ</button>
+        </div>
+      </div>
+      <div class="term-settings" id="termSettings">
+        <div class="settings-row">
+          <label class="field-label-inline" for="hackLevelSelect">УРОВЕНЬ ВЗЛОМА</label>
+          <select id="hackLevelSelect" class="field-input mini-select">
+            <option value="0">Нет (0)</option>
+            <option value="1">1 — 4 буквы</option>
+            <option value="2">2 — 5 букв</option>
+            <option value="3">3 — 6 букв</option>
+            <option value="4">4 — 7 букв</option>
+            <option value="5">5 — 8 букв</option>
+          </select>
+          <button class="btn btn-mini" id="btnApplySettings">ПРИМЕНИТЬ</button>
+        </div>
+        <div class="settings-row">
+          <label class="field-label-inline" for="introTextArea">ТЕКСТ ТЕРМИНАЛА (общий для всех экранов игрока)</label>
+          <textarea id="introTextArea" class="field-textarea settings-textarea" placeholder="Необязательный текст — покажется под шапкой на каждом экране этого терминала"></textarea>
+        </div>
+      </div>
+      <div class="tree-toolbar" id="treeToolbar">
+        <button class="btn btn-mini" id="btnAddFolder">+ ПАПКА</button>
+        <button class="btn btn-mini" id="btnAddCommand">+ КОМАНДА</button>
+        <button class="btn btn-mini" id="btnAddEntry">+ ЗАПИСЬ</button>
+        <span class="toolbar-hint" id="toolbarHint"></span>
+      </div>
+      <div class="tree-view" id="treeView"></div>
+    </main>
+
+    <!-- RIGHT: node editor form -->
+    <aside class="node-panel" id="nodePanel">
+      <div class="panel-hdr">СВОЙСТВА</div>
+      <div class="node-form" id="nodeForm">
+        <div class="node-empty">Выберите узел дерева слева</div>
+      </div>
+    </aside>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script type="module" src="./desktop-api.js"></script>
+<script type="module" src="./master.js"></script>
+</body>
+</html>

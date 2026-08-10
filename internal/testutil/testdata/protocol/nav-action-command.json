@@ -1,0 +1,5 @@
+{
+  "type": "NAV_ACTION",
+  "action": "command",
+  "nodeId": "n_cmd_1"
+}

@@ -9,6 +9,11 @@ source: existing implementation
 **Migration status**: Reverse-engineered from the existing implementation on 2026-08-09  
 **Scope**: Server-authoritative hacking gate, player experience, game-master controls, and persisted difficulty setting
 
+**Current runtime**: The behavior contract is unchanged under Wails v2. The
+mutex-protected Go live/hack services own private puzzle state; the master uses
+an explicitly bound desktop method and receives only the sanitized `hack-state`
+event.
+
 ## Purpose
 
 The hacking game optionally gates access to a live terminal behind a shared Fallout-style word puzzle. The game master configures the difficulty for each terminal, the server creates and owns the active puzzle, and every connected player sees and acts on the same public state. The secret answer remains on the server.
@@ -108,7 +113,7 @@ As a game master, I can monitor shared progress and force success so that the se
 - **FR-015**: Every accepted hacking action MUST result in a sanitized `HACK_STATE` broadcast to all connected clients and a master-status notification.
 - **FR-016**: A newly connected client MUST receive the current sanitized puzzle in `TERMINAL_LIVE` when a terminal is live.
 - **FR-017**: Solving the puzzle MUST transition the player from hacking mode to normal navigation after the existing success delay; failure MUST keep navigation blocked until the live terminal is restarted.
-- **FR-018**: The game master MUST be able to force success through the sandboxed preload/IPC boundary without exposing Node.js APIs to the renderer.
+- **FR-018**: The game master MUST be able to force success through the sandboxed bound-desktop boundary without exposing Node.js APIs to the frontend.
 - **FR-019**: Applying a difficulty change to an already-live terminal MUST NOT reset the active puzzle; the changed difficulty MUST apply on the next start or restart of the broadcast.
 - **FR-020**: Stopping the live terminal MUST clear the active puzzle and notify player and master interfaces.
 
@@ -120,8 +125,8 @@ As a game master, I can monitor shared progress and force success so that the se
 | Player → server | `HACK_ADMIN` | Requests the one-time administrator aid; no payload is required. |
 | Server → players | `HACK_STATE` | Carries `hack`, the current sanitized public puzzle state. |
 | Server → player | `TERMINAL_LIVE` | Includes `hackLevel` and current sanitized `hack` state during initial live publication or reconnection. |
-| Main → master renderer | `hack-state` | Carries sanitized progress for the status panel. |
-| Master renderer → main | `terminal:hack-force-success` | Requests privileged game-master success through the preload bridge. |
+| Go runtime → master frontend | `hack-state` | Carries sanitized progress for the status panel. |
+| Master frontend → Go runtime | `ForceHackSuccess` | Requests privileged game-master success through the narrow compatibility facade. |
 
 The public `hack` object contains `level`, `wordLength`, `attemptsMax`, `attemptsLeft`, `solved`, `failed`, `log`, and `columns`. Each column contains public addresses, board text, and selectable word locations. It excludes the secret and the private ID-to-word lookup.
 
@@ -131,7 +136,7 @@ The public `hack` object contains `level`, `wordLength`, `attemptsMax`, `attempt
 - A candidate may be skipped if no valid board position is found after 300 placement attempts.
 - Repeated administrator requests do not remove more words, but currently append the activation log line again.
 - Previously guessed words remain selectable and may consume further attempts.
-- Concurrent browser messages are applied sequentially by the single Node.js server process to shared in-memory state.
+- Concurrent browser messages are serialized by the mutex-protected Go live service against shared in-memory state.
 - Runtime puzzle state is not stored in session JSON; rebroadcasting generates a new puzzle.
 
 ## Success Criteria
@@ -149,7 +154,7 @@ The public `hack` object contains `level`, `wordLength`, `attemptsMax`, `attempt
 - The game is deliberately shared: any connected player can spend the group's attempts.
 - The word bank is English while interface feedback is primarily Russian.
 - The `SUCCESS` board entry is the implemented administrator trigger, while the player's keyboard command `1` sends the same server action without selecting that entry.
-- The game master is trusted and can force success from the local Electron interface.
+- The game master is trusted and can force success from the local Wails desktop interface.
 - Existing randomness is acceptable for play; deterministic generation is not part of the current contract.
 
 ## Known Gaps
@@ -161,4 +166,3 @@ The public `hack` object contains `level`, `wordLength`, `attemptsMax`, `attempt
 - Protocol payloads have no executable schema validation or version field.
 - Random generation has no injectable seed or deterministic test seam.
 - Accessibility expectations beyond the existing mouse and keyboard interaction are undocumented.
-
