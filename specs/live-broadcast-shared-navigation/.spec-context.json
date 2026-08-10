@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Live Broadcast Shared Navigation",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T18:36:39.160Z"
+    }
+  ],
+  "telemetryInstanceId": "0837d88e-aee1-46fb-9b39-20e72d911ceb"
+}
