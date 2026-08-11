@@ -1,85 +1,99 @@
-# Research: Hacking Game Evolution
+# Research: Phase 1 Generation-Bound Hacking Patterns
 
-## Decision 1: Replace the player administrator path with a typed pattern action
+This document supersedes the older coordinate-only and intended-count decisions. It records the corrective choices needed to bring the current implementation into alignment with `spec.md` and `planning-handoff.md` without adding any Non-Goal.
 
-**Decision**: Remove the generated `SUCCESS` candidate, keyboard command `1`, `HACK_ADMIN`, `ApplyAdmin`, and administrator-only model fields. Add player request `HACK_PATTERN` with one `patternId`, while leaving the Wails `ForceHackSuccess` method and its normal solved-state publication unchanged.
+## Decision 1: Keep `patternId` opaque but make it resolve to the complete identity
 
-**Rationale**: The current implementation exposes the same bulk-dud-removal shortcut as both a board word and a keyboard command. A distinct typed action makes the replacement mechanic explicit at the untrusted protocol boundary, while retaining the already narrow and trusted game-master recovery path required by the specification.
+**Decision**: Retain the existing `HACK_PATTERN` message with one required `patternId`. The server issues each ID from the complete tuple `generationId + row + inclusive start + inclusive end`; the browser treats the ID as opaque, and the hacking domain validates it only by resolving or matching it against patterns rediscovered from the active canonical board.
 
-**Alternatives considered**:
-
-- Reuse `HACK_ADMIN`: rejected because the identifier preserves a removed capability and blurs compatibility behavior.
-- Encode patterns as `HACK_GUESS` targets: rejected because guesses spend attempts while patterns have one-use random effects and require different validation.
-- Remove `ForceHackSuccess`: rejected because the game-master override is explicitly required and already isolated behind the desktop bridge.
-
-## Decision 2: Identify patterns by immutable board coordinates and rediscover them from current text
-
-**Decision**: Identify a pattern as `columnIndex:openingIndex:closingIndex`, scan every row from each opening bracket to the first matching closing bracket on its right, and accept the span only when the interior contains no ASCII alphabetic character. Store consumed identities privately and expose every currently valid span with its coordinate fields and `used` flag.
-
-**Rationale**: Coordinates make stacked openings that share a close distinct, are deterministic from the board already held by the server, and cannot reveal secret candidate data. Re-running the same pure discovery function after a dud becomes periods immediately reveals newly valid spans; retaining used coordinate identities prevents an earlier span from becoming reusable.
+**Rationale**: This is the smallest compatible correction to the current typed protocol. Including the generation prevents a delayed request from matching coordinates in a later puzzle, while row-local coordinates distinguish stacked openings, shared closers, and changed pairings without exposing candidate truth.
 
 **Alternatives considered**:
 
-- Use the bracket text as identity: rejected because duplicate and stacked patterns can have identical text.
-- Trust client-supplied start/end coordinates without rediscovery: rejected because stale and tampered spans could bypass current-board validation.
-- Assign opaque random IDs during generation only: rejected because dynamically created patterns would require a second identity mechanism.
+- Keep `columnIndex:openingIndex:closingIndex`: rejected because it lacks puzzle generation and does not implement the required rendered-row identity.
+- Send explicit `generationId`, `row`, `start`, and `end`: valid under the specification but rejected for this implementation because it expands the existing request surface when an opaque generation-bearing ID already satisfies the contract.
+- Assign an arbitrary ID unrelated to coordinates and store a permanent lookup: rejected because dynamic patterns would require mutable registration and stale lookup cleanup; deterministic resolution from the active generation and rediscovered coordinates is simpler.
 
-## Decision 3: Construct the initial valid-pattern count instead of relying on incidental filler
+## Decision 2: Define row coordinates independently of public column metadata
 
-**Decision**: Generate ordinary filler without `()`, `[]`, `{}`, or `<>`, choose the target with `3 + Intn(4)`, and insert exactly that many non-interacting same-row spans into free board cells after candidate placement. Cycle or randomly select among the exact allowed pairs `()`, `[]`, `{}`, `<>`; fill interiors only with non-alphabetic, non-bracket filler and verify the board with the production discovery function before returning it.
+**Decision**: Model `row` as the zero-based rendered-row ordinal in canonical column render order: all rows of the first hacking column, followed by all rows of the second. Model `start` and `end` as zero-based inclusive character offsets within that row's 12-character hacking text. Internal helpers translate the tuple to the existing column and absolute text offsets; `column` and `pair` remain derivable private implementation data and leave the public projection.
 
-**Rationale**: Incidental brackets in the current filler pool make the number of valid spans uncontrolled and can create cross-pair interactions. Constructing isolated spans and verifying the final board guarantees `3–6` inclusive for every difficulty while keeping the rule deterministic under the existing injectable `Random` seam.
-
-**Alternatives considered**:
-
-- Retry fully random boards until the count happens to be in range: rejected because it has an unbounded tail and makes deterministic tests brittle.
-- Publish only a random subset of incidental valid patterns: rejected because an apparently valid bracket span would become inexplicably unselectable.
-- Vary the target by difficulty: rejected by the explicit difficulty-independent requirement.
-
-## Decision 4: Consume and resolve a pattern atomically in the live service
-
-**Decision**: Add `ApplyHackPattern(patternId)` to the hacking domain and invoke it while `internal/live.Service` holds its existing exclusive mutex. The domain rediscovery check, used check, used-state insertion, random outcome, board mutation, pattern recalculation, and returned public projection occur as one transition; rejected actions return no accepted result and trigger no broadcast.
-
-**Rationale**: The existing live mutex is already the serialization boundary for shared hacking. Keeping the whole transition within it guarantees that simultaneous requests for one coordinate pair can produce at most one effect and that every emitted snapshot represents a complete state.
+**Rationale**: The tuple is stable, comparable, and sufficient for rendering while matching the exact identity fields required by the specification. A flattened row ordinal uniquely names each visible 12-character row without exposing an extra public `column` field, and row-local offsets make the same-row rule structural.
 
 **Alternatives considered**:
 
-- Deduplicate in the WebSocket server: rejected because other callers of the live service could bypass it and transport code would own domain rules.
-- Mark a pattern used after choosing its outcome: rejected because concurrent callers could both pass validation before consumption.
-- Let each browser disable a pattern locally: rejected because reconnects and multiple clients would diverge.
+- Retain public `column` with absolute column offsets: rejected because the clarified public projection permits only identity, row, inclusive coordinates, and status.
+- Treat one left/right screen line as a 24-character row: rejected because it could pair delimiters across the visual gap between memory columns and would require presentation spacing or addresses to become domain data.
+- Encode row and offsets only inside `patternId`: rejected because the browser also needs explicit coordinates for interaction and the public contract requires them.
 
-## Decision 5: Use the existing random boundary for exact effect selection
+## Decision 3: Issue generation IDs separately from gameplay randomness
 
-**Decision**: When at least one incorrect candidate remains, values `0..79` from `Intn(100)` remove one randomly selected incorrect candidate and values `80..99` restore attempts. Dud removal deletes exactly one non-secret candidate from the private lookup and public word placements and replaces its visible characters with periods. With no incorrect candidate, the transition restores attempts without making an outcome roll.
+**Decision**: Give each fresh runtime puzzle a non-blank server-issued generation ID before board construction. Use a process-local generation-ID source independent of the injected board/outcome `Random` source; production IDs are collision-resistant for the process lifetime, while live-service tests substitute a deterministic sequence.
 
-**Rationale**: The integer threshold implements the exact `80%` and `20%` contract without floating-point ambiguity or a new dependency. The current injectable random interface supports an exact controlled sequence test and deterministic dud selection.
-
-**Alternatives considered**:
-
-- Use floating-point probabilities: rejected because integer buckets are simpler to test exactly.
-- Allow a dud-removal outcome to do nothing: rejected because the specification requires attempt restoration as the useful fallback.
-- Preselect removable duds in public state: rejected because candidate truth, including the secret, must remain private.
-
-## Decision 6: Drive browser interaction entirely from the public pattern projection
-
-**Decision**: Extend the public hack state with current pattern metadata. The browser maps each opening coordinate to its pattern, highlights the inclusive opening-through-closing range on hover, and sends `HACK_PATTERN` on activation. Used openings remain mapped but do not highlight; reactivation sends the same pattern request so the server can reject it without spending an attempt. All other word and filler cells retain `HACK_GUESS` behavior.
-
-**Rationale**: The browser needs exact range metadata to render overlapping spans but must not rediscover or own canonical availability. Keeping used openings distinguishable also prevents a second click from falling through to an ordinary filler guess and unexpectedly consuming an attempt.
+**Rationale**: Generation identity must prevent stale activation even when coordinates repeat, including across puzzle replacement. Separating ID issuance from gameplay randomness ensures generation creation cannot disturb the exact outcome mapping or obscure assertions that rejected pattern requests consume zero outcome values.
 
 **Alternatives considered**:
 
-- Discover patterns independently in JavaScript: rejected because two implementations could disagree after board changes.
-- Render one wrapper element per pattern: rejected because overlapping and stacked ranges cannot be represented reliably as independent nested DOM spans.
-- Remove filler guessing: rejected because normal hacking behavior remains unchanged outside the former cheat paths.
+- Use only a service counter that resets on restart: rejected because a stale browser request could collide with the same counter and coordinates after a process restart.
+- Draw the generation ID from the pattern-outcome `Random`: rejected because puzzle identity would consume and couple the deterministic outcome sequence.
+- Persist generation IDs: rejected because active-puzzle persistence and deterministic seed persistence are explicit Non-Goals.
 
-## Decision 7: Extend `HACK_STATE` compatibly and reject the removed request
+## Decision 4: Accept boards only after final production discovery reports `3–6`
 
-**Decision**: Keep `TERMINAL_LIVE`, `HACK_STATE`, and the existing hack fields, add a camelCase `patterns` array, and remove the obsolete public `isAdmin` field from word placements. Old `HACK_ADMIN` requests become unsupported strict-protocol input and leave state unchanged; reconnects receive the current board and pattern projection through the existing full snapshot.
+**Decision**: Retain bracket-free ordinary filler and isolated intended pattern placement as bounded construction aids, but place construction inside a regeneration loop. After words, filler, addresses, and intended patterns form the final rendered board, run the same production discovery function used during gameplay and accept the board only when it discovers between `3–6` distinct selectable identities inclusive.
 
-**Rationale**: Additive server fields are tolerated by the current browser dispatch, and the existing reconnect envelope already carries the full public puzzle. Explicit rejection of the removed mutation path ensures stale clients cannot retain a cheat.
+**Rationale**: The final board is the only reliable authority because interactions among placed characters can create or remove discoverable spans. The existing implementation verifies equality with a randomly selected intended target but returns `nil` instead of regenerating; replacing that with final-range acceptance and regeneration meets the clarified publication rule without making the selected target a requirement.
 
 **Alternatives considered**:
 
-- Add a protocol version solely for this change: rejected because the application ships server and client together and the current decoder has no negotiation mechanism.
-- Keep accepting `HACK_ADMIN` as a no-op: rejected because a silently accepted removed command obscures validation and makes testing the absence of cheats weaker.
-- Add a separate reconnect message for patterns: rejected because it would duplicate state already carried by `TERMINAL_LIVE`.
+- Trust the number of inserted pairs: rejected because intended insertions do not prove final discovery count.
+- Require discovery to equal a randomly selected target: rejected because the specification requires only the final `3–6` range, not a random count distribution.
+- Publish only a subset of discovered patterns: rejected because the gameplay discovery contract makes every valid current pattern selectable.
+
+## Decision 5: Draw the weighted outcome before applying the no-dud fallback
+
+**Decision**: After validation and used-state insertion, every accepted activation consumes exactly one outcome draw using `Intn(100)`. Values `0..79` select dud removal and `80..99` select attempt restoration. If dud removal was selected and no incorrect candidate is currently removable, apply attempt restoration as the fallback; only an actual dud removal consumes a second draw to select the dud.
+
+**Rationale**: This preserves independent weighted selection for every accepted activation and makes the no-dud behavior a post-selection fallback. The current `len(decoys) == 0 || Intn(100) >= 80` short-circuit incorrectly skips the required outcome value when no dud remains.
+
+**Alternatives considered**:
+
+- Check for duds before drawing: rejected because it violates the mandated activation order and accepted-request RNG semantics.
+- Preassign an effect to each public pattern: rejected because it leaks a future effect and prevents independent activation-time selection.
+- Validate probability by demanding an exact random batch of 100 production activations: rejected because `80/20` defines the mapping, not a guaranteed sample result.
+
+## Decision 6: Commit ordered publication inside the live transition without moving transport ownership
+
+**Decision**: Extend the live pattern-activation call with a narrow publication callback. While holding the canonical live-service mutex, the service performs the nine ordered steps through detached projection creation and invokes the callback exactly once for an accepted activation. The callback, owned by `internal/player`, serializes and enqueues the detached `HACK_STATE` plus the existing game-master `hack-state` notification; it must not read or mutate live state or perform a reentrant live-service call.
+
+**Rationale**: The current service unlocks before `internal/player` broadcasts, allowing concurrent accepted transitions to race in publication order. A narrow callback commits publication at step nine while preserving dependency direction: live state remains transport-agnostic, and the player server still owns envelopes, client queues, and WebSocket writes.
+
+**Alternatives considered**:
+
+- Keep broadcasting after `ApplyHackPattern` returns: rejected because it does not preserve the specified mutex-protected ordering.
+- Make `internal/live` depend directly on the player server: rejected because it reverses the established boundary and violates transport independence.
+- Hold the live mutex during direct network writes: rejected because slow clients would block canonical state; the existing player connection queues provide the correct non-blocking transport boundary.
+
+## Decision 7: Project only current spans and retain complete used history privately
+
+**Decision**: Store used state as a private set keyed by the complete generation-bound coordinate identity. Re-run discovery after every dud mutation. The public `patterns` array contains only currently discovered spans, each with opaque `id`, `row`, inclusive `start`/`end`, and `used`; if a historical coordinate pair disappears it remains only in private history, and if it later reappears it is immediately projected as used.
+
+**Rationale**: This gives the browser exactly what it needs to render and interact with the current board while preserving the permanent one-use rule. Removing `column` and `pair` avoids broadening the projection, and detached copies prevent returned values from modifying canonical state.
+
+**Alternatives considered**:
+
+- Publish all historical used spans even when no longer valid: rejected because those coordinates no longer describe a current render target and could suppress ordinary filler interaction incorrectly.
+- Forget used spans when discovery changes: rejected because a rediscovered coordinate pair would become reusable.
+- Let the browser rediscover patterns: rejected because client and server discovery could diverge and the server is the canonical authority.
+
+## Decision 8: Preserve the existing reconnect, persistence, and trusted-control boundaries
+
+**Decision**: Continue sending the current detached hack projection through `TERMINAL_LIVE` on connection and `HACK_STATE` on accepted mutation. Keep generation, used history, removed duds, attempts, logs, and outcomes solely in the process-local live aggregate. Retain `ForceHackSuccess()` through the existing Wails `App` binding and existing success publication, with no player-protocol or browser invocation path.
+
+**Rationale**: The repository already separates durable version-1 session content from live hacking state and already has a narrow game-master override. Reusing those boundaries satisfies reconnect and recovery behavior without schema migration, persistence, new roles, or another message family.
+
+**Alternatives considered**:
+
+- Persist the active puzzle or a complete seed: rejected as an explicit Non-Goal and a version-1 compatibility change.
+- Add a session controller before accepting `HACK_PATTERN`: rejected because controlling-player and observer roles are explicitly out of scope; only the existing player/live-service seam remains as a future authorization extension point.
+- Expose `ForceHackSuccess` as a player message or browser control: rejected because it recreates the cheat this phase removes.

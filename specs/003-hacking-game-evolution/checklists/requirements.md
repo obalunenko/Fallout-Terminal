@@ -6,7 +6,7 @@
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
+- [x] Contains no unnecessary implementation details beyond explicitly mandated interface, security, concurrency, persistence, and verification constraints
 - [x] Focused on user value and business needs
 - [x] Written for non-technical stakeholders
 - [x] All mandatory sections completed (User Scenarios, Requirements, Success Criteria)
@@ -16,7 +16,7 @@
 - [x] Any [NEEDS CLARIFICATION] markers are genuine ambiguities (≤3) deferred to clarify — not unresolved guesses
 - [x] Each Functional Requirement is a single, testable MUST/SHOULD statement
 - [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
+- [x] Success criteria are behavior-focused except where an explicitly mandated deterministic verification or boundary check is itself acceptance-critical
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
 - [x] Scope is clearly bounded
@@ -27,9 +27,11 @@
 - [x] All functional requirements have clear acceptance criteria
 - [x] User scenarios cover primary flows
 - [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into the specification
+- [x] Every technical constraint in the specification is traceable to an explicit feature decision and no incidental implementation choice is presented as a requirement
 
 ## Notes
 
-- FR-013 requires the inclusive minimum and maximum random pattern count before planning can make it fully testable.
-- Items marked incomplete require spec updates before clarify or plan.
+- The named `HACK_PATTERN` contract, canonical live-service mutex, injected deterministic random source, and private desktop/Wails boundary are intentional normative constraints supplied during clarification; they are not accidental implementation leakage.
+- Planning must preserve these constraints while keeping all unmandated implementation choices in `plan.md`, `research.md`, `data-model.md`, or `contracts/`.
+- The final rendered board, not the number of intended pattern insertions, is the authority for the initial `3–6` count.
+- Planning guardrails and the ready-to-use invocation are recorded in [planning-handoff.md](../planning-handoff.md).

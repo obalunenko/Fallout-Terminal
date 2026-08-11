@@ -292,11 +292,15 @@ function setHackHover(key) {
   renderHackInputPreview();
 }
 
-function patternAtOpening(cell) {
-  if (!hack || !cell || cell.dataset.column == null || cell.dataset.index == null) return null;
-  const column = Number(cell.dataset.column);
-  const start = Number(cell.dataset.index);
-  return (hack.patterns || []).find(pattern => pattern.column === column && pattern.start === start) || null;
+function patternAtCell(cell) {
+  if (!hack || !cell || cell.dataset.row == null || cell.dataset.offset == null) return null;
+  const row = Number(cell.dataset.row);
+  const offset = Number(cell.dataset.offset);
+  const matches = (hack.patterns || []).filter(pattern =>
+    pattern.row === row && offset >= pattern.start && offset <= pattern.end
+  );
+  return matches.find(pattern => pattern.start === offset) ||
+    matches.reduce((nearest, pattern) => !nearest || pattern.start > nearest.start ? pattern : nearest, null);
 }
 
 function setHackPatternHover(pattern) {
@@ -304,13 +308,18 @@ function setHackPatternHover(pattern) {
   hackHoverKey = pattern ? pattern.id : null;
   hackHoverText = '';
   if (pattern && !pattern.used) {
-    const cells = hackColumns.querySelectorAll(`[data-column="${pattern.column}"][data-index]`);
+    const cells = hackColumns.querySelectorAll(`[data-row="${pattern.row}"][data-offset]`);
     cells.forEach(cell => {
-      const index = Number(cell.dataset.index);
-      if (index >= pattern.start && index <= pattern.end) cell.classList.add('hi');
+      const offset = Number(cell.dataset.offset);
+      if (offset >= pattern.start && offset <= pattern.end) cell.classList.add('hi');
     });
-    const column = hack.columns[pattern.column];
-    hackHoverText = column ? column.text.slice(pattern.start, pattern.end + 1) : '';
+    hackHoverText = Array.from(cells)
+      .filter(cell => {
+        const offset = Number(cell.dataset.offset);
+        return offset >= pattern.start && offset <= pattern.end;
+      })
+      .map(cell => cell.textContent)
+      .join('');
   }
   renderHackInputPreview();
 }
@@ -318,7 +327,7 @@ function setHackPatternHover(pattern) {
 hackColumns.addEventListener('mouseover', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell) return;
-  const pattern = patternAtOpening(cell);
+  const pattern = patternAtCell(cell);
   if (pattern) {
     if (pattern.used) setHackPatternHover(null);
     else setHackPatternHover(pattern);
@@ -333,7 +342,7 @@ hackColumns.addEventListener('mouseover', (e) => {
 hackColumns.addEventListener('mouseout', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell) return;
-  if (patternAtOpening(cell)) {
+  if (patternAtCell(cell)) {
     setHackPatternHover(null);
     return;
   }
@@ -344,7 +353,7 @@ hackColumns.addEventListener('click', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell || !hack || hack.solved || hack.failed) return;
   playEnter();
-  const pattern = patternAtOpening(cell);
+  const pattern = patternAtCell(cell);
   if (pattern) send({ type: 'HACK_PATTERN', patternId: pattern.id });
   else send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
 });
@@ -884,7 +893,7 @@ function renderHackScreen() {
   scheduleHackFit();
 }
 
-function buildColumnHtml(col, colIndex) {
+function buildColumnHtml(col, colIndex, rowBase) {
   const wordAt = new Array(col.text.length).fill(null);
   col.words.forEach(w => { for (let i = w.start; i < w.start + w.length; i++) wordAt[i] = w.id; });
 
@@ -903,7 +912,7 @@ function buildColumnHtml(col, colIndex) {
         cellsHtml += `<span class="hcell word" data-target="${esc(wid)}">${esc(col.text.slice(i, j))}</span>`;
         i = j;
       } else {
-        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-column="${colIndex}" data-index="${i}">${esc(col.text[i])}</span>`;
+        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}">${esc(col.text[i])}</span>`;
         i++;
       }
     }
@@ -916,7 +925,12 @@ function buildColumnHtml(col, colIndex) {
 function renderHackColumns() {
   hackHoverKey = null;
   hackHoverText = '';
-  hackColumns.innerHTML = hack.columns.map((col, ci) => buildColumnHtml(col, ci)).join('');
+  let rowBase = 0;
+  hackColumns.innerHTML = hack.columns.map((col, ci) => {
+    const html = buildColumnHtml(col, ci, rowBase);
+    rowBase += Math.ceil(col.text.length / ROW_WIDTH);
+    return html;
+  }).join('');
 }
 
 function renderHackLog() {

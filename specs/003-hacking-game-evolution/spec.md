@@ -1,165 +1,252 @@
-# Feature Specification: Immersive Hacking Game
+# Feature Specification: Phase 1 Server-Authoritative Hacking Patterns
 
 ## Clarifications
 
 ### Session 2026-08-11
 
-- Q: How many valid special-pattern bracket sets must each newly generated board contain? → A: 3–6 inclusive.
+- Q: How are valid special-pattern outcomes selected and verified? → A: Each accepted activation independently uses server-side weighted randomness: 80% dud removal and 20% attempt restoration, with deterministic boundary tests rather than an exact production sample.
+- Q: How is the initial 3–6 pattern requirement measured? → A: Run the final rendered board through the gameplay discovery algorithm before publication and regenerate until it contains 3–6 distinct selectable patterns.
+- Q: What gives a dynamic pattern stable identity? → A: Puzzle generation, row, inclusive opening index, and inclusive closing index; used state belongs to that complete coordinate pair.
+- Q: What must a player pattern request prove before it can mutate the puzzle? → A: It targets the active generation and a currently valid, unused coordinate pair while the puzzle is actionable, and validation precedes used-state marking, randomness, mutation, projection, and broadcast under the live-service lock.
+- Q: Where do pattern state and trusted overrides live? → A: Pattern progress is runtime-only and reconnectable within one server process; `ForceHackSuccess` remains private to the desktop/Wails boundary and is never player-accessible.
 
 ## User Scenarios & Testing
 
 ### User Story 1 - Solve Without Player Cheats (Priority: P1)
 
-As a player, I face the hacking puzzle using password guesses and authentic terminal interactions only, so success feels earned and follows the rules of the Fallout games.
+As a player, I face the hacking puzzle using ordinary password guesses and server-authoritative special patterns only, so success follows the established game rules without player-accessible cheats.
 
-**Why this priority**: Removing the existing shortcuts is the core immersion goal and establishes the fair-play boundary for every other story.
+**Why this priority**: Replacing the existing player shortcuts is the Phase 1 goal and establishes the trust boundary for every other story.
 
-**Independent Test**: Start a hacking puzzle, try every previously available player shortcut, and confirm that none can directly expose or force the answer while normal password guessing still works.
+**Independent Test**: Start a hacking puzzle, try every previously available player shortcut and public interface, and confirm that none can expose or force the answer while ordinary password guessing and its existing attempt rules remain unchanged.
 
 **Acceptance Scenarios**:
 
 1. **Given** an active puzzle, **When** a player enters the former administrator command, **Then** the puzzle state does not change and no incorrect passwords are removed.
-2. **Given** a newly generated board, **When** the player reviews its selectable content, **Then** no administrator entry or other player-selectable control can directly force success or bulk-remove incorrect passwords.
-3. **Given** an active puzzle, **When** the player selects a candidate password, **Then** the existing password-match and attempt rules continue to determine the result.
+2. **Given** a newly generated board, **When** the player reviews its selectable content, **Then** no player-selectable entry directly forces success or bulk-removes incorrect passwords.
+3. **Given** an active puzzle, **When** the player selects a candidate password, **Then** the existing password-match, likeness, logging, success, failure, and attempt rules determine the result unchanged.
+4. **Given** access only to the player browser and player protocol, **When** a player tries browser globals, DOM controls, keyboard shortcuts, query parameters, or protocol messages, **Then** `ForceHackSuccess` cannot be invoked.
 
-### User Story 2 - Use Special Patterns (Priority: P1)
+### User Story 2 - Discover and Use Special Patterns (Priority: P1)
 
-As a player, I can discover and activate bracketed symbol patterns on the board for a chance to remove an incorrect password or recover my attempts, giving me an immersive way to improve my odds without bypassing the puzzle.
+As a player, I can discover and activate Fallout-style delimiter patterns on the rendered board for a weighted chance to remove one incorrect password or restore my attempts.
 
-**Why this priority**: Special patterns replace the removed shortcut with the intended risk-and-reward mechanic.
+**Why this priority**: Special patterns are the server-authoritative replacement for the removed player cheat.
 
-**Independent Test**: Generate boards containing each allowed bracket type, activate unused patterns repeatedly across controlled outcomes, and verify the 80/20 effect split, one-use rule, and shared board updates.
+**Independent Test**: Generate controlled boards containing each allowed delimiter type and exercise discovery, highlighting, request validation, deterministic weighted outcomes, fallback behavior, and one-use state.
 
 **Acceptance Scenarios**:
 
-1. **Given** an unused valid pattern, **When** the player points to its opening bracket, **Then** the complete pattern from opening bracket through matching closing bracket is highlighted as one selectable target.
-2. **Given** an unused valid pattern and at least one incorrect password remains, **When** the pattern produces the dud-removal outcome, **Then** exactly one selectable incorrect password is replaced by periods and the correct password remains unchanged.
-3. **Given** an unused valid pattern, **When** the pattern produces the attempt-restoration outcome, **Then** the remaining attempts return to the puzzle maximum without exceeding it.
-4. **Given** a pattern has already been activated, **When** the player points to or selects the same opening-and-closing pair again, **Then** it cannot be highlighted or produce another effect.
-5. **Given** multiple players share a puzzle, **When** any player activates a pattern, **Then** all players see the same effect and the same used-pattern state.
+1. **Given** a matching opening delimiter, **When** the first compatible closing delimiter to its right is on the same row and the intervening rendered characters contain no alphabetic character, **Then** the inclusive opening-through-closing coordinate range is a valid selectable pattern.
+2. **Given** an unused valid pattern and at least one currently available incorrect password, **When** the deterministic random source selects dud removal, **Then** exactly one available incorrect password is replaced by periods and the correct password remains unchanged.
+3. **Given** an unused valid pattern, **When** the deterministic random source selects attempt restoration, **Then** remaining attempts return to the configured maximum without exceeding it.
+4. **Given** no removable incorrect password remains, **When** the deterministic random source selects dud removal for an accepted activation, **Then** attempts are restored instead.
+5. **Given** a valid request for an unused pattern, **When** activation succeeds, **Then** that exact generation-and-coordinate identity becomes used and cannot produce another effect.
 
 ### User Story 3 - Discover Stacked and Dynamic Patterns (Priority: P1)
 
-As a player, I can find overlapping patterns and newly formed patterns after a dud disappears, so careful board inspection remains rewarding as the puzzle changes.
+As a player, I can use overlapping patterns and patterns created by board mutation, so the selectable set always reflects the current canonical rendered board.
 
-**Why this priority**: Stacked and dynamically revealed patterns are explicit parts of the authentic interaction and must work in the first complete release.
+**Why this priority**: Shared closers and dynamically changed pairings are part of the defined discovery rule and identity model.
 
-**Independent Test**: Exercise a board with multiple compatible opening brackets sharing one closing bracket, then remove a dud whose replacement periods create another valid pair and verify every distinct pattern becomes usable once.
-
-**Acceptance Scenarios**:
-
-1. **Given** two compatible opening brackets can reach the same closing bracket on one row, **When** the player points to each opening bracket, **Then** each opening identifies a separate selectable pattern ending at that shared closing bracket.
-2. **Given** one of two stacked patterns has been used, **When** the player points to the other unused opening bracket, **Then** the other pattern remains selectable.
-3. **Given** an incorrect password separates a compatible opening and closing bracket, **When** a dud-removal effect replaces that password with periods and the resulting span meets the pattern rules, **Then** the newly valid pattern becomes immediately selectable.
-4. **Given** a board change creates a pattern, **When** players inspect the updated board, **Then** every connected player sees the same newly available pattern without restarting the puzzle.
-
-### User Story 4 - Let the Game Master Resolve the Puzzle (Priority: P1)
-
-As a game master, I can solve an active puzzle from my application so I can keep the session moving when the story or table situation requires intervention.
-
-**Why this priority**: Removing player cheats must not remove the game master's trusted recovery control.
-
-**Independent Test**: Start an unsolved puzzle, use the game-master solve control, and verify that all players receive the solved result and proceed to the terminal content.
+**Independent Test**: Exercise a board with multiple compatible openings sharing one closer, mutate it through dud removal, and verify identity, availability, rediscovery, and permanent used-pair history.
 
 **Acceptance Scenarios**:
 
-1. **Given** an active unsolved puzzle, **When** the game master presses the solve control, **Then** the puzzle is marked solved without consuming an attempt.
-2. **Given** the game master solves the puzzle, **When** the result is shared, **Then** all connected players receive the solved state and transition to normal terminal access through the existing success flow.
-3. **Given** there is no active eligible puzzle, **When** the game master views the hacking controls, **Then** the solve control is unavailable and cannot alter session state.
+1. **Given** two compatible opening delimiters have the same first compatible closing delimiter on one row, **When** patterns are discovered, **Then** their different opening coordinates produce two distinct selectable identities.
+2. **Given** one of two patterns sharing a closing delimiter has been used, **When** the other is selected, **Then** the other remains independently available.
+3. **Given** board mutation causes an opening delimiter to pair with a different first compatible closing delimiter, **When** the board is rediscovered, **Then** the new coordinate pair is a new pattern that may be used once.
+4. **Given** a coordinate pair was used earlier in the active puzzle generation, **When** later mutation makes that same pair valid again, **Then** it remains used and unavailable.
+5. **Given** dud removal creates additional valid patterns after the first player action, **When** the current board is rediscovered, **Then** all valid new patterns are published even if the current count exceeds six.
 
-### User Story 5 - Preserve Shared Progress Across Connections (Priority: P2)
+### User Story 4 - Share One Atomic Puzzle State (Priority: P1)
 
-As a group of players, we see one authoritative puzzle state, so pattern availability, removed duds, attempts, and outcomes remain consistent when people act concurrently or reconnect.
+As a group of players, we receive one canonical puzzle state, so concurrent, stale, invalid, and reconnecting requests cannot create divergent effects.
 
-**Why this priority**: A shared terminal experience is only trustworthy if special-pattern progress cannot diverge between players.
+**Why this priority**: Special-pattern effects change shared secret-bearing state and therefore must be validated and applied atomically by the live service.
 
-**Independent Test**: Connect two players, activate and reveal patterns from both clients, reconnect one client, and compare the board, attempts, used patterns, and outcome after every action.
+**Independent Test**: Connect multiple clients, submit duplicate and stale `HACK_PATTERN` requests concurrently, mutate returned projections, and reconnect a client while the same server process remains running.
 
 **Acceptance Scenarios**:
 
-1. **Given** multiple players are connected, **When** two players attempt to activate the same unused pattern, **Then** the pattern produces at most one effect.
-2. **Given** a pattern has been used or dynamically created, **When** a player reconnects, **Then** the player receives its current availability and the current board.
-3. **Given** a puzzle has ended, **When** a player submits a pattern action, **Then** attempts, board contents, logs, and outcome remain unchanged.
-4. **Given** a new hacking attempt begins, **When** its board is generated, **Then** pattern availability is recalculated for the new board and no used-pattern state carries over.
+1. **Given** concurrent requests for the same currently available pattern, **When** the server handles them, **Then** exactly one request is accepted, exactly one outcome is applied, and rejected duplicates consume no random value.
+2. **Given** a delayed request from an older puzzle generation, **When** its coordinates happen to match a pattern in the active puzzle, **Then** the request is rejected without mutation or random-source advancement.
+3. **Given** a missing, unknown, malformed, invalid, unavailable, used, stale, or non-actionable pattern request, **When** validation fails, **Then** canonical state and the random source remain unchanged.
+4. **Given** a client mutates any returned public pattern projection, **When** canonical puzzle state is read again, **Then** canonical slices, maps, objects, identities, board contents, and used state are unchanged.
+5. **Given** a client reconnects while the server process and puzzle remain active, **When** synchronization completes, **Then** it receives the current board, attempts, pattern availability, used identities, removed duds, and outcome.
+
+### User Story 5 - Let the Game Master Resolve the Puzzle Privately (Priority: P1)
+
+As a game master, I retain the existing trusted `ForceHackSuccess` control through the private desktop application so I can keep the table moving without exposing a player cheat.
+
+**Why this priority**: Removing player shortcuts must preserve the established trusted recovery control and its privileged boundary.
+
+**Independent Test**: Invoke `ForceHackSuccess` through the existing private desktop/Wails boundary, verify the shared success flow, and verify that every player-accessible surface lacks an equivalent invocation path.
+
+**Acceptance Scenarios**:
+
+1. **Given** an active unsolved puzzle, **When** the game master invokes `ForceHackSuccess` through the existing private desktop/Wails boundary, **Then** the puzzle is solved without consuming an attempt.
+2. **Given** the trusted action succeeds, **When** state is broadcast, **Then** all connected players transition through the existing success flow.
+3. **Given** there is no eligible active puzzle, **When** the game master views the hacking controls, **Then** the trusted solve control is unavailable and cannot alter state.
+4. **Given** a player WebSocket connection or browser context, **When** any player-accessible input is attempted, **Then** no `ForceHackSuccess` operation is exposed or accepted.
 
 ## Edge Cases
 
-- What happens when an 80% dud-removal outcome is selected after no incorrect password remains? The pattern restores attempts instead so every valid activation has a useful result.
-- Attempt restoration returns attempts to the configured maximum and never adds attempts above that maximum.
-- A valid pattern must use matching bracket types, remain within one horizontal row, and contain no alphabetic characters between its endpoints.
-- Each opening bracket pairs with the first compatible closing bracket to its right on the same row; this allows multiple openings to share a closing bracket while keeping the target deterministic.
-- A closing bracket before its opening bracket, a mismatched bracket type, a cross-row span, or a span containing alphabetic characters is not selectable.
-- Replacing a dud with periods may create, remove, or change overlapping pattern targets; availability must be recalculated from the current board immediately after the replacement.
-- Activating one stacked pattern does not consume another pattern that has a different opening position, even when they share a closing position.
-- Repeated, stale, malformed, or tampered pattern selections do not consume attempts and do not change the puzzle.
-- Pattern actions received after success or failure have no effect.
-- If simultaneous player actions target the same pattern, only the first accepted action applies its random outcome.
+- A selected dud-removal outcome falls back to attempt restoration when no currently available incorrect password can be removed.
+- Attempt restoration sets remaining attempts to the configured maximum and never exceeds it, including when attempts are already at maximum.
+- A closing delimiter before its opening delimiter, a mismatched delimiter type, a cross-row span, or a span containing any alphabetic character is invalid.
+- Discovery pairs each opening delimiter only with the first compatible closing delimiter to its right on the same rendered row; later compatible closers do not form patterns for that opening while the first remains its pair.
+- Multiple opening delimiters may share one closing delimiter, and each complete coordinate pair has independent used state.
+- Board mutation may create, remove, or change pattern pairings. A newly formed coordinate pair is available if it has not been used in the current generation; a previously used pair remains unavailable if rediscovered.
+- The published initial board is regenerated when final-board discovery returns fewer than three or more than six distinct selectable patterns, including patterns formed accidentally by filler characters.
+- The 3–6 count applies only before the first player action. Later board mutation may cause the valid pattern count to exceed six.
+- A delayed request carrying an old generation identifier cannot activate coincident coordinates in a new generation.
+- A request with missing, unknown, or invalid fields is rejected before used-state mutation or random selection.
+- Pattern requests received before a puzzle is actionable or after success, failure, or other terminal state have no effect.
+- Concurrent requests for the same pattern yield exactly one accepted activation; all duplicates are rejected without consuming attempts or random values.
+- Process restart may discard the active puzzle and all special-pattern progress; reconnect synchronization is guaranteed only while the same server process retains the canonical puzzle.
 
 ## Requirements
 
 ### Functional Requirements
 
-- **FR-001**: The player experience MUST provide no command, board entry, or other selectable action that directly forces puzzle success.
-- **FR-002**: The player experience MUST remove the former administrator shortcut that bulk-removes incorrect passwords.
-- **FR-003**: The game master MUST retain a solve control that completes an active unsolved puzzle without consuming an attempt.
-- **FR-004**: A game-master solve action MUST publish the solved result to every connected player through the normal shared success flow.
-- **FR-005**: A special pattern MUST begin and end with one matching pair from the four allowed bracket types.
-- **FR-006**: A special pattern MUST have its opening and closing bracket on the same horizontal board row.
-- **FR-007**: A special pattern MUST contain no alphabetic characters between its opening and closing bracket.
-- **FR-008**: Pointing to the opening bracket of an unused valid pattern MUST highlight the entire pattern through its matching closing bracket.
-- **FR-009**: Selecting an unused valid pattern MUST produce exactly one effect for the shared puzzle.
-- **FR-010**: When at least one incorrect password remains, each valid pattern activation MUST have an 80% chance to remove one incorrect password and a 20% chance to restore attempts.
-- **FR-011**: A dud-removal effect MUST replace exactly one selectable incorrect password with periods without removing the correct password.
-- **FR-012**: An attempt-restoration effect MUST return remaining attempts to the puzzle maximum without exceeding that maximum.
-- **FR-013**: Each newly generated board MUST contain a random number of valid special patterns from 3 through 6 inclusive.
-- **FR-014**: The special-pattern count range MUST NOT vary by hacking difficulty.
-- **FR-015**: Each distinct opening-position and closing-position pair MUST be usable at most once during a puzzle.
-- **FR-016**: Multiple compatible opening brackets MUST each form a separate pattern when they share a compatible closing bracket on the same row.
-- **FR-017**: Using one stacked pattern MUST NOT consume another pattern with a different opening position.
-- **FR-018**: Replacing a dud with periods MUST immediately make any newly valid pattern selectable during the same puzzle.
-- **FR-019**: When no incorrect password remains, an otherwise valid dud-removal outcome MUST restore attempts instead.
-- **FR-020**: Pattern activation, pattern availability, used-pattern state, removed duds, attempts, and puzzle outcome MUST be shared consistently across all connected players.
-- **FR-021**: Concurrent attempts to use the same pattern MUST produce no more than one effect.
-- **FR-022**: A reconnecting player MUST receive the current board and current pattern availability without regenerating the puzzle.
-- **FR-023**: Malformed, stale, tampered, repeated, or terminal-state pattern actions MUST leave puzzle state unchanged.
-- **FR-024**: Starting a fresh hacking attempt MUST discard the previous puzzle's pattern availability and used-pattern state.
+- **FR-001**: Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.
+- **FR-002**: The player experience MUST expose no command, board entry, protocol operation, browser global, DOM control, keyboard shortcut, or query parameter that directly forces puzzle success.
+- **FR-003**: The player experience MUST remove the former administrator shortcut that bulk-removes incorrect passwords.
+- **FR-004**: Ordinary candidate-word guesses and filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.
+- **FR-005**: The existing game-master `ForceHackSuccess` control MUST remain available only through the private desktop/Wails boundary.
+- **FR-006**: `ForceHackSuccess` MUST NOT be exposed through the player WebSocket protocol, browser globals, DOM controls, keyboard shortcuts, or query parameters.
+- **FR-007**: A successful trusted `ForceHackSuccess` action MUST use the existing shared success flow without consuming an attempt.
+
+- **FR-008**: A valid special pattern MUST use exactly one matching delimiter type from `()`, `[]`, `{}`, or `<>`.
+- **FR-009**: A valid special pattern MUST start and end on the same rendered row.
+- **FR-010**: A valid special pattern MUST contain no alphabetic character between its endpoints.
+- **FR-011**: Pattern discovery MUST pair each opening delimiter with the first compatible closing delimiter to its right on the same rendered row.
+- **FR-012**: A discovered pattern MUST be represented by an inclusive opening-through-closing coordinate range.
+- **FR-013**: Multiple opening delimiters that share the same first compatible closing delimiter MUST be discovered as distinct patterns.
+- **FR-014**: Using one pattern MUST NOT consume another pattern with a different complete coordinate pair.
+- **FR-015**: Before publication, a newly generated puzzle board MUST contain between three and six distinct selectable special patterns inclusive.
+- **FR-016**: The initial pattern count MUST be computed from the final rendered board using the same discovery algorithm used during gameplay.
+- **FR-017**: A final rendered board with fewer than three or more than six discovered patterns MUST be regenerated before publication.
+- **FR-018**: The initial three-to-six limit MUST apply only until the first player action.
+- **FR-019**: Gameplay discovery after board mutation MUST publish all current valid patterns even when their count exceeds six.
+- **FR-020**: The initial three-to-six limit MUST NOT vary by hacking difficulty.
+
+- **FR-021**: A special-pattern identity MUST contain the puzzle generation identifier, rendered row, opening-character index, and closing-character index.
+- **FR-022**: Pattern used state MUST belong to the complete generation-and-coordinate identity.
+- **FR-023**: A complete pattern identity MUST be accepted at most once during its puzzle generation.
+- **FR-024**: When board mutation causes the same opening character to pair with a different first compatible closing character, the resulting coordinate pair MUST be treated as a new pattern identity.
+- **FR-025**: A coordinate pair already used in the active puzzle generation MUST remain unavailable if that pair is later rediscovered.
+- **FR-026**: Replacing a removed incorrect password with periods MUST trigger discovery against the resulting canonical rendered board.
+
+- **FR-027**: Each accepted pattern activation MUST independently select one outcome using server-side weighted randomness.
+- **FR-028**: Eighty percent of the random-source value space MUST map to dud removal.
+- **FR-029**: Twenty percent of the random-source value space MUST map to attempt restoration.
+- **FR-030**: A dud-removal outcome MUST remove exactly one currently available incorrect password candidate.
+- **FR-031**: Dud removal MUST replace the selected incorrect password with periods without altering the correct password.
+- **FR-032**: An attempt-restoration outcome MUST set remaining attempts to the configured maximum without exceeding it.
+- **FR-033**: A selected dud-removal outcome MUST apply attempt restoration instead when no removable incorrect password remains.
+- **FR-034**: Invalid, stale, already-used, or otherwise rejected pattern requests MUST NOT consume a random-source value.
+- **FR-035**: Verification MUST use an injected deterministic random source for outcome mapping and activation-order tests.
+- **FR-036**: A controlled source spanning 100 equiprobable values MUST map exactly 80 values to dud removal and 20 values to attempt restoration.
+- **FR-037**: Production behavior MUST be judged by the configured probability mapping rather than by requiring every sample of 100 accepted activations to contain exactly 80 dud removals and 20 restorations.
+
+- **FR-038**: Every `HACK_PATTERN` request MUST identify both the target pattern and the puzzle generation from which the client received it.
+- **FR-039**: A pattern target MUST be represented either by an opaque server-issued `patternId` that resolves to generation and coordinates or by an explicit equivalent containing only `generationId`, `row`, `start`, and `end`.
+- **FR-040**: The server MUST reject a `HACK_PATTERN` payload containing missing, unknown, or invalid fields.
+- **FR-041**: The server MUST reject a `HACK_PATTERN` request whose generation does not match the active puzzle generation.
+- **FR-042**: The server MUST reject coordinates that do not identify a currently valid pattern in canonical board state.
+- **FR-043**: The server MUST reject a pattern identity already marked used.
+- **FR-044**: The server MUST reject a pattern request when the puzzle is not in an actionable state.
+- **FR-045**: A request from an older generation MUST NOT activate a pattern at matching coordinates in a newer generation.
+- **FR-046**: Accepted pattern activation MUST execute under the canonical live-service mutex.
+- **FR-047**: Under that mutex, activation MUST perform these steps in order: validate the active generation; validate or rediscover the requested coordinate pair against canonical board state; verify unused state; mark the pair used; select the weighted outcome; apply the outcome or fallback; recompute patterns affected by mutation; produce a detached public projection; broadcast resulting canonical state.
+- **FR-048**: Concurrent requests for the same pattern MUST result in exactly one accepted activation.
+- **FR-049**: Rejected duplicate requests MUST NOT mutate canonical state.
+- **FR-050**: Rejected duplicate requests MUST NOT advance the random source.
+- **FR-051**: Player authorization MUST remain behind a distinct player/live-service boundary so a future active-session check can be added without changing hacking domain logic.
+- **FR-052**: Phase 1 MUST NOT implement an active controlling-player or observer authorization model.
+
+- **FR-053**: The public pattern projection MUST contain only a stable public pattern identity, rendered row, inclusive start and end coordinates, and current available-or-used status.
+- **FR-054**: The public pattern projection MUST contain the rendered row and inclusive start and end coordinates.
+- **FR-055**: The public pattern projection MUST state whether each pattern is currently available or used.
+- **FR-056**: The public pattern projection MUST NOT reveal the password, dud identities, future effects of unused patterns, or private candidate metadata.
+- **FR-057**: Every public projection MUST be detached from canonical slices, maps, and objects.
+- **FR-058**: Mutating a returned projection MUST NOT alter canonical state.
+- **FR-059**: Pattern availability, used identities, removed duds, remaining attempts, and pattern outcomes MUST remain runtime-only state.
+- **FR-060**: A reconnecting client MUST receive the current canonical puzzle state while the originating server process retains that puzzle.
+- **FR-061**: Phase 1 MUST NOT preserve an active puzzle across server application restarts.
+- **FR-062**: Phase 1 MUST NOT modify the version-1 persisted session schema.
 
 ## Key Entities
 
-- **Special Pattern**: A selectable span on one board row, identified by its bracket type, opening position, closing position, current availability, and whether it has been used.
-- **Hacking Puzzle**: The shared challenge containing the board, candidate passwords, correct password, attempt limit, remaining attempts, special patterns, progress log, and outcome.
-- **Candidate Password**: A selectable word that is either the correct password or an incorrect dud and may be replaced by periods when a pattern removes it.
-- **Pattern Effect**: The single outcome of activating a pattern: either one dud is removed or attempts are restored.
-- **Player Action**: A request to guess a password or activate a special pattern against the current shared puzzle.
-- **Game-Master Action**: A trusted request to solve the active puzzle for all players.
+- **Puzzle Generation**: One runtime hacking puzzle instance with an opaque generation identifier that prevents actions from an older puzzle targeting a newer one.
+- **Special Pattern Identity**: The immutable tuple of puzzle generation identifier, rendered row, opening-character index, and closing-character index.
+- **Special Pattern**: A currently discovered inclusive coordinate span plus its stable public identity and current available-or-used status.
+- **Used Pattern History**: The runtime-only set of complete coordinate identities already accepted during the active puzzle generation, retained even when a pair temporarily disappears.
+- **Hacking Puzzle**: The canonical runtime challenge containing the rendered board, private candidate metadata, correct password, configured attempt maximum, remaining attempts, used-pattern history, progress log, and outcome.
+- **Candidate Password**: A selectable word that is either the correct password or an incorrect dud; only a currently available incorrect candidate may be removed by a pattern.
+- **Pattern Outcome**: The server-selected effect of one accepted activation: dud removal or attempt restoration, with restoration used as the fallback when dud removal has no eligible target.
+- **Public Pattern Projection**: A detached rendering and interaction view containing only stable public identity, row, inclusive coordinates, and current available-or-used state.
+- **Player Action**: An untrusted request submitted through the player/live-service boundary to guess a word or activate a generation-bound pattern.
+- **Game-Master Action**: A trusted `ForceHackSuccess` request available only through the private desktop/Wails boundary.
+
+## Non-Goals
+
+Phase 1 does not implement or modify:
+
+- one active controlling player with observer sessions;
+- session names or game-master reassignment;
+- a Fallout visual or CRT redesign;
+- modern-resolution rendering changes;
+- dictionary import or dictionary validation;
+- localization or audio controls;
+- terminal switching;
+- new lockout modes;
+- persistent unlocked state;
+- existing ordinary-word or filler-click attempt rules;
+- deterministic persistence of a complete puzzle seed;
+- active-puzzle persistence across server application restarts; or
+- the version-1 persisted session schema.
+
+The player/live-service authorization boundary is preserved only as an extension point for a future active-session check. No session-controller role, observer role, or reassignment behavior is introduced here.
 
 ## Success Criteria
 
 ### Measurable Outcomes
 
-- **SC-001**: Across 100 controlled valid pattern activations with an available dud, observed outcomes match 80 dud removals and 20 attempt restorations.
-- **SC-002**: Every allowed bracket type can be discovered and activated, while 100% of cross-row, mismatched, or alphabetic-content spans remain unavailable.
-- **SC-003**: In all tested stacked-pattern boards, each distinct opening can be activated once even when multiple openings share a closing bracket.
-- **SC-004**: In all tested dud removals that create a valid bracket span, the new pattern is selectable immediately without reloading or restarting the puzzle.
-- **SC-005**: Repeated or simultaneous activation attempts against one pattern produce exactly one effect in 100% of tested cases.
-- **SC-006**: Two connected players and one reconnecting player display identical attempts, board text, pattern availability, used-pattern state, and outcome after every accepted action.
-- **SC-007**: Players have zero available actions that directly force success or trigger the removed administrator aid.
-- **SC-008**: The game master can solve an eligible puzzle with one control action, and every connected player receives normal terminal access through the existing success sequence.
-- **SC-009**: Fresh puzzles contain 3–6 valid special patterns in 100% of 1,000 generated-board checks, with no count dependency on hacking difficulty.
+- **SC-001**: With an injected deterministic source spanning 100 equiprobable values, exactly 80 source values select dud removal and exactly 20 select attempt restoration.
+- **SC-002**: In all rejection-path tests for invalid, stale, already-used, duplicate, and non-actionable requests, the deterministic random source records zero consumed values and canonical state remains byte-for-byte equivalent in observable fields.
+- **SC-003**: Across 1,000 generated and publishable initial boards, gameplay discovery against each final rendered board reports 3–6 distinct selectable patterns before the first player action.
+- **SC-004**: Every generated board discovered outside the 3–6 initial range is rejected for publication and regenerated.
+- **SC-005**: Every allowed delimiter type is discovered under the first-compatible-closer rule, while 100% of tested cross-row, mismatched, and alphabetic-content spans are rejected.
+- **SC-006**: In all tested shared-closer boards, each distinct complete coordinate pair can be activated once independently.
+- **SC-007**: In all tested mutation sequences, a new coordinate pair is available once, while any previously used pair remains unavailable if rediscovered.
+- **SC-008**: Concurrent activation tests for the same pattern always produce exactly one accepted request, one applied outcome, one random-source advancement, and one resulting canonical broadcast state.
+- **SC-009**: Mutating every field and nested mutable value reachable from a returned public projection never changes canonical board, candidate, attempt, identity, or used-state data.
+- **SC-010**: Two connected players and one reconnecting player display identical current board text, attempts, pattern availability, used state, removed-dud effects, and puzzle outcome while the same server process is running.
+- **SC-011**: Restart-boundary tests confirm that no active-pattern runtime state is written to or required from version-1 session data.
+- **SC-012**: Player-surface checks find zero routes to `ForceHackSuccess` through WebSocket messages, browser globals, DOM controls, keyboard shortcuts, or query parameters, while the existing private desktop/Wails control still completes an eligible puzzle through the normal shared success flow.
+- **SC-013**: Regression tests confirm that ordinary password guesses and filler clicks retain their pre-feature attempt behavior.
 
 ## Assumptions
 
-- The existing password candidate, likeness, attempt-spending, shared-session, and success-transition rules remain unchanged except where this specification explicitly modifies them.
-- A pattern's closing bracket is the first matching closing bracket to the right of its opening bracket on the same row.
-- “No words inside” is interpreted as no alphabetic characters between the brackets; periods and other non-alphabetic symbols are allowed.
-- Pattern positions are evaluated against the current visible board, so replacing a dud with periods can change the available set during play.
-- Random outcomes are evaluated for each first-time valid activation and can be controlled in verification so the required distribution is tested exactly.
-- If a dud-removal result cannot remove a dud, restoring attempts is the fallback so a valid one-use pattern is never wasted.
-- Runtime hacking progress remains temporary and resets when a fresh hacking attempt begins.
+- The canonical rendered board is the source used by one shared pattern-discovery algorithm during initial publication checks and gameplay rediscovery.
+- Character indices are row-local indices into the rendered board representation, and `start` and `end` are inclusive.
+- Alphabetic means the same character classification used consistently by initial and gameplay discovery; selecting a concrete classification mechanism is deferred to planning without changing the no-alphabetic-character rule.
+- The configured maximum attempts already exists in the hacking puzzle and is not changed by this feature.
+- Weighted randomness is server-side and independently sampled only after a request has passed generation, coordinate, actionable-state, and unused-state validation.
+- The deterministic 80/20 test proves the probability mapping; production samples are allowed to vary naturally.
+- Board mutation from dud removal replaces only that candidate's rendered characters with periods and may increase, decrease, or otherwise change the discovered pattern set.
+- Runtime-only live puzzle data remains available to reconnecting clients only for the lifetime of the server process that owns it.
+- The existing player/live-service boundary is the authorization extension point; Phase 1 adds no controlling-player session model.
+- Existing candidate selection, likeness calculation, word-guess attempts, filler-click behavior, lockout, terminal navigation, and normal success transition remain unchanged.
 
 ## Verbatim Constraints
 
 - Allowed pattern pairs: `()`, `[]`, `{}`, `<>`.
-- Valid special-pattern count per newly generated board: `3–6` inclusive.
-- Dud-removal probability: `80%`.
-- Attempt-restoration probability: `20%`.
+- Initial valid special-pattern count: `3–6` inclusive on the final rendered board before the first player action.
+- Dud-removal probability mapping: `80%`.
+- Attempt-restoration probability mapping: `20%`.
+- Pattern identity: `generationId + row + inclusive start + inclusive end`.
+- Persistence boundary: runtime-only; no version-1 session schema change.

@@ -3,6 +3,7 @@ package hack
 
 import (
 	cryptorand "crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"strconv"
@@ -44,7 +45,10 @@ func (systemRandom) Intn(limit int) int {
 
 // GenerateBoard creates a fresh private hacking aggregate. Random and words
 // are injectable; nil values use the system random source and built-in bank.
-func GenerateBoard(level int, random Random, words WordSource) *domain.HackState {
+func GenerateBoard(generationID string, level int, random Random, words WordSource) *domain.HackState {
+	if strings.TrimSpace(generationID) == "" {
+		return nil
+	}
 	random = randomOrDefault(random)
 	wordLength := levelWordLength(level)
 	wordCount := 11 + clamp(level, 1, 5)
@@ -60,14 +64,30 @@ func GenerateBoard(level int, random Random, words WordSource) *domain.HackState
 		return nil
 	}
 
+	secretWord := candidates[safeIntn(random, len(candidates))]
+	for range placementTries {
+		state := generateBoardAttempt(generationID, level, wordLength, secretWord, candidates, random)
+		if state == nil {
+			continue
+		}
+		patternCount := len(discoverPatternSpans(generationID, state.Columns))
+		if patternCount >= 3 && patternCount <= 6 {
+			return state
+		}
+	}
+	return nil
+}
+
+func generateBoardAttempt(generationID string, level, wordLength int, secretWord string, candidates []string, random Random) *domain.HackState {
 	state := &domain.HackState{
+		GenerationID: generationID,
 		Level:        level,
 		WordLength:   wordLength,
 		AttemptsMax:  maximumAttempts,
 		AttemptsLeft: maximumAttempts,
-		SecretWord:   candidates[safeIntn(random, len(candidates))],
+		SecretWord:   secretWord,
 		WordsByID:    make(map[string]domain.HackCandidate, len(candidates)),
-		UsedPatterns: make(map[string]struct{}),
+		UsedPatterns: make(map[domain.HackPatternIdentity]struct{}),
 		Log:          []string{},
 	}
 
@@ -80,10 +100,11 @@ func GenerateBoard(level int, random Random, words WordSource) *domain.HackState
 		}
 		id, ok := builder.place(text, -1)
 		if !ok {
-			continue
+			return nil
 		}
 		state.WordsByID[id] = domain.HackCandidate{Text: text}
 	}
+
 	patternTarget := 3 + safeIntn(random, 4)
 	pairOffset := safeIntn(random, len(patternPairs))
 	for index := 0; index < patternTarget; index++ {
@@ -97,13 +118,7 @@ func GenerateBoard(level int, random Random, words WordSource) *domain.HackState
 		}
 	}
 
-	state.Columns = []domain.HackColumn{
-		columnA.finish(),
-		columnB.finish(),
-	}
-	if len(discoverPatternSpans(state.Columns)) != patternTarget {
-		return nil
-	}
+	state.Columns = []domain.HackColumn{columnA.finish(), columnB.finish()}
 	return state
 }
 
@@ -151,31 +166,33 @@ func ForceSuccess(state *domain.HackState) {
 // ApplyPattern consumes one currently valid coordinate span and applies
 // exactly one shared effect. Invalid, stale, repeated, and terminal-state
 // actions leave the aggregate unchanged.
-func ApplyPattern(state *domain.HackState, patternID string, random Random) bool {
+func ApplyPattern(state *domain.HackState, requestedID string, random Random) bool {
 	if state == nil || state.Solved || state.Failed {
 		return false
 	}
-	found := false
-	for _, pattern := range discoverPatternSpans(state.Columns) {
-		if pattern.ID == patternID {
-			found = true
+	var requested *domain.HackPattern
+	for _, pattern := range discoverPatternSpans(state.GenerationID, state.Columns) {
+		if patternID(pattern.Identity) == requestedID {
+			copy := pattern
+			requested = &copy
 			break
 		}
 	}
-	if !found {
+	if requested == nil {
 		return false
 	}
 	if state.UsedPatterns == nil {
-		state.UsedPatterns = make(map[string]struct{})
+		state.UsedPatterns = make(map[domain.HackPatternIdentity]struct{})
 	}
-	if _, used := state.UsedPatterns[patternID]; used {
+	if _, used := state.UsedPatterns[requested.Identity]; used {
 		return false
 	}
-	state.UsedPatterns[patternID] = struct{}{}
+	state.UsedPatterns[requested.Identity] = struct{}{}
 	random = randomOrDefault(random)
 
+	outcome := safeIntn(random, 100)
 	decoys := incorrectCandidateIDs(state)
-	if len(decoys) == 0 || safeIntn(random, 100) >= 80 {
+	if outcome >= 80 || len(decoys) == 0 {
 		state.AttemptsLeft = state.AttemptsMax
 		pushLog(state, "Попытки восстановлены.")
 		return true
@@ -201,7 +218,7 @@ func PublicState(state *domain.HackState) *domain.PublicHackState {
 		Failed:       state.Failed,
 		Log:          append([]string(nil), state.Log...),
 		Columns:      make([]domain.HackColumn, len(state.Columns)),
-		Patterns:     discoverPatterns(state.Columns, state.UsedPatterns),
+		Patterns:     discoverPatterns(state),
 	}
 	for index, column := range state.Columns {
 		public.Columns[index] = column
@@ -413,21 +430,26 @@ func incorrectCandidateIDs(state *domain.HackState) []string {
 	return ids
 }
 
-func discoverPatterns(columns []domain.HackColumn, used map[string]struct{}) []domain.PublicHackPattern {
-	spans := discoverPatternSpans(columns)
+func discoverPatterns(state *domain.HackState) []domain.PublicHackPattern {
+	spans := discoverPatternSpans(state.GenerationID, state.Columns)
 	patterns := make([]domain.PublicHackPattern, len(spans))
 	for index, span := range spans {
-		_, wasUsed := used[span.ID]
+		_, wasUsed := state.UsedPatterns[span.Identity]
 		patterns[index] = domain.PublicHackPattern{
-			ID: span.ID, Column: span.Column, Start: span.Start, End: span.End, Pair: span.Pair, Used: wasUsed,
+			ID:    patternID(span.Identity),
+			Row:   span.Identity.Row,
+			Start: span.Identity.Start,
+			End:   span.Identity.End,
+			Used:  wasUsed,
 		}
 	}
 	return patterns
 }
 
-func discoverPatternSpans(columns []domain.HackColumn) []domain.HackPattern {
+func discoverPatternSpans(generationID string, columns []domain.HackColumn) []domain.HackPattern {
 	closers := map[byte]byte{'(': ')', '[': ']', '{': '}', '<': '>'}
 	patterns := make([]domain.HackPattern, 0)
+	renderedRowBase := 0
 	for columnIndex, column := range columns {
 		text := column.Text
 		for rowStart := 0; rowStart < len(text); rowStart += boardRowWidth {
@@ -446,16 +468,27 @@ func discoverPatternSpans(columns []domain.HackColumn) []domain.HackPattern {
 					continue
 				}
 				patterns = append(patterns, domain.HackPattern{
-					ID:     fmt.Sprintf("%d:%d:%d", columnIndex, start, end),
-					Column: columnIndex,
-					Start:  start,
-					End:    end,
-					Pair:   string([]byte{text[start], closer}),
+					Identity: domain.HackPatternIdentity{
+						GenerationID: generationID,
+						Row:          renderedRowBase + rowStart/boardRowWidth,
+						Start:        start - rowStart,
+						End:          end - rowStart,
+					},
+					ColumnIndex:   columnIndex,
+					AbsoluteStart: start,
+					AbsoluteEnd:   end,
+					Pair:          string([]byte{text[start], closer}),
 				})
 			}
 		}
+		renderedRowBase += (len(text) + boardRowWidth - 1) / boardRowWidth
 	}
 	return patterns
+}
+
+func patternID(identity domain.HackPatternIdentity) string {
+	raw := fmt.Sprintf("%s\x00%d\x00%d\x00%d", identity.GenerationID, identity.Row, identity.Start, identity.End)
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
 func isASCIIAlpha(value rune) bool {

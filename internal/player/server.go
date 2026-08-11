@@ -294,10 +294,10 @@ func (server *Server) handleClientMessage(message ClientMessage) {
 			server.emitHackState(state)
 		}
 	case MessageHackPattern:
-		if state, ok := server.config.Live.ApplyHackPattern(message.PatternID); ok {
+		server.config.Live.ApplyHackPattern(message.PatternID, func(state *domain.PublicHackState) {
 			server.broadcast(NewHackStateEnvelope(state))
 			server.emitHackState(state)
-		}
+		})
 	}
 }
 

@@ -341,10 +341,21 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, forbidden := range []string{"HACK_ADMIN", "val === '1'", "SUCCESS"} {
+	for _, forbidden := range []string{
+		"HACK_ADMIN",
+		"val === '1'",
+		"SUCCESS",
+		"URLSearchParams",
+		"location.search",
+		"forceHackSuccess",
+		"ForceHackSuccess",
+	} {
 		if strings.Contains(string(playerScript), forbidden) {
 			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
 		}
+	}
+	if !strings.Contains(string(playerScript), "else send({ type: 'HACK_GUESS', targetId: cell.dataset.target });") {
+		t.Error("ordinary candidate and filler cells must continue through HACK_GUESS")
 	}
 }
 
@@ -358,15 +369,30 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 	}
 	playerScript := string(raw)
 	for _, required := range []string{
-		"function patternAtOpening(cell)",
+		"function patternAtCell(cell)",
 		"(hack.patterns || [])",
-		"index >= pattern.start && index <= pattern.end",
-		"column.text.slice(pattern.start, pattern.end + 1)",
+		"pattern.row === row && offset >= pattern.start && offset <= pattern.end",
+		"matches.find(pattern => pattern.start === offset)",
+		"pattern.start > nearest.start",
+		"const pattern = patternAtCell(cell)",
+		"if (patternAtCell(cell))",
+		"offset >= pattern.start && offset <= pattern.end",
+		"`[data-row=\"${pattern.row}\"][data-offset]`",
 		"if (pattern.used) setHackPatternHover(null)",
 		"send({ type: 'HACK_PATTERN', patternId: pattern.id })",
 	} {
 		if !strings.Contains(playerScript, required) {
 			t.Errorf("bundled player is missing pattern interaction contract %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"pattern.column",
+		"pattern.pair",
+		"column.text.slice(pattern.start",
+		"data-column=\"${pattern.column}",
+	} {
+		if strings.Contains(playerScript, forbidden) {
+			t.Errorf("bundled player depends on private pattern metadata %q", forbidden)
 		}
 	}
 }
@@ -385,15 +411,33 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 	}
 	masterHTML := read("frontend", "src", "index.html")
 	masterJS := read("frontend", "src", "master.js")
+	desktopAPI := read("frontend", "src", "desktop-api.js")
 	playerJS := read("client", "client.js")
-	for _, required := range []string{`id="btnHackSuccess"`, "desktopAPI.forceHackSuccess()", "h.solved || h.failed"} {
-		if !strings.Contains(masterHTML+masterJS, required) {
+	playerHTML := read("client", "index.html")
+	playerProtocol := read("internal", "player", "protocol.go")
+	appBoundary := read("app.go")
+	for _, required := range []string{
+		`id="btnHackSuccess"`,
+		"desktopAPI.forceHackSuccess()",
+		"h.solved || h.failed",
+		"forceHackSuccess: 'ForceHackSuccess'",
+		"func (app *App) ForceHackSuccess() CommandResult",
+	} {
+		if !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required) {
 			t.Errorf("game-master bundle is missing solve-control contract %q", required)
 		}
 	}
-	for _, forbidden := range []string{"forceHackSuccess", "ForceHackSuccess"} {
-		if strings.Contains(playerJS, forbidden) {
-			t.Errorf("player bundle gained game-master solve authority %q", forbidden)
+	playerSurface := playerJS + playerHTML + playerProtocol
+	for _, forbidden := range []string{
+		"forceHackSuccess",
+		"ForceHackSuccess",
+		"btnHackSuccess",
+		"HACK_ADMIN",
+		"URLSearchParams",
+		"location.search",
+	} {
+		if strings.Contains(playerSurface, forbidden) {
+			t.Errorf("player surface gained game-master solve authority %q", forbidden)
 		}
 	}
 }

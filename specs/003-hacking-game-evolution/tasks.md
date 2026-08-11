@@ -1,61 +1,50 @@
-# Tasks: Hacking Game Evolution
+# Tasks: Phase 1 Generation-Bound Hacking Patterns
 
-**Input**: `spec.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/hacking-interface.md`
+**Input**: `spec.md`, `planning-handoff.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/hacking-interface.md`
+
+Task IDs continue at `T027` so the prior completed task journal cannot mark this corrective task set complete accidentally.
 
 ## Phase 1: Setup
 
-The feature uses the existing Go module, browser assets, deterministic random seam, test packages, and WebSocket fixtures. No new directory, dependency, generated binding, or tooling setup is required.
+The corrective implementation uses the existing Go module, WebSocket server, browser assets, deterministic randomness seam, and test infrastructure. No package, dependency, generated binding, directory, or tooling setup is required.
 
-## Phase 2: Foundational Models
+## Phase 2: Foundational Identity and Projection Model
 
-This phase establishes the shared types needed by every user story.
+This phase establishes the generation-bound identity and minimal public shape required by every story.
 
 **Wave 1:**
 
-- [x] **T001** Add private used-pattern state and detached public pattern projection types, and remove administrator-only fields · `internal/domain/model.go`
+- [x] **T027** Replace coordinate-only pattern models with `GenerationID`, comparable generation/row/start/end identity, private discovery metadata, and minimal detached public `id`/`row`/`start`/`end`/`used` fields · `internal/domain/model.go`
 
-**Checkpoint**: Domain types compile and define the canonical/public boundary used by later story slices.
+**Checkpoint**: Canonical and public types compile with no public `column` or `pair`, and all later story work can target the complete generation-bound identity.
 
 ## Phase 3: User Story 1 — Solve Without Player Cheats (P1)
 
-**Goal**: Remove every player-accessible administrator shortcut while preserving ordinary guesses.
+**Goal**: Preserve the removal of every player-accessible cheat and retain ordinary password/filler behavior while the model changes.
 
-**Independent Test**: Generate a board, send the former board/keyboard/protocol shortcuts, and verify no administrator entry exists, `HACK_ADMIN` is rejected, state is unchanged, and normal candidate guesses still work.
-
-### Tests
-
-**Wave 1 — independent (different files):**
-
-- [x] **T002** [P] [US1] Add failing domain coverage for boards without `SUCCESS` or administrator metadata while retaining normal guess transitions · `internal/hack/hack_test.go`
-- [x] **T003** [P] [US1] Add failing strict-decoder coverage proving `HACK_ADMIN` is unsupported and malformed replacements do not dispatch · `internal/player/protocol_test.go`
-- [x] **T004** [P] [US1] Add failing bundled-player assertions that the keyboard shortcut and player cheat identifiers are absent · `internal/platform/assets_test.go`
-
-**⟶ Wait for Wave 1 to finish, then:**
-
-### Implementation
-
-**Wave 2 — independent (different files):**
-
-- [x] **T005** [P] [US1] Remove administrator generation, lookup, activation, logging, and public metadata without changing word/filler guess rules · `internal/hack/hack.go`
-- [x] **T006** [P] [US1] Remove `HACK_ADMIN` from the accepted player protocol and client-message model · `internal/player/protocol.go`
-- [x] **T007** [P] [US1] Remove the typed `1` administrator dispatch while retaining ordinary hacking keyboard and cell interactions · `client/client.js`
-
-**Checkpoint**: User Story 1 is independently functional and testable; players have no force-success or bulk-dud-removal path.
-
-## Phase 4: User Story 2 — Use Special Patterns (P1)
-
-**Goal**: Generate, highlight, and atomically activate one-use patterns with exact dud-removal and attempt-restoration outcomes.
-
-**Independent Test**: Exercise all four bracket pairs with deterministic random values, verify `3–6` initial patterns at every difficulty, activate each outcome, and observe one shared public update.
+**Independent Test**: Exercise normal candidate and filler guesses, the removed administrator command, and bundled player surfaces; verify unchanged attempts and no force-success or bulk-dud path.
 
 ### Tests
 
 **Wave 1 — independent (different files):**
 
-- [x] **T008** [P] [US2] Add failing discovery, 1,000-board count, all-pairs, exact 80/20, one-use, dud-removal, restore, and no-dud fallback tests · `internal/hack/hack_test.go`
-- [x] **T009** [P] [US2] Add failing `HACK_PATTERN` decoding/public-envelope tests and update the golden public pattern payload · `internal/player/protocol_test.go`, `internal/testutil/testdata/protocol/hack-state.json`
-- [x] **T010** [P] [US2] Add failing live-service coverage for an accepted pattern effect and detached public pattern snapshots · `internal/live/service_test.go`
-- [x] **T011** [P] [US2] Add failing player-server coverage for pattern dispatch, one `HACK_STATE` broadcast, and game-master callback publication · `internal/player/server_test.go`
+- [x] **T028** [P] [US1] Update and strengthen ordinary candidate, filler-click, removed `SUCCESS`, and terminal-state regression cases against the generation-bound model · `internal/hack/hack_test.go`
+- [x] **T029** [P] [US1] Strengthen bundled-player checks for removed administrator inputs, query/keyboard/global cheat paths, and unchanged ordinary cell dispatch · `internal/platform/assets_test.go`
+
+**Checkpoint**: User Story 1 is independently verified; the corrective work has not restored any player cheat or changed ordinary attempt rules.
+
+## Phase 4: User Story 2 — Discover and Use Special Patterns (P1)
+
+**Goal**: Publish only final boards with `3–6` discovered patterns and apply the exact weighted outcome mapping with one required outcome draw per accepted activation.
+
+**Independent Test**: Generate 1,000 final boards, cover all four pairs, drive all 100 equiprobable outcome values, exercise no-dud fallback, and interact through row-based inclusive browser coordinates.
+
+### Tests
+
+**Wave 1 — independent (different files):**
+
+- [x] **T030** [P] [US2] Add failing final-board regeneration, `3–6` discovery, 100-value `80/20` mapping, accepted no-dud RNG consumption, rejected zero-RNG, secret-preservation, restoration, and minimal-projection tests · `internal/hack/hack_test.go`
+- [x] **T031** [P] [US2] Add failing bundled-player assertions for row-local inclusive hover/click lookup, opaque `patternId` echo, used-state handling, and absence of public `column`/`pair` dependencies · `internal/platform/assets_test.go`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
@@ -63,107 +52,110 @@ This phase establishes the shared types needed by every user story.
 
 **Wave 2:**
 
-- [x] **T012** [US2] Implement exact-count pattern construction, current-board discovery, coordinate identities, first-use effects, logs, dud replacement, attempt restoration, and public projection · `internal/hack/hack.go`
+- [x] **T032** [US2] Implement generation-aware row discovery, final-board regeneration through the production scanner, mandatory weighted outcome draw before fallback, dud selection, and minimal detached current-pattern projection · `internal/hack/hack.go`
+
+**⟶ Wait for Wave 2 to finish, then:**
+
+**Wave 3:**
+
+- [x] **T033** [US2] Replace column-based pattern interaction with rendered-row and row-local inclusive offsets while continuing to send the opaque server-issued `patternId` without optimistic mutation · `client/client.js`
+
+**Checkpoint**: User Story 2 is independently functional and testable across generation, weighted effects, projection, and browser interaction.
+
+## Phase 5: User Story 3 — Discover Stacked and Dynamic Patterns (P1)
+
+**Goal**: Keep shared-closer openings independent and preserve permanent coordinate-pair used history across dynamic discovery changes.
+
+**Independent Test**: Mutate controlled boards so one opening changes its first compatible closer and a previously used pair disappears and reappears; verify new identity availability and old identity unavailability.
+
+### Tests
+
+**Wave 1:**
+
+- [x] **T034** [US3] Add failing stacked shared-closer, first-compatible-close, same-row, alphabetic-interior, changed-closer, disappeared/reappeared used-pair, and post-dud dynamic projection cases · `internal/hack/hack_test.go`
+
+**⟶ Wait for Wave 1 to finish, then:**
+
+### Implementation
+
+**Wave 2:**
+
+- [x] **T035** [US3] Complete row-local scanning and private complete-identity history so changed coordinate pairs are new and rediscovered used pairs remain unavailable · `internal/hack/hack.go`
+
+**Checkpoint**: User Story 3 is independently functional and testable for stacked, changed, newly created, and rediscovered patterns.
+
+## Phase 6: User Story 4 — Share One Atomic Puzzle State (P1)
+
+**Goal**: Reject stale and duplicate generation-bound requests without RNG or mutation, publish accepted transitions in the mandated mutex order, and converge connected/reconnecting clients on detached state.
+
+**Independent Test**: Race duplicate requests, delay an ID across two puzzle generations with coincident coordinates, mutate returned snapshots, and reconnect a client; verify one acceptance, one outcome draw, one ordered publication, and current state convergence.
+
+### Tests
+
+**Wave 1 — independent (different files):**
+
+- [x] **T036** [P] [US4] Add failing deterministic generation-ID, stale-generation, duplicate zero-RNG, exact one-publication, callback-order, terminal-state, fresh-set, and detached-projection live-service tests · `internal/live/service_test.go`
+- [x] **T037** [P] [US4] Update strict `HACK_PATTERN` decoder and envelope tests for opaque generation-bearing IDs, missing/unknown/invalid fields, and minimal public pattern JSON · `internal/player/protocol_test.go`
+- [x] **T038** [P] [US4] Add failing multi-client duplicate, stale-generation, no-broadcast rejection, accepted ordered fanout, reconnect-current-state, and process-local reset cases · `internal/player/server_test.go`
+- [x] **T039** [P] [US4] Update public-pattern fixtures and deepen returned-projection mutation tests across runtime status and game-master events · `app_test.go`
+
+**⟶ Wait for Wave 1 to finish, then:**
+
+### Implementation
+
+**Wave 2:**
+
+- [x] **T040** [US4] Issue collision-resistant runtime generation IDs independently of gameplay RNG and execute validation, used marking, outcome, mutation, rediscovery, detached projection, and one publication callback under the live mutex · `internal/live/service.go`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — independent (different files):**
 
-- [x] **T013** [P] [US2] Add strict `HACK_PATTERN` decoding with `patternId` and retain the extended `HACK_STATE`/`TERMINAL_LIVE` envelope shapes · `internal/player/protocol.go`
-- [x] **T014** [P] [US2] Add the mutex-protected live-service pattern transition returning a detached accepted state · `internal/live/service.go`
+- [x] **T041** [P] [US4] Retain strict `HACK_PATTERN` decoding while documenting and carrying the opaque generation-bearing `patternId` with no coordinate-only assumptions · `internal/player/protocol.go`
+- [x] **T042** [P] [US4] Replace the golden public pattern object with `id`, `row`, inclusive `start`/`end`, and `used` only · `internal/testutil/testdata/protocol/hack-state.json`
 
 **⟶ Wait for Wave 3 to finish, then:**
 
 **Wave 4:**
 
-- [x] **T015** [US2] Dispatch accepted `HACK_PATTERN` actions through the live service and publish the resulting player/master state · `internal/player/server.go`
+- [x] **T043** [US4] Supply the non-reentrant publication callback, enqueue exactly one accepted `HACK_STATE` plus detached game-master notification under the live transition, and suppress every rejected publication · `internal/player/server.go`
 
-**⟶ Wait for Wave 4 to finish, then:**
+**Checkpoint**: User Story 4 is independently functional and testable under concurrency, stale delivery, projection mutation, and reconnect.
 
-**Wave 5:**
+## Phase 7: User Story 5 — Let the Game Master Resolve the Puzzle Privately (P1)
 
-- [x] **T016** [US2] Render coordinate-aware pattern openings/ranges, inclusive hover preview, used-state behavior, and `HACK_PATTERN` requests without optimistic mutation · `client/client.js`
+**Goal**: Preserve `ForceHackSuccess` only through the private desktop/Wails boundary after the public model and publication changes.
 
-**Checkpoint**: User Story 2 is independently functional and testable across domain, protocol, live service, server, and browser surfaces.
-
-## Phase 5: User Story 3 — Discover Stacked and Dynamic Patterns (P1)
-
-**Goal**: Keep distinct stacked openings usable and reveal newly valid spans immediately after a dud becomes periods.
-
-**Independent Test**: Use controlled boards with two openings sharing one close and with an alphabetic dud between matching brackets, then verify separate one-use identities and immediate rediscovery after removal.
-
-### Tests
-
-**Wave 1:**
-
-- [x] **T017** [US3] Add failing stacked-opening, first-compatible-close, row-boundary, alphabetic-interior, and post-dud dynamic-discovery cases · `internal/hack/hack_test.go`
-
-**⟶ Wait for Wave 1 to finish, then:**
-
-### Implementation
-
-**Wave 2:**
-
-- [x] **T018** [US3] Complete row-local scanning and post-mutation rediscovery so stacked identities remain independent and new spans enter the same public projection · `internal/hack/hack.go`
-
-**Checkpoint**: User Story 3 is independently functional and testable with stacked and dynamically created patterns.
-
-## Phase 6: User Story 4 — Let the Game Master Resolve the Puzzle (P1)
-
-**Goal**: Preserve the trusted game-master solve control and normal shared success publication.
-
-**Independent Test**: Force an active puzzle through the Wails application boundary, verify no attempt is consumed, verify player/master solved publication, and verify ineligible states are rejected/disabled.
+**Independent Test**: Invoke the trusted control for an eligible puzzle, verify unchanged attempts and normal shared success, reject ineligible states, and inspect every player surface for equivalent authority.
 
 ### Tests
 
 **Wave 1 — independent (different files):**
 
-- [x] **T019** [P] [US4] Extend bridge tests for game-master solve eligibility, unchanged attempts, shared publication, and detached pattern metadata · `app_test.go`
-- [x] **T020** [P] [US4] Assert the bundled master retains `#btnHackSuccess`, `forceHackSuccess`, and solved/failed disabling while the player bundle lacks equivalent authority · `internal/platform/assets_test.go`
+- [x] **T044** [P] [US5] Update generation-bound public fixtures and verify eligible/ineligible `ForceHackSuccess`, unchanged attempts, detached events, and existing shared success publication · `app_test.go`
+- [x] **T045** [P] [US5] Verify the private master control and Wails call remain intact while WebSocket messages, browser globals, DOM controls, keyboard shortcuts, query parameters, and player assets expose no equivalent · `internal/platform/assets_test.go`
 
-**⟶ Wait for Wave 1 to finish, then:**
-
-### Implementation
-
-**Wave 2:**
-
-- [x] **T021** [US4] Deep-clone public pattern metadata across runtime status/events while retaining the existing `ForceHackSuccess` command and publication path · `app.go`
-
-**Checkpoint**: User Story 4 is independently functional and testable; only the game master retains forced success.
-
-## Phase 7: User Story 5 — Preserve Shared Progress Across Connections (P2)
-
-**Goal**: Guarantee single-effect concurrency, no-op rejection, reconnect convergence, and fresh-puzzle reset.
-
-**Independent Test**: Race two clients on one pattern, reconnect another client after used/dynamic changes, send stale and terminal-state actions, then start a fresh puzzle and compare every public field.
-
-### Tests
-
-**Wave 1 — independent (different files):**
-
-- [x] **T022** [P] [US5] Add concurrent same-pattern, rejected-action immutability, detached snapshot, and fresh-set reset coverage · `internal/live/service_test.go`
-- [x] **T023** [P] [US5] Add multi-client convergence, no-broadcast rejection, terminal-state no-op, and reconnect-current-pattern coverage · `internal/player/server_test.go`
-
-**⟶ Wait for Wave 1 to finish, then:**
-
-### Implementation
-
-**Wave 2 — independent (different files):**
-
-- [x] **T024** [P] [US5] Distinguish accepted pattern mutations from absent/stale/repeated/terminal no-ops at the mutex boundary and reset used state on fresh `Set` · `internal/live/service.go`
-- [x] **T025** [P] [US5] Suppress player broadcasts and game-master callbacks for rejected pattern actions while preserving accepted convergence · `internal/player/server.go`
-
-**Checkpoint**: User Story 5 is independently functional and testable under concurrency and reconnection.
+**Checkpoint**: User Story 5 is independently verified; only the trusted game-master boundary can force success.
 
 ## Phase 8: Polish and Success-Criteria Validation
 
 **Wave 1:**
 
-- [x] **T026** Run `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, and `npm run build` in `frontend/`; fix any feature-caused failures and confirm SC-001 through SC-009 · `.`
+- [x] **T046** Add a version-1 encode/decode regression proving generation IDs, patterns, used history, removed duds, attempts, outcomes, unlocked state, and puzzle seeds never enter persisted session JSON · `internal/domain/model_test.go`
+
+**⟶ Wait for Wave 1 to finish, then:**
+
+**Wave 2:**
+
+- [x] **T047** Run `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, and `npm --prefix frontend run build`; fix only feature-caused failures and verify SC-001 through SC-013 · `.`
 
 ## Dependencies & Execution Order
 
-- Phase 1 confirms no setup work; Phase 2 blocks every story by defining the shared model.
-- User Story 1 removes the old authority before User Story 2 adds its replacement; User Story 3 then extends the same discovery engine; User Story 4 verifies the separate trusted override; User Story 5 hardens shared-state behavior; Polish validates the complete vertical slice.
-- Phase 3 Wave 1 blocks Wave 2. Phase 4 Wave 1 blocks Wave 2, which blocks Wave 3, then Wave 4, then Wave 5. Phase 5 Wave 1 blocks Wave 2. Phase 6 Wave 1 blocks Wave 2. Phase 7 Wave 1 blocks Wave 2. Phase 8 runs only after every story checkpoint.
-- Tasks tagged `[P]` touch different files within their wave and may be completed in any order; all joins must complete before the next wave begins.
+- Setup adds no work. Foundational T027 blocks every user-story phase.
+- User Story 1 protects existing behavior before User Story 2 changes discovery/outcomes; User Story 3 then extends the same hacking engine; User Story 4 integrates generation, concurrency, projection, protocol, and publication; User Story 5 verifies the separate trusted boundary; Polish closes persistence and full-suite gates.
+- Phase 3 Wave 1 is independent after T027. Phase 4 Wave 1 blocks T032, which blocks T033. Phase 5 T034 blocks T035. Phase 6 Wave 1 blocks T040, which blocks Wave 3, which blocks T043. Phase 7 Wave 1 follows the public integration. Phase 8 T046 blocks the final T047 validation.
+- Tasks tagged `[P]` touch different files within their wave and may be completed in any order; every explicit join must complete before the next wave begins.
+
+## Phase 9: Convergence
+
+- [x] **T048** Make browser special-pattern hover and click resolution row-local and inclusive across every offset from `start` through `end`, and add an asset-contract regression covering full-span activation · `client/client.js`, `internal/platform/assets_test.go` per plan: client hover/click mapping and T031/T033 (partial)

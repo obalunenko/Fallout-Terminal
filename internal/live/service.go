@@ -2,8 +2,13 @@
 package live
 
 import (
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/obalunenko/Fallout-Terminal/internal/hack"
@@ -14,16 +19,33 @@ import (
 // across this boundary are detached projections and may be freely mutated by
 // callers without changing the canonical aggregate.
 type Service struct {
-	mu     sync.RWMutex
-	live   *domain.LiveState
-	random hack.Random
-	words  hack.WordSource
+	mu            sync.RWMutex
+	live          *domain.LiveState
+	random        hack.Random
+	words         hack.WordSource
+	generationIDs generationIDSource
+}
+
+type generationIDSource interface {
+	Next() string
+}
+
+type cryptoGenerationIDSource struct {
+	fallback atomic.Uint64
+}
+
+func (source *cryptoGenerationIDSource) Next() string {
+	var value [16]byte
+	if _, err := cryptorand.Read(value[:]); err == nil {
+		return hex.EncodeToString(value[:])
+	}
+	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), source.fallback.Add(1))
 }
 
 // New returns an empty live-state service. Randomness and the word source are
 // injectable to keep puzzle generation deterministic in tests.
 func New(random hack.Random, words hack.WordSource) *Service {
-	return &Service{random: random, words: words}
+	return &Service{random: random, words: words, generationIDs: &cryptoGenerationIDSource{}}
 }
 
 // Set installs a fresh live terminal, resets navigation, and creates a new
@@ -41,7 +63,7 @@ func (service *Service) Set(terminalID, terminalName string, tree domain.Content
 		Nav:          nav.Default(),
 	}
 	if hackLevel > 0 {
-		state.Hack = hack.GenerateBoard(hackLevel, service.random, service.words)
+		state.Hack = hack.GenerateBoard(service.generationIDs.Next(), hackLevel, service.random, service.words)
 	}
 	service.live = state
 	return publicLiveState(state)
@@ -108,17 +130,21 @@ func (service *Service) ApplyHackGuess(targetID string) (*domain.PublicHackState
 }
 
 // ApplyHackPattern atomically validates and consumes one current pattern.
-func (service *Service) ApplyHackPattern(patternID string) (*domain.PublicHackState, bool) {
+func (service *Service) ApplyHackPattern(patternID string, publish func(*domain.PublicHackState)) bool {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 	if !activePuzzle(service.live) {
-		return nil, false
+		return false
 	}
 
 	if !hack.ApplyPattern(service.live.Hack, patternID, service.random) {
-		return nil, false
+		return false
 	}
-	return hack.PublicState(service.live.Hack), true
+	projection := hack.PublicState(service.live.Hack)
+	if publish != nil {
+		publish(projection)
+	}
+	return true
 }
 
 // ForceHackSuccess completes an active puzzle without spending an attempt.

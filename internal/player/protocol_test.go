@@ -29,7 +29,7 @@ func TestDecodeClientMessageAcceptsExactProtocol(t *testing.T) {
 		{name: "word guess", input: `{"type":"HACK_GUESS","targetId":"A1"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "A1"}},
 		{name: "filler guess", input: `{"type":"HACK_GUESS","targetId":"0:0"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "0:0"}},
 		{name: "stale guess remains syntactically eligible", input: `{"type":"HACK_GUESS","targetId":"stale"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "stale"}},
-		{name: "special pattern", input: `{"type":"HACK_PATTERN","patternId":"0:17:23"}`, want: ClientMessage{Type: "HACK_PATTERN", PatternID: "0:17:23"}},
+		{name: "generation-bound special pattern", input: `{"type":"HACK_PATTERN","patternId":"Z2VuZXJhdGlvbi0xADAAMQA0"}`, want: ClientMessage{Type: "HACK_PATTERN", PatternID: "Z2VuZXJhdGlvbi0xADAAMQA0"}},
 	}
 
 	for _, test := range tests {
@@ -95,7 +95,10 @@ func TestDecodeClientMessageValidatesActionAndTargetFields(t *testing.T) {
 		`{"type":"HACK_PATTERN"}`,
 		`{"type":"HACK_PATTERN","patternId":1}`,
 		`{"type":"HACK_PATTERN","patternId":""}`,
-		`{"type":"HACK_PATTERN","patternId":"0:17:23","targetId":"A1"}`,
+		`{"type":"HACK_PATTERN","patternId":"   "}`,
+		`{"type":"HACK_PATTERN","patternId":"opaque","targetId":"A1"}`,
+		`{"type":"HACK_PATTERN","patternId":"opaque","generationId":"client-supplied"}`,
+		`{"type":"HACK_PATTERN","patternId":"first","patternId":"second"}`,
 		`{"type":"HACK_ADMIN","targetId":"A1"}`,
 	}
 
@@ -165,13 +168,14 @@ func TestPlayerEnvelopesNeverMarshalPrivateHackFields(t *testing.T) {
 	t.Parallel()
 
 	private := &domain.HackState{
+		GenerationID: "generation-private",
 		Level:        2,
 		WordLength:   5,
 		AttemptsMax:  4,
 		AttemptsLeft: 4,
 		SecretWord:   "VAULT",
 		WordsByID:    map[string]domain.HackCandidate{"A1": {Text: "VAULT"}},
-		UsedPatterns: map[string]struct{}{"0:0:1": {}},
+		UsedPatterns: map[domain.HackPatternIdentity]struct{}{{GenerationID: "generation-private", Row: 0, Start: 0, End: 1}: {}},
 		Columns:      []domain.HackColumn{},
 		Log:          []string{},
 	}

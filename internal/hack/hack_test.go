@@ -26,7 +26,7 @@ func TestGenerateBoardUsesLevelRules(t *testing.T) {
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("level_%d", test.level), func(t *testing.T) {
 			words := &recordingWordSource{}
-			hack := GenerateBoard(test.level, newSequenceRandom(), words)
+			hack := GenerateBoard("generation-level", test.level, newSequenceRandom(), words)
 
 			if hack == nil {
 				t.Fatal("GenerateBoard() returned nil")
@@ -169,20 +169,21 @@ func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
 	seenPairs := map[string]bool{}
 	for level := 1; level <= 5; level++ {
 		for iteration := 0; iteration < 200; iteration++ {
-			state := GenerateBoard(level, newSequenceRandom(), &recordingWordSource{})
+			generationID := fmt.Sprintf("generation-%d-%d", level, iteration)
+			state := GenerateBoard(generationID, level, newSequenceRandom(), &recordingWordSource{})
 			if state == nil {
 				t.Fatalf("level %d iteration %d returned nil", level, iteration)
 			}
-			patterns := discoverPatterns(state.Columns, state.UsedPatterns)
+			patterns := discoverPatternSpans(state.GenerationID, state.Columns)
 			if len(patterns) < 3 || len(patterns) > 6 {
 				t.Fatalf("level %d iteration %d patterns = %d, want 3..6", level, iteration, len(patterns))
 			}
 			for _, pattern := range patterns {
 				seenPairs[pattern.Pair] = true
-				if pattern.Start/boardRowWidth != pattern.End/boardRowWidth {
-					t.Fatalf("pattern %#v crosses a row", pattern)
+				if pattern.Identity.GenerationID != generationID {
+					t.Fatalf("pattern generation = %q, want %q", pattern.Identity.GenerationID, generationID)
 				}
-				text := state.Columns[pattern.Column].Text[pattern.Start : pattern.End+1]
+				text := state.Columns[pattern.ColumnIndex].Text[pattern.AbsoluteStart : pattern.AbsoluteEnd+1]
 				if strings.IndexFunc(text[1:len(text)-1], isASCIIAlpha) >= 0 {
 					t.Fatalf("pattern %#v contains alphabetic interior %q", pattern, text)
 				}
@@ -203,8 +204,12 @@ func TestApplyPatternUsesExactOutcomeBuckets(t *testing.T) {
 		state := patternTestState()
 		state.AttemptsLeft = 1
 		beforeCandidates := len(state.WordsByID)
-		if !ApplyPattern(state, "0:0:3", &constantRandom{value: roll}) {
+		random := &recordingRandom{values: []int{roll, 0}}
+		if !ApplyPattern(state, firstPatternID(t, state), random) {
 			t.Fatalf("roll %d rejected valid pattern", roll)
+		}
+		if random.calls == 0 || random.limits[0] != 100 {
+			t.Fatalf("roll %d first RNG call = %v, want outcome Intn(100)", roll, random.limits)
 		}
 		if len(state.WordsByID) == beforeCandidates-1 {
 			dudRemovals++
@@ -228,16 +233,25 @@ func TestApplyPatternIsOneUseAndRestoresWhenNoDudRemains(t *testing.T) {
 	delete(state.WordsByID, "A2")
 	state.Columns[0].Words = state.Columns[0].Words[:1]
 	state.Columns[0].Text = state.Columns[0].Text[:9] + "...."
+	patternID := firstPatternID(t, state)
+	random := &recordingRandom{values: []int{0}}
 
-	if !ApplyPattern(state, "0:0:3", &constantRandom{value: 0}) {
+	if !ApplyPattern(state, patternID, random) {
 		t.Fatal("valid pattern was rejected")
+	}
+	if random.calls != 1 || !reflect.DeepEqual(random.limits, []int{100}) {
+		t.Fatalf("no-dud fallback RNG calls = %v, want one outcome draw", random.limits)
 	}
 	if state.AttemptsLeft != state.AttemptsMax {
 		t.Fatalf("attempts = %d, want restored to %d", state.AttemptsLeft, state.AttemptsMax)
 	}
 	after := cloneHackState(t, state)
-	if ApplyPattern(state, "0:0:3", &constantRandom{value: 0}) {
+	rejectedRandom := &recordingRandom{values: []int{0}}
+	if ApplyPattern(state, patternID, rejectedRandom) {
 		t.Fatal("used pattern was accepted twice")
+	}
+	if rejectedRandom.calls != 0 {
+		t.Fatalf("used pattern consumed %d RNG values, want zero", rejectedRandom.calls)
 	}
 	if !reflect.DeepEqual(state, after) {
 		t.Fatalf("repeated pattern mutated state\ngot: %#v\nwant: %#v", state, after)
@@ -245,10 +259,20 @@ func TestApplyPatternIsOneUseAndRestoresWhenNoDudRemains(t *testing.T) {
 }
 
 func TestPatternDiscoveryHandlesStackedAndInvalidSpans(t *testing.T) {
-	stacked := discoverPatternSpans([]domain.HackColumn{{Text: "((!!)", Words: []domain.HackWord{}}})
-	wantIDs := []string{"0:0:4", "0:1:4"}
+	stacked := discoverPatternSpans("generation-stacked", []domain.HackColumn{{Text: "((!!)", Words: []domain.HackWord{}}})
+	wantIDs := []string{
+		patternID(domain.HackPatternIdentity{GenerationID: "generation-stacked", Row: 0, Start: 0, End: 4}),
+		patternID(domain.HackPatternIdentity{GenerationID: "generation-stacked", Row: 0, Start: 1, End: 4}),
+	}
 	if got := patternIDs(stacked); !reflect.DeepEqual(got, wantIDs) {
 		t.Fatalf("stacked pattern IDs = %v, want %v", got, wantIDs)
+	}
+	if stacked[0].Identity.End != stacked[1].Identity.End || stacked[0].Identity.Start == stacked[1].Identity.Start {
+		t.Fatalf("shared closer patterns are not distinct complete coordinate pairs: %#v", stacked)
+	}
+	firstClose := discoverPatternSpans("generation-first-close", []domain.HackColumn{{Text: "(!!))"}})
+	if len(firstClose) != 1 || firstClose[0].Identity.End != 3 {
+		t.Fatalf("first-compatible-close discovery = %#v, want one span ending at 3", firstClose)
 	}
 
 	invalid := []struct {
@@ -261,31 +285,74 @@ func TestPatternDiscoveryHandlesStackedAndInvalidSpans(t *testing.T) {
 	}
 	for _, test := range invalid {
 		t.Run(test.name, func(t *testing.T) {
-			if patterns := discoverPatternSpans([]domain.HackColumn{{Text: test.text}}); len(patterns) != 0 {
+			if patterns := discoverPatternSpans("generation-invalid", []domain.HackColumn{{Text: test.text}}); len(patterns) != 0 {
 				t.Fatalf("discoverPatternSpans(%q) = %#v, want none", test.text, patterns)
 			}
 		})
 	}
 }
 
+func TestChangedCloserCreatesNewIdentityAndUsedPairStaysUnavailable(t *testing.T) {
+	state := &domain.HackState{
+		GenerationID: "generation-changing-closer",
+		Level:        1,
+		WordLength:   4,
+		AttemptsMax:  4,
+		AttemptsLeft: 2,
+		SecretWord:   "CODE",
+		WordsByID:    map[string]domain.HackCandidate{"A1": {Text: "CODE"}},
+		UsedPatterns: map[domain.HackPatternIdentity]struct{}{},
+		Columns:      []domain.HackColumn{{Text: "(!)!"}},
+	}
+
+	oldIdentity := discoverPatternSpans(state.GenerationID, state.Columns)[0].Identity
+	oldID := patternID(oldIdentity)
+	if !ApplyPattern(state, oldID, &constantRandom{value: 99}) {
+		t.Fatal("initial coordinate pair was rejected")
+	}
+
+	state.Columns[0].Text = "(!!)"
+	changed := discoverPatternSpans(state.GenerationID, state.Columns)
+	if len(changed) != 1 || changed[0].Identity.End == oldIdentity.End {
+		t.Fatalf("changed closer discovery = %#v, want a new coordinate pair", changed)
+	}
+	changedID := patternID(changed[0].Identity)
+	if !ApplyPattern(state, changedID, &constantRandom{value: 99}) {
+		t.Fatal("new coordinate pair was not independently available")
+	}
+
+	state.Columns[0].Text = "(!)!"
+	public := PublicState(state)
+	if len(public.Patterns) != 1 || public.Patterns[0].ID != oldID || !public.Patterns[0].Used {
+		t.Fatalf("rediscovered old coordinate pair = %#v, want permanently used", public.Patterns)
+	}
+	random := &recordingRandom{values: []int{0}}
+	if ApplyPattern(state, oldID, random) || random.calls != 0 {
+		t.Fatalf("rediscovered used pair accepted or consumed RNG: calls=%d", random.calls)
+	}
+}
+
 func TestDudRemovalRevealsDynamicPatternImmediately(t *testing.T) {
 	state := &domain.HackState{
-		Level: 1, WordLength: 4, AttemptsMax: 4, AttemptsLeft: 4, SecretWord: "CODE",
+		GenerationID: "generation-dynamic",
+		Level:        1, WordLength: 4, AttemptsMax: 4, AttemptsLeft: 4, SecretWord: "CODE",
 		WordsByID:    map[string]domain.HackCandidate{"A1": {Text: "DUST"}, "B1": {Text: "CODE"}},
-		UsedPatterns: map[string]struct{}{},
+		UsedPatterns: map[domain.HackPatternIdentity]struct{}{},
 		Columns: []domain.HackColumn{
 			{Text: "(DUST)!!!!!!", Words: []domain.HackWord{{ID: "A1", Start: 1, Length: 4}}},
 			{Text: "[]CODE!!!!!!", Words: []domain.HackWord{{ID: "B1", Start: 2, Length: 4}}},
 		},
 	}
-	if patterns := discoverPatternSpans(state.Columns); !reflect.DeepEqual(patternIDs(patterns), []string{"1:0:1"}) {
-		t.Fatalf("initial patterns = %#v", patterns)
+	initial := discoverPatternSpans(state.GenerationID, state.Columns)
+	if len(initial) != 1 || initial[0].Identity.Row != 1 || initial[0].Identity.Start != 0 || initial[0].Identity.End != 1 {
+		t.Fatalf("initial patterns = %#v", initial)
 	}
-	if !ApplyPattern(state, "1:0:1", &constantRandom{value: 0}) {
+	if !ApplyPattern(state, patternID(initial[0].Identity), &constantRandom{value: 0}) {
 		t.Fatal("available pattern was rejected")
 	}
-	if got := patternIDs(discoverPatternSpans(state.Columns)); !reflect.DeepEqual(got, []string{"0:0:5", "1:0:1"}) {
-		t.Fatalf("post-dud patterns = %v, want dynamic and used spans", got)
+	postDud := discoverPatternSpans(state.GenerationID, state.Columns)
+	if len(postDud) != 2 || postDud[0].Identity.Row != 0 || postDud[0].Identity.End != 5 || postDud[1].Identity.Row != 1 {
+		t.Fatalf("post-dud patterns = %#v, want dynamic and used spans", postDud)
 	}
 	public := PublicState(state)
 	if public == nil || len(public.Patterns) != 2 || public.Patterns[0].Used || !public.Patterns[1].Used {
@@ -294,7 +361,7 @@ func TestDudRemovalRevealsDynamicPatternImmediately(t *testing.T) {
 }
 
 func TestGeneratedBoardHasNoPlayerAdministratorEntry(t *testing.T) {
-	hack := GenerateBoard(1, newSequenceRandom(), &recordingWordSource{})
+	hack := GenerateBoard("generation-no-admin", 1, newSequenceRandom(), &recordingWordSource{})
 	if hack == nil {
 		t.Fatal("GenerateBoard() returned nil")
 	}
@@ -352,7 +419,7 @@ func TestPublicStateExcludesPrivatePuzzleFields(t *testing.T) {
 		t.Fatalf("PublicState(nil) = %#v, want nil", got)
 	}
 
-	hack := testHackState()
+	hack := patternTestState()
 	public := PublicState(hack)
 	if public == nil {
 		t.Fatal("PublicState() returned nil")
@@ -369,6 +436,41 @@ func TestPublicStateExcludesPrivatePuzzleFields(t *testing.T) {
 		if strings.Contains(string(raw), secret) {
 			t.Errorf("public JSON contains private value %q: %s", secret, raw)
 		}
+	}
+	before := cloneHackState(t, hack)
+	if len(public.Patterns) == 0 {
+		t.Fatal("public state omitted the current valid pattern")
+	}
+	public.Patterns[0].ID = "mutated"
+	public.Patterns[0].Used = true
+	public.Columns[0].Text = "mutated"
+	public.Columns[0].Words[0].ID = "mutated"
+	if !reflect.DeepEqual(hack, before) {
+		t.Fatalf("mutating public projection changed canonical state\ngot: %#v\nwant: %#v", hack, before)
+	}
+}
+
+func TestRejectedPatternsDoNotConsumeRandomness(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*domain.HackState) string
+	}{
+		{name: "invalid", mutate: func(*domain.HackState) string { return "not-a-server-pattern" }},
+		{name: "terminal", mutate: func(state *domain.HackState) string {
+			state.Solved = true
+			return firstPatternID(t, state)
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			state := patternTestState()
+			random := &recordingRandom{values: []int{0}}
+			if ApplyPattern(state, test.mutate(state), random) {
+				t.Fatal("rejected pattern was accepted")
+			}
+			if random.calls != 0 {
+				t.Fatalf("rejected pattern consumed %d RNG values, want zero", random.calls)
+			}
+		})
 	}
 }
 
@@ -388,6 +490,22 @@ func (r *sequenceRandom) Intn(limit int) int {
 
 type constantRandom struct {
 	value int
+}
+
+type recordingRandom struct {
+	values []int
+	calls  int
+	limits []int
+}
+
+func (r *recordingRandom) Intn(limit int) int {
+	r.limits = append(r.limits, limit)
+	value := 0
+	if r.calls < len(r.values) {
+		value = r.values[r.calls]
+	}
+	r.calls++
+	return value % limit
 }
 
 func (r *constantRandom) Intn(limit int) int {
@@ -416,6 +534,7 @@ var wordsByLength = map[int][]string{
 
 func testHackState() *domain.HackState {
 	return &domain.HackState{
+		GenerationID: "generation-guess",
 		Level:        1,
 		WordLength:   4,
 		AttemptsMax:  4,
@@ -427,7 +546,7 @@ func testHackState() *domain.HackState {
 			"A3": {Text: "DUST"},
 			"A4": {Text: "IRON"},
 		},
-		UsedPatterns: map[string]struct{}{},
+		UsedPatterns: map[domain.HackPatternIdentity]struct{}{},
 		Columns: []domain.HackColumn{
 			{
 				Addresses: []string{"0xC000"},
@@ -446,13 +565,14 @@ func testHackState() *domain.HackState {
 
 func patternTestState() *domain.HackState {
 	return &domain.HackState{
+		GenerationID: "generation-pattern",
 		Level:        1,
 		WordLength:   4,
 		AttemptsMax:  4,
 		AttemptsLeft: 4,
 		SecretWord:   "CODE",
 		WordsByID:    map[string]domain.HackCandidate{"A1": {Text: "CODE"}, "A2": {Text: "DUST"}},
-		UsedPatterns: map[string]struct{}{},
+		UsedPatterns: map[domain.HackPatternIdentity]struct{}{},
 		Log:          []string{},
 		Columns: []domain.HackColumn{
 			{
@@ -471,12 +591,14 @@ func patternTestState() *domain.HackState {
 func cloneHackState(t *testing.T, source *domain.HackState) *domain.HackState {
 	t.Helper()
 	clone := *source
-	clone.Log = append([]string(nil), source.Log...)
+	if source.Log != nil {
+		clone.Log = append([]string{}, source.Log...)
+	}
 	clone.WordsByID = make(map[string]domain.HackCandidate, len(source.WordsByID))
 	for id, candidate := range source.WordsByID {
 		clone.WordsByID[id] = candidate
 	}
-	clone.UsedPatterns = make(map[string]struct{}, len(source.UsedPatterns))
+	clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(source.UsedPatterns))
 	for id := range source.UsedPatterns {
 		clone.UsedPatterns[id] = struct{}{}
 	}
@@ -494,9 +616,18 @@ func cloneHackState(t *testing.T, source *domain.HackState) *domain.HackState {
 func patternIDs(patterns []domain.HackPattern) []string {
 	ids := make([]string, len(patterns))
 	for index, pattern := range patterns {
-		ids[index] = pattern.ID
+		ids[index] = patternID(pattern.Identity)
 	}
 	return ids
+}
+
+func firstPatternID(t *testing.T, state *domain.HackState) string {
+	t.Helper()
+	patterns := discoverPatternSpans(state.GenerationID, state.Columns)
+	if len(patterns) == 0 {
+		t.Fatal("test state has no valid pattern")
+	}
+	return patternID(patterns[0].Identity)
 }
 
 func containsCandidate(hack *domain.HackState, text string) bool {

@@ -1,19 +1,21 @@
-# Hacking Interface Contract
+# Hacking Interface Contract: Phase 1 Generation-Bound Patterns
 
 ## Scope
 
-This contract changes the player WebSocket hacking interface and the public hack projection. The static HTTP player route, navigation protocol, session JSON, and game-master desktop method name remain unchanged.
+This contract governs the player WebSocket pattern request, the public pattern projection carried by existing hack snapshots, ordered publication, reconnect behavior, and the separation of the trusted game-master solve control. It does not add a route, protocol version, session role, persisted puzzle, terminal switch, or presentation redesign.
 
-## Exact Gameplay Constants
+## Exact Gameplay Constraints
 
 - Allowed pattern pairs: `()`, `[]`, `{}`, `<>`.
-- Valid special-pattern count per newly generated board: `3–6` inclusive.
-- Dud-removal probability: `80%`.
-- Attempt-restoration probability: `20%`.
+- Initial valid special-pattern count: `3–6` inclusive on the final rendered board before the first player action.
+- Dud-removal probability mapping: `80%`.
+- Attempt-restoration probability mapping: `20%`.
+- Pattern identity: `generationId + row + inclusive start + inclusive end`.
+- Persistence boundary: runtime-only; no version-1 session schema change.
 
 ## Player-to-Server Messages
 
-### `HACK_GUESS` — retained
+### `HACK_GUESS` — retained unchanged
 
 ```json
 {
@@ -22,34 +24,59 @@ This contract changes the player WebSocket hacking interface and the public hack
 }
 ```
 
-`targetId` remains a non-blank candidate ID or `columnIndex:characterIndex` filler coordinate. Guess validation, likeness, attempt spending, success, and failure behavior are unchanged. There is no generated administrator candidate.
+`targetId` remains a non-blank candidate ID or the existing filler coordinate. Candidate validation, likeness, attempt spending, log messages, success, failure, and filler-click behavior do not change. There is no generated administrator candidate.
 
-### `HACK_PATTERN` — added
+### `HACK_PATTERN` — generation-bound opaque identity
 
 ```json
 {
   "type": "HACK_PATTERN",
-  "patternId": "0:17:23"
+  "patternId": "opaque-server-issued-pattern-identity"
 }
 ```
 
 | Field | Required | Validation |
 |---|---|---|
 | `type` | yes | Exact string `HACK_PATTERN` |
-| `patternId` | yes | Non-blank string; semantic form is `columnIndex:openingIndex:closingIndex` |
-| any other field | prohibited | Strict decoder ignores the malformed request before dispatch |
+| `patternId` | yes | Non-blank server-issued string that contains or resolves to the originating `generationId`, `row`, inclusive `start`, and inclusive `end` |
+| any other field | prohibited | Strict decoding rejects the complete request before live-service dispatch |
 
-The server accepts the action only when an active, unsolved, unfailed puzzle exists and production discovery finds the exact currently valid coordinate identity with `used == false`. Acceptance atomically marks the identity used and applies exactly one effect. A malformed, unknown, stale, tampered, repeated, solved-state, or failed-state action changes no board text, candidates, used state, attempts, log, or outcome and emits no `HACK_STATE`.
+The browser must echo `patternId` exactly as received and must not parse, synthesize, shorten, or replace it with coordinates from another projection.
+
+### Semantic Acceptance
+
+The canonical live service accepts `HACK_PATTERN` only when all conditions are true in this order:
+
+1. A puzzle exists and is active, unsolved, and unfailed.
+2. The identity resolves to the active puzzle generation.
+3. Production discovery against the current canonical rendered board contains the exact `row`, `start`, and `end` coordinate pair.
+4. The complete generation-bound identity is not in used history.
+
+Acceptance then marks the identity used, selects one weighted outcome, applies the effect or no-dud fallback, recomputes current patterns, creates a detached public state, and commits one ordered publication under the same live-service mutex.
+
+### Rejection Contract
+
+| Rejection | Required result |
+|---|---|
+| Missing, blank, non-string, duplicate, or unknown field | Decoder rejects before dispatch |
+| Unsupported message type, including removed `HACK_ADMIN` | Decoder rejects before dispatch |
+| Generation differs from the active puzzle | No canonical mutation, random-source advancement, or broadcast |
+| Coordinates are malformed or do not identify a currently discovered span | No canonical mutation, random-source advancement, or broadcast |
+| Complete identity is already used | No canonical mutation, random-source advancement, or broadcast |
+| No puzzle, solved puzzle, failed puzzle, or otherwise non-actionable puzzle | No canonical mutation, random-source advancement, or broadcast |
+| Concurrent duplicate arriving after the accepted request | Rejected as used; exactly one request total advances the random source and broadcasts |
+
+A delayed ID from an older puzzle can never activate coincident coordinates in a newer puzzle because the opaque identity includes or resolves to the older `generationId`.
 
 ### `HACK_ADMIN` — removed
 
-`HACK_ADMIN` is no longer a supported player message. The strict decoder ignores it as an unsupported type, and it can never mutate the puzzle. The player keyboard no longer translates `1` or any other typed command into a hacking action.
+`HACK_ADMIN` is unsupported player input. The player has no keyboard command, query parameter, board entry, DOM control, browser global, or alternate message that maps to it or to `ForceHackSuccess`.
 
 ## Server-to-Player Messages
 
-### `HACK_STATE` — extended
+### `HACK_STATE` — minimal pattern projection
 
-The envelope remains:
+The existing envelope remains:
 
 ```json
 {
@@ -65,11 +92,10 @@ The envelope remains:
     "columns": [],
     "patterns": [
       {
-        "id": "0:17:23",
-        "column": 0,
-        "start": 17,
-        "end": 23,
-        "pair": "[]",
+        "id": "opaque-server-issued-pattern-identity",
+        "row": 4,
+        "start": 1,
+        "end": 6,
         "used": false
       }
     ]
@@ -77,41 +103,71 @@ The envelope remains:
 }
 ```
 
-Production `columns` retain the existing two-column shape with `addresses`, `text`, and `words`. A word contains `id`, `start`, and `length`; the obsolete `isAdmin` property is removed. `patterns` is always present for a non-null puzzle, may grow after dud removal, and is sorted by `column`, `start`, then `end`. A just-consumed pattern remains present with `used: true`.
+Existing hack and column fields retain their current behavior. For each currently discovered special pattern, the `patterns` array contains only:
 
-The public object MUST NOT contain `secretWord`, `wordsById`, the private used-pattern set, an outcome roll, or the selected dud before mutation.
-
-### `TERMINAL_LIVE` — retained and transitively extended
-
-The existing full live envelope retains `terminalId`, `terminalName`, `tree`, `hackLevel`, `introText`, `hack`, and `nav`. When `hack` is non-null, it has the exact extended public shape above. A late or reconnecting player receives the current board, current attempts and outcome, all current patterns with their `used` flags, and no regenerated puzzle.
-
-## Publication Rules
-
-| Event | Broadcast |
+| Field | Meaning |
 |---|---|
-| Accepted first activation of a valid pattern | One `HACK_STATE` containing the fully applied effect and updated pattern state to every connected player; one detached `hack-state` event to the game-master frontend |
-| Simultaneous second activation of the same pattern | None; canonical state is unchanged |
-| Repeated, stale, tampered, malformed, or terminal-state activation | None; canonical state is unchanged |
-| Fresh live broadcast | One `TERMINAL_LIVE` with a newly generated puzzle and no used patterns |
-| Reconnection during a puzzle | One `TERMINAL_LIVE` snapshot of the existing puzzle |
-| Game-master solve | Existing `ForceHackSuccess` flow publishes solved `HACK_STATE` and `hack-state` without consuming an attempt |
+| `id` | Stable opaque identity containing or resolving to `generationId + row + inclusive start + inclusive end` |
+| `row` | Zero-based rendered-row ordinal in canonical column render order |
+| `start` | Zero-based inclusive opening-character offset within that row |
+| `end` | Zero-based inclusive closing-character offset within that row |
+| `used` | `false` when currently available; `true` when this complete identity has already been accepted |
 
-All mutation and acceptance decisions occur while the canonical live service holds its exclusive mutex. Network writes occur only after the detached snapshot is returned.
+The array is sorted by `row`, `start`, then `end`. It may exceed six after the first player action. A currently discovered used span remains present with `used: true`; a used span that is not currently valid remains only in private history and reappears as used if later rediscovered.
+
+The pattern object must not contain `column`, `pair`, a separately editable `generationId`, password or dud facts, a future outcome, random values, private candidate metadata, or any reference to canonical slices, maps, or objects.
+
+### `TERMINAL_LIVE` — reconnect snapshot retained
+
+The existing full live envelope retains `terminalId`, `terminalName`, `tree`, `hackLevel`, `introText`, `hack`, and `nav`. When `hack` is non-null, its `patterns` use the exact shape above.
+
+A player connecting or reconnecting to the same running process receives the current canonical public puzzle: rendered board, remaining attempts, log and outcome, removed-dud board changes, and all current pattern statuses. The server does not regenerate the puzzle for a reconnect.
+
+No contract promises restoration after application restart. A fresh puzzle has a new generation identity and empty used history; version-1 session data contains neither.
+
+## Atomic Publication Contract
+
+For an accepted `HACK_PATTERN`, the canonical live-service mutex covers this order:
+
+1. Validate active puzzle generation.
+2. Rediscover or validate the requested coordinates against canonical board state.
+3. Verify unused state.
+4. Mark the complete identity used.
+5. Select the weighted outcome.
+6. Apply dud removal, restoration, or the no-dud restoration fallback.
+7. Recompute patterns affected by board mutation.
+8. Produce a detached public projection.
+9. Invoke one publication callback with that projection.
+
+The publication callback is owned by the player boundary. It serializes and enqueues one `HACK_STATE` to the existing client fanout and invokes the existing detached `hack-state` game-master notification. It performs no reentrant live-service call. Actual WebSocket writes remain outside the canonical domain and use the existing player connection queues.
+
+| Event | Publication |
+|---|---|
+| First accepted activation | Exactly one complete post-effect `HACK_STATE` committed for all connected players and one detached game-master `hack-state` notification |
+| Concurrent duplicate | None |
+| Invalid, stale-generation, non-current, already-used, or terminal-state request | None |
+| Fresh live publication | Existing `TERMINAL_LIVE` with a new generation and `3–6` final-board-discovered initial patterns |
+| Reconnect while process remains active | Existing `TERMINAL_LIVE` with current state and generation-bound pattern IDs |
+| Trusted game-master solve | Existing success publication; no attempt spent |
 
 ## Player UI Contract
 
-- The browser consumes `hack.patterns`; it does not discover canonical patterns locally.
-- Hovering the opening cell of an unused pattern highlights every character from `start` through `end`, inclusive, and shows the complete span in the existing input preview.
-- Stacked patterns are selected by opening coordinate, so different openings sharing one close highlight different ranges.
-- A used pattern does not highlight. Activating its opening resends its `patternId`, allowing the server to reject it without falling through to `HACK_GUESS` or consuming an attempt.
-- Clicking an unused pattern opening sends `HACK_PATTERN`. Clicking candidate words or cells that are not pattern openings retains `HACK_GUESS`.
-- The browser changes no canonical board, attempts, pattern, log, or outcome state until `HACK_STATE` arrives.
-- The former typed administrator command and the `SUCCESS` board entry are absent.
+- The browser consumes `hack.patterns`; it never performs canonical discovery or effect selection.
+- Each rendered hacking cell exposes its canonical rendered-row ordinal and row-local character offset for lookup and inclusive highlighting.
+- Hovering an unused pattern opening highlights `start` through `end` on `row`, inclusive, and previews that board substring.
+- Different openings sharing one closer remain different targets because their `start` values and opaque IDs differ.
+- A used current pattern does not highlight and does not fall through to `HACK_GUESS` when clicked; the server remains authoritative if a repeated request is sent.
+- Clicking an available opening sends only `{type: "HACK_PATTERN", patternId: pattern.id}`. Clicking an ordinary candidate or non-pattern filler cell retains existing `HACK_GUESS` behavior.
+- The browser changes no board, attempts, log, pattern status, or outcome until a server snapshot arrives.
 
 ## Game-Master Interface Contract
 
-The trusted desktop contract remains `ForceHackSuccess()` through the generated Wails `App` binding. It is eligible only for an active unsolved, unfailed puzzle, does not consume an attempt, returns the existing command result shape, and publishes through the same public success flow. The existing `#btnHackSuccess` control remains disabled when no eligible puzzle exists.
+The trusted desktop contract remains `ForceHackSuccess()` through the generated Wails `App` binding. It is eligible only for an active unsolved and unfailed puzzle, does not consume an attempt, and publishes through the existing shared success flow. The existing private control remains disabled when no eligible puzzle exists.
+
+No player WebSocket type, browser global, DOM control, keyboard shortcut, query parameter, static asset, or public endpoint exposes `ForceHackSuccess` or an equivalent operation.
 
 ## Compatibility Impact
 
-The server and bundled player are released together. Existing `HACK_GUESS`, `HACK_STATE`, and `TERMINAL_LIVE` message names remain stable; `patterns` is additive. Clients that still send `HACK_ADMIN` receive no mutation or response for that unsupported request. Consumers of word placement JSON must stop expecting `isAdmin`; no replacement administrator marker exists.
+The server and bundled player are released together. Existing `HACK_GUESS`, `HACK_STATE`, and `TERMINAL_LIVE` message names remain stable. `HACK_PATTERN` retains `patternId`, but coordinate-only IDs from the older implementation are stale and are rejected because they do not resolve to the active generation. Public pattern objects replace `column` and `pair` with `row`; bundled browser code and golden fixtures change in the same release.
+
+No session migration, protocol negotiation, terminal switch, role assignment, persistent unlock, or active-puzzle restart recovery is introduced.

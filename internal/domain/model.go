@@ -68,34 +68,45 @@ type HackCandidate struct {
 	Text string
 }
 
+// HackPatternIdentity is the complete one-use identity of a bracket span.
+// Row, Start, and End are rendered-row coordinates; GenerationID prevents a
+// delayed action from targeting coincident coordinates in a later puzzle.
+type HackPatternIdentity struct {
+	GenerationID string
+	Row          int
+	Start        int
+	End          int
+}
+
 // HackPattern is one valid bracket span derived from the current board text.
+// Storage coordinates and Pair remain private discovery metadata.
 type HackPattern struct {
-	ID     string
-	Column int
-	Start  int
-	End    int
-	Pair   string
+	Identity      HackPatternIdentity
+	ColumnIndex   int
+	AbsoluteStart int
+	AbsoluteEnd   int
+	Pair          string
 }
 
 // PublicHackPattern is the client-safe projection of one current bracket span.
 type PublicHackPattern struct {
-	ID     string `json:"id"`
-	Column int    `json:"column"`
-	Start  int    `json:"start"`
-	End    int    `json:"end"`
-	Pair   string `json:"pair"`
-	Used   bool   `json:"used"`
+	ID    string `json:"id"`
+	Row   int    `json:"row"`
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+	Used  bool   `json:"used"`
 }
 
 // HackState is the canonical private hacking aggregate.
 type HackState struct {
+	GenerationID string
 	Level        int
 	WordLength   int
 	AttemptsMax  int
 	AttemptsLeft int
 	SecretWord   string
 	WordsByID    map[string]HackCandidate
-	UsedPatterns map[string]struct{}
+	UsedPatterns map[HackPatternIdentity]struct{}
 	Solved       bool
 	Failed       bool
 	Log          []string

@@ -307,6 +307,49 @@ func TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState(t *test
 	assertNoPlayerMessage(t, reconnected)
 }
 
+func TestStaleAndConcurrentDuplicatePatternsPublishExactlyOneCurrentTransition(t *testing.T) {
+	service := live.New(&serverRandom{values: []int{1, 99}}, serverWords{})
+	old := service.Set("terminal-1", "Overseer", serverTree(), 1, "WELCOME")
+	server := startTestServer(t, service, nil, 8)
+	staleSender := dialPlayer(t, server.Info().URL)
+	readMessage(t, staleSender)
+	staleID := old.Hack.Patterns[0].ID
+
+	current := service.Set("terminal-1", "Overseer", serverTree(), 1, "WELCOME")
+	server.PublishLive()
+	readMessage(t, staleSender)
+	currentID := current.Hack.Patterns[0].ID
+	if currentID == staleID {
+		t.Fatal("fresh puzzle reused the stale opaque pattern identity")
+	}
+
+	writeJSON(t, staleSender, map[string]any{"type": MessageHackPattern, "patternId": staleID})
+	assertNoPlayerMessage(t, staleSender)
+	staleSender.CloseNow()
+
+	first := dialPlayer(t, server.Info().URL)
+	defer first.CloseNow()
+	second := dialPlayer(t, server.Info().URL)
+	defer second.CloseNow()
+	readMessage(t, first)
+	readMessage(t, second)
+
+	writeJSON(t, first, map[string]any{"type": MessageHackPattern, "patternId": currentID})
+	writeJSON(t, second, map[string]any{"type": MessageHackPattern, "patternId": currentID})
+	accepted := readConvergedMessages(t, []*websocket.Conn{first, second}, MessageHackState)
+	if !publicPatternUsed(accepted.Hack, currentID) {
+		t.Fatalf("accepted concurrent state = %#v", accepted.Hack)
+	}
+	reconnected := dialPlayer(t, server.Info().URL)
+	defer reconnected.CloseNow()
+	snapshot := readMessage(t, reconnected)
+	if snapshot.Type != MessageTerminalLive || !reflect.DeepEqual(snapshot.Hack, accepted.Hack) {
+		t.Fatalf("reconnect state = %#v, want accepted canonical state %#v", snapshot.Hack, accepted.Hack)
+	}
+	assertNoPlayerMessage(t, first)
+	assertNoPlayerMessage(t, second)
+}
+
 func assertNoPlayerMessage(t *testing.T, connection *websocket.Conn) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

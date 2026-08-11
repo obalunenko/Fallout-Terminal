@@ -539,7 +539,7 @@ func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T
 	live := &recordingLiveService{
 		forceState: &domain.PublicHackState{
 			Level: 2, AttemptsMax: 4, AttemptsLeft: 2, Solved: true,
-			Patterns: []domain.PublicHackPattern{{ID: "0:0:1", Column: 0, Start: 0, End: 1, Pair: "[]", Used: false}},
+			Patterns: []domain.PublicHackPattern{{ID: "opaque-generation-pattern", Row: 0, Start: 0, End: 1, Used: false}},
 		},
 	}
 	app := NewAppWithDependencies(AppDependencies{
@@ -562,6 +562,22 @@ func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T
 	}
 }
 
+func TestForceHackSuccessRejectsIneligiblePuzzleWithoutPublication(t *testing.T) {
+	recorder := &callRecorder{}
+	live := &recordingLiveService{}
+	app := NewAppWithDependencies(AppDependencies{
+		Live: live, Player: &recordingPlayerServer{recorder: recorder}, Events: &recordingEventSink{recorder: recorder},
+	})
+
+	result := app.ForceHackSuccess()
+	if result.OK || result.Error == "" {
+		t.Fatalf("ForceHackSuccess() = %#v, want structured ineligible rejection", result)
+	}
+	if live.forceCalls != 1 || len(recorder.Calls()) != 0 {
+		t.Fatalf("ineligible force calls=%d publications=%v, want one validation and no publication", live.forceCalls, recorder.Calls())
+	}
+}
+
 func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
 	recorder := &callRecorder{}
 	events := &recordingEventSink{recorder: recorder}
@@ -569,7 +585,7 @@ func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
 	hackState := &domain.PublicHackState{
 		Level: 3, AttemptsMax: 4, AttemptsLeft: 2,
 		Log:      []string{"ENTRY DENIED"},
-		Patterns: []domain.PublicHackPattern{{ID: "0:0:1", Column: 0, Start: 0, End: 1, Pair: "[]"}},
+		Patterns: []domain.PublicHackPattern{{ID: "opaque-generation-pattern", Row: 0, Start: 0, End: 1}},
 	}
 
 	app.updateClientCount(6)
@@ -577,12 +593,14 @@ func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
 	hackState.AttemptsLeft = 0
 	hackState.Log[0] = "MUTATED"
 	hackState.Patterns[0].ID = "mutated"
+	hackState.Patterns[0].Row = 99
+	hackState.Patterns[0].Used = true
 
 	if got, want := recorder.Calls(), []string{"event:client-count", "event:hack-state"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("player callback events = %v, want %v", got, want)
 	}
 	status := app.GetRuntimeStatus()
-	if status.ClientCount != 6 || status.HackState == nil || status.HackState.AttemptsLeft != 2 || status.HackState.Log[0] != "ENTRY DENIED" || status.HackState.Patterns[0].ID != "0:0:1" {
+	if status.ClientCount != 6 || status.HackState == nil || status.HackState.AttemptsLeft != 2 || status.HackState.Log[0] != "ENTRY DENIED" || status.HackState.Patterns[0].ID != "opaque-generation-pattern" || status.HackState.Patterns[0].Row != 0 || status.HackState.Patterns[0].Used {
 		t.Fatalf("detached player callback status = %#v", status)
 	}
 }

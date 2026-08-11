@@ -167,6 +167,9 @@ func decodeHackPattern(fields map[string]json.RawMessage) (ClientMessage, error)
 	if err := allowFields(fields, "type", "patternId"); err != nil {
 		return ClientMessage{}, err
 	}
+	// patternId is an opaque server-issued identity that binds the active
+	// puzzle generation to one inclusive rendered-row coordinate pair. The
+	// player protocol echoes it and never reconstructs coordinates itself.
 	patternID, err := requiredString(fields, "patternId")
 	if err != nil {
 		return ClientMessage{}, err
