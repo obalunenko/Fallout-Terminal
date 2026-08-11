@@ -51,10 +51,9 @@ type NavState struct {
 
 // HackWord describes a visible word placement in a hacking column.
 type HackWord struct {
-	ID      string `json:"id"`
-	Start   int    `json:"start"`
-	Length  int    `json:"length"`
-	IsAdmin bool   `json:"isAdmin"`
+	ID     string `json:"id"`
+	Start  int    `json:"start"`
+	Length int    `json:"length"`
 }
 
 // HackColumn is one 192-character public hacking column.
@@ -66,35 +65,65 @@ type HackColumn struct {
 
 // HackCandidate is private lookup data for a placed hacking word.
 type HackCandidate struct {
-	Text    string
-	IsAdmin bool
+	Text string
+}
+
+// HackPatternIdentity is the complete one-use identity of a bracket span.
+// Row, Start, and End are rendered-row coordinates; GenerationID prevents a
+// delayed action from targeting coincident coordinates in a later puzzle.
+type HackPatternIdentity struct {
+	GenerationID string
+	Row          int
+	Start        int
+	End          int
+}
+
+// HackPattern is one valid bracket span derived from the current board text.
+// Storage coordinates and Pair remain private discovery metadata.
+type HackPattern struct {
+	Identity      HackPatternIdentity
+	ColumnIndex   int
+	AbsoluteStart int
+	AbsoluteEnd   int
+	Pair          string
+}
+
+// PublicHackPattern is the client-safe projection of one current bracket span.
+type PublicHackPattern struct {
+	ID    string `json:"id"`
+	Row   int    `json:"row"`
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+	Used  bool   `json:"used"`
 }
 
 // HackState is the canonical private hacking aggregate.
 type HackState struct {
-	Level         int
-	WordLength    int
-	AttemptsMax   int
-	AttemptsLeft  int
-	SecretWord    string
-	WordsByID     map[string]HackCandidate
-	AdminModeUsed bool
-	Solved        bool
-	Failed        bool
-	Log           []string
-	Columns       []HackColumn
+	GenerationID string
+	Level        int
+	WordLength   int
+	AttemptsMax  int
+	AttemptsLeft int
+	SecretWord   string
+	WordsByID    map[string]HackCandidate
+	UsedPatterns map[HackPatternIdentity]struct{}
+	Solved       bool
+	Failed       bool
+	Log          []string
+	Columns      []HackColumn
 }
 
 // PublicHackState is the only hacking representation permitted at a client boundary.
 type PublicHackState struct {
-	Level        int          `json:"level"`
-	WordLength   int          `json:"wordLength"`
-	AttemptsMax  int          `json:"attemptsMax"`
-	AttemptsLeft int          `json:"attemptsLeft"`
-	Solved       bool         `json:"solved"`
-	Failed       bool         `json:"failed"`
-	Log          []string     `json:"log"`
-	Columns      []HackColumn `json:"columns"`
+	Level        int                 `json:"level"`
+	WordLength   int                 `json:"wordLength"`
+	AttemptsMax  int                 `json:"attemptsMax"`
+	AttemptsLeft int                 `json:"attemptsLeft"`
+	Solved       bool                `json:"solved"`
+	Failed       bool                `json:"failed"`
+	Log          []string            `json:"log"`
+	Columns      []HackColumn        `json:"columns"`
+	Patterns     []PublicHackPattern `json:"patterns"`
 }
 
 // LiveState is the private process-local canonical broadcast state.

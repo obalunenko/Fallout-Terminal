@@ -281,9 +281,7 @@ function cssEscape(s) {
 
 function setHackHover(key) {
   if (hackHoverKey === key) return;
-  if (hackHoverKey != null) {
-    hackColumns.querySelectorAll(`[data-target="${cssEscape(hackHoverKey)}"]`).forEach(el => el.classList.remove('hi'));
-  }
+  hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
   hackHoverKey = key;
   hackHoverText = '';
   if (key != null) {
@@ -294,23 +292,80 @@ function setHackHover(key) {
   renderHackInputPreview();
 }
 
-hackColumns.addEventListener('mouseover', (e) => {
-  const cell = e.target.closest('.hcell');
+function patternAtCell(cell) {
+  if (!hack || !cell || cell.dataset.row == null || cell.dataset.offset == null) return null;
+  const row = Number(cell.dataset.row);
+  const offset = Number(cell.dataset.offset);
+  return (hack.patterns || []).find(pattern =>
+    pattern.row === row && pattern.start === offset
+  ) || null;
+}
+
+function setHackPatternHover(pattern) {
+  hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
+  hackHoverKey = pattern ? pattern.id : null;
+  hackHoverText = '';
+  if (pattern && !pattern.used) {
+    const cells = hackColumns.querySelectorAll(`[data-row="${pattern.row}"][data-offset]`);
+    cells.forEach(cell => {
+      const offset = Number(cell.dataset.offset);
+      if (offset >= pattern.start && offset <= pattern.end) cell.classList.add('hi');
+    });
+    hackHoverText = Array.from(cells)
+      .filter(cell => {
+        const offset = Number(cell.dataset.offset);
+        return offset >= pattern.start && offset <= pattern.end;
+      })
+      .map(cell => cell.textContent)
+      .join('');
+  }
+  renderHackInputPreview();
+}
+
+function previewHackCell(cell) {
   if (!cell) return;
+  const pattern = patternAtCell(cell);
+  if (pattern) {
+    if (pattern.used) setHackPatternHover(null);
+    else setHackPatternHover(pattern);
+    if (!pattern.used) playMultiple();
+    return;
+  }
   const key = cell.dataset.target;
   if (key === hackHoverKey) return;
   setHackHover(key);
   if (cell.classList.contains('word')) playMultiple(); else playSingle();
+}
+
+hackColumns.addEventListener('mouseover', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
 });
 hackColumns.addEventListener('mouseout', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell) return;
+  if (patternAtCell(cell)) {
+    setHackPatternHover(null);
+    return;
+  }
   const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
   if (!related || related.dataset.target !== cell.dataset.target) setHackHover(null);
+});
+hackColumns.addEventListener('focusin', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
+});
+hackColumns.addEventListener('focusout', (e) => {
+  if (e.target.closest('.hcell')) setHackPatternHover(null);
 });
 hackColumns.addEventListener('click', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell || !hack || hack.solved || hack.failed) return;
+  const pattern = patternAtCell(cell);
+  if (pattern && !pattern.used) {
+    playEnter();
+    send({ type: 'HACK_PATTERN', patternId: pattern.id });
+    return;
+  }
+  if (pattern) return;
   playEnter();
   send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
 });
@@ -324,9 +379,7 @@ document.addEventListener('keydown', (e) => {
   if (mode === MODE.HACK) {
     if (!hack || hack.solved || hack.failed) return;
     if (e.key === 'Enter') {
-      const val = hackTyped.trim();
       hackTyped = '';
-      if (val === '1') send({ type: 'HACK_ADMIN' });
       renderHackInputPreview();
       e.preventDefault();
     } else if (e.key === 'Backspace') {
@@ -852,7 +905,7 @@ function renderHackScreen() {
   scheduleHackFit();
 }
 
-function buildColumnHtml(col, colIndex) {
+function buildColumnHtml(col, colIndex, rowBase) {
   const wordAt = new Array(col.text.length).fill(null);
   col.words.forEach(w => { for (let i = w.start; i < w.start + w.length; i++) wordAt[i] = w.id; });
 
@@ -868,10 +921,10 @@ function buildColumnHtml(col, colIndex) {
       if (wid) {
         let j = i;
         while (j < rowEnd && wordAt[j] === wid) j++;
-        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}">${esc(col.text.slice(i, j))}</span>`;
+        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}" tabindex="0">${esc(col.text.slice(i, j))}</span>`;
         i = j;
       } else {
-        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}">${esc(col.text[i])}</span>`;
+        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0">${esc(col.text[i])}</span>`;
         i++;
       }
     }
@@ -884,7 +937,12 @@ function buildColumnHtml(col, colIndex) {
 function renderHackColumns() {
   hackHoverKey = null;
   hackHoverText = '';
-  hackColumns.innerHTML = hack.columns.map((col, ci) => buildColumnHtml(col, ci)).join('');
+  let rowBase = 0;
+  hackColumns.innerHTML = hack.columns.map((col, ci) => {
+    const html = buildColumnHtml(col, ci, rowBase);
+    rowBase += Math.ceil(col.text.length / ROW_WIDTH);
+    return html;
+  }).join('');
 }
 
 function renderHackLog() {

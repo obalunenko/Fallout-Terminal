@@ -19,7 +19,7 @@ const (
 
 	MessageNavAction      = "NAV_ACTION"
 	MessageHackGuess      = "HACK_GUESS"
-	MessageHackAdmin      = "HACK_ADMIN"
+	MessageHackPattern    = "HACK_PATTERN"
 	MessageTerminalLive   = "TERMINAL_LIVE"
 	MessageTerminalUpdate = "TERMINAL_UPDATE"
 	MessageTerminalClear  = "TERMINAL_CLEAR"
@@ -35,10 +35,11 @@ var ErrMessageTooLarge = errors.New("player message exceeds read limit")
 // ClientMessage is the complete typed player-to-server protocol. Only fields
 // applicable to Type are populated.
 type ClientMessage struct {
-	Type     string
-	Action   string
-	NodeID   string
-	TargetID string
+	Type      string
+	Action    string
+	NodeID    string
+	TargetID  string
+	PatternID string
 }
 
 // DecodeClientMessage reads exactly one bounded JSON object and validates its
@@ -71,11 +72,8 @@ func DecodeClientMessage(reader io.Reader) (ClientMessage, error) {
 		return decodeNavAction(fields)
 	case MessageHackGuess:
 		return decodeHackGuess(fields)
-	case MessageHackAdmin:
-		if err := allowFields(fields, "type"); err != nil {
-			return ClientMessage{}, err
-		}
-		return ClientMessage{Type: MessageHackAdmin}, nil
+	case MessageHackPattern:
+		return decodeHackPattern(fields)
 	default:
 		return ClientMessage{}, fmt.Errorf("unsupported player message type %q", typeName)
 	}
@@ -163,6 +161,20 @@ func decodeHackGuess(fields map[string]json.RawMessage) (ClientMessage, error) {
 		return ClientMessage{}, err
 	}
 	return ClientMessage{Type: MessageHackGuess, TargetID: targetID}, nil
+}
+
+func decodeHackPattern(fields map[string]json.RawMessage) (ClientMessage, error) {
+	if err := allowFields(fields, "type", "patternId"); err != nil {
+		return ClientMessage{}, err
+	}
+	// patternId is an opaque server-issued identity that binds the active
+	// puzzle generation to one inclusive rendered-row coordinate pair. The
+	// player protocol echoes it and never reconstructs coordinates itself.
+	patternID, err := requiredString(fields, "patternId")
+	if err != nil {
+		return ClientMessage{}, err
+	}
+	return ClientMessage{Type: MessageHackPattern, PatternID: patternID}, nil
 }
 
 func allowFields(fields map[string]json.RawMessage, names ...string) error {
