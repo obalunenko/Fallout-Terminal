@@ -1,0 +1,1121 @@
+{
+  "workflow": "companion",
+  "specName": "player sessions control",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T22:20:13.731Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T22:25:52.495Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T22:27:57.976Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:34:47.726Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:39:03.709Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T22:39:40.097Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T22:41:38.336Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:48:29.935Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T22:49:39.207Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T22:50:15.373Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:50:28.356Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:52:34.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:53:59.472Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:54:04.544Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:55:56.937Z"
+    }
+  ],
+  "last_action": "living specs evaluated — skipped (not configured)",
+  "coverage": {
+    "FR-001": {
+      "title": "The system MUST resolve every player connection to exactly one server-recognized logical session.",
+      "tasks": [
+        "T043",
+        "T044"
+      ]
+    },
+    "FR-002": {
+      "title": "A logical session MUST have an opaque stable identity for the lifetime of the current server process.",
+      "tasks": [
+        "T005",
+        "T016",
+        "T043"
+      ]
+    },
+    "FR-003": {
+      "title": "A newly established logical session MUST receive a unique automatically generated fallback display name.",
+      "tasks": [
+        "T016",
+        "T039"
+      ]
+    },
+    "FR-004": {
+      "title": "The game master MUST be able to rename a logical session's fallback display name without changing its identity, character assignment, control status, or terminal state.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T053",
+        "T057"
+      ]
+    },
+    "FR-005": {
+      "title": "Reopening, refreshing, reconnecting, navigating away and returning, or reopening the browser from the same recognized browser profile MUST reuse the same logical session while the server process remains active.",
+      "tasks": [
+        "T039",
+        "T040",
+        "T041",
+        "T043",
+        "T044",
+        "T045"
+      ]
+    },
+    "FR-006": {
+      "title": "Multiple tabs sharing one recognized browser identity MUST represent one logical session.",
+      "tasks": [
+        "T040",
+        "T041",
+        "T043",
+        "T044",
+        "T045"
+      ]
+    },
+    "FR-007": {
+      "title": "A logical session MUST be connected while at least one of its player connections remains open.",
+      "tasks": [
+        "T039",
+        "T043",
+        "T044"
+      ]
+    },
+    "FR-008": {
+      "title": "Closing one of several connections for a logical session MUST NOT disconnect the session or release its character.",
+      "tasks": [
+        "T039",
+        "T043",
+        "T044"
+      ]
+    },
+    "FR-009": {
+      "title": "A different browser, browser profile, private-browsing context, cleared local identity, or otherwise unrecognized device context MUST establish a separate logical session.",
+      "tasks": [
+        "T039",
+        "T041",
+        "T043",
+        "T045"
+      ]
+    },
+    "FR-010": {
+      "title": "Establishing a new logical session MUST NOT release any claim held by an older disconnected session.",
+      "tasks": [
+        "T039",
+        "T043",
+        "T050"
+      ]
+    },
+    "FR-011": {
+      "title": "Logical session identity and fallback-name changes MUST remain process-local and MUST expire when the server process restarts.",
+      "tasks": [
+        "T101",
+        "T102",
+        "T106"
+      ]
+    },
+    "FR-012": {
+      "title": "Character assignments MUST belong to the current live broadcast rather than to an individual configured terminal.",
+      "tasks": [
+        "T016",
+        "T082",
+        "T106"
+      ]
+    },
+    "FR-013": {
+      "title": "Switching active terminals, starting or finishing a puzzle, and disconnecting or reconnecting MUST NOT clear a valid current-broadcast character assignment.",
+      "tasks": [
+        "T068",
+        "T072",
+        "T077",
+        "T082"
+      ]
+    },
+    "FR-014": {
+      "title": "Ending a broadcast MUST clear every character claim and the active-controller assignment.",
+      "tasks": [
+        "T101",
+        "T106",
+        "T107",
+        "T109"
+      ]
+    },
+    "FR-015": {
+      "title": "Ending a broadcast MUST retain recognized logical sessions until server restart.",
+      "tasks": [
+        "T101",
+        "T106",
+        "T111"
+      ]
+    },
+    "FR-016": {
+      "title": "Starting a new broadcast MUST require every logical session to obtain a new character assignment.",
+      "tasks": [
+        "T101",
+        "T106",
+        "T110"
+      ]
+    },
+    "FR-017": {
+      "title": "A session identifier issued by a previous server process MUST restore none of its previous name, assignment, presence, or control state.",
+      "tasks": [
+        "T039",
+        "T040",
+        "T103",
+        "T109"
+      ]
+    },
+    "FR-018": {
+      "title": "Runtime session, fallback-name, presence, character-claim, and controller data MUST NOT be added to the persisted version-1 terminal/session schema.",
+      "tasks": [
+        "T002",
+        "T102",
+        "T114"
+      ]
+    },
+    "FR-019": {
+      "title": "The game master MUST be able to define a roster of player characters before or during a live broadcast.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T019",
+        "T025",
+        "T046",
+        "T050",
+        "T051",
+        "T057"
+      ]
+    },
+    "FR-020": {
+      "title": "Each roster entry MUST have a stable identity for the current server process, a player-facing name, and an available-or-claimed state.",
+      "tasks": [
+        "T005",
+        "T016",
+        "T050"
+      ]
+    },
+    "FR-021": {
+      "title": "The game master MUST be able to add and rename roster entries without mutating logical sessions, controller status, or terminal state.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T053",
+        "T057"
+      ]
+    },
+    "FR-022": {
+      "title": "Renaming a roster entry MUST update every affected game-master and player view without creating a new assignment.",
+      "tasks": [
+        "T046",
+        "T048",
+        "T049",
+        "T050",
+        "T055",
+        "T056",
+        "T057"
+      ]
+    },
+    "FR-023": {
+      "title": "The system MUST refuse to delete a claimed roster entry until its claim is released or transferred.",
+      "tasks": [
+        "T046",
+        "T047",
+        "T050",
+        "T053",
+        "T057"
+      ]
+    },
+    "FR-024": {
+      "title": "One logical session MUST have no more than one character assignment during a broadcast.",
+      "tasks": [
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-025": {
+      "title": "One roster character MUST be claimed by no more than one logical session during a broadcast.",
+      "tasks": [
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-026": {
+      "title": "Character availability and claim decisions MUST be authoritative at the server when each selection is processed.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T022"
+      ]
+    },
+    "FR-027": {
+      "title": "Concurrent claims for one character MUST result in exactly one successful claim.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T022"
+      ]
+    },
+    "FR-028": {
+      "title": "Concurrent different selections from one logical session MUST result in no more than one character assignment.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T033"
+      ]
+    },
+    "FR-029": {
+      "title": "A rejected claimant MUST remain unassigned and receive the current roster state.",
+      "tasks": [
+        "T010",
+        "T011",
+        "T012",
+        "T016",
+        "T022",
+        "T023"
+      ]
+    },
+    "FR-030": {
+      "title": "A disconnected session's character MUST remain claimed until release, transfer, broadcast end, or server restart.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T068",
+        "T072"
+      ]
+    },
+    "FR-031": {
+      "title": "A player MUST NOT independently replace a completed character assignment.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T023"
+      ]
+    },
+    "FR-032": {
+      "title": "The game master MUST be able to assign an available character to an unassigned logical session.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T053",
+        "T057"
+      ]
+    },
+    "FR-033": {
+      "title": "Releasing a character MUST make it available and return its connected former session to character selection without canonical terminal or puzzle mutation.",
+      "tasks": [
+        "T046",
+        "T048",
+        "T049",
+        "T050",
+        "T055",
+        "T056"
+      ]
+    },
+    "FR-034": {
+      "title": "Moving a character MUST remove it from the old session and assign it to the new session as one authoritative operation.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T053",
+        "T057"
+      ]
+    },
+    "FR-035": {
+      "title": "Character release, correction, and transfer MUST NOT mutate terminal navigation, puzzle state, logs, attempts, randomness, or outcome.",
+      "tasks": [
+        "T046",
+        "T050"
+      ]
+    },
+    "FR-036": {
+      "title": "Player-facing roster state MUST distinguish available from claimed characters without exposing private connection information.",
+      "tasks": [
+        "T011",
+        "T015",
+        "T023",
+        "T048"
+      ]
+    },
+    "FR-037": {
+      "title": "No more than one character-assigned logical session MUST be designated active controller at any time.",
+      "tasks": [
+        "T005",
+        "T010",
+        "T016",
+        "T058",
+        "T062"
+      ]
+    },
+    "FR-038": {
+      "title": "The first eligible character assignment processed while the broadcast has no established controller MUST atomically designate exactly one initial active controller.",
+      "tasks": [
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-039": {
+      "title": "Character-assigned sessions completing selection while a controller exists MUST begin as observers.",
+      "tasks": [
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-040": {
+      "title": "Raw connection order MUST NOT establish controller status before successful character assignment.",
+      "tasks": [
+        "T010",
+        "T016",
+        "T022"
+      ]
+    },
+    "FR-041": {
+      "title": "Concurrent first-time assignments MUST establish exactly one active controller.",
+      "tasks": [
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-042": {
+      "title": "Controller assignment MUST apply globally across the live broadcast and all configured terminals.",
+      "tasks": [
+        "T058",
+        "T062",
+        "T077",
+        "T082"
+      ]
+    },
+    "FR-043": {
+      "title": "The game master MUST be able to designate a connected, character-assigned observer as the active controller.",
+      "tasks": [
+        "T058",
+        "T059",
+        "T062",
+        "T063",
+        "T067"
+      ]
+    },
+    "FR-044": {
+      "title": "Reassignment MUST make the selected session active and the previous active session an observer as one authoritative change.",
+      "tasks": [
+        "T058",
+        "T060",
+        "T062",
+        "T065",
+        "T066"
+      ]
+    },
+    "FR-045": {
+      "title": "Controller reassignment MUST preserve character assignments and all canonical terminal and puzzle state.",
+      "tasks": [
+        "T058",
+        "T062"
+      ]
+    },
+    "FR-046": {
+      "title": "Releasing or moving the active session's character without explicit reassignment MUST clear controller assignment and MUST NOT promote an observer.",
+      "tasks": [
+        "T046",
+        "T050",
+        "T062"
+      ]
+    },
+    "FR-047": {
+      "title": "When no eligible controller is designated, player terminal actions MUST remain read-only until game-master reassignment or a later eligible initial assignment establishes control.",
+      "tasks": [
+        "T027",
+        "T033",
+        "T034"
+      ]
+    },
+    "FR-048": {
+      "title": "Disconnecting the active session MUST retain its active designation and character claim.",
+      "tasks": [
+        "T068",
+        "T072",
+        "T073"
+      ]
+    },
+    "FR-049": {
+      "title": "Disconnecting the active session MUST NOT automatically promote or elect another session.",
+      "tasks": [
+        "T068",
+        "T072"
+      ]
+    },
+    "FR-050": {
+      "title": "Reconnecting the unchanged active session before reassignment MUST restore its ability to control the terminal.",
+      "tasks": [
+        "T068",
+        "T069",
+        "T073",
+        "T074"
+      ]
+    },
+    "FR-051": {
+      "title": "Reconnecting a former controller after game-master reassignment MUST restore it as an observer with its existing character.",
+      "tasks": [
+        "T068",
+        "T069",
+        "T073",
+        "T074"
+      ]
+    },
+    "FR-052": {
+      "title": "Disconnecting or reconnecting any session MUST NOT mutate terminal or puzzle state.",
+      "tasks": [
+        "T068",
+        "T072"
+      ]
+    },
+    "FR-053": {
+      "title": "A player action MUST be eligible for canonical processing only when its connection resolves to a current logical session with a valid current-broadcast character assignment.",
+      "tasks": [
+        "T027",
+        "T033",
+        "T035"
+      ]
+    },
+    "FR-054": {
+      "title": "A terminal-mutating player action MUST be eligible only when the owning logical session is the active controller at processing time and is currently connected.",
+      "tasks": [
+        "T027",
+        "T033",
+        "T035"
+      ]
+    },
+    "FR-055": {
+      "title": "Controller authorization MUST be enforced authoritatively for every player action rather than relying on disabled player controls.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T033",
+        "T035"
+      ]
+    },
+    "FR-056": {
+      "title": "Observer, unassigned, unknown, expired, invalid, and stale-controller actions MUST leave all canonical state unchanged.",
+      "tasks": [
+        "T027",
+        "T028",
+        "T033",
+        "T035"
+      ]
+    },
+    "FR-057": {
+      "title": "Rejected player actions MUST NOT consume attempts, activate patterns, advance randomness, navigate content, alter logs, trigger outcomes, or otherwise mutate puzzle or terminal state.",
+      "tasks": [
+        "T027",
+        "T033"
+      ]
+    },
+    "FR-058": {
+      "title": "An unassigned session MUST NOT submit or cause terminal actions before character selection completes.",
+      "tasks": [
+        "T027",
+        "T033",
+        "T034"
+      ]
+    },
+    "FR-059": {
+      "title": "The system MUST accept existing player-side navigation, menu, password-candidate, filler-character, special-pattern, and other terminal actions for canonical processing only from the active controller.",
+      "tasks": [
+        "T027",
+        "T031",
+        "T033",
+        "T034",
+        "T035",
+        "T037"
+      ]
+    },
+    "FR-060": {
+      "title": "Observer hover and focus feedback MUST remain local without submitting a shared action or changing canonical state.",
+      "tasks": [
+        "T029",
+        "T030",
+        "T032",
+        "T034"
+      ]
+    },
+    "FR-061": {
+      "title": "Any control available to an observer MUST be limited to client-local behavior that does not affect shared state.",
+      "tasks": [
+        "T029",
+        "T030",
+        "T032",
+        "T034"
+      ]
+    },
+    "FR-062": {
+      "title": "The player surface MUST present observer controls as visibly read-only within the existing terminal aesthetic.",
+      "tasks": [
+        "T029",
+        "T030",
+        "T032"
+      ]
+    },
+    "FR-063": {
+      "title": "The player surface MUST expose no operation that invokes `ForceHackSuccess`.",
+      "tasks": [
+        "T015",
+        "T030",
+        "T036",
+        "T113"
+      ]
+    },
+    "FR-064": {
+      "title": "Active-controller status MUST NOT grant access to any private game-master operation.",
+      "tasks": [
+        "T030",
+        "T036",
+        "T113"
+      ]
+    },
+    "FR-065": {
+      "title": "Accepted active-controller actions MUST continue to follow all existing password, likeness, attempt, special-pattern, dud-removal, restoration, lockout, navigation, and content rules.",
+      "tasks": [
+        "T027",
+        "T031",
+        "T037",
+        "T114"
+      ]
+    },
+    "FR-066": {
+      "title": "Character claims, player actions, controller changes, roster changes, and active-terminal changes MUST have one unambiguous authoritative order.",
+      "tasks": [
+        "T003",
+        "T009",
+        "T027",
+        "T033",
+        "T058",
+        "T062",
+        "T077",
+        "T082"
+      ]
+    },
+    "FR-067": {
+      "title": "An action ordered before controller reassignment MUST be evaluated using the former controller's authority at that processing point.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T062"
+      ]
+    },
+    "FR-068": {
+      "title": "An action ordered after controller reassignment MUST be rejected when submitted by the former controller.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T062"
+      ]
+    },
+    "FR-069": {
+      "title": "A race between action processing and reassignment MUST NOT produce duplicate or unauthorized canonical mutation.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T062",
+        "T114"
+      ]
+    },
+    "FR-070": {
+      "title": "After submitting a shared action, player input MUST enter a pending state until an authoritative outcome is applied.",
+      "tasks": [
+        "T029",
+        "T034"
+      ]
+    },
+    "FR-071": {
+      "title": "Player clients MUST NOT optimistically mutate canonical shared state.",
+      "tasks": [
+        "T029",
+        "T034",
+        "T037"
+      ]
+    },
+    "FR-072": {
+      "title": "The authoritative outcome of an accepted or rejected action MUST end its pending state without relying only on an arbitrary animation delay.",
+      "tasks": [
+        "T004",
+        "T006",
+        "T029",
+        "T034",
+        "T035"
+      ]
+    },
+    "FR-073": {
+      "title": "Rapid duplicate submissions for a one-use action MUST produce no more than one accepted mutation.",
+      "tasks": [
+        "T027",
+        "T028",
+        "T033",
+        "T035"
+      ]
+    },
+    "FR-074": {
+      "title": "Every connected assigned session MUST receive accepted terminal navigation, hacking state, logs, loading transitions, and outcomes from the same canonical state.",
+      "tasks": [
+        "T028",
+        "T035",
+        "T079",
+        "T085"
+      ]
+    },
+    "FR-075": {
+      "title": "All tabs belonging to one logical session MUST receive the same assignment and controller status changes.",
+      "tasks": [
+        "T040",
+        "T044",
+        "T048",
+        "T055",
+        "T060",
+        "T065"
+      ]
+    },
+    "FR-076": {
+      "title": "The game master MUST determine which single configured terminal, if any, is currently presented to players.",
+      "tasks": [
+        "T077",
+        "T082",
+        "T083",
+        "T087"
+      ]
+    },
+    "FR-077": {
+      "title": "Activating another terminal MUST transition every connected player automatically through the existing terminal loading presentation.",
+      "tasks": [
+        "T079",
+        "T080",
+        "T085",
+        "T086"
+      ]
+    },
+    "FR-078": {
+      "title": "Active-terminal switching MUST preserve logical sessions, character assignments, and controller assignment.",
+      "tasks": [
+        "T077",
+        "T082"
+      ]
+    },
+    "FR-079": {
+      "title": "A newly assigned player MUST join the terminal currently selected by the game master.",
+      "tasks": [
+        "T077",
+        "T079",
+        "T080",
+        "T082",
+        "T085",
+        "T086"
+      ]
+    },
+    "FR-080": {
+      "title": "When no terminal is active during a broadcast, assigned sessions MUST retain identity and assignment while seeing an immersive waiting state.",
+      "tasks": [
+        "T077",
+        "T080",
+        "T082",
+        "T086"
+      ]
+    },
+    "FR-081": {
+      "title": "An inactive terminal MUST reject player actions until it becomes active again.",
+      "tasks": [
+        "T027",
+        "T033",
+        "T077",
+        "T079",
+        "T082",
+        "T085"
+      ]
+    },
+    "FR-082": {
+      "title": "Requesting a switch away from an unfinished puzzle MUST pause the switch for an explicit preserve, discard, or cancel decision by the game master.",
+      "tasks": [
+        "T089",
+        "T090",
+        "T095",
+        "T096",
+        "T100"
+      ]
+    },
+    "FR-083": {
+      "title": "Choosing preserve MUST suspend the unfinished puzzle in process-local state and make it unable to receive player actions while inactive.",
+      "tasks": [
+        "T088",
+        "T089",
+        "T094",
+        "T095"
+      ]
+    },
+    "FR-084": {
+      "title": "Reactivating a terminal with a preserved puzzle MUST restore its exact board, remaining attempts, removed duds, available and used patterns, progress log, and outcome.",
+      "tasks": [
+        "T088",
+        "T091",
+        "T092",
+        "T094",
+        "T095"
+      ]
+    },
+    "FR-085": {
+      "title": "Choosing discard MUST cause the terminal's next hacking attempt to create a fresh puzzle under the existing generation rules.",
+      "tasks": [
+        "T088",
+        "T089",
+        "T094",
+        "T095"
+      ]
+    },
+    "FR-086": {
+      "title": "Choosing cancel MUST leave the current terminal and unfinished puzzle active and unchanged.",
+      "tasks": [
+        "T089",
+        "T090",
+        "T092",
+        "T095",
+        "T100"
+      ]
+    },
+    "FR-087": {
+      "title": "The system MUST NOT silently discard, solve, fail, restart, or otherwise alter an unfinished puzzle during a terminal-switch request.",
+      "tasks": [
+        "T088",
+        "T089",
+        "T094",
+        "T095"
+      ]
+    },
+    "FR-088": {
+      "title": "The private game-master application MUST show every currently connected logical session with its fallback name, character assignment if any, presence, and controller-or-observer status.",
+      "tasks": [
+        "T013",
+        "T021",
+        "T025",
+        "T047",
+        "T053",
+        "T057",
+        "T070",
+        "T075"
+      ]
+    },
+    "FR-089": {
+      "title": "The private game-master application MUST keep a disconnected active session visibly identified until it reconnects or control is reassigned.",
+      "tasks": [
+        "T068",
+        "T070",
+        "T075"
+      ]
+    },
+    "FR-090": {
+      "title": "The game-master session view MUST show both fallback session name and character name when needed to resolve device or assignment problems.",
+      "tasks": [
+        "T046",
+        "T051",
+        "T057"
+      ]
+    },
+    "FR-091": {
+      "title": "Character name MUST remain the primary player-facing identity after assignment, while fallback session name remains a separate technical label.",
+      "tasks": [
+        "T014",
+        "T023",
+        "T049",
+        "T056",
+        "T057"
+      ]
+    },
+    "FR-092": {
+      "title": "Ending a broadcast MUST remove the active terminal from player control and return connected clients to an immersive waiting or selection state.",
+      "tasks": [
+        "T101",
+        "T103",
+        "T105",
+        "T106",
+        "T109",
+        "T110",
+        "T111"
+      ]
+    },
+    "FR-093": {
+      "title": "Ending a broadcast MUST NOT delete configured terminals or silently alter durable unlocked-terminal state.",
+      "tasks": [
+        "T102",
+        "T104",
+        "T106",
+        "T107",
+        "T111"
+      ]
+    },
+    "FR-094": {
+      "title": "Server restart MUST discard logical sessions, fallback-name changes, presence, character claims, controller assignment, and any active runtime puzzle allowed to expire by the existing persistence boundary.",
+      "tasks": [
+        "T101",
+        "T102",
+        "T103",
+        "T106",
+        "T109"
+      ]
+    },
+    "FR-095": {
+      "title": "The game-master application MUST retain its existing trusted operations regardless of player connection, assignment, or controller state.",
+      "tasks": [
+        "T030",
+        "T036",
+        "T090",
+        "T096",
+        "T113"
+      ]
+    },
+    "FR-096": {
+      "title": "This feature MUST NOT redesign existing terminal or hacking logs to add historical character ownership.",
+      "tasks": [
+        "T027",
+        "T031",
+        "T114"
+      ]
+    },
+    "FR-097": {
+      "title": "This feature MUST NOT add accounts, authentication, persistent player profiles, individual invitation links, unassigned spectators, multiple simultaneous controllers, or automatic controller election after disconnect.",
+      "tasks": [
+        "T015",
+        "T030",
+        "T042",
+        "T113"
+      ]
+    },
+    "FR-098": {
+      "title": "This feature MUST NOT import or manage character sheets, attributes, skills, perks, eligibility, rules tests, inventory, or campaign history.",
+      "tasks": [
+        "T015",
+        "T113"
+      ]
+    },
+    "FR-099": {
+      "title": "This feature MUST NOT change existing password-guessing, likeness, attempt, special-pattern, dud-removal, attempt-restoration, lockout, terminal-content, or game-master success rules.",
+      "tasks": [
+        "T027",
+        "T031",
+        "T037",
+        "T114"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 16,
+    "projectedTasks": 40,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: existing live broadcast, player server, protocol, and master/player presentation",
+    "source spec: specs/live-broadcast-shared-navigation/spec.md",
+    "source spec: specs/hacking-game/spec.md and specs/003-hacking-game-evolution/spec.md",
+    "constraint: behavior-focused only; storage, protocol fields, synchronization primitive, package, and schema design deferred to plan",
+    "constraint: preserve all existing hacking, terminal-content, and ForceHackSuccess rules"
+  ],
+  "intent": "Coordinate one character per logical player session and one authorized terminal controller while every other assigned player observes the same canonical live broadcast.",
+  "expectations": [
+    "No user accounts, passwords, or authentication",
+    "No character sheets, campaign profiles, or Fallout 2d20 rules automation",
+    "No hacking-eligibility validation",
+    "No individual invitation links",
+    "No new internet exposure or access control beyond the existing setup",
+    "No unassigned spectator access",
+    "No simultaneous control by multiple logical sessions",
+    "No automatic controller election after disconnect",
+    "No logical-session persistence across server restarts",
+    "No character-claim persistence across broadcasts",
+    "No persistent connection or character action history",
+    "No per-terminal controller assignments",
+    "No hacking-difficulty changes",
+    "No special-pattern rule changes",
+    "No ordinary password-guess or filler-click rule changes",
+    "No ForceHackSuccess behavior changes",
+    "No terminal-content rule changes",
+    "No new Fallout or CRT visual redesign",
+    "No new localization or audio systems",
+    "No mobile-phone-specific presentation"
+  ],
+  "approach": "Introduce one process-local control coordinator that serializes logical-session presence, roster and claims, controller authority, terminal switching, and player actions while delegating unchanged terminal mechanics to internal/live. Publish detached revisioned master/player projections and correlated action results, keep recognition in a server-issued same-origin browser token, and preserve the version-1 persistence and private ForceHackSuccess boundaries.",
+  "decisions": [
+    {
+      "decision": "Use one outer internal/control coordinator for every game-master and player transition",
+      "why": "Claims, controller changes, actions, and switches require one mutation and publication order across concurrent Wails and WebSocket callers",
+      "rejected": "Separately locked roster, authorization, and live-state services"
+    },
+    {
+      "decision": "Use a server-issued browser token in same-origin localStorage, separate from the process-local logical session ID",
+      "why": "It supports refresh, reopen, and multi-tab continuity while stale tokens after restart restore no state",
+      "rejected": "Raw connection IDs, persisted accounts, or sessionStorage"
+    },
+    {
+      "decision": "Separate process, broadcast, and active-terminal lifetimes",
+      "why": "Sessions and roster survive broadcast end, claims and controller do not, and a broadcast may have no active terminal",
+      "rejected": "Per-terminal assignments or treating terminal clear as broadcast end"
+    },
+    {
+      "decision": "Checkpoint the complete private terminal runtime for preserve and refresh authored content on reactivation",
+      "why": "Exact puzzle restoration requires secret and generation-bound state that public projections omit",
+      "rejected": "Reconstructing from public state or silently discarding on switch/delete"
+    },
+    {
+      "decision": "Require requestId, broadcastId, and terminalId preconditions and return revisioned ACTION_RESULT outcomes",
+      "why": "Stale and duplicate requests must not mutate a later broadcast or terminal, and pending input must end authoritatively on acceptance or rejection",
+      "rejected": "Animation timeouts or uncorrelated later snapshots"
+    },
+    {
+      "decision": "Use complete personalized PLAYER_STATE and one complete coordination-state master snapshot",
+      "why": "Role and roster state are personalized while complete revisioned snapshots avoid reconnect gaps and mixed-revision UI",
+      "rejected": "Broadcasting private master session data or many partially ordered deltas"
+    },
+    {
+      "decision": "Add no runtime dependency",
+      "why": "The standard library and existing deterministic Go and Playwright infrastructure cover identifiers, ordering, protocol, and browser behavior",
+      "rejected": "A database, frontend framework, or second browser-test tool"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned one ordered process-local coordination layer with strict revisioned Wails and WebSocket contracts",
+      "key_finding": "Current live mutations are mutex-protected, but their Wails and WebSocket publications occur across separate caller paths and can overtake each other; authorization and publication must share one outer transaction."
+    },
+    "tasks": {
+      "summary": "115 tasks across Setup, Foundational, nine user-story phases, and Polish; every phase uses explicit test-first dependency waves and all FR-001 through FR-099 are mapped."
+    }
+  },
+  "currentTask": "T008",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Broadened Playwright discovery to all browser specs without changing its worker or server configuration.",
+      "files": [
+        "tests/browser/playwright.config.mjs"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Specified strict handshake, selection, request-precondition, personalized-state, action-result, and revisioned terminal protocol contracts.",
+      "files": [
+        "internal/player/protocol_test.go"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added coordinator foundation contract tests for deterministic IDs, revision rules, detached effects, and enqueue ordering",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added failing-first deep-detachment and version-1 runtime-persistence boundary tests for coordination projections",
+      "files": [
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added concurrency-safe deterministic opaque-ID and ordered-effect fakes with call/order inspection and context-aware waiting",
+      "files": [
+        "internal/testutil/fakes.go"
+      ]
+    }
+  }
+}
