@@ -18,7 +18,7 @@ As a player, I face the hacking puzzle using ordinary password guesses and serve
 
 **Why this priority**: Replacing the existing player shortcuts is the Phase 1 goal and establishes the trust boundary for every other story.
 
-**Independent Test**: Start a hacking puzzle, try every previously available player shortcut and public interface, and confirm that none can expose or force the answer while ordinary password guessing and its existing attempt rules remain unchanged.
+**Independent Test**: Start a hacking puzzle, try every previously available player shortcut and public interface, and confirm that none can expose or force the answer while ordinary password guessing and non-delimiter filler attempt rules remain unchanged.
 
 **Acceptance Scenarios**:
 
@@ -90,15 +90,43 @@ As a game master, I retain the existing trusted `ForceHackSuccess` control throu
 3. **Given** there is no eligible active puzzle, **When** the game master views the hacking controls, **Then** the trusted solve control is unavailable and cannot alter state.
 4. **Given** a player WebSocket connection or browser context, **When** any player-accessible input is attempted, **Then** no `ForceHackSuccess` operation is exposed or accepted.
 
+### User Story 6 - Search a Camouflaged Board (Priority: P1)
+
+As a player, I search for special patterns in the same rows as candidate words, ordinary punctuation, and misleading delimiter characters, so valid patterns feel discovered rather than pre-labeled.
+
+**Why this priority**: Camouflage is required for the special-pattern mechanic to preserve the intended deduction challenge without changing which spans are valid.
+
+**Independent Test**: Generate 1,000 publishable initial boards, inspect their final rendered rows and public projections, interact with valid and invalid delimiter cases in the browser, remove a word from an alphabetic-interrupted span, and verify every camouflage, rediscovery, and inert-decoy rule independently of pattern outcomes.
+
+**Acceptance Scenarios**:
+
+1. **Given** a newly published board, **When** its final rendered rows are inspected, **Then** candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rows, their occupied-row intervals overlap pairwise, and ordinary punctuation or filler remains present in at least two rows.
+2. **Given** a newly published board, **When** its valid patterns are inspected, **Then** at least one has one or more non-alphabetic filler characters between its endpoints, while adjacent empty pairs remain allowed for other patterns.
+3. **Given** a newly published board, **When** final production discovery and camouflage classification complete, **Then** the board has 3–6 valid patterns, at least as many standalone delimiter-decoy characters as valid patterns, and at least one matching-delimiter span invalidated by alphabetic content.
+4. **Given** matching delimiters on opposite sides of a candidate word, **When** the player selects that word, **Then** it follows the existing candidate-word guess rules and the enclosing delimiter span has no pattern identity or pattern interaction.
+5. **Given** dud removal replaces the incorrect candidate inside a word-interrupted delimiter span with periods, **When** production discovery analyzes the mutated canonical board, **Then** the span is published and selectable if and only if it now satisfies every existing special-pattern rule.
+6. **Given** a standalone, mismatched, word-interrupted, later-closer, or otherwise invalid delimiter, **When** the player hovers, focuses, or selects it, **Then** it does not highlight, send `HACK_PATTERN`, consume an attempt, or change puzzle state.
+7. **Given** valid pattern endpoints and delimiter decoys before interaction, **When** their static presentation is compared, **Then** color, brightness, font, CRT effect, and other static styling reveal no validity difference; only normal valid-pattern hover, focus, or selection behavior reveals validity.
+8. **Given** words and all camouflage characters have been placed, **When** the complete final rendered board fails any initial count or camouflage condition, **Then** the entire board is regenerated before any player receives it.
+9. **Given** the complete final rendered board contains valid and invalid delimiter characters, **When** its public pattern projection is produced, **Then** only spans returned by production discovery receive public pattern identities.
+
 ## Edge Cases
 
 - A selected dud-removal outcome falls back to attempt restoration when no currently available incorrect password can be removed.
 - Attempt restoration sets remaining attempts to the configured maximum and never exceeds it, including when attempts are already at maximum.
+- `<!%>`, `[.=+]`, `{#}`, and `()` are representative valid patterns because their interiors are empty or contain only non-alphabetic filler.
+- `<PASSWORD>`, `[RAIDER+]`, and `{!ROBOT}` are representative invalid spans while their alphabetic content remains rendered.
+- `!%]>`, `{+#)`, `[!%}`, and the trailing `]+>` in `()+]>` are representative standalone or mismatched delimiter-decoy arrangements.
 - A closing delimiter before its opening delimiter, a mismatched delimiter type, a cross-row span, or a span containing any alphabetic character is invalid.
 - Discovery pairs each opening delimiter only with the first compatible closing delimiter to its right on the same rendered row; later compatible closers do not form patterns for that opening while the first remains its pair.
+- An opening without a compatible closer, a closing without a compatible opener, and mismatched delimiter types remain inert rendered characters unless another valid opening-to-first-compatible-closing relationship uses them.
+- A generated standalone delimiter decoy that falls inside any valid pattern's inclusive selectable range cannot satisfy the inert-decoy requirement and is not counted toward the initial decoy minimum.
+- A candidate word between matching delimiters remains selectable as a normal word while the surrounding span is invalid; replacing an incorrect word with periods may make that exact span valid on rediscovery.
 - Multiple opening delimiters may share one closing delimiter, and each complete coordinate pair has independent used state.
 - Board mutation may create, remove, or change pattern pairings. A newly formed coordinate pair is available if it has not been used in the current generation; a previously used pair remains unavailable if rediscovered.
-- The published initial board is regenerated when final-board discovery returns fewer than three or more than six distinct selectable patterns, including patterns formed accidentally by filler characters.
+- Delimiter decoys may accidentally participate in a valid span with other board characters; final production discovery treats the resulting span as valid, removes affected characters from the standalone-decoy count, and includes the span in the initial 3–6 count.
+- The published initial board is regenerated when final-board discovery returns fewer than three or more than six distinct selectable patterns, including patterns formed accidentally by filler or camouflage characters.
+- The published initial board is also regenerated when it lacks the minimum standalone delimiter-decoy count, a non-empty valid pattern interior, an alphabetic-interrupted potential span, or the required occupied-row distribution.
 - The 3–6 count applies only before the first player action. Later board mutation may cause the valid pattern count to exceed six.
 - A delayed request carrying an old generation identifier cannot activate coincident coordinates in a new generation.
 - A request with missing, unknown, or invalid fields is rejected before used-state mutation or random selection.
@@ -113,7 +141,7 @@ As a game master, I retain the existing trusted `ForceHackSuccess` control throu
 - **FR-001**: Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.
 - **FR-002**: The player experience MUST expose no command, board entry, protocol operation, browser global, DOM control, keyboard shortcut, or query parameter that directly forces puzzle success.
 - **FR-003**: The player experience MUST remove the former administrator shortcut that bulk-removes incorrect passwords.
-- **FR-004**: Ordinary candidate-word guesses and filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.
+- **FR-004**: Ordinary candidate-word guesses and non-delimiter filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.
 - **FR-005**: The existing game-master `ForceHackSuccess` control MUST remain available only through the private desktop/Wails boundary.
 - **FR-006**: `ForceHackSuccess` MUST NOT be exposed through the player WebSocket protocol, browser globals, DOM controls, keyboard shortcuts, or query parameters.
 - **FR-007**: A successful trusted `ForceHackSuccess` action MUST use the existing shared success flow without consuming an attempt.
@@ -178,6 +206,28 @@ As a game master, I retain the existing trusted `ForceHackSuccess` control throu
 - **FR-061**: Phase 1 MUST NOT preserve an active puzzle across server application restarts.
 - **FR-062**: Phase 1 MUST NOT modify the version-1 persisted session schema.
 
+- **FR-063**: Every initially published board MUST interleave candidate password words, ordinary punctuation and filler symbols, delimiters belonging to valid special patterns, and standalone delimiter-decoy characters outside every currently valid pattern's inclusive interaction range.
+- **FR-064**: On every initially published board, candidate words, valid-pattern endpoints, and standalone delimiter decoys MUST each occupy at least two rendered rows, their occupied-row intervals MUST overlap pairwise, and ordinary punctuation or filler MUST remain present in at least two rendered rows.
+- **FR-065**: Production discovery MUST accept a matching same-row pattern with one or more ordinary non-alphabetic filler characters between its opening and first compatible closing delimiter.
+- **FR-066**: Every initially published board MUST contain at least one valid special pattern with one or more non-alphabetic filler characters between its endpoints.
+- **FR-067**: Production discovery MUST continue to accept an adjacent empty matching delimiter pair that satisfies all normal special-pattern rules.
+- **FR-068**: The generator MUST NOT construct every initial valid pattern as an adjacent empty pair.
+- **FR-069**: Matching delimiters surrounding a candidate word or other alphabetic content MUST NOT form a valid special pattern while that alphabetic content remains rendered.
+- **FR-070**: A candidate word inside an alphabetic-interrupted delimiter span MUST remain selectable under the existing candidate-word guess rules.
+- **FR-071**: When dud removal replaces an incorrect word inside a delimiter span with periods, production discovery MUST publish the resulting span if it satisfies every normal special-pattern rule on the mutated board.
+- **FR-072**: Every initially published board MUST contain standalone delimiter-decoy characters that are not part of any currently valid pattern interaction range.
+- **FR-073**: The number of standalone delimiter-decoy characters on every initially published board MUST be at least the number of initially valid special patterns.
+- **FR-074**: Every initially published board MUST contain at least one potential matching-delimiter span that is invalid because alphabetic content appears between its endpoints.
+- **FR-075**: A standalone delimiter decoy MUST NOT highlight, produce a `HACK_PATTERN` request, consume an attempt, or change puzzle state.
+- **FR-076**: A delimiter decoy MUST use the same color, brightness, font, CRT effect, and static styling as the same delimiter character when it belongs to a valid pattern.
+- **FR-077**: Pattern validity MUST be revealed only through normal hover, focus, or selection behavior for currently valid patterns.
+- **FR-078**: Candidate words and all camouflage characters MUST be added before initial-board validation begins.
+- **FR-079**: Initial-board validation MUST run the production discovery algorithm against the complete final rendered board and count every accidentally formed valid pattern toward the initial 3–6 limit.
+- **FR-080**: Initial-board validation MUST regenerate a board that fails the 3–6 valid-pattern limit, standalone delimiter-decoy minimum, non-empty valid-interior requirement, alphabetic-interrupted-span requirement, or mixed-distribution requirement.
+- **FR-081**: The public pattern projection MUST include only spans that are currently valid under production discovery.
+- **FR-082**: Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters MUST receive no public pattern identity.
+- **FR-083**: Camouflage construction and final-board validation MUST preserve the discovery rules in FR-008 through FR-013 unchanged.
+
 ## Key Entities
 
 - **Puzzle Generation**: One runtime hacking puzzle instance with an opaque generation identifier that prevents actions from an older puzzle targeting a newer one.
@@ -186,6 +236,8 @@ As a game master, I retain the existing trusted `ForceHackSuccess` control throu
 - **Used Pattern History**: The runtime-only set of complete coordinate identities already accepted during the active puzzle generation, retained even when a pair temporarily disappears.
 - **Hacking Puzzle**: The canonical runtime challenge containing the rendered board, private candidate metadata, correct password, configured attempt maximum, remaining attempts, used-pattern history, progress log, and outcome.
 - **Candidate Password**: A selectable word that is either the correct password or an incorrect dud; only a currently available incorrect candidate may be removed by a pattern.
+- **Delimiter Decoy**: A rendered opening or closing delimiter deliberately left outside every currently valid pattern interaction range so it looks plausible but remains inert and receives no public identity.
+- **Alphabetic-Interrupted Span**: Matching delimiters with candidate-word or other alphabetic content between them; invalid while the letters remain, but eligible for normal rediscovery after board mutation removes the alphabetic content.
 - **Pattern Outcome**: The server-selected effect of one accepted activation: dud removal or attempt restoration, with restoration used as the fallback when dud removal has no eligible target.
 - **Public Pattern Projection**: A detached rendering and interaction view containing only stable public identity, row, inclusive coordinates, and current available-or-used state.
 - **Player Action**: An untrusted request submitted through the player/live-service boundary to guess a word or activate a generation-bound pattern.
@@ -217,8 +269,8 @@ The player/live-service authorization boundary is preserved only as an extension
 
 - **SC-001**: With an injected deterministic source spanning 100 equiprobable values, exactly 80 source values select dud removal and exactly 20 select attempt restoration.
 - **SC-002**: In all rejection-path tests for invalid, stale, already-used, duplicate, and non-actionable requests, the deterministic random source records zero consumed values and canonical state remains byte-for-byte equivalent in observable fields.
-- **SC-003**: Across 1,000 generated and publishable initial boards, gameplay discovery against each final rendered board reports 3–6 distinct selectable patterns before the first player action.
-- **SC-004**: Every generated board discovered outside the 3–6 initial range is rejected for publication and regenerated.
+- **SC-003**: Across 1,000 generated and publishable initial boards, production discovery and final-board classification confirm that every complete rendered board has 3–6 distinct selectable patterns, at least as many standalone delimiter-decoy characters as valid patterns, at least one valid pattern with a non-empty non-alphabetic interior, at least one alphabetic-interrupted matching-delimiter span, at least two occupied rows per candidate-word, valid-endpoint, and standalone-decoy category, pairwise-overlapping occupied-row intervals for those categories, ordinary punctuation or filler in at least two rows, and a public projection containing exactly the discovered valid patterns and no invalid delimiters.
+- **SC-004**: Every generated board that fails any initial pattern-count or camouflage condition is rejected for publication and regenerated after the complete board is analyzed.
 - **SC-005**: Every allowed delimiter type is discovered under the first-compatible-closer rule, while 100% of tested cross-row, mismatched, and alphabetic-content spans are rejected.
 - **SC-006**: In all tested shared-closer boards, each distinct complete coordinate pair can be activated once independently.
 - **SC-007**: In all tested mutation sequences, a new coordinate pair is available once, while any previously used pair remains unavailable if rediscovered.
@@ -227,7 +279,11 @@ The player/live-service authorization boundary is preserved only as an extension
 - **SC-010**: Two connected players and one reconnecting player display identical current board text, attempts, pattern availability, used state, removed-dud effects, and puzzle outcome while the same server process is running.
 - **SC-011**: Restart-boundary tests confirm that no active-pattern runtime state is written to or required from version-1 session data.
 - **SC-012**: Player-surface checks find zero routes to `ForceHackSuccess` through WebSocket messages, browser globals, DOM controls, keyboard shortcuts, or query parameters, while the existing private desktop/Wails control still completes an eligible puzzle through the normal shared success flow.
-- **SC-013**: Regression tests confirm that ordinary password guesses and filler clicks retain their pre-feature attempt behavior.
+- **SC-013**: Regression tests confirm that ordinary password guesses and non-delimiter filler clicks retain their pre-feature attempt behavior.
+- **SC-014**: Controlled generator tests prove that adjacent empty pairs remain discoverable but no publishable initial board relies exclusively on adjacent empty pairs.
+- **SC-015**: Browser interaction tests confirm that 100% of tested delimiter decoys produce no highlight, focus preview, `HACK_PATTERN` request, attempt consumption, log change, board mutation, or outcome change, while valid patterns retain their existing inclusive interaction behavior.
+- **SC-016**: Dynamic-board tests confirm that an alphabetic-interrupted span has no public identity before dud removal and is published immediately after the word becomes periods when the resulting span satisfies all unchanged discovery rules.
+- **SC-017**: Static-style checks find no validity-dependent color, brightness, font, CRT effect, class, or other persistent visual treatment on delimiter characters before interaction.
 
 ## Assumptions
 
@@ -238,6 +294,10 @@ The player/live-service authorization boundary is preserved only as an extension
 - Weighted randomness is server-side and independently sampled only after a request has passed generation, coordinate, actionable-state, and unused-state validation.
 - The deterministic 80/20 test proves the probability mapping; production samples are allowed to vary naturally.
 - Board mutation from dud removal replaces only that candidate's rendered characters with periods and may increase, decrease, or otherwise change the discovered pattern set.
+- A generated standalone delimiter decoy is placed outside every currently valid pattern's inclusive interaction range; a delimiter character inside a valid range follows the existing inclusive valid-pattern interaction and does not count toward the standalone-decoy minimum.
+- An occupied-row interval is the inclusive range from the lowest to highest rendered-row ordinal containing a category; two occupied-row intervals overlap when their inclusive ranges share at least one row ordinal, even when the categories do not occupy the same character cells.
+- Distributed content means candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rows and their occupied-row intervals overlap pairwise; ordinary punctuation or filler remains present in at least two rows, and no category-specific row block is reserved.
+- Initial camouflage validation derives valid spans from production discovery first, then classifies remaining delimiter characters and alphabetic-interrupted spans from the same complete rendered board.
 - Runtime-only live puzzle data remains available to reconnecting clients only for the lifetime of the server process that owns it.
 - The existing player/live-service boundary is the authorization extension point; Phase 1 adds no controlling-player session model.
 - Existing candidate selection, likeness calculation, word-guess attempts, filler-click behavior, lockout, terminal navigation, and normal success transition remain unchanged.
@@ -249,4 +309,5 @@ The player/live-service authorization boundary is preserved only as an extension
 - Dud-removal probability mapping: `80%`.
 - Attempt-restoration probability mapping: `20%`.
 - Pattern identity: `generationId + row + inclusive start + inclusive end`.
+- Pattern activation request: `HACK_PATTERN`.
 - Persistence boundary: runtime-only; no version-1 session schema change.

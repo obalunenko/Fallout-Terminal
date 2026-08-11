@@ -38,17 +38,20 @@ This document supersedes the older coordinate-only and intended-count decisions.
 - Draw the generation ID from the pattern-outcome `Random`: rejected because puzzle identity would consume and couple the deterministic outcome sequence.
 - Persist generation IDs: rejected because active-puzzle persistence and deterministic seed persistence are explicit Non-Goals.
 
-## Decision 4: Accept boards only after final production discovery reports `3–6`
+## Decision 4: Build camouflage first and accept only complete boards that pass production discovery and camouflage validation
 
-**Decision**: Retain bracket-free ordinary filler and isolated intended pattern placement as bounded construction aids, but place construction inside a regeneration loop. After words, filler, addresses, and intended patterns form the final rendered board, run the same production discovery function used during gameplay and accept the board only when it discovers between `3–6` distinct selectable identities inclusive.
+**Decision**: Replace bracket-free filler and isolated adjacent-pair placement with a camouflaged construction attempt. Place candidate words, ordinary punctuation, intended valid patterns with at least one non-empty non-alphabetic interior, matching delimiters around at least one candidate word, and standalone delimiter-decoy candidates through the normal board rows before validation. Run the unchanged production discovery function used during gameplay on the complete final render. Accept only when it discovers `3–6` identities inclusive; the remaining inert standalone delimiter-decoy character count is at least the valid-pattern count; at least one valid interior is non-empty; at least one potential span is invalidated by alphabetic content; candidate words, valid-pattern endpoints, and standalone decoys each occupy at least two rows; the three inclusive minimum-to-maximum occupied-row intervals overlap pairwise; and ordinary punctuation or filler remains in at least two rows. Otherwise discard the attempt and regenerate.
 
-**Rationale**: The final board is the only reliable authority because interactions among placed characters can create or remove discoverable spans. The existing implementation verifies equality with a randomly selected intended target but returns `nil` instead of regenerating; replacing that with final-range acceptance and regeneration meets the clarified publication rule without making the selected target a requirement.
+**Rationale**: The final board is the only reliable authority because words, intended spans, and delimiter decoys can accidentally create or remove discoverable spans and change which delimiter characters remain inert. Classifying camouflage only after production discovery keeps one gameplay definition of validity and prevents construction metadata from leaking into the public projection. Non-empty interiors and word-interrupted spans provide camouflage without altering the same-row, matching-pair, first-compatible-closer, no-alphabetic-interior discovery rules.
 
 **Alternatives considered**:
 
 - Trust the number of inserted pairs: rejected because intended insertions do not prove final discovery count.
 - Require discovery to equal a randomly selected target: rejected because the specification requires only the final `3–6` range, not a random count distribution.
 - Publish only a subset of discovered patterns: rejected because the gameplay discovery contract makes every valid current pattern selectable.
+- Keep ordinary filler free of delimiters: rejected because the board must contain standalone delimiter decoys rendered among ordinary content.
+- Construct every intended pattern as an adjacent empty pair: rejected because every published board must include a non-empty valid interior.
+- Validate decoys before adding words or before final discovery: rejected because alphabetic interruptions and accidental pairings are properties of the complete rendered board.
 
 ## Decision 5: Draw the weighted outcome before applying the no-dud fallback
 
@@ -76,7 +79,7 @@ This document supersedes the older coordinate-only and intended-count decisions.
 
 ## Decision 7: Project only current spans and retain complete used history privately
 
-**Decision**: Store used state as a private set keyed by the complete generation-bound coordinate identity. Re-run discovery after every dud mutation. The public `patterns` array contains only currently discovered spans, each with opaque `id`, `row`, inclusive `start`/`end`, and `used`; if a historical coordinate pair disappears it remains only in private history, and if it later reappears it is immediately projected as used.
+**Decision**: Store used state as a private set keyed by the complete generation-bound coordinate identity. Re-run discovery after every dud mutation. The public `patterns` array contains only currently discovered spans, each with opaque `id`, `row`, inclusive `start`/`end`, and `used`; standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters remain board text with no identity. If dud removal turns an alphabetic-interrupted span into a valid span, it enters the next projection normally. If a historical coordinate pair disappears it remains only in private history, and if it later reappears it is immediately projected as used.
 
 **Rationale**: This gives the browser exactly what it needs to render and interact with the current board while preserving the permanent one-use rule. Removing `column` and `pair` avoids broadening the projection, and detached copies prevent returned values from modifying canonical state.
 
@@ -85,8 +88,22 @@ This document supersedes the older coordinate-only and intended-count decisions.
 - Publish all historical used spans even when no longer valid: rejected because those coordinates no longer describe a current render target and could suppress ordinary filler interaction incorrectly.
 - Forget used spans when discovery changes: rejected because a rediscovered coordinate pair would become reusable.
 - Let the browser rediscover patterns: rejected because client and server discovery could diverge and the server is the canonical authority.
+- Publish decoy identities with an unavailable marker: rejected because identity itself would reveal validity metadata and broaden the public projection beyond actually valid patterns.
 
-## Decision 8: Preserve the existing reconnect, persistence, and trusted-control boundaries
+## Decision 8: Make delimiter decoys inert without marking them as valid
+
+**Decision**: Treat a rendered delimiter cell outside every projected valid pattern range as inert input. The browser sends neither `HACK_PATTERN` nor `HACK_GUESS` for that cell, and canonical filler-target validation also ignores a direct delimiter-decoy guess. Candidate cells between matching delimiters retain their existing candidate IDs and ordinary guess behavior. Valid and invalid delimiter glyphs share the same static rendering in `client/client.css`; the browser adds transient pattern feedback only when a current public pattern covers the interaction. Retain Go source and stylesheet contract checks, and add an isolated executable browser suite with an exactly pinned and locked test-only dependency because source inspection cannot prove hover, focus, click, computed-style, or outbound-message behavior.
+
+**Rationale**: The public pattern projection must stay valid-only, so the browser can distinguish actionable ranges only from projected coordinates and can identify an otherwise inert delimiter directly from its rendered character. The canonical guard prevents a manually submitted filler target from turning an intended no-op into an attempt loss. Keeping static rendering uniform prevents presentation metadata from exposing validity.
+
+**Alternatives considered**:
+
+- Give decoys public IDs marked unavailable: rejected because invalid delimiters must receive no public pattern identity.
+- Let delimiter decoys fall through to ordinary filler guesses: rejected because the requirement makes decoy selection a no-op that consumes no attempt and changes no state.
+- Add a permanent valid-pattern CSS class: rejected because static styling may not reveal which delimiters are valid.
+- Treat Go asset-source assertions as complete browser interaction coverage: rejected because source inspection does not execute DOM events, computed styling, or outbound WebSocket dispatch.
+
+## Decision 9: Preserve the existing reconnect, persistence, and trusted-control boundaries
 
 **Decision**: Continue sending the current detached hack projection through `TERMINAL_LIVE` on connection and `HACK_STATE` on accepted mutation. Keep generation, used history, removed duds, attempts, logs, and outcomes solely in the process-local live aggregate. Retain `ForceHackSuccess()` through the existing Wails `App` binding and existing success publication, with no player-protocol or browser invocation path.
 

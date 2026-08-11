@@ -2,6 +2,7 @@
 
 const MODE = { LIST: 'list', ENTRY: 'entry', HACK: 'hack' };
 const ROW_WIDTH = 12; // must match server/hack.js
+const HACK_DELIMITERS = '()[]{}<>';
 
 // ── State ─────────────────────────────────────────────────
 // navStack / mode(list|entry) / viewEntryId / commandOutput are mirrors of
@@ -303,6 +304,11 @@ function patternAtCell(cell) {
     matches.reduce((nearest, pattern) => !nearest || pattern.start > nearest.start ? pattern : nearest, null);
 }
 
+function isDelimiterCell(cell) {
+  return !!cell && cell.classList.contains('filler') &&
+    cell.textContent.length === 1 && HACK_DELIMITERS.includes(cell.textContent);
+}
+
 function setHackPatternHover(pattern) {
   hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
   hackHoverKey = pattern ? pattern.id : null;
@@ -324,8 +330,7 @@ function setHackPatternHover(pattern) {
   renderHackInputPreview();
 }
 
-hackColumns.addEventListener('mouseover', (e) => {
-  const cell = e.target.closest('.hcell');
+function previewHackCell(cell) {
   if (!cell) return;
   const pattern = patternAtCell(cell);
   if (pattern) {
@@ -334,10 +339,18 @@ hackColumns.addEventListener('mouseover', (e) => {
     if (!pattern.used) playMultiple();
     return;
   }
+  if (isDelimiterCell(cell)) {
+    setHackPatternHover(null);
+    return;
+  }
   const key = cell.dataset.target;
   if (key === hackHoverKey) return;
   setHackHover(key);
   if (cell.classList.contains('word')) playMultiple(); else playSingle();
+}
+
+hackColumns.addEventListener('mouseover', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
 });
 hackColumns.addEventListener('mouseout', (e) => {
   const cell = e.target.closest('.hcell');
@@ -349,13 +362,25 @@ hackColumns.addEventListener('mouseout', (e) => {
   const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
   if (!related || related.dataset.target !== cell.dataset.target) setHackHover(null);
 });
+hackColumns.addEventListener('focusin', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
+});
+hackColumns.addEventListener('focusout', (e) => {
+  if (e.target.closest('.hcell')) setHackPatternHover(null);
+});
 hackColumns.addEventListener('click', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell || !hack || hack.solved || hack.failed) return;
-  playEnter();
   const pattern = patternAtCell(cell);
-  if (pattern) send({ type: 'HACK_PATTERN', patternId: pattern.id });
-  else send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
+  if (pattern && !pattern.used) {
+    playEnter();
+    send({ type: 'HACK_PATTERN', patternId: pattern.id });
+  } else if (pattern || isDelimiterCell(cell)) {
+    return;
+  } else {
+    playEnter();
+    send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
+  }
 });
 
 // ════════════════════════════════════════════════════
@@ -909,10 +934,10 @@ function buildColumnHtml(col, colIndex, rowBase) {
       if (wid) {
         let j = i;
         while (j < rowEnd && wordAt[j] === wid) j++;
-        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}">${esc(col.text.slice(i, j))}</span>`;
+        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}" tabindex="0">${esc(col.text.slice(i, j))}</span>`;
         i = j;
       } else {
-        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}">${esc(col.text[i])}</span>`;
+        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0">${esc(col.text[i])}</span>`;
         i++;
       }
     }

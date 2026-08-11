@@ -354,7 +354,7 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
 		}
 	}
-	if !strings.Contains(string(playerScript), "else send({ type: 'HACK_GUESS', targetId: cell.dataset.target });") {
+	if !strings.Contains(string(playerScript), "send({ type: 'HACK_GUESS', targetId: cell.dataset.target });") {
 		t.Error("ordinary candidate and filler cells must continue through HACK_GUESS")
 	}
 }
@@ -393,6 +393,67 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 	} {
 		if strings.Contains(playerScript, forbidden) {
 			t.Errorf("bundled player depends on private pattern metadata %q", forbidden)
+		}
+	}
+}
+
+func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	playerScript := read("client/client.js")
+	for _, required := range []string{
+		"const HACK_DELIMITERS = '()[]{}<>';",
+		"function isDelimiterCell(cell)",
+		"HACK_DELIMITERS.includes(cell.textContent)",
+		"const pattern = patternAtCell(cell)",
+		"if (isDelimiterCell(cell))",
+		"if (pattern && !pattern.used)",
+		"send({ type: 'HACK_PATTERN', patternId: pattern.id });",
+		"send({ type: 'HACK_GUESS', targetId: cell.dataset.target });",
+		"class=\"hcell word\"",
+		"class=\"hcell filler\"",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("bundled player is missing camouflage interaction contract %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"classList.add('pattern')",
+		"classList.add('valid-pattern')",
+		"classList.add('delimiter-decoy')",
+		"classList.add('decoy')",
+		"data-pattern-valid",
+		"data-delimiter-decoy",
+	} {
+		if strings.Contains(playerScript, forbidden) {
+			t.Errorf("bundled player exposes persistent pattern validity through %q", forbidden)
+		}
+	}
+
+	stylesheet := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(stylesheet)
+	for _, required := range []string{
+		".hcell{cursor:pointer;}",
+		".hcell.filler{opacity:.8;}",
+		".hcell.hi{background:#57ff6e;color:#021002;text-shadow:none;}",
+	} {
+		if !strings.Contains(compactCSS, required) {
+			t.Errorf("player stylesheet is missing static/transient cell styling contract %q", required)
+		}
+	}
+	for _, forbidden := range []string{".pattern{", ".valid-pattern{", ".delimiter-decoy{", ".decoy{"} {
+		if strings.Contains(compactCSS, forbidden) {
+			t.Errorf("player stylesheet exposes persistent delimiter validity through %q", forbidden)
 		}
 	}
 }

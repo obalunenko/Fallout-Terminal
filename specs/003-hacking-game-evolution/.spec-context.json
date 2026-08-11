@@ -482,9 +482,65 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-11T12:43:33.302Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T13:58:56.340Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:01:42.666Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:02:21.502Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:32:07.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:34:25.860Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:35:23.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:39:36.523Z"
     }
   ],
-  "last_action": "T048 complete — all formatting, test, race, syntax, and build gates pass",
+  "last_action": "all Phase 10 tasks done — Go, race, browser, syntax, vet, formatting, and frontend build pass",
   "coverage": {
     "FR-001": {
       "title": "Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.",
@@ -1127,6 +1183,303 @@
         "T038",
         "T046"
       ]
+    },
+    "FR-063": {
+      "title": "Every initially published board MUST interleave candidate password words, ordinary punctuation and filler symbols, delimiters belonging to valid special patterns, and standalone delimiter-decoy characters outside every currently valid pattern's inclusive interaction range.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-064": {
+      "title": "The generator MUST NOT reserve or group board rows or contiguous board regions by content type for candidate words, ordinary filler, valid patterns, or delimiter decoys.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-065": {
+      "title": "Production discovery MUST accept a matching same-row pattern with one or more ordinary non-alphabetic filler characters between its opening and first compatible closing delimiter.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-066": {
+      "title": "Every initially published board MUST contain at least one valid special pattern with one or more non-alphabetic filler characters between its endpoints.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-067": {
+      "title": "Production discovery MUST continue to accept an adjacent empty matching delimiter pair that satisfies all normal special-pattern rules.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-068": {
+      "title": "The generator MUST NOT construct every initial valid pattern as an adjacent empty pair.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-069": {
+      "title": "Matching delimiters surrounding a candidate word or other alphabetic content MUST NOT form a valid special pattern while that alphabetic content remains rendered.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-070": {
+      "title": "A candidate word inside an alphabetic-interrupted delimiter span MUST remain selectable under the existing candidate-word guess rules.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable",
+        "tests/browser/hacking-camouflage.spec.mjs::word-interrupted spans stay ordinary until a server snapshot publishes a new pattern"
+      ]
+    },
+    "FR-071": {
+      "title": "When dud removal replaces an incorrect word inside a delimiter span with periods, production discovery MUST publish the resulting span if it satisfies every normal special-pattern rule on the mutated board.",
+      "tasks": [
+        "T049",
+        "T051",
+        "T052",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDudRemovalRevealsDynamicPatternImmediately",
+        "tests/browser/hacking-camouflage.spec.mjs::word-interrupted spans stay ordinary until a server snapshot publishes a new pattern"
+      ]
+    },
+    "FR-072": {
+      "title": "Every initially published board MUST contain standalone delimiter-decoy characters that are not part of any currently valid pattern interaction range.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-073": {
+      "title": "The number of standalone delimiter-decoy characters on every initially published board MUST be at least the number of initially valid special patterns.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-074": {
+      "title": "Every initially published board MUST contain at least one potential matching-delimiter span that is invalid because alphabetic content appears between its endpoints.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-075": {
+      "title": "A standalone delimiter decoy MUST NOT highlight, produce a HACK_PATTERN request, consume an attempt, or change puzzle state.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-076": {
+      "title": "A delimiter decoy MUST use the same color, brightness, font, CRT effect, and static styling as the same delimiter character when it belongs to a valid pattern.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingCamouflageAndDelimiterContract",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-077": {
+      "title": "Pattern validity MUST be revealed only through normal hover, focus, or selection behavior for currently valid patterns.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingCamouflageAndDelimiterContract",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-078": {
+      "title": "Candidate words and all camouflage characters MUST be added before initial-board validation begins.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-079": {
+      "title": "Initial-board validation MUST run the production discovery algorithm against the complete final rendered board and count every accidentally formed valid pattern toward the initial 3–6 limit.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestFinalBoardClassificationCountsAccidentalPatternsAndOnlyStandaloneDecoys",
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-080": {
+      "title": "Initial-board validation MUST regenerate a board that fails the 3–6 valid-pattern limit, standalone delimiter-decoy minimum, non-empty valid-interior requirement, alphabetic-interrupted-span requirement, or mixed-distribution requirement.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-081": {
+      "title": "The public pattern projection MUST include only spans that are currently valid under production discovery.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "FR-082": {
+      "title": "Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters MUST receive no public pattern identity.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "FR-083": {
+      "title": "Camouflage construction and final-board validation MUST preserve the discovery rules in FR-008 through FR-013 unchanged.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-003": {
+      "title": "Across 1,000 generated and publishable initial boards, every complete board satisfies all pattern, camouflage, exact occupied-row distribution, and valid-only projection gates.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-004": {
+      "title": "Every generated board that fails any initial pattern-count or camouflage condition is rejected and regenerated after complete-board analysis.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-014": {
+      "title": "Controlled generator tests preserve adjacent empty pairs while preventing all-empty initial pattern sets.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-015": {
+      "title": "Executable browser interaction tests prove delimiter decoys are inert while valid patterns retain inclusive interaction behavior.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "SC-016": {
+      "title": "Dynamic-board tests prove word-interrupted spans gain identity only after dud removal makes them valid.",
+      "tasks": [
+        "T049",
+        "T051",
+        "T052",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "SC-017": {
+      "title": "Static and computed-style checks find no persistent validity-dependent delimiter treatment.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
     }
   },
   "size": "oversized",
@@ -1140,9 +1493,14 @@
     "area: existing hacking-game behavior and prior migrated specification",
     "area: puzzle model, board generation, player protocol, player interface, and game-master control",
     "constraint: remove every player cheat while preserving the trusted game-master solve control",
-    "constraint: exact bracket pairs and 80/20 special-pattern outcomes"
+    "constraint: exact bracket pairs and 80/20 special-pattern outcomes",
+    "area: board generation, production discovery, public projection, and browser interaction",
+    "constraint: preserve same-row, matching-pair, first-compatible-closer, no-alphabetic-interior discovery semantics",
+    "verification: 1,000 complete final boards must pass pattern-count and camouflage gates",
+    "surface: client/client.css static delimiter styling",
+    "verification: executable browser interactions in tests/browser complement Go asset contracts"
   ],
-  "intent": "Restore Fallout-style hacking immersion by replacing player cheats with one-use special patterns while preserving a game-master solve override.",
+  "intent": "Camouflage valid hacking patterns among ordinary board content and inert delimiter decoys while preserving the established discovery and activation rules.",
   "approach": "Correct the existing pattern implementation in place: use generation-bound opaque identities over rendered-row coordinates, validate final boards with the gameplay discovery function, and apply weighted outcomes plus ordered detached publication under the live mutex. Keep runtime persistence and the private game-master boundary unchanged.",
   "decisions": [
     {
@@ -1239,6 +1597,25 @@
       "decision": "Resolve exact pattern openings first, then choose the containing pattern with the nearest opening for other in-range cells",
       "why": "This enables inclusive interaction without making stacked patterns with shared closers unreachable from their distinct openings",
       "rejected": "Selecting the first containing range, which would mask nested pattern openings"
+    },
+    {
+      "decision": "Amend the completed full-pipeline feature in place and preserve its oversized classification; implement the amendment through unchecked T049-T053."
+    },
+    {
+      "decision": "Define mixed distribution by per-category occupied-row counts and pairwise-overlapping inclusive row intervals."
+    },
+    {
+      "decision": "Use an isolated, exactly pinned and locked executable browser-test dependency because Go asset checks cannot execute DOM interaction or message dispatch."
+    },
+    {
+      "decision": "Derive all camouflage categories only after unchanged production discovery analyzes the complete rendered board",
+      "why": "Accidental spans and decoy membership are final-board properties and must share the gameplay validity authority",
+      "rejected": "Trust construction-time intended pattern and decoy metadata"
+    },
+    {
+      "decision": "Reject non-ASCII-alphabetic injected candidate placeholders and supplement from the built-in word bank",
+      "why": "Published word-interrupted spans must contain alphabetic candidate content and scanner semantics are ASCII alphabetic",
+      "rejected": "Count numeric placeholder content as alphabetic interruption"
     }
   ],
   "step_summaries": {
@@ -1250,10 +1627,10 @@
       "summary": "21 corrective tasks across foundational work, five user-story phases, and one success-criteria validation phase"
     },
     "implement": {
-      "summary": "Completed T048 with inclusive row-local browser pattern interaction and regression coverage; all validation gates pass."
+      "summary": "Shipped publishable board camouflage, inert delimiter behavior, and executable browser coverage with all validation gates passing"
     }
   },
-  "currentTask": "T048",
+  "currentTask": "T054",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1595,6 +1972,56 @@
         "client/client.js",
         "internal/platform/assets_test.go"
       ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Added 1,000-board camouflage, scanner fixture, accidental-pattern, projection, inert-decoy, candidate, and rediscovery regressions",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Added bundled-player contracts for valid-only lookup, inert delimiters, ordinary guesses, and static style parity",
+      "files": [
+        "internal/platform/assets_test.go",
+        "client/client.css"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Added exactly pinned Playwright harness with controlled snapshots for valid, decoy, candidate, style, no-optimism, and post-dud interactions",
+      "files": [
+        "tests/browser/package.json",
+        "tests/browser/package-lock.json",
+        "tests/browser/playwright.config.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        ".gitignore"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Implemented normal-row camouflage placement and complete-board discovery, decoy, interruption, distribution, overlap, and projection publication gates",
+      "files": [
+        "internal/hack/hack.go",
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Made delimiter targets inert in canonical guessing and browser hover, focus, and click dispatch while preserving valid patterns and ordinary guesses",
+      "files": [
+        "internal/hack/hack.go",
+        "client/client.js",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Passed formatting, vet, full and race Go suites, browser syntax and interaction tests, frontend build, and SC-003/004/014-017 verification",
+      "files": [
+        "."
+      ]
     }
   },
   "verified": [
@@ -1681,6 +2108,26 @@
       "command": "npm --prefix frontend run build",
       "result": "passed",
       "warnings": []
+    },
+    {
+      "what": "Browser JavaScript syntax",
+      "command": "node --check client/client.js && node --check tests/browser/playwright.config.mjs && node --check tests/browser/hacking-camouflage.spec.mjs",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Executable browser interactions",
+      "command": "npm --prefix tests/browser test -- --reporter=line",
+      "result": "2 tests passed",
+      "warnings": [
+        "Static fixture server returns expected 404 responses for optional sound APIs"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Socket integration tests could not bind inside the filesystem sandbox; they were rerun successfully with approved localhost access",
+      "step": "implement"
     }
   ]
 }

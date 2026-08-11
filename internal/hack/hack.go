@@ -25,6 +25,8 @@ var fillerPool = []byte("!@#$%^&*_+-=\\|;:'\",./?~")
 
 var patternPairs = [...]string{"()", "[]", "{}", "<>"}
 
+var delimiterClosers = [...]byte{')', ']', '}', '>'}
+
 // Random is the small random-number boundary used by board generation.
 type Random interface {
 	Intn(limit int) int
@@ -70,8 +72,7 @@ func GenerateBoard(generationID string, level int, random Random, words WordSour
 		if state == nil {
 			continue
 		}
-		patternCount := len(discoverPatternSpans(generationID, state.Columns))
-		if patternCount >= 3 && patternCount <= 6 {
+		if classifyFinalBoard(state).publishable() {
 			return state
 		}
 	}
@@ -104,16 +105,35 @@ func generateBoardAttempt(generationID string, level, wordLength int, secretWord
 		}
 		state.WordsByID[id] = domain.HackCandidate{Text: text}
 	}
+	if !placeInterruptedCandidateSpan(columnA, columnB, random) {
+		return nil
+	}
 
 	patternTarget := 3 + safeIntn(random, 4)
 	pairOffset := safeIntn(random, len(patternPairs))
 	for index := 0; index < patternTarget; index++ {
 		pair := patternPairs[(pairOffset+index)%len(patternPairs)]
+		interiorLength := 0
+		if index == 0 {
+			interiorLength = 1 + safeIntn(random, 3)
+		} else if safeIntn(random, 2) == 1 {
+			interiorLength = 1 + safeIntn(random, 2)
+		}
 		primary, secondary := columnA, columnB
 		if index%2 != 0 {
 			primary, secondary = columnB, columnA
 		}
-		if !primary.placePattern(pair) && !secondary.placePattern(pair) {
+		if !primary.placePattern(pair, interiorLength) && !secondary.placePattern(pair, interiorLength) {
+			return nil
+		}
+	}
+	for index := 0; index < patternTarget; index++ {
+		primary, secondary := columnA, columnB
+		if index%2 != 0 {
+			primary, secondary = columnB, columnA
+		}
+		closer := delimiterClosers[(pairOffset+index)%len(delimiterClosers)]
+		if !primary.placeDelimiterDecoy(closer) && !secondary.placeDelimiterDecoy(closer) {
 			return nil
 		}
 	}
@@ -147,6 +167,9 @@ func ApplyGuess(state *domain.HackState, targetID string) {
 	}
 	column := &state.Columns[columnIndex]
 	if characterIndex >= len(column.Text) || containsWord(column.Words, characterIndex) {
+		return
+	}
+	if isDelimiter(column.Text[characterIndex]) {
 		return
 	}
 	pushLog(state, string(column.Text[characterIndex]))
@@ -267,27 +290,65 @@ func (builder *columnBuilder) place(text string, requestedStart int) (string, bo
 	return id, true
 }
 
-func (builder *columnBuilder) placePattern(pair string) bool {
-	if len(pair) != 2 {
+func placeInterruptedCandidateSpan(first, second *columnBuilder, random Random) bool {
+	builders := []*columnBuilder{first, second}
+	startBuilder := safeIntn(random, len(builders))
+	pairOffset := safeIntn(random, len(patternPairs))
+	for builderIndex := range builders {
+		builder := builders[(startBuilder+builderIndex)%len(builders)]
+		if builder.placeInterruptedSpan(patternPairs[(pairOffset+builderIndex)%len(patternPairs)]) {
+			return true
+		}
+	}
+	return false
+}
+
+func (builder *columnBuilder) placeInterruptedSpan(pair string) bool {
+	if len(pair) != 2 || len(builder.words) == 0 {
 		return false
 	}
-	startsPerRow := boardRowWidth - 1
+	wordOffset := safeIntn(builder.random, len(builder.words))
+	for index := range builder.words {
+		word := builder.words[(wordOffset+index)%len(builder.words)]
+		start := word.Start - 1
+		end := word.Start + word.Length
+		if start < 0 || end >= len(builder.used) || start/boardRowWidth != end/boardRowWidth || builder.used[start] || builder.used[end] {
+			continue
+		}
+		builder.chars[start] = pair[0]
+		builder.chars[end] = pair[1]
+		builder.used[start] = true
+		builder.used[end] = true
+		return true
+	}
+	return false
+}
+
+func (builder *columnBuilder) placePattern(pair string, interiorLength int) bool {
+	if len(pair) != 2 || interiorLength < 0 {
+		return false
+	}
+	spanLength := interiorLength + 2
+	if spanLength > boardRowWidth {
+		return false
+	}
+	startsPerRow := boardRowWidth - spanLength + 1
 	limit := boardRows * startsPerRow
 	for attempt := 0; attempt < placementTries; attempt++ {
 		candidate := safeIntn(builder.random, limit)
 		row := candidate / startsPerRow
 		column := candidate % startsPerRow
 		start := row*boardRowWidth + column
-		if builder.canPlacePattern(start) {
-			builder.writePattern(start, pair)
+		if builder.canPlacePattern(start, spanLength) {
+			builder.writePattern(start, pair, interiorLength)
 			return true
 		}
 	}
 	for row := 0; row < boardRows; row++ {
 		for column := 0; column < startsPerRow; column++ {
 			start := row*boardRowWidth + column
-			if builder.canPlacePattern(start) {
-				builder.writePattern(start, pair)
+			if builder.canPlacePattern(start, spanLength) {
+				builder.writePattern(start, pair, interiorLength)
 				return true
 			}
 		}
@@ -295,17 +356,46 @@ func (builder *columnBuilder) placePattern(pair string) bool {
 	return false
 }
 
-func (builder *columnBuilder) canPlacePattern(start int) bool {
-	return start >= 0 && start+1 < len(builder.used) &&
-		start/boardRowWidth == (start+1)/boardRowWidth &&
-		!builder.used[start] && !builder.used[start+1]
+func (builder *columnBuilder) canPlacePattern(start, length int) bool {
+	if start < 0 || length < 2 || start+length > len(builder.used) || start/boardRowWidth != (start+length-1)/boardRowWidth {
+		return false
+	}
+	for index := start; index < start+length; index++ {
+		if builder.used[index] {
+			return false
+		}
+	}
+	return true
 }
 
-func (builder *columnBuilder) writePattern(start int, pair string) {
+func (builder *columnBuilder) writePattern(start int, pair string, interiorLength int) {
 	builder.chars[start] = pair[0]
-	builder.chars[start+1] = pair[1]
-	builder.used[start] = true
-	builder.used[start+1] = true
+	for index := 0; index < interiorLength; index++ {
+		builder.chars[start+1+index] = fillerPool[safeIntn(builder.random, len(fillerPool))]
+	}
+	builder.chars[start+interiorLength+1] = pair[1]
+	for index := start; index < start+interiorLength+2; index++ {
+		builder.used[index] = true
+	}
+}
+
+func (builder *columnBuilder) placeDelimiterDecoy(delimiter byte) bool {
+	for attempt := 0; attempt < placementTries; attempt++ {
+		index := safeIntn(builder.random, len(builder.used))
+		if !builder.used[index] {
+			builder.chars[index] = delimiter
+			builder.used[index] = true
+			return true
+		}
+	}
+	for index := range builder.used {
+		if !builder.used[index] {
+			builder.chars[index] = delimiter
+			builder.used[index] = true
+			return true
+		}
+	}
+	return false
 }
 
 func (builder *columnBuilder) randomStart(length int) int {
@@ -368,7 +458,7 @@ func normalizeCandidates(input []string, length, count int) []string {
 	seen := make(map[string]struct{}, len(input))
 	for _, raw := range input {
 		word := strings.ToUpper(raw)
-		if len(word) != length {
+		if len(word) != length || strings.IndexFunc(word, func(value rune) bool { return !isASCIIAlpha(value) }) >= 0 {
 			continue
 		}
 		if _, duplicate := seen[word]; duplicate {
@@ -484,6 +574,152 @@ func discoverPatternSpans(generationID string, columns []domain.HackColumn) []do
 		renderedRowBase += (len(text) + boardRowWidth - 1) / boardRowWidth
 	}
 	return patterns
+}
+
+type boardPosition struct {
+	row         int
+	offset      int
+	columnIndex int
+	absolute    int
+}
+
+type finalBoardCamouflage struct {
+	patterns                     []domain.HackPattern
+	standaloneDelimiters         []boardPosition
+	hasNonEmptyPattern           bool
+	hasAlphabeticInterruptedSpan bool
+	candidateRows                map[int]struct{}
+	patternRows                  map[int]struct{}
+	decoyRows                    map[int]struct{}
+	ordinaryFillerRows           map[int]struct{}
+}
+
+func (camouflage finalBoardCamouflage) publishable() bool {
+	patternCount := len(camouflage.patterns)
+	return patternCount >= 3 && patternCount <= 6 &&
+		len(camouflage.standaloneDelimiters) >= patternCount &&
+		camouflage.hasNonEmptyPattern &&
+		camouflage.hasAlphabeticInterruptedSpan &&
+		len(camouflage.candidateRows) >= 2 &&
+		len(camouflage.patternRows) >= 2 &&
+		len(camouflage.decoyRows) >= 2 &&
+		len(camouflage.ordinaryFillerRows) >= 2 &&
+		rowIntervalsOverlapPairwise(camouflage.candidateRows, camouflage.patternRows, camouflage.decoyRows)
+}
+
+func classifyFinalBoard(state *domain.HackState) finalBoardCamouflage {
+	camouflage := finalBoardCamouflage{
+		candidateRows:      make(map[int]struct{}),
+		patternRows:        make(map[int]struct{}),
+		decoyRows:          make(map[int]struct{}),
+		ordinaryFillerRows: make(map[int]struct{}),
+	}
+	if state == nil {
+		return camouflage
+	}
+
+	camouflage.patterns = discoverPatternSpans(state.GenerationID, state.Columns)
+	covered := make(map[[2]int]struct{})
+	for _, pattern := range camouflage.patterns {
+		camouflage.patternRows[pattern.Identity.Row] = struct{}{}
+		if pattern.Identity.End-pattern.Identity.Start > 1 {
+			camouflage.hasNonEmptyPattern = true
+		}
+		for offset := pattern.Identity.Start; offset <= pattern.Identity.End; offset++ {
+			covered[[2]int{pattern.Identity.Row, offset}] = struct{}{}
+		}
+	}
+
+	renderedRowBase := 0
+	for columnIndex, column := range state.Columns {
+		wordPositions := make(map[int]struct{})
+		for _, word := range column.Words {
+			for absolute := word.Start; absolute < word.Start+word.Length && absolute < len(column.Text); absolute++ {
+				wordPositions[absolute] = struct{}{}
+				camouflage.candidateRows[renderedRowBase+absolute/boardRowWidth] = struct{}{}
+			}
+		}
+
+		for rowStart := 0; rowStart < len(column.Text); rowStart += boardRowWidth {
+			rowEnd := min(rowStart+boardRowWidth, len(column.Text))
+			row := renderedRowBase + rowStart/boardRowWidth
+			if rowHasAlphabeticInterruptedSpan(column.Text[rowStart:rowEnd]) {
+				camouflage.hasAlphabeticInterruptedSpan = true
+			}
+			for absolute := rowStart; absolute < rowEnd; absolute++ {
+				value := column.Text[absolute]
+				offset := absolute - rowStart
+				if isDelimiter(value) {
+					if _, inValidRange := covered[[2]int{row, offset}]; !inValidRange {
+						camouflage.standaloneDelimiters = append(camouflage.standaloneDelimiters, boardPosition{
+							row: row, offset: offset, columnIndex: columnIndex, absolute: absolute,
+						})
+						camouflage.decoyRows[row] = struct{}{}
+					}
+					continue
+				}
+				if _, isWord := wordPositions[absolute]; !isWord && !isASCIIAlpha(rune(value)) {
+					camouflage.ordinaryFillerRows[row] = struct{}{}
+				}
+			}
+		}
+		renderedRowBase += (len(column.Text) + boardRowWidth - 1) / boardRowWidth
+	}
+	return camouflage
+}
+
+func rowHasAlphabeticInterruptedSpan(row string) bool {
+	closers := map[byte]byte{'(': ')', '[': ']', '{': '}', '<': '>'}
+	for start := 0; start < len(row); start++ {
+		closer, isOpening := closers[row[start]]
+		if !isOpening {
+			continue
+		}
+		relativeEnd := strings.IndexByte(row[start+1:], closer)
+		if relativeEnd < 0 {
+			continue
+		}
+		end := start + 1 + relativeEnd
+		if strings.IndexFunc(row[start+1:end], isASCIIAlpha) >= 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func rowIntervalsOverlapPairwise(rowSets ...map[int]struct{}) bool {
+	if len(rowSets) < 2 {
+		return true
+	}
+	type interval struct{ low, high int }
+	intervals := make([]interval, len(rowSets))
+	for index, rows := range rowSets {
+		if len(rows) == 0 {
+			return false
+		}
+		first := true
+		for row := range rows {
+			if first || row < intervals[index].low {
+				intervals[index].low = row
+			}
+			if first || row > intervals[index].high {
+				intervals[index].high = row
+			}
+			first = false
+		}
+	}
+	for left := 0; left < len(intervals); left++ {
+		for right := left + 1; right < len(intervals); right++ {
+			if intervals[left].high < intervals[right].low || intervals[right].high < intervals[left].low {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isDelimiter(value byte) bool {
+	return strings.IndexByte("()[]{}<>", value) >= 0
 }
 
 func patternID(identity domain.HackPatternIdentity) string {

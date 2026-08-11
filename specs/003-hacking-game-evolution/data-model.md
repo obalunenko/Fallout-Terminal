@@ -5,6 +5,7 @@
 - The private hacking aggregate remains the process-local source of truth and is mutated only while the canonical live-service mutex is held.
 - Pattern identity is the complete tuple `generationId + row + inclusive start + inclusive end`; public `patternId` values contain or resolve to that tuple and are opaque to clients.
 - Pattern validity is derived from the current final rendered board by one discovery function used both before publication and during gameplay.
+- Initial camouflage classification is derived only after that discovery function analyzes the complete board; construction intent never grants validity or public identity.
 - Used history survives discovery changes for the lifetime of one puzzle generation, while public patterns describe only spans currently present on the board.
 - Outcome selection and private candidate truth remain server-only. Public projections are detached and contain no mutable reference to canonical data.
 - All state introduced here is runtime-only and does not alter version-1 session JSON.
@@ -15,6 +16,9 @@
 |---|---|
 | Allowed pattern pairs | `()`, `[]`, `{}`, `<>` |
 | Initial valid special-pattern count | `3–6` inclusive on the final rendered board before the first player action |
+| Initial standalone delimiter-decoy count | At least the number of initially valid special patterns |
+| Required initial interiors | At least one valid pattern with one or more non-alphabetic filler characters |
+| Required initial invalid span | At least one matching-delimiter span interrupted by alphabetic content |
 | Dud-removal probability mapping | `80%` |
 | Attempt-restoration probability mapping | `20%` |
 | Pattern identity | `generationId + row + inclusive start + inclusive end` |
@@ -75,6 +79,20 @@ A span is discovered only when the opening delimiter and first compatible closer
 
 Every opening is evaluated independently. Two openings may therefore have different identities and the same closing offset. If mutation changes the first compatible closer for one opening, the new `End` produces a new identity.
 
+### FinalBoardCamouflage
+
+`FinalBoardCamouflage` is a generation-time validation result derived from the complete rendered columns after production discovery. It is not persisted or projected.
+
+| Attribute | Rules |
+|---|---|
+| Valid patterns | Exact spans returned by production discovery, including accidental spans |
+| Non-empty valid interiors | Valid spans whose exclusive interior contains at least one non-alphabetic filler character |
+| Standalone delimiter decoys | Delimiter characters deliberately outside every valid pattern's inclusive interaction range; each remains inert and has no public identity |
+| Alphabetic-interrupted spans | Potential matching-delimiter spans rejected because their exclusive interior contains at least one alphabetic character |
+| Mixed distribution | Candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rows; their inclusive minimum-to-maximum occupied-row intervals overlap pairwise; ordinary punctuation or filler remains in at least two rows |
+
+A board is publishable only when it has `3–6` valid patterns, at least one non-empty valid interior, at least one alphabetic-interrupted span, at least as many standalone delimiter-decoy characters as valid patterns, and the exact mixed-distribution predicate above. An occupied-row interval is inclusive from the lowest through highest row containing the category; two intervals overlap when their inclusive ranges share at least one row ordinal. A delimiter candidate that participates in an accidental valid pattern is classified through that pattern and cannot count as a standalone decoy.
+
 ### HackState
 
 `HackState` remains the canonical aggregate mutated by `internal/hack` while `internal/live.Service` owns the mutex.
@@ -133,7 +151,7 @@ It deliberately excludes `column`, `pair`, `generationId` as a separately editab
 
 ### PublicHackState
 
-The existing public fields remain: `level`, `wordLength`, `attemptsMax`, `attemptsLeft`, `solved`, `failed`, `log`, and `columns`. The `patterns` field is an array of detached `PublicHackPattern` values for every currently discovered span, sorted by `row`, `start`, then `end`.
+The existing public fields remain: `level`, `wordLength`, `attemptsMax`, `attemptsLeft`, `solved`, `failed`, `log`, and `columns`. The `patterns` field is an array of detached `PublicHackPattern` values for every currently discovered span, sorted by `row`, `start`, then `end`. Invalid delimiter characters remain present only in rendered column text; they gain no pattern object, status, or identity.
 
 Public columns retain existing addresses, text, and word placements because ordinary board rendering and guessing are unchanged. Word placements reveal no correct/dud classification. Every public slice and nested mutable value is copied before leaving the canonical boundary.
 
@@ -156,13 +174,14 @@ PublicHackState 1 ── * PublicHackPattern (current derived spans only)
 
 ```text
 issue fresh generation ID without using outcome Random
-  → construct candidate words and final rendered board attempt
-  → run production discovery on final board
-  → discovered count < 3 or > 6? discard attempt and regenerate
-  → discovered count in 3..6? publish fresh active HackState
+  → construct candidate words, ordinary filler, intended valid spans, non-empty interiors, word-interrupted spans, and delimiter-decoy candidates through normal rows
+  → run unchanged production discovery on the complete final board
+  → classify non-empty valid interiors, standalone inert decoys, alphabetic-interrupted spans, occupied-row counts, pairwise interval overlap, and ordinary-filler rows from that same render
+  → any discovered-count or camouflage gate fails? discard attempt and regenerate
+  → all gates pass? publish fresh active HackState with valid-only pattern projection
 ```
 
-Intended bracket insertion and bracket-free filler may reduce retries, but only final production discovery decides publication. No target-count distribution becomes part of the contract.
+Intended placement may reduce retries, but only final production discovery plus derived camouflage validation decides publication. Every accidental valid span counts toward `3–6`, and its delimiter characters cannot be counted as standalone decoys. No target-count distribution becomes part of the contract.
 
 ### Atomic Pattern Activation
 
@@ -190,6 +209,14 @@ accept activation → store G/R/S/A in UsedPatterns
 board mutation makes closer B first → identity G/R/S/B is new and available
 later mutation restores closer A → identity G/R/S/A is rediscovered as used
 fresh puzzle generation H at same R/S/A → H/R/S/A is a distinct available identity
+```
+
+An alphabetic-interrupted span follows the same lifecycle without a special-case discovery rule:
+
+```text
+matching delimiters surround candidate letters → no discovered identity; word remains an ordinary candidate
+dud removal replaces that incorrect word with periods → run production discovery on the mutated board
+span now satisfies the existing rules → project a new current identity and allow one normal activation
 ```
 
 ### Reconnect and Restart

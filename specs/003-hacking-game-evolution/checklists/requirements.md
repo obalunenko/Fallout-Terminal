@@ -34,4 +34,9 @@
 - The named `HACK_PATTERN` contract, canonical live-service mutex, injected deterministic random source, and private desktop/Wails boundary are intentional normative constraints supplied during clarification; they are not accidental implementation leakage.
 - Planning must preserve these constraints while keeping all unmandated implementation choices in `plan.md`, `research.md`, `data-model.md`, or `contracts/`.
 - The final rendered board, not the number of intended pattern insertions, is the authority for the initial `3–6` count.
+- Camouflage is validated only after candidate words, ordinary filler, intended patterns, alphabetic interruptions, and delimiter decoys are all present on the complete rendered board.
+- The amendment preserves the existing same-row, matching-pair, first-compatible-closer, no-alphabetic-interior discovery rules and changes only board construction, final-board publication gates, projection exclusivity, and decoy interaction.
+- The 1,000-board gate now verifies the valid-pattern count, standalone-decoy parity, a non-empty valid interior, an alphabetic-interrupted span, exact occupied-row counts and pairwise interval overlap, accidental-pattern accounting, and valid-only projection on every board.
+- `client/client.css` is an explicit affected surface, with static contract checks complemented by an isolated executable browser interaction suite.
+- Generator and browser acceptance work is captured as unchecked T049–T054; T047 is explicitly identified as pre-amendment verification so the completed task journal remains intact without claiming the amended SC-003 or SC-004.
 - Planning guardrails and the ready-to-use invocation are recorded in [planning-handoff.md](../planning-handoff.md).

@@ -167,6 +167,7 @@ func TestApplyGuessTransitions(t *testing.T) {
 
 func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
 	seenPairs := map[string]bool{}
+	generated := 0
 	for level := 1; level <= 5; level++ {
 		for iteration := 0; iteration < 200; iteration++ {
 			generationID := fmt.Sprintf("generation-%d-%d", level, iteration)
@@ -178,6 +179,39 @@ func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
 			if len(patterns) < 3 || len(patterns) > 6 {
 				t.Fatalf("level %d iteration %d patterns = %d, want 3..6", level, iteration, len(patterns))
 			}
+			camouflage := classifyFinalBoard(state)
+			if !camouflage.publishable() {
+				t.Fatalf("level %d iteration %d failed final-board camouflage: %#v", level, iteration, camouflage)
+			}
+			if len(camouflage.standaloneDelimiters) < len(patterns) {
+				t.Fatalf("level %d iteration %d standalone delimiters = %d, want at least %d", level, iteration, len(camouflage.standaloneDelimiters), len(patterns))
+			}
+			if !camouflage.hasNonEmptyPattern || !camouflage.hasAlphabeticInterruptedSpan {
+				t.Fatalf("level %d iteration %d missing non-empty pattern or alphabetic interruption: %#v", level, iteration, camouflage)
+			}
+			for category, rows := range map[string]map[int]struct{}{
+				"candidate": camouflage.candidateRows,
+				"pattern":   camouflage.patternRows,
+				"decoy":     camouflage.decoyRows,
+				"filler":    camouflage.ordinaryFillerRows,
+			} {
+				if len(rows) < 2 {
+					t.Fatalf("level %d iteration %d %s rows = %v, want at least two", level, iteration, category, rows)
+				}
+			}
+			if !rowIntervalsOverlapPairwise(camouflage.candidateRows, camouflage.patternRows, camouflage.decoyRows) {
+				t.Fatalf("level %d iteration %d occupied-row intervals do not overlap: candidate=%v pattern=%v decoy=%v", level, iteration, camouflage.candidateRows, camouflage.patternRows, camouflage.decoyRows)
+			}
+			public := PublicState(state)
+			if len(public.Patterns) != len(patterns) {
+				t.Fatalf("level %d iteration %d public patterns = %d, production discovery = %d", level, iteration, len(public.Patterns), len(patterns))
+			}
+			for index := range patterns {
+				if public.Patterns[index].ID != patternID(patterns[index].Identity) {
+					t.Fatalf("level %d iteration %d public pattern %d does not match production discovery", level, iteration, index)
+				}
+			}
+			generated++
 			for _, pattern := range patterns {
 				seenPairs[pattern.Pair] = true
 				if pattern.Identity.GenerationID != generationID {
@@ -190,11 +224,91 @@ func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
 			}
 		}
 	}
+	if generated != 1000 {
+		t.Fatalf("generated boards = %d, want exactly 1000", generated)
+	}
 	for _, pair := range []string{"()", "[]", "{}", "<>"} {
 		if !seenPairs[pair] {
 			t.Errorf("generated boards never exposed pair %s", pair)
 		}
 	}
+}
+
+func TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules(t *testing.T) {
+	tests := []struct {
+		name      string
+		text      string
+		wantSpans [][2]int
+	}{
+		{name: "adjacent empty", text: "()!!!!!!!!!!", wantSpans: [][2]int{{0, 1}}},
+		{name: "non-empty punctuation", text: "[!%]!!!!!!!!", wantSpans: [][2]int{{0, 3}}},
+		{name: "unmatched", text: "(!!!!!!!!!!!", wantSpans: nil},
+		{name: "mismatched", text: "[!)!!!!!!!!!", wantSpans: nil},
+		{name: "alphabetic interior", text: "{AB}!!!!!!!!", wantSpans: nil},
+		{name: "first compatible closer", text: "<!!>>!!!!!!!", wantSpans: [][2]int{{0, 3}}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			patterns := discoverPatternSpans("generation-fixture", []domain.HackColumn{{Text: test.text}})
+			got := make([][2]int, len(patterns))
+			for index, pattern := range patterns {
+				got[index] = [2]int{pattern.Identity.Start, pattern.Identity.End}
+			}
+			if len(got) != len(test.wantSpans) || len(got) > 0 && !reflect.DeepEqual(got, test.wantSpans) {
+				t.Fatalf("discoverPatternSpans(%q) = %v, want %v", test.text, got, test.wantSpans)
+			}
+		})
+	}
+}
+
+func TestFinalBoardClassificationCountsAccidentalPatternsAndOnlyStandaloneDecoys(t *testing.T) {
+	state := &domain.HackState{
+		GenerationID: "generation-accidental",
+		Columns: []domain.HackColumn{{
+			Text:  "([])!]!!!!!!",
+			Words: []domain.HackWord{},
+		}},
+	}
+
+	camouflage := classifyFinalBoard(state)
+	if len(camouflage.patterns) != 2 {
+		t.Fatalf("accidental patterns = %#v, want both outer and inner discoveries", camouflage.patterns)
+	}
+	if len(camouflage.standaloneDelimiters) != 1 {
+		t.Fatalf("standalone delimiters = %#v, want only the delimiter outside both valid ranges", camouflage.standaloneDelimiters)
+	}
+	if camouflage.standaloneDelimiters[0].offset != 5 {
+		t.Fatalf("standalone delimiter offset = %d, want 5", camouflage.standaloneDelimiters[0].offset)
+	}
+}
+
+func TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable(t *testing.T) {
+	t.Run("direct delimiter target is inert", func(t *testing.T) {
+		state := testHackState()
+		state.Columns[1].Text = "]!!!!!!!!!!!"
+		before := cloneHackState(t, state)
+
+		ApplyGuess(state, "1:0")
+
+		if !reflect.DeepEqual(state, before) {
+			t.Fatalf("delimiter decoy mutated state\ngot:  %#v\nwant: %#v", state, before)
+		}
+	})
+
+	t.Run("candidate inside alphabetic interrupted span uses ordinary guess rules", func(t *testing.T) {
+		state := testHackState()
+		state.Columns[0].Text = "(CODE)!CAVE!DUST!IRON!"
+		state.Columns[0].Words[0].Start = 1
+		state.WordsByID["A1"] = domain.HackCandidate{Text: "CAVE"}
+		state.SecretWord = "IRON"
+
+		ApplyGuess(state, "A1")
+
+		if state.AttemptsLeft != 3 || state.Solved || state.Failed {
+			t.Fatalf("interrupted-span candidate did not retain ordinary guess behavior: %#v", state)
+		}
+		assertLogContains(t, state.Log, "> CAVE", "> Отказ в доступе")
+	})
 }
 
 func TestApplyPatternUsesExactOutcomeBuckets(t *testing.T) {

@@ -8,6 +8,9 @@ This contract governs the player WebSocket pattern request, the public pattern p
 
 - Allowed pattern pairs: `()`, `[]`, `{}`, `<>`.
 - Initial valid special-pattern count: `3–6` inclusive on the final rendered board before the first player action.
+- Initial standalone delimiter-decoy count: at least the number of initially valid special patterns.
+- Every initial board contains at least one valid pattern with a non-empty non-alphabetic interior and at least one matching-delimiter span invalidated by alphabetic content.
+- Candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rendered rows; their inclusive minimum-to-maximum occupied-row intervals overlap pairwise; ordinary punctuation or filler remains present in at least two rows.
 - Dud-removal probability mapping: `80%`.
 - Attempt-restoration probability mapping: `20%`.
 - Pattern identity: `generationId + row + inclusive start + inclusive end`.
@@ -115,7 +118,7 @@ Existing hack and column fields retain their current behavior. For each currentl
 
 The array is sorted by `row`, `start`, then `end`. It may exceed six after the first player action. A currently discovered used span remains present with `used: true`; a used span that is not currently valid remains only in private history and reappears as used if later rediscovered.
 
-The pattern object must not contain `column`, `pair`, a separately editable `generationId`, password or dud facts, a future outcome, random values, private candidate metadata, or any reference to canonical slices, maps, or objects.
+The pattern object must not contain `column`, `pair`, a separately editable `generationId`, password or dud facts, a future outcome, random values, private candidate metadata, delimiter-decoy metadata, or any reference to canonical slices, maps, or objects. Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters remain ordinary rendered characters and receive no pattern object or identity.
 
 ### `TERMINAL_LIVE` — reconnect snapshot retained
 
@@ -146,7 +149,7 @@ The publication callback is owned by the player boundary. It serializes and enqu
 | First accepted activation | Exactly one complete post-effect `HACK_STATE` committed for all connected players and one detached game-master `hack-state` notification |
 | Concurrent duplicate | None |
 | Invalid, stale-generation, non-current, already-used, or terminal-state request | None |
-| Fresh live publication | Existing `TERMINAL_LIVE` with a new generation and `3–6` final-board-discovered initial patterns |
+| Fresh live publication | Existing `TERMINAL_LIVE` with a new generation, `3–6` complete-final-board-discovered initial patterns, and all camouflage publication gates satisfied |
 | Reconnect while process remains active | Existing `TERMINAL_LIVE` with current state and generation-bound pattern IDs |
 | Trusted game-master solve | Existing success publication; no attempt spent |
 
@@ -157,7 +160,11 @@ The publication callback is owned by the player boundary. It serializes and enqu
 - Hovering an unused pattern opening highlights `start` through `end` on `row`, inclusive, and previews that board substring.
 - Different openings sharing one closer remain different targets because their `start` values and opaque IDs differ.
 - A used current pattern does not highlight and does not fall through to `HACK_GUESS` when clicked; the server remains authoritative if a repeated request is sent.
-- Clicking an available opening sends only `{type: "HACK_PATTERN", patternId: pattern.id}`. Clicking an ordinary candidate or non-pattern filler cell retains existing `HACK_GUESS` behavior.
+- Clicking an available opening sends only `{type: "HACK_PATTERN", patternId: pattern.id}`. Clicking an ordinary candidate, including a candidate inside an alphabetic-interrupted delimiter span, retains existing `HACK_GUESS` behavior.
+- Hovering, focusing, or clicking a rendered delimiter outside every current projected pattern range produces no highlight, preview, `HACK_PATTERN`, `HACK_GUESS`, attempt consumption, or puzzle-state change. Canonical filler-target handling also rejects such a direct delimiter target without mutation.
+- Clicking ordinary non-delimiter filler retains existing `HACK_GUESS` behavior.
+- Valid delimiter endpoints and delimiter decoys use identical static color, brightness, font, CRT effect, and persistent classes. Only transient valid-pattern hover, focus, or selection feedback may distinguish them.
+- After dud removal replaces an alphabetic-interrupted candidate with periods, the browser treats the span as actionable only after the server's next valid-only pattern projection includes it.
 - The browser changes no board, attempts, log, pattern status, or outcome until a server snapshot arrives.
 
 ## Game-Master Interface Contract
