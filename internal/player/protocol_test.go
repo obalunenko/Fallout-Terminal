@@ -29,7 +29,7 @@ func TestDecodeClientMessageAcceptsExactProtocol(t *testing.T) {
 		{name: "word guess", input: `{"type":"HACK_GUESS","targetId":"A1"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "A1"}},
 		{name: "filler guess", input: `{"type":"HACK_GUESS","targetId":"0:0"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "0:0"}},
 		{name: "stale guess remains syntactically eligible", input: `{"type":"HACK_GUESS","targetId":"stale"}`, want: ClientMessage{Type: "HACK_GUESS", TargetID: "stale"}},
-		{name: "administrator", input: `{"type":"HACK_ADMIN"}`, want: ClientMessage{Type: "HACK_ADMIN"}},
+		{name: "special pattern", input: `{"type":"HACK_PATTERN","patternId":"0:17:23"}`, want: ClientMessage{Type: "HACK_PATTERN", PatternID: "0:17:23"}},
 	}
 
 	for _, test := range tests {
@@ -61,6 +61,7 @@ func TestDecodeClientMessageRejectsMalformedOrUnsupportedObjects(t *testing.T) {
 		{name: "missing type", input: `{}`},
 		{name: "non-string type", input: `{"type":7}`},
 		{name: "unknown type", input: `{"type":"DELETE_SESSION"}`},
+		{name: "removed administrator type", input: `{"type":"HACK_ADMIN"}`},
 		{name: "server type from client", input: `{"type":"TERMINAL_LIVE"}`},
 		{name: "unknown field", input: `{"type":"HACK_ADMIN","canonicalState":true}`},
 		{name: "duplicate field", input: `{"type":"HACK_ADMIN","type":"HACK_GUESS","targetId":"A1"}`},
@@ -91,6 +92,10 @@ func TestDecodeClientMessageValidatesActionAndTargetFields(t *testing.T) {
 		`{"type":"HACK_GUESS","targetId":1}`,
 		`{"type":"HACK_GUESS","targetId":""}`,
 		`{"type":"HACK_GUESS","targetId":"   "}`,
+		`{"type":"HACK_PATTERN"}`,
+		`{"type":"HACK_PATTERN","patternId":1}`,
+		`{"type":"HACK_PATTERN","patternId":""}`,
+		`{"type":"HACK_PATTERN","patternId":"0:17:23","targetId":"A1"}`,
 		`{"type":"HACK_ADMIN","targetId":"A1"}`,
 	}
 
@@ -160,15 +165,15 @@ func TestPlayerEnvelopesNeverMarshalPrivateHackFields(t *testing.T) {
 	t.Parallel()
 
 	private := &domain.HackState{
-		Level:         2,
-		WordLength:    5,
-		AttemptsMax:   4,
-		AttemptsLeft:  4,
-		SecretWord:    "VAULT",
-		WordsByID:     map[string]domain.HackCandidate{"A1": {Text: "VAULT"}},
-		AdminModeUsed: true,
-		Columns:       []domain.HackColumn{},
-		Log:           []string{},
+		Level:        2,
+		WordLength:   5,
+		AttemptsMax:  4,
+		AttemptsLeft: 4,
+		SecretWord:   "VAULT",
+		WordsByID:    map[string]domain.HackCandidate{"A1": {Text: "VAULT"}},
+		UsedPatterns: map[string]struct{}{"0:0:1": {}},
+		Columns:      []domain.HackColumn{},
+		Log:          []string{},
 	}
 	public := hack.PublicState(private)
 	live := &domain.PublicLiveState{
@@ -183,7 +188,7 @@ func TestPlayerEnvelopesNeverMarshalPrivateHackFields(t *testing.T) {
 		"hack state":    NewHackStateEnvelope(public),
 	} {
 		raw := marshalEnvelope(t, envelope)
-		for _, forbidden := range []string{"secretWord", "wordsById", "adminModeUsed"} {
+		for _, forbidden := range []string{"secretWord", "wordsById", "usedPatterns", "adminModeUsed", "isAdmin"} {
 			if strings.Contains(string(raw), forbidden) {
 				t.Errorf("%s leaked %q: %s", name, forbidden, raw)
 			}

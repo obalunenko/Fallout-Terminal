@@ -107,16 +107,17 @@ func (service *Service) ApplyHackGuess(targetID string) (*domain.PublicHackState
 	return hack.PublicState(service.live.Hack), true
 }
 
-// ApplyHackAdmin applies the one-time administrator board mutation to an
-// active puzzle.
-func (service *Service) ApplyHackAdmin() (*domain.PublicHackState, bool) {
+// ApplyHackPattern atomically validates and consumes one current pattern.
+func (service *Service) ApplyHackPattern(patternID string) (*domain.PublicHackState, bool) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 	if !activePuzzle(service.live) {
 		return nil, false
 	}
 
-	hack.ApplyAdmin(service.live.Hack, service.random)
+	if !hack.ApplyPattern(service.live.Hack, patternID, service.random) {
+		return nil, false
+	}
 	return hack.PublicState(service.live.Hack), true
 }
 

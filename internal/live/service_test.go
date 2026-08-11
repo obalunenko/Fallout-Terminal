@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
@@ -67,6 +68,34 @@ func TestUpdateRevalidatesNavigationAndPreservesPuzzle(t *testing.T) {
 	}
 }
 
+func TestApplyHackPatternReturnsDetachedAcceptedState(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	initial := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
+	if initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0 {
+		t.Fatalf("Set() pattern state = %#v", initial)
+	}
+	patternID := initial.Hack.Patterns[0].ID
+
+	result, ok := service.ApplyHackPattern(patternID)
+	if !ok || result == nil {
+		t.Fatalf("ApplyHackPattern(%q) = %#v, %t", patternID, result, ok)
+	}
+	used := false
+	for _, pattern := range result.Patterns {
+		if pattern.ID == patternID {
+			used = pattern.Used
+		}
+	}
+	if !used {
+		t.Fatalf("accepted pattern %q was not marked used: %#v", patternID, result.Patterns)
+	}
+	result.Patterns[0].ID = "mutated"
+	snapshot := service.Snapshot()
+	if snapshot == nil || snapshot.Hack == nil || snapshot.Hack.Patterns[0].ID == "mutated" {
+		t.Fatal("public pattern projection mutated canonical state")
+	}
+}
+
 func TestClearAndAbsentActions(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	if service.Snapshot() != nil {
@@ -80,6 +109,9 @@ func TestClearAndAbsentActions(t *testing.T) {
 	}
 	if _, ok := service.ApplyHackGuess("A1"); ok {
 		t.Fatal("ApplyHackGuess() succeeded without a puzzle")
+	}
+	if _, ok := service.ApplyHackPattern("0:0:1"); ok {
+		t.Fatal("ApplyHackPattern() succeeded without a puzzle")
 	}
 
 	service.Set("terminal-1", "Overseer", testTree(), 0, "")
@@ -107,7 +139,10 @@ func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
 				case 1:
 					service.ApplyHackGuess("missing")
 				case 2:
-					service.ApplyHackAdmin()
+					snapshot := service.Snapshot()
+					if snapshot != nil && snapshot.Hack != nil && len(snapshot.Hack.Patterns) > 0 {
+						service.ApplyHackPattern(snapshot.Hack.Patterns[0].ID)
+					}
 				case 3:
 					snapshot := service.Snapshot()
 					if snapshot != nil {
@@ -122,6 +157,49 @@ func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
 	snapshot := service.Snapshot()
 	if snapshot == nil || snapshot.Tree.Name != "ROOT" || len(snapshot.Nav.Path) == 0 || snapshot.Nav.Path[0] != "root" {
 		t.Fatalf("concurrent use corrupted canonical state: %#v", snapshot)
+	}
+}
+
+func TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	initial := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
+	if initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0 {
+		t.Fatalf("Set() pattern state = %#v", initial)
+	}
+	patternID := initial.Hack.Patterns[0].ID
+
+	var accepted atomic.Int32
+	var workers sync.WaitGroup
+	for range 16 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			if _, ok := service.ApplyHackPattern(patternID); ok {
+				accepted.Add(1)
+			}
+		}()
+	}
+	workers.Wait()
+	if accepted.Load() != 1 {
+		t.Fatalf("accepted concurrent actions = %d, want 1", accepted.Load())
+	}
+
+	beforeRejected := service.Snapshot()
+	if _, ok := service.ApplyHackPattern(patternID); ok {
+		t.Fatal("repeated pattern was accepted")
+	}
+	if afterRejected := service.Snapshot(); !reflect.DeepEqual(afterRejected, beforeRejected) {
+		t.Fatalf("repeated pattern changed state\ngot: %#v\nwant: %#v", afterRejected, beforeRejected)
+	}
+
+	fresh := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
+	if fresh == nil || fresh.Hack == nil || len(fresh.Hack.Patterns) == 0 {
+		t.Fatalf("fresh Set() pattern state = %#v", fresh)
+	}
+	for _, pattern := range fresh.Hack.Patterns {
+		if pattern.Used {
+			t.Fatalf("fresh puzzle retained used pattern %#v", pattern)
+		}
 	}
 }
 

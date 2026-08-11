@@ -17,11 +17,12 @@ const (
 	columnChars     = boardRows * boardRowWidth
 	wordGap         = 4
 	placementTries  = 300
-	administrator   = "SUCCESS"
 	maximumAttempts = 4
 )
 
-var fillerPool = []byte("!@#$%^&*()_+-=[]{}\\|;:'\",.<>/?~")
+var fillerPool = []byte("!@#$%^&*_+-=\\|;:'\",./?~")
+
+var patternPairs = [...]string{"()", "[]", "{}", "<>"}
 
 // Random is the small random-number boundary used by board generation.
 type Random interface {
@@ -65,30 +66,43 @@ func GenerateBoard(level int, random Random, words WordSource) *domain.HackState
 		AttemptsMax:  maximumAttempts,
 		AttemptsLeft: maximumAttempts,
 		SecretWord:   candidates[safeIntn(random, len(candidates))],
-		WordsByID:    make(map[string]domain.HackCandidate, len(candidates)+1),
+		WordsByID:    make(map[string]domain.HackCandidate, len(candidates)),
+		UsedPatterns: make(map[string]struct{}),
 		Log:          []string{},
 	}
 
 	columnA := newColumnBuilder("A", random)
 	columnB := newColumnBuilder("B", random)
-	if id, ok := columnB.place(administrator, true, 0); ok {
-		state.WordsByID[id] = domain.HackCandidate{Text: administrator, IsAdmin: true}
-	}
 	for index, text := range candidates {
 		builder := columnA
 		if index%2 != 0 {
 			builder = columnB
 		}
-		id, ok := builder.place(text, false, -1)
+		id, ok := builder.place(text, -1)
 		if !ok {
 			continue
 		}
 		state.WordsByID[id] = domain.HackCandidate{Text: text}
 	}
+	patternTarget := 3 + safeIntn(random, 4)
+	pairOffset := safeIntn(random, len(patternPairs))
+	for index := 0; index < patternTarget; index++ {
+		pair := patternPairs[(pairOffset+index)%len(patternPairs)]
+		primary, secondary := columnA, columnB
+		if index%2 != 0 {
+			primary, secondary = columnB, columnA
+		}
+		if !primary.placePattern(pair) && !secondary.placePattern(pair) {
+			return nil
+		}
+	}
 
 	state.Columns = []domain.HackColumn{
 		columnA.finish(),
 		columnB.finish(),
+	}
+	if len(discoverPatternSpans(state.Columns)) != patternTarget {
+		return nil
 	}
 	return state
 }
@@ -101,10 +115,6 @@ func ApplyGuess(state *domain.HackState, targetID string) {
 	}
 
 	if candidate, ok := state.WordsByID[targetID]; ok {
-		if candidate.IsAdmin {
-			ApplyAdmin(state, nil)
-			return
-		}
 		pushLog(state, candidate.Text)
 		matches := countMatches(candidate.Text, state.SecretWord)
 		if matches == state.WordLength {
@@ -128,56 +138,6 @@ func ApplyGuess(state *domain.HackState, targetID string) {
 	spendAttempt(state, 0)
 }
 
-// ApplyAdmin removes every ordinary candidate except the secret and one
-// random decoy. The compatibility log is emitted on every eligible use, while
-// board mutation occurs only once.
-func ApplyAdmin(state *domain.HackState, random Random) {
-	if state == nil || state.Solved || state.Failed {
-		return
-	}
-	pushLog(state, "Режим администратора активирован.")
-	if state.AdminModeUsed {
-		return
-	}
-	state.AdminModeUsed = true
-	random = randomOrDefault(random)
-
-	candidateIDs := make([]string, 0, len(state.WordsByID))
-	secretID := ""
-	for _, column := range state.Columns {
-		for _, word := range column.Words {
-			candidate, exists := state.WordsByID[word.ID]
-			if !exists || candidate.IsAdmin {
-				continue
-			}
-			candidateIDs = append(candidateIDs, word.ID)
-			if secretID == "" && candidate.Text == state.SecretWord {
-				secretID = word.ID
-			}
-		}
-	}
-	if secretID == "" && len(candidateIDs) > 0 {
-		secretID = candidateIDs[0]
-	}
-
-	decoys := make([]string, 0, len(candidateIDs))
-	for _, id := range candidateIDs {
-		if id != secretID {
-			decoys = append(decoys, id)
-		}
-	}
-	decoyID := ""
-	if len(decoys) > 0 {
-		decoyID = decoys[safeIntn(random, len(decoys))]
-	}
-	for _, id := range candidateIDs {
-		if id == secretID || id == decoyID {
-			continue
-		}
-		dotCandidate(state, id)
-	}
-}
-
 // ForceSuccess solves a currently active puzzle without spending an attempt.
 func ForceSuccess(state *domain.HackState) {
 	if state == nil || state.Solved || state.Failed {
@@ -186,6 +146,45 @@ func ForceSuccess(state *domain.HackState) {
 	pushLog(state, state.SecretWord)
 	state.Solved = true
 	pushSuccessLog(state)
+}
+
+// ApplyPattern consumes one currently valid coordinate span and applies
+// exactly one shared effect. Invalid, stale, repeated, and terminal-state
+// actions leave the aggregate unchanged.
+func ApplyPattern(state *domain.HackState, patternID string, random Random) bool {
+	if state == nil || state.Solved || state.Failed {
+		return false
+	}
+	found := false
+	for _, pattern := range discoverPatternSpans(state.Columns) {
+		if pattern.ID == patternID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	if state.UsedPatterns == nil {
+		state.UsedPatterns = make(map[string]struct{})
+	}
+	if _, used := state.UsedPatterns[patternID]; used {
+		return false
+	}
+	state.UsedPatterns[patternID] = struct{}{}
+	random = randomOrDefault(random)
+
+	decoys := incorrectCandidateIDs(state)
+	if len(decoys) == 0 || safeIntn(random, 100) >= 80 {
+		state.AttemptsLeft = state.AttemptsMax
+		pushLog(state, "Попытки восстановлены.")
+		return true
+	}
+
+	dudID := decoys[safeIntn(random, len(decoys))]
+	dotCandidate(state, dudID)
+	pushLog(state, "Ложное слово удалено.")
+	return true
 }
 
 // PublicState creates a detached client-safe projection of private state.
@@ -202,6 +201,7 @@ func PublicState(state *domain.HackState) *domain.PublicHackState {
 		Failed:       state.Failed,
 		Log:          append([]string(nil), state.Log...),
 		Columns:      make([]domain.HackColumn, len(state.Columns)),
+		Patterns:     discoverPatterns(state.Columns, state.UsedPatterns),
 	}
 	for index, column := range state.Columns {
 		public.Columns[index] = column
@@ -230,7 +230,7 @@ func newColumnBuilder(prefix string, random Random) *columnBuilder {
 	}
 }
 
-func (builder *columnBuilder) place(text string, admin bool, requestedStart int) (string, bool) {
+func (builder *columnBuilder) place(text string, requestedStart int) (string, bool) {
 	start := requestedStart
 	if start < 0 {
 		start = builder.randomStart(len(text))
@@ -245,9 +245,50 @@ func (builder *columnBuilder) place(text string, admin bool, requestedStart int)
 		builder.used[index] = true
 	}
 	builder.words = append(builder.words, domain.HackWord{
-		ID: id, Start: start, Length: len(text), IsAdmin: admin,
+		ID: id, Start: start, Length: len(text),
 	})
 	return id, true
+}
+
+func (builder *columnBuilder) placePattern(pair string) bool {
+	if len(pair) != 2 {
+		return false
+	}
+	startsPerRow := boardRowWidth - 1
+	limit := boardRows * startsPerRow
+	for attempt := 0; attempt < placementTries; attempt++ {
+		candidate := safeIntn(builder.random, limit)
+		row := candidate / startsPerRow
+		column := candidate % startsPerRow
+		start := row*boardRowWidth + column
+		if builder.canPlacePattern(start) {
+			builder.writePattern(start, pair)
+			return true
+		}
+	}
+	for row := 0; row < boardRows; row++ {
+		for column := 0; column < startsPerRow; column++ {
+			start := row*boardRowWidth + column
+			if builder.canPlacePattern(start) {
+				builder.writePattern(start, pair)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (builder *columnBuilder) canPlacePattern(start int) bool {
+	return start >= 0 && start+1 < len(builder.used) &&
+		start/boardRowWidth == (start+1)/boardRowWidth &&
+		!builder.used[start] && !builder.used[start+1]
+}
+
+func (builder *columnBuilder) writePattern(start int, pair string) {
+	builder.chars[start] = pair[0]
+	builder.chars[start+1] = pair[1]
+	builder.used[start] = true
+	builder.used[start+1] = true
 }
 
 func (builder *columnBuilder) randomStart(length int) int {
@@ -357,6 +398,68 @@ func dotCandidate(state *domain.HackState, id string) {
 			return
 		}
 	}
+}
+
+func incorrectCandidateIDs(state *domain.HackState) []string {
+	ids := make([]string, 0, len(state.WordsByID))
+	for _, column := range state.Columns {
+		for _, word := range column.Words {
+			candidate, exists := state.WordsByID[word.ID]
+			if exists && candidate.Text != state.SecretWord {
+				ids = append(ids, word.ID)
+			}
+		}
+	}
+	return ids
+}
+
+func discoverPatterns(columns []domain.HackColumn, used map[string]struct{}) []domain.PublicHackPattern {
+	spans := discoverPatternSpans(columns)
+	patterns := make([]domain.PublicHackPattern, len(spans))
+	for index, span := range spans {
+		_, wasUsed := used[span.ID]
+		patterns[index] = domain.PublicHackPattern{
+			ID: span.ID, Column: span.Column, Start: span.Start, End: span.End, Pair: span.Pair, Used: wasUsed,
+		}
+	}
+	return patterns
+}
+
+func discoverPatternSpans(columns []domain.HackColumn) []domain.HackPattern {
+	closers := map[byte]byte{'(': ')', '[': ']', '{': '}', '<': '>'}
+	patterns := make([]domain.HackPattern, 0)
+	for columnIndex, column := range columns {
+		text := column.Text
+		for rowStart := 0; rowStart < len(text); rowStart += boardRowWidth {
+			rowEnd := min(rowStart+boardRowWidth, len(text))
+			for start := rowStart; start < rowEnd; start++ {
+				closer, isOpening := closers[text[start]]
+				if !isOpening {
+					continue
+				}
+				relativeEnd := strings.IndexByte(text[start+1:rowEnd], closer)
+				if relativeEnd < 0 {
+					continue
+				}
+				end := start + 1 + relativeEnd
+				if strings.IndexFunc(text[start+1:end], isASCIIAlpha) >= 0 {
+					continue
+				}
+				patterns = append(patterns, domain.HackPattern{
+					ID:     fmt.Sprintf("%d:%d:%d", columnIndex, start, end),
+					Column: columnIndex,
+					Start:  start,
+					End:    end,
+					Pair:   string([]byte{text[start], closer}),
+				})
+			}
+		}
+	}
+	return patterns
+}
+
+func isASCIIAlpha(value rune) bool {
+	return value >= 'A' && value <= 'Z' || value >= 'a' && value <= 'z'
 }
 
 func parseFillerTarget(target string) (int, int, bool) {

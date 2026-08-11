@@ -29,21 +29,28 @@ func TestServerConvergesFourThroughSevenClients(t *testing.T) {
 			server := startTestServer(t, service, counts.Add, 16)
 
 			clients := make([]*websocket.Conn, 0, clientTotal)
+			patternID := ""
 			for range clientTotal {
 				connection := dialPlayer(t, server.Info().URL)
 				clients = append(clients, connection)
 				message := readMessage(t, connection)
-				if message.Type != MessageTerminalLive || message.Nav == nil || !reflect.DeepEqual(message.Nav.Path, []string{"root"}) {
+				if message.Type != MessageTerminalLive || message.Nav == nil || message.Hack == nil || len(message.Hack.Patterns) == 0 || !reflect.DeepEqual(message.Nav.Path, []string{"root"}) {
 					t.Fatalf("initial message = %#v", message)
+				}
+				if patternID == "" {
+					patternID = message.Hack.Patterns[0].ID
 				}
 			}
 			waitForCount(t, counts, clientTotal)
 
-			writeJSON(t, clients[0], map[string]any{"type": MessageHackAdmin})
-			adminState := readConvergedMessages(t, clients, MessageHackState)
-			candidateID := firstCandidateID(adminState.Hack)
+			writeJSON(t, clients[0], map[string]any{"type": MessageHackPattern, "patternId": patternID})
+			patternState := readConvergedMessages(t, clients, MessageHackState)
+			if !publicPatternUsed(patternState.Hack, patternID) {
+				t.Fatalf("pattern state did not converge as used: %#v", patternState.Hack)
+			}
+			candidateID := firstCandidateID(patternState.Hack)
 			if candidateID == "" {
-				t.Fatal("administrator state contained no guessable candidate")
+				t.Fatal("pattern state contained no guessable candidate")
 			}
 			writeJSON(t, clients[1], map[string]any{"type": MessageHackGuess, "targetId": candidateID})
 			readConvergedMessages(t, clients, MessageHackState)
@@ -218,7 +225,7 @@ func TestServerRejectsPortAlreadyOwnedOnConfiguredIPv4Interface(t *testing.T) {
 	}
 }
 
-func TestPlayerHackActionPublishesPublicCallback(t *testing.T) {
+func TestPlayerPatternActionPublishesPublicCallback(t *testing.T) {
 	service := live.New(&serverRandom{values: []int{0}}, serverWords{})
 	service.Set("terminal-1", "Overseer", serverTree(), 1, "WELCOME")
 	states := make(chan *domain.PublicHackState, 1)
@@ -243,21 +250,82 @@ func TestPlayerHackActionPublishesPublicCallback(t *testing.T) {
 
 	connection := dialPlayer(t, server.Info().URL)
 	snapshot := readMessage(t, connection)
-	if snapshot.Type != MessageTerminalLive {
+	if snapshot.Type != MessageTerminalLive || snapshot.Hack == nil || len(snapshot.Hack.Patterns) == 0 {
 		t.Fatalf("initial message = %#v", snapshot)
 	}
-	writeJSON(t, connection, map[string]any{"type": MessageHackAdmin})
+	patternID := snapshot.Hack.Patterns[0].ID
+	writeJSON(t, connection, map[string]any{"type": MessageHackPattern, "patternId": patternID})
 	if message := readMessage(t, connection); message.Type != MessageHackState {
 		t.Fatalf("hack broadcast = %#v", message)
 	}
 	select {
 	case state := <-states:
-		if state == nil || state.Level != 1 {
+		if state == nil || state.Level != 1 || !publicPatternUsed(state, patternID) {
 			t.Fatalf("hack callback = %#v", state)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("player hack action did not reach public callback")
 	}
+}
+
+func TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState(t *testing.T) {
+	service := live.New(&serverRandom{values: []int{1, 0}}, serverWords{})
+	service.Set("terminal-1", "Overseer", serverTree(), 1, "WELCOME")
+	server := startTestServer(t, service, nil, 8)
+
+	first := dialPlayer(t, server.Info().URL)
+	defer first.CloseNow()
+	second := dialPlayer(t, server.Info().URL)
+	initialFirst := readMessage(t, first)
+	readMessage(t, second)
+	if initialFirst.Hack == nil || len(initialFirst.Hack.Patterns) == 0 {
+		t.Fatalf("initial pattern state = %#v", initialFirst)
+	}
+	patternID := initialFirst.Hack.Patterns[0].ID
+	writeJSON(t, first, map[string]any{"type": MessageHackPattern, "patternId": patternID})
+	accepted := readConvergedMessages(t, []*websocket.Conn{first, second}, MessageHackState)
+	if !publicPatternUsed(accepted.Hack, patternID) {
+		t.Fatalf("accepted state = %#v", accepted.Hack)
+	}
+
+	_ = second.Close(websocket.StatusNormalClosure, "reconnect")
+	reconnected := dialPlayer(t, server.Info().URL)
+	defer reconnected.CloseNow()
+	snapshot := readMessage(t, reconnected)
+	if snapshot.Type != MessageTerminalLive || !reflect.DeepEqual(snapshot.Hack, accepted.Hack) {
+		t.Fatalf("reconnect hack state = %#v, want %#v", snapshot.Hack, accepted.Hack)
+	}
+
+	if _, ok := service.ForceHackSuccess(); !ok {
+		t.Fatal("ForceHackSuccess() rejected active puzzle")
+	}
+	server.PublishHack()
+	readMessage(t, first)
+	readMessage(t, reconnected)
+	writeJSON(t, first, map[string]any{"type": MessageHackPattern, "patternId": patternID})
+	assertNoPlayerMessage(t, first)
+	assertNoPlayerMessage(t, reconnected)
+}
+
+func assertNoPlayerMessage(t *testing.T, connection *websocket.Conn) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	if _, _, err := connection.Read(ctx); err == nil {
+		t.Fatal("unexpected player broadcast")
+	}
+}
+
+func publicPatternUsed(state *domain.PublicHackState, patternID string) bool {
+	if state == nil {
+		return false
+	}
+	for _, pattern := range state.Patterns {
+		if pattern.ID == patternID {
+			return pattern.Used
+		}
+	}
+	return false
 }
 
 type serverMessage struct {
@@ -291,9 +359,7 @@ func firstCandidateID(state *domain.PublicHackState) string {
 	}
 	for _, column := range state.Columns {
 		for _, word := range column.Words {
-			if !word.IsAdmin {
-				return word.ID
-			}
+			return word.ID
 		}
 	}
 	return ""

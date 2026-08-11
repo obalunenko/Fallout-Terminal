@@ -586,7 +586,7 @@ func (app *App) captureSessionStatus(commands sessionCommands) {
 }
 
 // updateHackState is also the player-server callback boundary for accepted
-// HACK_GUESS and HACK_ADMIN actions. Only the detached public projection enters
+// HACK_GUESS and HACK_PATTERN actions. Only the detached public projection enters
 // RuntimeStatus or crosses the desktop event bridge.
 func (app *App) updateHackState(state *domain.PublicHackState) {
 	clone := clonePublicHackState(state)
@@ -631,6 +631,7 @@ func clonePublicHackState(state *domain.PublicHackState) *domain.PublicHackState
 	}
 	clone := *state
 	clone.Log = append([]string(nil), state.Log...)
+	clone.Patterns = append([]domain.PublicHackPattern(nil), state.Patterns...)
 	clone.Columns = make([]domain.HackColumn, len(state.Columns))
 	for index, column := range state.Columns {
 		clone.Columns[index] = column

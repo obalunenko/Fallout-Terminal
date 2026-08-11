@@ -293,8 +293,8 @@ func (server *Server) handleClientMessage(message ClientMessage) {
 			server.broadcast(NewHackStateEnvelope(state))
 			server.emitHackState(state)
 		}
-	case MessageHackAdmin:
-		if state, ok := server.config.Live.ApplyHackAdmin(); ok {
+	case MessageHackPattern:
+		if state, ok := server.config.Live.ApplyHackPattern(message.PatternID); ok {
 			server.broadcast(NewHackStateEnvelope(state))
 			server.emitHackState(state)
 		}

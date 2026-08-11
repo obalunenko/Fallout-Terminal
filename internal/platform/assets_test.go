@@ -333,6 +333,71 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 	}
 }
 
+func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"HACK_ADMIN", "val === '1'", "SUCCESS"} {
+		if strings.Contains(string(playerScript), forbidden) {
+			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
+		}
+	}
+}
+
+func TestPlayerHackingPatternInteractionContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	playerScript := string(raw)
+	for _, required := range []string{
+		"function patternAtOpening(cell)",
+		"(hack.patterns || [])",
+		"index >= pattern.start && index <= pattern.end",
+		"column.text.slice(pattern.start, pattern.end + 1)",
+		"if (pattern.used) setHackPatternHover(null)",
+		"send({ type: 'HACK_PATTERN', patternId: pattern.id })",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("bundled player is missing pattern interaction contract %q", required)
+		}
+	}
+}
+
+func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(parts ...string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	masterHTML := read("frontend", "src", "index.html")
+	masterJS := read("frontend", "src", "master.js")
+	playerJS := read("client", "client.js")
+	for _, required := range []string{`id="btnHackSuccess"`, "desktopAPI.forceHackSuccess()", "h.solved || h.failed"} {
+		if !strings.Contains(masterHTML+masterJS, required) {
+			t.Errorf("game-master bundle is missing solve-control contract %q", required)
+		}
+	}
+	for _, forbidden := range []string{"forceHackSuccess", "ForceHackSuccess"} {
+		if strings.Contains(playerJS, forbidden) {
+			t.Errorf("player bundle gained game-master solve authority %q", forbidden)
+		}
+	}
+}
+
 func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 	t.Parallel()
 
