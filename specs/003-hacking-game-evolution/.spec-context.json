@@ -538,9 +538,210 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-11T14:39:36.523Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T15:12:03.222Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:12:49.572Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:13:23.217Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:14:26.874Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:15:41.188Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:16:18.225Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:16:36.036Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:17:09.771Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:17:53.662Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T15:39:41.793Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:40:55.984Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T16:34:25.187Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:18.182Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:27.223Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:38.554Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:51.379Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:09.049Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:15.571Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:24.895Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:37.143Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:37:22.816Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:38:06.634Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:38:44.356Z",
+      "reopened": true
     }
   ],
-  "last_action": "all Phase 10 tasks done — Go, race, browser, syntax, vet, formatting, and frontend build pass",
+  "last_action": "all tasks done — Go, race, syntax, Playwright 3/3, frontend build, and diff checks pass; Electron smoke recorded unavailable",
   "coverage": {
     "FR-001": {
       "title": "Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.",
@@ -777,9 +978,7 @@
         "T033"
       ],
       "tests": [
-        "internal/live/service_test.go::TestApplyHackPatternReturnsDetachedAcceptedState",
-        "internal/player/server_test.go::TestServerConvergesFourThroughSevenClients",
-        "internal/player/server_test.go::TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState"
+        "internal/hack/hack_test.go::TestGeneratedBoardsAtEveryDifficultyContainThreeThroughSixValidPatterns"
       ]
     },
     "FR-021": {
@@ -1480,6 +1679,50 @@
         "internal/platform/assets_test.go",
         "tests/browser/hacking-camouflage.spec.mjs"
       ]
+    },
+    "FR-084": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-085": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-086": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-087": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-088": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ],
+      "title": "Non-opening delimiter symbols use HACK_GUESS logging and attempt behavior and never send HACK_PATTERN.",
+      "tasks": [
+        "T055"
+      ]
+    },
+    "SC-018": {
+      "title": "Browser and domain tests prove invalid delimiter targets use ordinary individual interaction and send zero HACK_PATTERN requests.",
+      "tasks": [
+        "T055"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs::invalid delimiter categories remain ordinary individual targets"
+      ]
     }
   },
   "size": "oversized",
@@ -1616,6 +1859,25 @@
       "decision": "Reject non-ASCII-alphabetic injected candidate placeholders and supplement from the built-in word bank",
       "why": "Published word-interrupted spans must contain alphabetic candidate content and scanner semantics are ASCII alphabetic",
       "rejected": "Count numeric placeholder content as alphabetic interruption"
+    },
+    {
+      "decision": "Resolve whole-pattern interaction only when a cell exactly matches a current pattern start, while keeping start-to-end solely as the highlight span",
+      "why": "This preserves stacked-pattern identity and makes every non-opening cell follow ordinary filler behavior as required by BUG-001",
+      "rejected": "Inclusive span hit-testing, which incorrectly captured interior and closing cells"
+    },
+    {
+      "decision": "Reserve current pattern openings in canonical ApplyGuess by consulting production discovery, but allow every other delimiter coordinate through the existing filler path",
+      "why": "The server remains authoritative even for crafted HACK_GUESS messages without maintaining a second validity model",
+      "rejected": "Blanket delimiter rejection or browser-only enforcement"
+    },
+    {
+      "decision": "Use controlled 12-character board rows and table-driven targets to mirror production delimiter discovery categories; no production change was needed because ordinary fallback behavior is already generic.",
+      "why": "This isolates unmatched, mismatched, and first-compatible-closer semantics while proving the existing implementation satisfies SC-018."
+    },
+    {
+      "decision": "Make the existing 1,000-board gate explicitly enumerate all five configured hacking difficulties",
+      "why": "FR-020 requires the same initial 3-6 pattern invariant at every supported level",
+      "rejected": "A separate duplicate generator test with weaker camouflage coverage"
     }
   ],
   "step_summaries": {
@@ -1627,7 +1889,9 @@
       "summary": "21 corrective tasks across foundational work, five user-story phases, and one success-criteria validation phase"
     },
     "implement": {
-      "summary": "Shipped publishable board camouflage, inert delimiter behavior, and executable browser coverage with all validation gates passing"
+      "summary": "Revalidated BUG-001 opening-only pattern activation, completed SC-018 fixtures and all-difficulties generation coverage, and passed the full automated gate",
+      "key_finding": "The existing production implementation already routes every non-selected delimiter coordinate through ordinary HACK_GUESS behavior, so only explicit regression fixtures were required.",
+      "risks": "No remaining implementation risks identified."
     }
   },
   "currentTask": "T054",
@@ -1845,7 +2109,7 @@
     },
     "T031": {
       "status": "DONE",
-      "did": "Added player asset contract assertions for row-local inclusive interaction, opaque pattern IDs, used state, and removal of private column/pair dependencies.",
+      "did": "Validated opening-only pattern lookup, inclusive highlighting, individual non-opening dispatch, and opaque pattern IDs",
       "files": [
         "internal/platform/assets_test.go"
       ]
@@ -1860,7 +2124,7 @@
     },
     "T033": {
       "status": "DONE",
-      "did": "Replaced column-based special-pattern interaction with rendered-row and row-local inclusive offsets while echoing the opaque server pattern ID.",
+      "did": "Validated row/start-only browser pattern resolution, inclusive highlight spans, ordinary non-opening guesses, opaque IDs, and no optimistic mutation",
       "files": [
         "client/client.js"
       ]
@@ -1967,7 +2231,7 @@
     },
     "T048": {
       "status": "DONE",
-      "did": "Made browser pattern hover and click lookup inclusive with exact-opening priority and added asset-contract coverage",
+      "did": "Validated convergence of start-only browser hit resolution, inclusive highlighting, and individual non-opening filler selection",
       "files": [
         "client/client.js",
         "internal/platform/assets_test.go"
@@ -1975,14 +2239,14 @@
     },
     "T049": {
       "status": "DONE",
-      "did": "Added 1,000-board camouflage, scanner fixture, accidental-pattern, projection, inert-decoy, candidate, and rediscovery regressions",
+      "did": "Validated 1,000-board camouflage, decoy classification, ordinary delimiter guesses, candidate selection, and post-dud rediscovery",
       "files": [
         "internal/hack/hack_test.go"
       ]
     },
     "T050": {
       "status": "DONE",
-      "did": "Added bundled-player contracts for valid-only lookup, inert delimiters, ordinary guesses, and static style parity",
+      "did": "Validated opening-only pattern dispatch, ordinary delimiter and non-opening dispatch, and static player styling parity",
       "files": [
         "internal/platform/assets_test.go",
         "client/client.css"
@@ -1990,13 +2254,12 @@
     },
     "T051": {
       "status": "DONE",
-      "did": "Added exactly pinned Playwright harness with controlled snapshots for valid, decoy, candidate, style, no-optimism, and post-dud interactions",
+      "did": "Validated pinned Playwright fixtures for opening-only activation, individual delimiters, styling parity, no optimistic mutation, and dud-created patterns",
       "files": [
         "tests/browser/package.json",
         "tests/browser/package-lock.json",
         "tests/browser/playwright.config.mjs",
-        "tests/browser/hacking-camouflage.spec.mjs",
-        ".gitignore"
+        "tests/browser/hacking-camouflage.spec.mjs"
       ]
     },
     "T052": {
@@ -2009,16 +2272,37 @@
     },
     "T053": {
       "status": "DONE",
-      "did": "Made delimiter targets inert in canonical guessing and browser hover, focus, and click dispatch while preserving valid patterns and ordinary guesses",
+      "did": "Validated canonical HACK_GUESS handling for standalone and non-opening symbols, reserved pattern starts, and matching browser dispatch; CSS required no change",
       "files": [
         "internal/hack/hack.go",
-        "client/client.js",
-        "internal/platform/assets_test.go"
+        "client/client.js"
       ]
     },
     "T054": {
       "status": "DONE",
-      "did": "Passed formatting, vet, full and race Go suites, browser syntax and interaction tests, frontend build, and SC-003/004/014-017 verification",
+      "did": "Passed formatting, vet, full Go and race suites, JS syntax, Playwright 3/3, frontend build, difficulty-invariant generation, and diff hygiene; Electron smoke accurately recorded unavailable",
+      "files": [
+        "."
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Validated domain and executable-browser fixtures for unmatched, mismatched, word-interrupted, and later-closer delimiter targets under SC-018",
+      "files": [
+        "internal/hack/hack_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Made the 1,000-board generator gate explicitly iterate all five configured difficulties and assert the invariant 3-6 pattern count",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Ran npm start and recorded UNAVAILABLE: the post-cutover repository has no root package.json or Electron baseline, so no smoke pass was claimed",
       "files": [
         "."
       ]
@@ -2122,11 +2406,48 @@
       "warnings": [
         "Static fixture server returns expected 404 responses for optional sound APIs"
       ]
+    },
+    {
+      "what": "Go formatting and static analysis",
+      "result": "passed",
+      "command": "gofmt -l .; go vet ./..."
+    },
+    {
+      "what": "Go unit and race suites",
+      "result": "passed",
+      "command": "go test ./...; go test -race ./..."
+    },
+    {
+      "what": "Player JavaScript syntax and frontend build",
+      "result": "passed",
+      "command": "node --check client/client.js client/sound.js frontend/src/*.js frontend/vite.config.js tests/browser/*.mjs; npm --prefix frontend run build"
+    },
+    {
+      "what": "Controlled browser interaction suite",
+      "result": "3 passed",
+      "command": "npm --prefix tests/browser test",
+      "warnings": "The static fixture server returns expected 404 responses for sound API routes; media playback is stubbed and all assertions pass."
+    },
+    {
+      "what": "Electron behavioral smoke",
+      "command": "npm start",
+      "result": "UNAVAILABLE: no root package.json exists in the post-cutover repository; no pass claimed",
+      "warnings": [
+        "Electron baseline is absent"
+      ]
     }
   ],
   "concerns": [
     {
       "note": "Socket integration tests could not bind inside the filesystem sandbox; they were rerun successfully with approved localhost access",
+      "step": "implement"
+    },
+    {
+      "note": "Full player-server tests require loopback listeners, which the default sandbox denied; rerunning the unchanged suites with approved local-listener permission passed",
+      "step": "implement"
+    },
+    {
+      "note": "The constitution-requested npm start smoke is unavailable because the post-cutover repository has no root package.json or Electron runtime; the result is recorded without claiming success",
       "step": "implement"
     }
   ]

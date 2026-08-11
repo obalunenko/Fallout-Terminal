@@ -2,7 +2,6 @@
 
 const MODE = { LIST: 'list', ENTRY: 'entry', HACK: 'hack' };
 const ROW_WIDTH = 12; // must match server/hack.js
-const HACK_DELIMITERS = '()[]{}<>';
 
 // ── State ─────────────────────────────────────────────────
 // navStack / mode(list|entry) / viewEntryId / commandOutput are mirrors of
@@ -297,16 +296,9 @@ function patternAtCell(cell) {
   if (!hack || !cell || cell.dataset.row == null || cell.dataset.offset == null) return null;
   const row = Number(cell.dataset.row);
   const offset = Number(cell.dataset.offset);
-  const matches = (hack.patterns || []).filter(pattern =>
-    pattern.row === row && offset >= pattern.start && offset <= pattern.end
-  );
-  return matches.find(pattern => pattern.start === offset) ||
-    matches.reduce((nearest, pattern) => !nearest || pattern.start > nearest.start ? pattern : nearest, null);
-}
-
-function isDelimiterCell(cell) {
-  return !!cell && cell.classList.contains('filler') &&
-    cell.textContent.length === 1 && HACK_DELIMITERS.includes(cell.textContent);
+  return (hack.patterns || []).find(pattern =>
+    pattern.row === row && pattern.start === offset
+  ) || null;
 }
 
 function setHackPatternHover(pattern) {
@@ -337,10 +329,6 @@ function previewHackCell(cell) {
     if (pattern.used) setHackPatternHover(null);
     else setHackPatternHover(pattern);
     if (!pattern.used) playMultiple();
-    return;
-  }
-  if (isDelimiterCell(cell)) {
-    setHackPatternHover(null);
     return;
   }
   const key = cell.dataset.target;
@@ -375,12 +363,11 @@ hackColumns.addEventListener('click', (e) => {
   if (pattern && !pattern.used) {
     playEnter();
     send({ type: 'HACK_PATTERN', patternId: pattern.id });
-  } else if (pattern || isDelimiterCell(cell)) {
     return;
-  } else {
-    playEnter();
-    send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
   }
+  if (pattern) return;
+  playEnter();
+  send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
 });
 
 // ════════════════════════════════════════════════════

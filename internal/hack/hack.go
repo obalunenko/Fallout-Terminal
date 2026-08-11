@@ -169,8 +169,10 @@ func ApplyGuess(state *domain.HackState, targetID string) {
 	if characterIndex >= len(column.Text) || containsWord(column.Words, characterIndex) {
 		return
 	}
-	if isDelimiter(column.Text[characterIndex]) {
-		return
+	for _, pattern := range discoverPatternSpans(state.GenerationID, state.Columns) {
+		if pattern.ColumnIndex == columnIndex && pattern.AbsoluteStart == characterIndex {
+			return
+		}
 	}
 	pushLog(state, string(column.Text[characterIndex]))
 	spendAttempt(state, 0)

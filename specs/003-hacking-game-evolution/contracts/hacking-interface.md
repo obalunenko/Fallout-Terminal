@@ -1,5 +1,7 @@
 # Hacking Interface Contract: Phase 1 Generation-Bound Patterns
 
+**Bugfix**: 2026-08-11 — BUG-001 retained the `HACK_GUESS` wire shape while extending filler eligibility to delimiters and restricting pattern interaction to `start`.
+
 ## Scope
 
 This contract governs the player WebSocket pattern request, the public pattern projection carried by existing hack snapshots, ordered publication, reconnect behavior, and the separation of the trusted game-master solve control. It does not add a route, protocol version, session role, persisted puzzle, terminal switch, or presentation redesign.
@@ -18,7 +20,7 @@ This contract governs the player WebSocket pattern request, the public pattern p
 
 ## Player-to-Server Messages
 
-### `HACK_GUESS` — retained unchanged
+### `HACK_GUESS` — retained wire shape; delimiter eligibility expanded by BUG-001
 
 ```json
 {
@@ -27,7 +29,7 @@ This contract governs the player WebSocket pattern request, the public pattern p
 }
 ```
 
-`targetId` remains a non-blank candidate ID or the existing filler coordinate. Candidate validation, likeness, attempt spending, log messages, success, failure, and filler-click behavior do not change. There is no generated administrator candidate.
+`targetId` remains a non-blank candidate ID or the existing filler coordinate. Candidate validation, likeness, attempt spending, log messages, success, failure, and filler-click behavior do not change. Under BUG-001, an existing filler coordinate is valid for standalone delimiter glyphs and non-opening filler glyphs inside a valid pattern span; a current pattern's opening coordinate remains reserved for pattern handling. There is no generated administrator candidate.
 
 ### `HACK_PATTERN` — generation-bound opaque identity
 
@@ -112,13 +114,13 @@ Existing hack and column fields retain their current behavior. For each currentl
 |---|---|
 | `id` | Stable opaque identity containing or resolving to `generationId + row + inclusive start + inclusive end` |
 | `row` | Zero-based rendered-row ordinal in canonical column render order |
-| `start` | Zero-based inclusive opening-character offset within that row |
-| `end` | Zero-based inclusive closing-character offset within that row |
+| `start` | Zero-based inclusive opening-character offset within that row and sole coordinate eligible for pattern handling |
+| `end` | Zero-based inclusive closing-character offset within that row; completes the highlight/effect span but is not a pattern hit target |
 | `used` | `false` when currently available; `true` when this complete identity has already been accepted |
 
 The array is sorted by `row`, `start`, then `end`. It may exceed six after the first player action. A currently discovered used span remains present with `used: true`; a used span that is not currently valid remains only in private history and reappears as used if later rediscovered.
 
-The pattern object must not contain `column`, `pair`, a separately editable `generationId`, password or dud facts, a future outcome, random values, private candidate metadata, delimiter-decoy metadata, or any reference to canonical slices, maps, or objects. Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters remain ordinary rendered characters and receive no pattern object or identity.
+The pattern object must not contain `column`, `pair`, a separately editable `generationId`, password or dud facts, a future outcome, random values, private candidate metadata, delimiter-decoy metadata, or any reference to canonical slices, maps, or objects. Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters remain individually selectable ordinary rendered characters and receive no pattern object or identity.
 
 ### `TERMINAL_LIVE` — reconnect snapshot retained
 
@@ -156,14 +158,14 @@ The publication callback is owned by the player boundary. It serializes and enqu
 ## Player UI Contract
 
 - The browser consumes `hack.patterns`; it never performs canonical discovery or effect selection.
-- Each rendered hacking cell exposes its canonical rendered-row ordinal and row-local character offset for lookup and inclusive highlighting.
+- Each rendered hacking cell exposes its canonical rendered-row ordinal and row-local character offset. Pattern lookup resolves only at `start`; the resolved pattern still supplies inclusive `start`-through-`end` highlighting.
 - Hovering an unused pattern opening highlights `start` through `end` on `row`, inclusive, and previews that board substring.
 - Different openings sharing one closer remain different targets because their `start` values and opaque IDs differ.
 - A used current pattern does not highlight and does not fall through to `HACK_GUESS` when clicked; the server remains authoritative if a repeated request is sent.
 - Clicking an available opening sends only `{type: "HACK_PATTERN", patternId: pattern.id}`. Clicking an ordinary candidate, including a candidate inside an alphabetic-interrupted delimiter span, retains existing `HACK_GUESS` behavior.
-- Hovering, focusing, or clicking a rendered delimiter outside every current projected pattern range produces no highlight, preview, `HACK_PATTERN`, `HACK_GUESS`, attempt consumption, or puzzle-state change. Canonical filler-target handling also rejects such a direct delimiter target without mutation.
-- Clicking ordinary non-delimiter filler retains existing `HACK_GUESS` behavior.
-- Valid delimiter endpoints and delimiter decoys use identical static color, brightness, font, CRT effect, and persistent classes. Only transient valid-pattern hover, focus, or selection feedback may distinguish them.
+- ~~Hovering, focusing, or clicking a rendered delimiter outside every current projected pattern range produces no highlight, preview, `HACK_PATTERN`, `HACK_GUESS`, attempt consumption, or puzzle-state change. Canonical filler-target handling also rejects such a direct delimiter target without mutation.~~ **Superseded by BUG-001**: standalone delimiters and non-opening filler cells inside a current pattern span receive ordinary individual highlight/preview; clicking sends `HACK_GUESS`, and canonical filler handling applies the established log and attempt behavior. They never send `HACK_PATTERN`.
+- Clicking ordinary ~~non-delimiter~~ filler retains existing `HACK_GUESS` behavior unless the cell is a current pattern's opening coordinate. A used current pattern opening retains its existing unavailable behavior and does not fall through to `HACK_GUESS`.
+- Valid delimiter endpoints and delimiter decoys use identical static color, brightness, font, CRT effect, and persistent classes. Only transient whole-span feedback from hovering, focusing, or selecting a current unused pattern's opening coordinate may distinguish a valid pattern.
 - After dud removal replaces an alphabetic-interrupted candidate with periods, the browser treats the span as actionable only after the server's next valid-only pattern projection includes it.
 - The browser changes no board, attempts, log, pattern status, or outcome until a server snapshot arrives.
 

@@ -165,11 +165,13 @@ func TestApplyGuessTransitions(t *testing.T) {
 	})
 }
 
-func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
+func TestGeneratedBoardsAtEveryDifficultyContainThreeThroughSixValidPatterns(t *testing.T) {
+	configuredLevels := []int{1, 2, 3, 4, 5}
+	const boardsPerLevel = 200
 	seenPairs := map[string]bool{}
 	generated := 0
-	for level := 1; level <= 5; level++ {
-		for iteration := 0; iteration < 200; iteration++ {
+	for _, level := range configuredLevels {
+		for iteration := 0; iteration < boardsPerLevel; iteration++ {
 			generationID := fmt.Sprintf("generation-%d-%d", level, iteration)
 			state := GenerateBoard(generationID, level, newSequenceRandom(), &recordingWordSource{})
 			if state == nil {
@@ -224,8 +226,9 @@ func TestGeneratedBoardsContainThreeThroughSixValidPatterns(t *testing.T) {
 			}
 		}
 	}
-	if generated != 1000 {
-		t.Fatalf("generated boards = %d, want exactly 1000", generated)
+	wantGenerated := len(configuredLevels) * boardsPerLevel
+	if generated != wantGenerated {
+		t.Fatalf("generated boards = %d, want exactly %d across all configured difficulties", generated, wantGenerated)
 	}
 	for _, pair := range []string{"()", "[]", "{}", "<>"} {
 		if !seenPairs[pair] {
@@ -282,16 +285,64 @@ func TestFinalBoardClassificationCountsAccidentalPatternsAndOnlyStandaloneDecoys
 	}
 }
 
-func TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable(t *testing.T) {
-	t.Run("direct delimiter target is inert", func(t *testing.T) {
-		state := testHackState()
-		state.Columns[1].Text = "]!!!!!!!!!!!"
+func TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules(t *testing.T) {
+	t.Run("invalid delimiter categories use ordinary filler behavior", func(t *testing.T) {
+		for _, target := range []struct {
+			name  string
+			text  string
+			id    string
+			glyph string
+		}{
+			{name: "standalone closer", text: "]!!!!!!!!!!!", id: "1:0", glyph: "]"},
+			{name: "unmatched opening", text: "(!!!!!!!!!!!", id: "1:0", glyph: "("},
+			{name: "mismatched opening", text: "[)!!!!!!!!!!", id: "1:0", glyph: "["},
+			{name: "mismatched closer", text: "[)!!!!!!!!!!", id: "1:1", glyph: ")"},
+			{name: "later compatible closer", text: "<!!>>!!!!!!!", id: "1:4", glyph: ">"},
+		} {
+			t.Run(target.name, func(t *testing.T) {
+				state := testHackState()
+				state.Columns[1].Text = target.text
+
+				ApplyGuess(state, target.id)
+
+				if state.AttemptsLeft != 3 || state.Solved || state.Failed {
+					t.Fatalf("target %s did not retain ordinary filler behavior: %#v", target.id, state)
+				}
+				assertLogContains(t, state.Log, "> "+target.glyph, "> Отказ в доступе", "> 0/4 правильно.")
+			})
+		}
+	})
+
+	t.Run("non-opening cells in a valid span remain individual filler targets", func(t *testing.T) {
+		for _, target := range []struct {
+			name  string
+			id    string
+			glyph string
+		}{
+			{name: "interior", id: "0:1", glyph: "!"},
+			{name: "closing delimiter", id: "0:3", glyph: ")"},
+		} {
+			t.Run(target.name, func(t *testing.T) {
+				state := patternTestState()
+
+				ApplyGuess(state, target.id)
+
+				if state.AttemptsLeft != 3 || state.Solved || state.Failed {
+					t.Fatalf("target %s did not retain ordinary filler behavior: %#v", target.id, state)
+				}
+				assertLogContains(t, state.Log, "> "+target.glyph, "> Отказ в доступе", "> 0/4 правильно.")
+			})
+		}
+	})
+
+	t.Run("current pattern opening remains reserved", func(t *testing.T) {
+		state := patternTestState()
 		before := cloneHackState(t, state)
 
-		ApplyGuess(state, "1:0")
+		ApplyGuess(state, "0:0")
 
 		if !reflect.DeepEqual(state, before) {
-			t.Fatalf("delimiter decoy mutated state\ngot:  %#v\nwant: %#v", state, before)
+			t.Fatalf("pattern opening fell through to ordinary filler behavior\ngot:  %#v\nwant: %#v", state, before)
 		}
 	})
 

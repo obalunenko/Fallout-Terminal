@@ -371,21 +371,23 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 	for _, required := range []string{
 		"function patternAtCell(cell)",
 		"(hack.patterns || [])",
-		"pattern.row === row && offset >= pattern.start && offset <= pattern.end",
-		"matches.find(pattern => pattern.start === offset)",
-		"pattern.start > nearest.start",
+		"pattern.row === row && pattern.start === offset",
 		"const pattern = patternAtCell(cell)",
 		"if (patternAtCell(cell))",
 		"offset >= pattern.start && offset <= pattern.end",
 		"`[data-row=\"${pattern.row}\"][data-offset]`",
 		"if (pattern.used) setHackPatternHover(null)",
 		"send({ type: 'HACK_PATTERN', patternId: pattern.id })",
+		"send({ type: 'HACK_GUESS', targetId: cell.dataset.target })",
 	} {
 		if !strings.Contains(playerScript, required) {
 			t.Errorf("bundled player is missing pattern interaction contract %q", required)
 		}
 	}
 	for _, forbidden := range []string{
+		"offset >= pattern.start && offset <= pattern.end\n  )",
+		"matches.find(pattern => pattern.start === offset)",
+		"pattern.start > nearest.start",
 		"pattern.column",
 		"pattern.pair",
 		"column.text.slice(pattern.start",
@@ -412,13 +414,11 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 
 	playerScript := read("client/client.js")
 	for _, required := range []string{
-		"const HACK_DELIMITERS = '()[]{}<>';",
-		"function isDelimiterCell(cell)",
-		"HACK_DELIMITERS.includes(cell.textContent)",
 		"const pattern = patternAtCell(cell)",
-		"if (isDelimiterCell(cell))",
+		"pattern.row === row && pattern.start === offset",
 		"if (pattern && !pattern.used)",
 		"send({ type: 'HACK_PATTERN', patternId: pattern.id });",
+		"if (pattern) return;",
 		"send({ type: 'HACK_GUESS', targetId: cell.dataset.target });",
 		"class=\"hcell word\"",
 		"class=\"hcell filler\"",
@@ -428,6 +428,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		}
 	}
 	for _, forbidden := range []string{
+		"function isDelimiterCell(cell)",
+		"HACK_DELIMITERS.includes(cell.textContent)",
+		"pattern || isDelimiterCell(cell)",
 		"classList.add('pattern')",
 		"classList.add('valid-pattern')",
 		"classList.add('delimiter-decoy')",

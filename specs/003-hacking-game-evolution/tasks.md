@@ -2,6 +2,8 @@
 
 **Input**: `spec.md`, `planning-handoff.md`, `plan.md`, `research.md`, `data-model.md`, and `contracts/hacking-interface.md`
 
+**Bugfix**: 2026-08-11 — BUG-001 Updated from bugfix patch; artifact consistency and verification coverage remediated after analysis.
+
 Task IDs continue at `T027` so the prior completed task journal cannot mark this corrective task set complete accidentally.
 
 ## Phase 1: Setup
@@ -44,7 +46,7 @@ This phase establishes the generation-bound identity and minimal public shape re
 **Wave 1 — independent (different files):**
 
 - [x] **T030** [P] [US2] Add failing final-board regeneration, `3–6` discovery, 100-value `80/20` mapping, accepted no-dud RNG consumption, rejected zero-RNG, secret-preservation, restoration, and minimal-projection tests · `internal/hack/hack_test.go`
-- [x] **T031** [P] [US2] Add failing bundled-player assertions for row-local inclusive hover/click lookup, opaque `patternId` echo, used-state handling, and absence of public `column`/`pair` dependencies · `internal/platform/assets_test.go`
+- [x] **T031** [P] [US2] ⚠️ Reopened — Add failing bundled-player assertions for ~~row-local inclusive hover/click lookup~~ opening-coordinate-only pattern lookup, inclusive whole-span highlighting from that anchor, ordinary individual lookup at every non-opening filler offset, opaque `patternId` echo, used-state handling, and absence of public `column`/`pair` dependencies · `internal/platform/assets_test.go` (reopened — BUG-001)
 
 **⟶ Wait for Wave 1 to finish, then:**
 
@@ -58,7 +60,7 @@ This phase establishes the generation-bound identity and minimal public shape re
 
 **Wave 3:**
 
-- [x] **T033** [US2] Replace column-based pattern interaction with rendered-row and row-local inclusive offsets while continuing to send the opaque server-issued `patternId` without optimistic mutation · `client/client.js`
+- [x] **T033** [US2] ⚠️ Reopened — Replace column-based pattern interaction with ~~rendered-row and row-local inclusive offsets~~ rendered-row coordinates where only `start` resolves to the pattern, while `start` through `end` remains the inclusive highlight span and every non-opening filler offset retains ordinary individual interaction; continue to send the opaque server-issued `patternId` without optimistic mutation · `client/client.js` (reopened — BUG-001)
 
 **Checkpoint**: User Story 2 is independently functional and testable across generation, weighted effects, projection, and browser interaction.
 
@@ -158,23 +160,23 @@ This phase establishes the generation-bound identity and minimal public shape re
 
 ## Phase 9: Convergence
 
-- [x] **T048** Make browser special-pattern hover and click resolution row-local and inclusive across every offset from `start` through `end`, and add an asset-contract regression covering full-span activation · `client/client.js`, `internal/platform/assets_test.go` per plan: client hover/click mapping and T031/T033 (partial)
+- [x] **T048** ⚠️ Reopened — Make browser special-pattern hover and click resolution row-local and ~~inclusive across every offset from `start` through `end`~~ pattern-aware only at `start`; retain inclusive whole-span highlighting from that opening anchor, make all non-opening filler offsets individually selectable, and correct the asset-contract regression · `client/client.js`, `internal/platform/assets_test.go` per plan: client hover/click mapping and T031/T033 (partial) (reopened — BUG-001)
 
 ## Phase 10: Board Camouflage and Delimiter Decoys
 
-**Goal**: Camouflage the unchanged special-pattern discovery rules among words, ordinary filler, non-empty pattern interiors, word-interrupted spans, and inert delimiter decoys, then publish only complete boards that pass every final-board gate.
+**Goal**: Camouflage the unchanged special-pattern discovery rules among words, ordinary filler, non-empty pattern interiors, word-interrupted spans, and ~~inert~~ individually selectable delimiter decoys, then publish only complete boards that pass every final-board gate.
 
 **Independent Test**: Generate 1,000 publishable boards and prove each has `3–6` production-discovered patterns, decoy parity, a non-empty valid interior, an alphabetic-interrupted span, at least two occupied rows per candidate-word, valid-endpoint, and standalone-decoy category, pairwise-overlapping occupied-row intervals, ordinary filler in at least two rows, accidental-pattern accounting, and a valid-only public projection; then execute valid-pattern, candidate-word, delimiter-decoy, computed-style, and dud-created rediscovery interactions in a real browser context.
 
-**Verification status**: The current SC-003, SC-004, and SC-014–SC-017 are pending T054; completed T047 does not satisfy their amended definitions.
+**Verification status**: SC-003, SC-004, SC-014, and SC-016–SC-019 are verified by completed corrective tasks T049–T056 and the reopened final verification gate T054. T057 recorded the constitution-mandated Electron smoke as unavailable because the post-cutover repository has no root `package.json`; no smoke-test pass is claimed. T047 predates the camouflage and BUG-001 interaction amendments and remains only a historical baseline.
 
 ### Tests
 
 **Wave 1 — independent (different files):**
 
-- [x] **T049** [P] [US6] Extend generator and domain regressions with the 1,000-board camouflage gate; exact occupied-row counts and pairwise interval overlap; adjacent-empty and non-empty patterns; unmatched, mismatched, and first-closer decoys; accidental-pattern accounting; valid-only projection; inert direct delimiter targets; ordinary word selection inside invalid spans; and post-dud rediscovery while preserving the existing scanner fixtures unchanged · `internal/hack/hack_test.go`
-- [x] **T050** [P] [US6] Extend bundled-player asset and style contracts for valid-only pattern lookup, candidate-word dispatch, inert delimiter dispatch, unchanged non-delimiter filler behavior, no persistent validity-dependent class, and static styling parity across the governed player stylesheet · `internal/platform/assets_test.go`, `client/client.css`
-- [x] **T051** [P] [US6] Add an isolated, exactly pinned and locked executable browser-test harness plus controlled board fixtures covering valid-pattern hover/focus/click, ordinary candidate selection inside an alphabetic-interrupted span, standalone delimiter no-op behavior, outbound message capture, equal pre-interaction computed styles, no optimistic mutation, and activation only after a server snapshot publishes a dud-created pattern · `tests/browser/package.json`, `tests/browser/package-lock.json`, `tests/browser/playwright.config.mjs`, `tests/browser/hacking-camouflage.spec.mjs`
+- [x] **T049** [P] [US6] ⚠️ Reopened — Extend generator and domain regressions with the 1,000-board camouflage gate; exact occupied-row counts and pairwise interval overlap; adjacent-empty and non-empty patterns; unmatched, mismatched, and first-closer decoys; accidental-pattern accounting; valid-only projection; ~~inert direct delimiter targets~~ ordinary individual delimiter-target logging and attempt behavior; ordinary word selection inside invalid spans; and post-dud rediscovery while preserving the existing scanner fixtures unchanged · `internal/hack/hack_test.go` (reopened — BUG-001)
+- [x] **T050** [P] [US6] ⚠️ Reopened — Extend bundled-player asset and style contracts for opening-only valid-pattern lookup, candidate-word dispatch, ~~inert delimiter dispatch~~ ordinary individual delimiter and non-opening pattern-cell dispatch, unchanged filler behavior, no persistent validity-dependent class, and static styling parity across the governed player stylesheet · `internal/platform/assets_test.go`, `client/client.css` (reopened — BUG-001)
+- [x] **T051** [P] [US6] ⚠️ Reopened — ~~Add~~ Update the isolated, exactly pinned and locked executable browser-test harness plus controlled board fixtures covering ~~valid-pattern hover/focus/click~~ whole-pattern hover/focus/click only from `start`, ordinary individual selection for non-opening pattern cells, ordinary candidate selection inside an alphabetic-interrupted span, ~~standalone delimiter no-op behavior~~ standalone delimiter selection, outbound message capture, equal pre-interaction computed styles, no optimistic mutation, and activation only after a server snapshot publishes a dud-created pattern · `tests/browser/package.json`, `tests/browser/package-lock.json`, `tests/browser/playwright.config.mjs`, `tests/browser/hacking-camouflage.spec.mjs` (reopened — BUG-001)
 
 **⟶ Wait for Wave 1 to finish, then:**
 
@@ -188,17 +190,24 @@ This phase establishes the generation-bound identity and minimal public shape re
 
 **Wave 3:**
 
-- [x] **T053** [US6] Make rendered delimiter cells outside all current valid pattern ranges inert in canonical filler-target handling and browser dispatch while retaining ordinary candidate, non-delimiter filler, and valid-pattern behavior; change the governed stylesheet only if static-parity tests expose a difference · `internal/hack/hack.go`, `client/client.js`, `client/client.css`
-
-**⟶ Wait for Wave 3 to finish, then:**
-
-**Wave 4:**
-
-- [x] **T054** Run formatting, static analysis, full tests, race tests, browser syntax checks, `npm --prefix tests/browser test`, the frontend build, and explicit SC-003/SC-004/SC-014–SC-017 verification; confirm the 1,000-board gate, executable browser interactions, and unchanged discovery fixtures pass · `.`
-
-**Checkpoint**: User Story 6 is independently functional and the board reveals pattern validity only through normal valid-pattern interaction, never through construction grouping, public decoy metadata, static styling, or decoy side effects.
+- [x] **T053** [US6] ⚠️ Reopened — ~~Make rendered delimiter cells outside all current valid pattern ranges inert~~ Preserve ordinary canonical filler-target handling and browser `HACK_GUESS` dispatch for standalone delimiters and every non-opening filler cell within a pattern span, while only a current unused pattern's `start` sends `HACK_PATTERN` and a used `start` retains existing unavailable behavior; retain ordinary candidate and filler behavior and change the governed stylesheet only if static-parity tests expose a difference · `internal/hack/hack.go`, `client/client.js`, `client/client.css` (reopened — BUG-001)
 
 ## Updated Dependencies & Execution Order
 
-- Phase 10 starts from the completed T027–T048 baseline. T049, T050, and T051 may run in parallel; all three block T052. T052 blocks T053, and T053 blocks the final T054 verification gate.
+- ~~Phase 10 starts from the completed T027–T048 baseline. T049, T050, and T051 may run in parallel; all three block T052. T052 blocks T053, and T053 blocks the final T054 verification gate.~~ BUG-001 reopens the affected interaction work after completed T052: `T031 → T050`, T049, and T051 form the corrective test wave; all block T033, which blocks T048, then T053. T049 and T051 may run in parallel with the T031 → T050 chain because they touch different files.
 - The existing discovery, identity, activation, probability, concurrency, projection, reconnect, private-control, and persistence rules remain prerequisites and are not reopened except where a new regression explicitly proves they remain unchanged.
+- Phase 11 closes the remaining coverage before final verification: T055 blocks T056 because both update `internal/hack/hack_test.go`; T057 may run independently after T053; T055, T056, and T057 all block the reopened T054 verification gate.
+
+## Phase 11: Convergence
+
+- [x] **T055** Add table-driven domain and executable browser fixtures for unmatched, mismatched, word-interrupted, and later-compatible-but-unselected delimiter targets; verify individual hover/preview behavior, ordinary `HACK_GUESS` logging and attempt consumption, and zero `HACK_PATTERN` requests per SC-018 and US6/AC6 · `internal/hack/hack_test.go`, `tests/browser/hacking-camouflage.spec.mjs`
+- [x] **T056** [US6] Extend the publishable-board generator tests across every configured hacking difficulty and prove that each uses the same inclusive `3–6` initial production-discovered-pattern limit, with no difficulty-specific count branch · `internal/hack/hack_test.go`
+- [x] **T057** Run and record the constitution-mandated `npm start` Electron behavioral smoke and rollback check, including player hacking interactions and the private game-master success flow; if unavailable, record the reason and do not claim it passed · `.`
+
+**⟶ Wait for T055–T057 to finish, then:**
+
+### Final Verification
+
+- [x] **T054** ⚠️ Reopened — Run formatting, static analysis, full tests, race tests, browser syntax checks, `npm --prefix tests/browser test`, the frontend build, and explicit ~~SC-003/SC-004/SC-014–SC-017~~ SC-003/SC-004/SC-014/SC-016–SC-019 verification; confirm the 1,000-board gate, opening-only pattern activation, individual delimiter/non-opening-symbol selection, executable browser interactions, unchanged discovery fixtures, difficulty-invariant `3–6` generation, and an accurately recorded Electron smoke result without claiming unavailable checks passed · `.` (reopened — BUG-001)
+
+**Checkpoint**: User Story 6 is independently functional and the board reveals pattern validity only through ~~normal valid-pattern interaction~~ whole-span interaction from an unused valid pattern's opening coordinate, never through construction grouping, public decoy metadata, or static styling. ~~Delimiter decoys have no side effects.~~ Under BUG-001 they retain ordinary individual filler effects without gaining pattern identity.

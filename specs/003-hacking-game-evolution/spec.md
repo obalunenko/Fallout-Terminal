@@ -1,5 +1,7 @@
 # Feature Specification: Phase 1 Server-Authoritative Hacking Patterns
 
+**Bugfix**: 2026-08-11 — BUG-001 separated opening-symbol-only pattern activation from ordinary individual delimiter-symbol selection.
+
 ## Clarifications
 
 ### Session 2026-08-11
@@ -18,7 +20,7 @@ As a player, I face the hacking puzzle using ordinary password guesses and serve
 
 **Why this priority**: Replacing the existing player shortcuts is the Phase 1 goal and establishes the trust boundary for every other story.
 
-**Independent Test**: Start a hacking puzzle, try every previously available player shortcut and public interface, and confirm that none can expose or force the answer while ordinary password guessing and non-delimiter filler attempt rules remain unchanged.
+**Independent Test**: Start a hacking puzzle, try every previously available player shortcut and public interface, and confirm that none can expose or force the answer while ordinary password guessing and ~~non-delimiter filler~~ individual filler-symbol attempt rules remain unchanged. The struck wording was superseded by BUG-001 because delimiter glyphs also retain ordinary individual selection when they are not a current pattern's opening symbol.
 
 **Acceptance Scenarios**:
 
@@ -42,6 +44,8 @@ As a player, I can discover and activate Fallout-style delimiter patterns on the
 3. **Given** an unused valid pattern, **When** the deterministic random source selects attempt restoration, **Then** remaining attempts return to the configured maximum without exceeding it.
 4. **Given** no removable incorrect password remains, **When** the deterministic random source selects dud removal for an accepted activation, **Then** attempts are restored instead.
 5. **Given** a valid request for an unused pattern, **When** activation succeeds, **Then** that exact generation-and-coordinate identity becomes used and cannot produce another effect.
+6. **Given** an unused valid pattern, **When** the player hovers, focuses, or selects its opening symbol at `start`, **Then** the whole inclusive `start`-through-`end` span is the pattern interaction, and selection sends one `HACK_PATTERN` request for that pattern.
+7. **Given** an interior or closing symbol inside a valid pattern, **When** the player hovers, focuses, or selects that non-opening symbol, **Then** only that symbol receives ordinary filler interaction and it does not highlight or activate the enclosing pattern.
 
 ### User Story 3 - Discover Stacked and Dynamic Patterns (Priority: P1)
 
@@ -96,7 +100,7 @@ As a player, I search for special patterns in the same rows as candidate words, 
 
 **Why this priority**: Camouflage is required for the special-pattern mechanic to preserve the intended deduction challenge without changing which spans are valid.
 
-**Independent Test**: Generate 1,000 publishable initial boards, inspect their final rendered rows and public projections, interact with valid and invalid delimiter cases in the browser, remove a word from an alphabetic-interrupted span, and verify every camouflage, rediscovery, and inert-decoy rule independently of pattern outcomes.
+**Independent Test**: Generate 1,000 publishable initial boards, inspect their final rendered rows and public projections, interact with valid and invalid delimiter cases in the browser, remove a word from an alphabetic-interrupted span, and verify every camouflage and rediscovery rule plus individual delimiter selection and opening-symbol-only pattern activation independently of pattern outcomes. ~~The earlier test treated delimiter decoys as inert.~~ That interaction contract was superseded by BUG-001.
 
 **Acceptance Scenarios**:
 
@@ -105,8 +109,8 @@ As a player, I search for special patterns in the same rows as candidate words, 
 3. **Given** a newly published board, **When** final production discovery and camouflage classification complete, **Then** the board has 3–6 valid patterns, at least as many standalone delimiter-decoy characters as valid patterns, and at least one matching-delimiter span invalidated by alphabetic content.
 4. **Given** matching delimiters on opposite sides of a candidate word, **When** the player selects that word, **Then** it follows the existing candidate-word guess rules and the enclosing delimiter span has no pattern identity or pattern interaction.
 5. **Given** dud removal replaces the incorrect candidate inside a word-interrupted delimiter span with periods, **When** production discovery analyzes the mutated canonical board, **Then** the span is published and selectable if and only if it now satisfies every existing special-pattern rule.
-6. **Given** a standalone, mismatched, word-interrupted, later-closer, or otherwise invalid delimiter, **When** the player hovers, focuses, or selects it, **Then** it does not highlight, send `HACK_PATTERN`, consume an attempt, or change puzzle state.
-7. **Given** valid pattern endpoints and delimiter decoys before interaction, **When** their static presentation is compared, **Then** color, brightness, font, CRT effect, and other static styling reveal no validity difference; only normal valid-pattern hover, focus, or selection behavior reveals validity.
+6. ~~**Given** a standalone, mismatched, word-interrupted, later-closer, or otherwise invalid delimiter, **When** the player hovers, focuses, or selects it, **Then** it does not highlight, send `HACK_PATTERN`, consume an attempt, or change puzzle state.~~ **Superseded by BUG-001**: such a delimiter remains outside the public pattern projection but receives ordinary individual filler-symbol preview, highlight, and selection behavior; it never sends `HACK_PATTERN` merely because it is a delimiter.
+7. **Given** valid pattern endpoints and delimiter decoys before interaction, **When** their static presentation is compared, **Then** color, brightness, font, CRT effect, and other static styling reveal no validity difference; ~~only normal valid-pattern hover, focus, or selection behavior reveals validity~~ under BUG-001, only targeting an unused valid pattern's opening symbol reveals validity through whole-span interaction.
 8. **Given** words and all camouflage characters have been placed, **When** the complete final rendered board fails any initial count or camouflage condition, **Then** the entire board is regenerated before any player receives it.
 9. **Given** the complete final rendered board contains valid and invalid delimiter characters, **When** its public pattern projection is produced, **Then** only spans returned by production discovery receive public pattern identities.
 
@@ -119,8 +123,8 @@ As a player, I search for special patterns in the same rows as candidate words, 
 - `!%]>`, `{+#)`, `[!%}`, and the trailing `]+>` in `()+]>` are representative standalone or mismatched delimiter-decoy arrangements.
 - A closing delimiter before its opening delimiter, a mismatched delimiter type, a cross-row span, or a span containing any alphabetic character is invalid.
 - Discovery pairs each opening delimiter only with the first compatible closing delimiter to its right on the same rendered row; later compatible closers do not form patterns for that opening while the first remains its pair.
-- An opening without a compatible closer, a closing without a compatible opener, and mismatched delimiter types remain inert rendered characters unless another valid opening-to-first-compatible-closing relationship uses them.
-- A generated standalone delimiter decoy that falls inside any valid pattern's inclusive selectable range cannot satisfy the inert-decoy requirement and is not counted toward the initial decoy minimum.
+- ~~An opening without a compatible closer, a closing without a compatible opener, and mismatched delimiter types remain inert rendered characters unless another valid opening-to-first-compatible-closing relationship uses them.~~ **Superseded by BUG-001**: these glyphs remain invalid as patterns but are individually selectable with ordinary filler-symbol behavior.
+- A generated standalone delimiter decoy that falls inside any valid pattern's inclusive ~~selectable range cannot satisfy the inert-decoy requirement~~ span cannot satisfy the standalone-decoy classification and is not counted toward the initial decoy minimum. BUG-001 changes interaction anchoring, not camouflage classification.
 - A candidate word between matching delimiters remains selectable as a normal word while the surrounding span is invalid; replacing an incorrect word with periods may make that exact span valid on rediscovery.
 - Multiple opening delimiters may share one closing delimiter, and each complete coordinate pair has independent used state.
 - Board mutation may create, remove, or change pattern pairings. A newly formed coordinate pair is available if it has not been used in the current generation; a previously used pair remains unavailable if rediscovered.
@@ -141,7 +145,7 @@ As a player, I search for special patterns in the same rows as candidate words, 
 - **FR-001**: Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.
 - **FR-002**: The player experience MUST expose no command, board entry, protocol operation, browser global, DOM control, keyboard shortcut, or query parameter that directly forces puzzle success.
 - **FR-003**: The player experience MUST remove the former administrator shortcut that bulk-removes incorrect passwords.
-- **FR-004**: Ordinary candidate-word guesses and non-delimiter filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.
+- **FR-004**: ~~Ordinary candidate-word guesses and non-delimiter filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.~~ **Superseded by BUG-001 and FR-084 through FR-088** because ordinary filler behavior also applies to delimiter glyphs unless an available pattern is activated from its opening symbol.
 - **FR-005**: The existing game-master `ForceHackSuccess` control MUST remain available only through the private desktop/Wails boundary.
 - **FR-006**: `ForceHackSuccess` MUST NOT be exposed through the player WebSocket protocol, browser globals, DOM controls, keyboard shortcuts, or query parameters.
 - **FR-007**: A successful trusted `ForceHackSuccess` action MUST use the existing shared success flow without consuming an attempt.
@@ -206,7 +210,7 @@ As a player, I search for special patterns in the same rows as candidate words, 
 - **FR-061**: Phase 1 MUST NOT preserve an active puzzle across server application restarts.
 - **FR-062**: Phase 1 MUST NOT modify the version-1 persisted session schema.
 
-- **FR-063**: Every initially published board MUST interleave candidate password words, ordinary punctuation and filler symbols, delimiters belonging to valid special patterns, and standalone delimiter-decoy characters outside every currently valid pattern's inclusive interaction range.
+- **FR-063**: Every initially published board MUST interleave candidate password words, ordinary punctuation and filler symbols, delimiters belonging to valid special patterns, and standalone delimiter-decoy characters ~~outside every currently valid pattern's inclusive interaction range~~ not contained in any currently valid pattern's inclusive span. The struck interaction wording was superseded by BUG-001; this requirement remains a board-classification rule.
 - **FR-064**: On every initially published board, candidate words, valid-pattern endpoints, and standalone delimiter decoys MUST each occupy at least two rendered rows, their occupied-row intervals MUST overlap pairwise, and ordinary punctuation or filler MUST remain present in at least two rendered rows.
 - **FR-065**: Production discovery MUST accept a matching same-row pattern with one or more ordinary non-alphabetic filler characters between its opening and first compatible closing delimiter.
 - **FR-066**: Every initially published board MUST contain at least one valid special pattern with one or more non-alphabetic filler characters between its endpoints.
@@ -215,18 +219,23 @@ As a player, I search for special patterns in the same rows as candidate words, 
 - **FR-069**: Matching delimiters surrounding a candidate word or other alphabetic content MUST NOT form a valid special pattern while that alphabetic content remains rendered.
 - **FR-070**: A candidate word inside an alphabetic-interrupted delimiter span MUST remain selectable under the existing candidate-word guess rules.
 - **FR-071**: When dud removal replaces an incorrect word inside a delimiter span with periods, production discovery MUST publish the resulting span if it satisfies every normal special-pattern rule on the mutated board.
-- **FR-072**: Every initially published board MUST contain standalone delimiter-decoy characters that are not part of any currently valid pattern interaction range.
+- **FR-072**: Every initially published board MUST contain standalone delimiter-decoy characters that are not part of any currently valid pattern ~~interaction range~~ inclusive span. BUG-001 limits the pattern activation target to the opening symbol without changing this classification.
 - **FR-073**: The number of standalone delimiter-decoy characters on every initially published board MUST be at least the number of initially valid special patterns.
 - **FR-074**: Every initially published board MUST contain at least one potential matching-delimiter span that is invalid because alphabetic content appears between its endpoints.
-- **FR-075**: A standalone delimiter decoy MUST NOT highlight, produce a `HACK_PATTERN` request, consume an attempt, or change puzzle state.
+- **FR-075**: ~~A standalone delimiter decoy MUST NOT highlight, produce a `HACK_PATTERN` request, consume an attempt, or change puzzle state.~~ **Superseded by BUG-001 and FR-084/FR-088**: it remains invalid as a pattern but retains ordinary individual filler-symbol interaction.
 - **FR-076**: A delimiter decoy MUST use the same color, brightness, font, CRT effect, and static styling as the same delimiter character when it belongs to a valid pattern.
-- **FR-077**: Pattern validity MUST be revealed only through normal hover, focus, or selection behavior for currently valid patterns.
+- **FR-077**: ~~Pattern validity MUST be revealed only through normal hover, focus, or selection behavior for currently valid patterns.~~ **Superseded by BUG-001 and FR-085/FR-086**: only interaction with an available pattern's opening symbol may reveal validity by highlighting or activating the whole span.
 - **FR-078**: Candidate words and all camouflage characters MUST be added before initial-board validation begins.
 - **FR-079**: Initial-board validation MUST run the production discovery algorithm against the complete final rendered board and count every accidentally formed valid pattern toward the initial 3–6 limit.
 - **FR-080**: Initial-board validation MUST regenerate a board that fails the 3–6 valid-pattern limit, standalone delimiter-decoy minimum, non-empty valid-interior requirement, alphabetic-interrupted-span requirement, or mixed-distribution requirement.
 - **FR-081**: The public pattern projection MUST include only spans that are currently valid under production discovery.
 - **FR-082**: Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters MUST receive no public pattern identity.
 - **FR-083**: Camouflage construction and final-board validation MUST preserve the discovery rules in FR-008 through FR-013 unchanged.
+- **FR-084**: Every rendered filler symbol, including `(`, `)`, `[`, `]`, `{`, `}`, `<`, and `>`, MUST remain individually selectable unless that exact cell is the opening symbol at `start` of a currently valid special pattern; unused openings use pattern interaction and used openings retain their existing unavailable behavior.
+- **FR-085**: The cell at a current pattern's `start` coordinate MUST be the only hover, focus, or selection target that resolves to that pattern; the inclusive `start`-through-`end` coordinates remain the resulting highlight and effect span, not the hit area.
+- **FR-086**: Hovering or focusing an unused pattern's opening symbol MUST highlight and preview its whole inclusive span, and selecting that opening symbol MUST send exactly one `HACK_PATTERN` request containing the opaque `patternId`.
+- **FR-087**: Hovering, focusing, or selecting a non-opening filler symbol inside a valid pattern span, including its closing delimiter, MUST use ordinary individual filler-symbol behavior and MUST NOT highlight or activate the enclosing pattern.
+- **FR-088**: Selecting an individually actionable delimiter symbol that is not a current pattern's opening coordinate MUST use the existing `HACK_GUESS` filler-target path, including its established logging and attempt-spending behavior, and MUST NOT send `HACK_PATTERN`.
 
 ## Key Entities
 
@@ -236,7 +245,7 @@ As a player, I search for special patterns in the same rows as candidate words, 
 - **Used Pattern History**: The runtime-only set of complete coordinate identities already accepted during the active puzzle generation, retained even when a pair temporarily disappears.
 - **Hacking Puzzle**: The canonical runtime challenge containing the rendered board, private candidate metadata, correct password, configured attempt maximum, remaining attempts, used-pattern history, progress log, and outcome.
 - **Candidate Password**: A selectable word that is either the correct password or an incorrect dud; only a currently available incorrect candidate may be removed by a pattern.
-- **Delimiter Decoy**: A rendered opening or closing delimiter deliberately left outside every currently valid pattern interaction range so it looks plausible but remains inert and receives no public identity.
+- **Delimiter Decoy**: A rendered opening or closing delimiter deliberately left outside every currently valid pattern ~~interaction range so it looks plausible but remains inert~~ inclusive span so it looks plausible, remains individually selectable as ordinary filler under BUG-001, and receives no public pattern identity.
 - **Alphabetic-Interrupted Span**: Matching delimiters with candidate-word or other alphabetic content between them; invalid while the letters remain, but eligible for normal rediscovery after board mutation removes the alphabetic content.
 - **Pattern Outcome**: The server-selected effect of one accepted activation: dud removal or attempt restoration, with restoration used as the fallback when dud removal has no eligible target.
 - **Public Pattern Projection**: A detached rendering and interaction view containing only stable public identity, row, inclusive coordinates, and current available-or-used state.
@@ -279,11 +288,13 @@ The player/live-service authorization boundary is preserved only as an extension
 - **SC-010**: Two connected players and one reconnecting player display identical current board text, attempts, pattern availability, used state, removed-dud effects, and puzzle outcome while the same server process is running.
 - **SC-011**: Restart-boundary tests confirm that no active-pattern runtime state is written to or required from version-1 session data.
 - **SC-012**: Player-surface checks find zero routes to `ForceHackSuccess` through WebSocket messages, browser globals, DOM controls, keyboard shortcuts, or query parameters, while the existing private desktop/Wails control still completes an eligible puzzle through the normal shared success flow.
-- **SC-013**: Regression tests confirm that ordinary password guesses and non-delimiter filler clicks retain their pre-feature attempt behavior.
+- **SC-013**: ~~Regression tests confirm that ordinary password guesses and non-delimiter filler clicks retain their pre-feature attempt behavior.~~ **Superseded by BUG-001 and SC-018** to cover delimiter glyphs as ordinary filler symbols when they are not a current pattern's opening coordinate.
 - **SC-014**: Controlled generator tests prove that adjacent empty pairs remain discoverable but no publishable initial board relies exclusively on adjacent empty pairs.
-- **SC-015**: Browser interaction tests confirm that 100% of tested delimiter decoys produce no highlight, focus preview, `HACK_PATTERN` request, attempt consumption, log change, board mutation, or outcome change, while valid patterns retain their existing inclusive interaction behavior.
+- **SC-015**: ~~Browser interaction tests confirm that 100% of tested delimiter decoys produce no highlight, focus preview, `HACK_PATTERN` request, attempt consumption, log change, board mutation, or outcome change, while valid patterns retain their existing inclusive interaction behavior.~~ **Superseded by BUG-001, SC-018, and SC-019** because delimiters are individually selectable and only a pattern's opening symbol activates the inclusive span.
 - **SC-016**: Dynamic-board tests confirm that an alphabetic-interrupted span has no public identity before dud removal and is published immediately after the word becomes periods when the resulting span satisfies all unchanged discovery rules.
 - **SC-017**: Static-style checks find no validity-dependent color, brightness, font, CRT effect, class, or other persistent visual treatment on delimiter characters before interaction.
+- **SC-018**: Browser and domain interaction tests confirm that 100% of tested standalone, mismatched, word-interrupted, later-closer, and otherwise invalid delimiter targets use ordinary individual filler-symbol highlight, preview, `HACK_GUESS`, logging, and attempt behavior while sending zero `HACK_PATTERN` requests.
+- **SC-019**: For every controlled valid-pattern span, interaction with `start` highlights the complete inclusive span and selection sends one `HACK_PATTERN`, while interaction with every tested offset greater than `start` highlights or selects only that symbol and sends no `HACK_PATTERN`.
 
 ## Assumptions
 
@@ -294,7 +305,7 @@ The player/live-service authorization boundary is preserved only as an extension
 - Weighted randomness is server-side and independently sampled only after a request has passed generation, coordinate, actionable-state, and unused-state validation.
 - The deterministic 80/20 test proves the probability mapping; production samples are allowed to vary naturally.
 - Board mutation from dud removal replaces only that candidate's rendered characters with periods and may increase, decrease, or otherwise change the discovered pattern set.
-- A generated standalone delimiter decoy is placed outside every currently valid pattern's inclusive interaction range; a delimiter character inside a valid range follows the existing inclusive valid-pattern interaction and does not count toward the standalone-decoy minimum.
+- A generated standalone delimiter decoy is placed outside every currently valid pattern's inclusive span. ~~A delimiter character inside a valid range follows the existing inclusive valid-pattern interaction.~~ **Superseded by BUG-001**: only the opening coordinate activates the span; every non-opening filler symbol uses ordinary individual selection. A delimiter inside the span still does not count toward the standalone-decoy minimum.
 - An occupied-row interval is the inclusive range from the lowest to highest rendered-row ordinal containing a category; two occupied-row intervals overlap when their inclusive ranges share at least one row ordinal, even when the categories do not occupy the same character cells.
 - Distributed content means candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rows and their occupied-row intervals overlap pairwise; ordinary punctuation or filler remains present in at least two rows, and no category-specific row block is reserved.
 - Initial camouflage validation derives valid spans from production discovery first, then classifies remaining delimiter characters and alphabetic-interrupted spans from the same complete rendered board.

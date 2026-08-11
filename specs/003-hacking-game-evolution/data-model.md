@@ -1,9 +1,12 @@
 # Data Model: Phase 1 Generation-Bound Hacking Patterns
 
+**Bugfix**: 2026-08-11 — BUG-001 made `start` the sole whole-pattern interaction anchor while preserving ordinary individual selection for other filler symbols.
+
 ## Modeling Principles
 
 - The private hacking aggregate remains the process-local source of truth and is mutated only while the canonical live-service mutex is held.
 - Pattern identity is the complete tuple `generationId + row + inclusive start + inclusive end`; public `patternId` values contain or resolve to that tuple and are opaque to clients.
+- The inclusive identity describes the complete pattern highlight/effect span, while only `start` is eligible for pattern handling; an unused `start` provides whole-pattern hover, focus, and activation, a used `start` retains unavailable behavior, and other filler coordinates retain individual selection.
 - Pattern validity is derived from the current final rendered board by one discovery function used both before publication and during gameplay.
 - Initial camouflage classification is derived only after that discovery function analyzes the complete board; construction intent never grants validity or public identity.
 - Used history survives discovery changes for the lifetime of one puzzle generation, while public patterns describe only spans currently present on the board.
@@ -87,7 +90,7 @@ Every opening is evaluated independently. Two openings may therefore have differ
 |---|---|
 | Valid patterns | Exact spans returned by production discovery, including accidental spans |
 | Non-empty valid interiors | Valid spans whose exclusive interior contains at least one non-alphabetic filler character |
-| Standalone delimiter decoys | Delimiter characters deliberately outside every valid pattern's inclusive interaction range; each remains inert and has no public identity |
+| Standalone delimiter decoys | Delimiter characters deliberately outside every valid pattern's inclusive span; ~~each remains inert~~ each remains individually selectable as ordinary filler under BUG-001 and has no public pattern identity |
 | Alphabetic-interrupted spans | Potential matching-delimiter spans rejected because their exclusive interior contains at least one alphabetic character |
 | Mixed distribution | Candidate words, valid-pattern endpoints, and standalone delimiter decoys each occupy at least two rows; their inclusive minimum-to-maximum occupied-row intervals overlap pairwise; ordinary punctuation or filler remains in at least two rows |
 
@@ -143,15 +146,15 @@ The public pattern projection contains only:
 |---|---|---|
 | `id` | string | Stable opaque public identity containing or resolving to the complete `PatternIdentity` |
 | `row` | integer | Rendered-row ordinal |
-| `start` | integer | Inclusive opening offset within the row |
-| `end` | integer | Inclusive closing offset within the row |
+| `start` | integer | Inclusive opening offset within the row and the sole whole-pattern interaction anchor |
+| `end` | integer | Inclusive closing offset within the row; completes the highlight/effect span but is not a pattern activation target |
 | `used` | boolean | True when the complete identity exists in private used history; false when currently available |
 
 It deliberately excludes `column`, `pair`, `generationId` as a separately editable field, the password, dud identities, future effects, outcome values, candidate truth, and private maps or slices.
 
 ### PublicHackState
 
-The existing public fields remain: `level`, `wordLength`, `attemptsMax`, `attemptsLeft`, `solved`, `failed`, `log`, and `columns`. The `patterns` field is an array of detached `PublicHackPattern` values for every currently discovered span, sorted by `row`, `start`, then `end`. Invalid delimiter characters remain present only in rendered column text; they gain no pattern object, status, or identity.
+The existing public fields remain: `level`, `wordLength`, `attemptsMax`, `attemptsLeft`, `solved`, `failed`, `log`, and `columns`. The `patterns` field is an array of detached `PublicHackPattern` values for every currently discovered span, sorted by `row`, `start`, then `end`. Invalid delimiter characters remain present only in rendered column text; they gain no pattern object, status, or identity, but their existing filler target makes them individually selectable.
 
 Public columns retain existing addresses, text, and word placements because ordinary board rendering and guessing are unchanged. Word placements reveal no correct/dud classification. Every public slice and nested mutable value is copied before leaving the canonical boundary.
 
@@ -176,7 +179,7 @@ PublicHackState 1 ── * PublicHackPattern (current derived spans only)
 issue fresh generation ID without using outcome Random
   → construct candidate words, ordinary filler, intended valid spans, non-empty interiors, word-interrupted spans, and delimiter-decoy candidates through normal rows
   → run unchanged production discovery on the complete final board
-  → classify non-empty valid interiors, standalone inert decoys, alphabetic-interrupted spans, occupied-row counts, pairwise interval overlap, and ordinary-filler rows from that same render
+  → classify non-empty valid interiors, standalone ~~inert~~ individually selectable decoys, alphabetic-interrupted spans, occupied-row counts, pairwise interval overlap, and ordinary-filler rows from that same render
   → any discovered-count or camouflage gate fails? discard attempt and regenerate
   → all gates pass? publish fresh active HackState with valid-only pattern projection
 ```
