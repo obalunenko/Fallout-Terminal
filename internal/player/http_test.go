@@ -227,14 +227,43 @@ func TestHTTPHandlerListsOnlyAllowlistedSoundFiles(t *testing.T) {
 	}
 }
 
+func TestHTTPHandlerServesHackingSoundManifestsAndAssets(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(playerAssets())
+	for folder, want := range map[string][]string{
+		"charscroll": {"scroll.wav"},
+		"enter":      {"enter.wav"},
+		"hack-bad":   {"bad.wav"},
+		"hack-good":  {"good.mp3"},
+		"menu-focus": {"focus.wav"},
+		"multiple":   {"multiple.wav"},
+		"single":     {"single.wav"},
+	} {
+		manifest := serveRequest(t, handler, "/api/sounds/"+folder)
+		if manifest.Code != http.StatusOK {
+			t.Fatalf("GET %s manifest status = %d, want 200", folder, manifest.Code)
+		}
+		var files []string
+		if err := json.Unmarshal(manifest.Body.Bytes(), &files); err != nil {
+			t.Fatalf("decode %s manifest: %v", folder, err)
+		}
+		if !reflect.DeepEqual(files, want) {
+			t.Fatalf("%s manifest = %#v, want %#v", folder, files, want)
+		}
+		asset := serveRequest(t, handler, "/sounds/"+folder+"/"+want[0])
+		if asset.Code != http.StatusOK || asset.Body.Len() == 0 {
+			t.Fatalf("GET %s asset status = %d bytes = %d, want 200 and non-empty", folder, asset.Code, asset.Body.Len())
+		}
+	}
+}
+
 func TestHTTPHandlerSoundDiscoveryDegradesToAnEmptyJSONArray(t *testing.T) {
 	t.Parallel()
 
 	handler := NewHTTPHandler(playerAssets())
 	for _, requestPath := range []string{
 		"/api/sounds/not-allowed",
-		"/api/sounds/hack-bad",
-		"/api/sounds/menu-focus",
 	} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
@@ -264,16 +293,22 @@ func TestHTTPHandlerReturnsNotFoundWhenRequiredAssetsAreMissing(t *testing.T) {
 
 func playerAssets() fs.FS {
 	return fstest.MapFS{
-		"index.html":                  {Data: []byte("<!doctype html><title>player-shell</title>")},
-		"client.js":                   {Data: []byte("const client = 'player-client';")},
-		"fonts/Fixedsys.ttf":          {Data: []byte("fake-font")},
-		"outside.txt":                 {Data: []byte("outside-client-root")},
-		"sounds/ambient/HISS.OGG":     {Data: []byte("ogg")},
-		"sounds/ambient/hum.wav":      {Data: []byte("wav")},
-		"sounds/ambient/theme.m4a":    {Data: []byte("m4a")},
-		"sounds/ambient/README.txt":   {Data: []byte("not audio")},
-		"sounds/hack-good/good.mp3":   {Data: []byte("mp3")},
-		"sounds/menu-focus/empty.txt": {Data: []byte("not audio")},
+		"index.html":                   {Data: []byte("<!doctype html><title>player-shell</title>")},
+		"client.js":                    {Data: []byte("const client = 'player-client';")},
+		"fonts/Fixedsys.ttf":           {Data: []byte("fake-font")},
+		"outside.txt":                  {Data: []byte("outside-client-root")},
+		"sounds/ambient/HISS.OGG":      {Data: []byte("ogg")},
+		"sounds/ambient/hum.wav":       {Data: []byte("wav")},
+		"sounds/ambient/theme.m4a":     {Data: []byte("m4a")},
+		"sounds/ambient/README.txt":    {Data: []byte("not audio")},
+		"sounds/charscroll/scroll.wav": {Data: []byte("wav")},
+		"sounds/enter/enter.wav":       {Data: []byte("wav")},
+		"sounds/hack-bad/bad.wav":      {Data: []byte("wav")},
+		"sounds/hack-good/good.mp3":    {Data: []byte("mp3")},
+		"sounds/menu-focus/focus.wav":  {Data: []byte("wav")},
+		"sounds/menu-focus/empty.txt":  {Data: []byte("not audio")},
+		"sounds/multiple/multiple.wav": {Data: []byte("wav")},
+		"sounds/single/single.wav":     {Data: []byte("wav")},
 	}
 }
 

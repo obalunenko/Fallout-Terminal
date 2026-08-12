@@ -50,7 +50,6 @@ type PlayerConfigService interface {
 
 // LiveService owns canonical shared player state.
 type LiveService interface {
-	Set(string, string, domain.ContentNode, int, string) *domain.PublicLiveState
 	Update(domain.ContentNode, *string) (*domain.PublicLiveState, bool)
 	Clear()
 	Snapshot() *domain.PublicLiveState
@@ -128,9 +127,7 @@ type PlayerServer interface {
 // compatibility with partial-start and test servers while making every live
 // bridge mutation observable by connected browsers.
 type playerPublisher interface {
-	PublishLive()
 	PublishUpdate()
-	PublishClear()
 	PublishHack()
 }
 
@@ -744,26 +741,6 @@ func (app *App) EndBroadcast() CoordinationCommandResult {
 	return app.completeCoordinationCommand(state, err, "broadcast could not be ended")
 }
 
-// SetLiveTerminal validates privileged input before installing canonical live
-// state and emits only the public hacking projection.
-func (app *App) SetLiveTerminal(payload LiveTerminalPayload) CommandResult {
-	if app.deps.Live == nil {
-		return commandFailure("live service is unavailable")
-	}
-	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
-		return commandFailure(err.Error())
-	}
-	state := app.deps.Live.Set(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText)
-	if state == nil {
-		return commandFailure("live terminal could not be created")
-	}
-	if publisher, ok := app.deps.Player.(playerPublisher); ok {
-		publisher.PublishLive()
-	}
-	app.updateHackState(state.Hack)
-	return CommandResult{OK: true}
-}
-
 // RequestTerminalActivation validates and normalizes authored content before
 // asking the coordinator to atomically select the broadcast-wide terminal.
 func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalSwitchCommandResult {
@@ -870,19 +847,6 @@ func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommand
 		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
 	})
 	return app.completeCoordinationCommand(state, err, "failed hacking puzzle could not be reset")
-}
-
-// ClearLiveTerminal clears process-only live state and its public status.
-func (app *App) ClearLiveTerminal() CommandResult {
-	if app.deps.Live == nil {
-		return commandFailure("live service is unavailable")
-	}
-	app.deps.Live.Clear()
-	if publisher, ok := app.deps.Player.(playerPublisher); ok {
-		publisher.PublishClear()
-	}
-	app.updateHackState(nil)
-	return CommandResult{OK: true}
 }
 
 // ForceHackSuccess completes an eligible puzzle and publishes the sanitized

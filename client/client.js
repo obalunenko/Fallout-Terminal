@@ -50,8 +50,10 @@ let hackSolvedTimer   = null;
 let hackTyped         = '';
 let hackHoverKey      = null;
 let hackHoverText     = '';
+let hackHoverClearTimer = null;
 let hackWasSolved     = false;
 let lastAttemptsLeft  = null;
+let terminalLiveBaselinePending = true;
 
 // Player identity and assignment are complete server projections. Selection
 // only creates a pending request; it never changes this state optimistically.
@@ -365,6 +367,7 @@ function connect() {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
     sessionReady = false;
+    terminalLiveBaselinePending = true;
     connOverlay.classList.remove('hidden');
     connText.textContent = 'УСТАНОВКА СВЯЗИ...';
 
@@ -380,6 +383,7 @@ function connect() {
   socket.addEventListener('close', () => {
     if (ws !== socket) return;
     sessionReady = false;
+    terminalLiveBaselinePending = true;
     signalRecognitionChange();
     connOverlay.classList.remove('hidden');
     connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
@@ -469,8 +473,10 @@ function clearBroadcastMirrors() {
   hackTyped = '';
   hackHoverKey = null;
   hackHoverText = '';
+  cancelHackHoverClear();
   hackWasSolved = false;
   lastAttemptsLeft = null;
+  terminalLiveBaselinePending = true;
   appliedSharedRevision = 0;
 
   clearTimeout(hackSolvedTimer);
@@ -491,6 +497,25 @@ function clearBroadcastMirrors() {
   hackInputPreview.textContent = '';
 }
 
+function playHackOutcomeTransition(previousHack, nextHack) {
+  if (!previousHack || !nextHack) return;
+  if (!nextHack.solved && nextHack.attemptsLeft < previousHack.attemptsLeft) {
+    playHackBad();
+  }
+  if (nextHack.solved && !previousHack.solved) {
+    playHackGood();
+  }
+}
+
+function scheduleHackSolvedNavigation() {
+  if (!hack || !hack.solved || hackSolvedTimer) return;
+  hackSolvedTimer = setTimeout(() => {
+    hackSolvedTimer = null;
+    mode = MODE.LIST;
+    render();
+  }, 2600);
+}
+
 function dispatch(msg) {
   if (msg.type === 'SESSION_WELCOME') {
     if (!msg.state || typeof msg.browserToken !== 'string' || !msg.browserToken) return;
@@ -501,6 +526,7 @@ function dispatch(msg) {
     }
     signalRecognitionChange();
     sessionReady = true;
+    terminalLiveBaselinePending = true;
     pendingSelection = null;
     pendingSharedAction = null;
     showPlayerNotice('');
@@ -515,6 +541,9 @@ function dispatch(msg) {
     applyActionResult(msg);
   } else if (msg.type === 'TERMINAL_LIVE') {
     if (!matchesExpectedTerminalLive(msg) || !acceptSharedSnapshot(msg)) return;
+    const previousHack = hack;
+    const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive &&
+      terminalID === msg.terminalId && mode === MODE.HACK;
     hasLive       = true;
     terminalID    = msg.terminalId || '';
     terminalBroadcastID = playerState?.broadcastId || '';
@@ -524,13 +553,17 @@ function dispatch(msg) {
     hackLevel     = msg.hackLevel || 0;
     hack          = msg.hack || null;
     serverNum     = 1 + Math.floor(Math.random() * 9);
-    hackTyped     = '';
-    hackHoverKey  = null;
-    hackHoverText = '';
+    if (!isContinuousTerminalUpdate) {
+      hackTyped     = '';
+      hackHoverKey  = null;
+      hackHoverText = '';
+    }
     hackWasSolved = !!(hack && hack.solved);
     lastAttemptsLeft = hack ? hack.attemptsLeft : null;
-    clearTimeout(hackSolvedTimer);
-    hackSolvedTimer = null;
+    if (!isContinuousTerminalUpdate) {
+      clearTimeout(hackSolvedTimer);
+      hackSolvedTimer = null;
+    }
 
     const nav = msg.nav || { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null };
     navStack      = nav.path.slice();
@@ -542,7 +575,13 @@ function dispatch(msg) {
     lastRenderedEntryId    = null;
     lastRenderedCommandKey = null;
 
-    mode = (hackLevel > 0 && hack && !hack.solved) ? MODE.HACK : (nav.mode === 'entry' ? MODE.ENTRY : MODE.LIST);
+    mode = (hackLevel > 0 && hack && (!hack.solved || isContinuousTerminalUpdate))
+      ? MODE.HACK
+      : (nav.mode === 'entry' ? MODE.ENTRY : MODE.LIST);
+
+    if (isContinuousTerminalUpdate) playHackOutcomeTransition(previousHack, hack);
+    if (isContinuousTerminalUpdate) scheduleHackSolvedNavigation();
+    terminalLiveBaselinePending = false;
 
     tryStartAmbient();
     render();
@@ -558,26 +597,14 @@ function dispatch(msg) {
     render();
   } else if (msg.type === 'HACK_STATE') {
     if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
+    const previousHack = hack;
     hack = msg.hack;
     if (mode !== MODE.HACK || !hack) return;
-
-    if (!hack.solved && lastAttemptsLeft != null && hack.attemptsLeft < lastAttemptsLeft) {
-      playHackBad();
-    }
+    playHackOutcomeTransition(previousHack, hack);
     lastAttemptsLeft = hack.attemptsLeft;
+    hackWasSolved = hack.solved;
 
-    if (hack.solved && !hackWasSolved) {
-      hackWasSolved = true;
-      playHackGood();
-    }
-
-    if (hack.solved && !hackSolvedTimer) {
-      hackSolvedTimer = setTimeout(() => {
-        hackSolvedTimer = null;
-        mode = MODE.LIST;
-        render();
-      }, 2600);
-    }
+    scheduleHackSolvedNavigation();
     render();
   } else if (msg.type === 'TERMINAL_CLEAR') {
     if (!expectsTerminalClear() || !acceptSharedSnapshot(msg)) return;
@@ -686,7 +713,7 @@ function applyActionResult(result) {
       pendingSharedAction.acceptedRevision = Number(result.revision) || 0;
       completeAcceptedSharedAction();
     }
-    render();
+    renderPlayerContext();
     return;
   }
 
@@ -735,7 +762,7 @@ function beginSharedAction(type, fields) {
   const requestId = createRequestID();
   pendingSharedAction = { requestId, type, acceptedRevision: null };
   showPlayerNotice('');
-  render();
+  renderPlayerContext();
   send({
     type,
     requestId,
@@ -909,8 +936,8 @@ function cssEscape(s) {
   return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 }
 
-function setHackHover(key) {
-  if (hackHoverKey === key) return;
+function setHackHover(key, force = false) {
+  if (!force && hackHoverKey === key) return;
   hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
   hackHoverKey = key;
   hackHoverText = '';
@@ -920,6 +947,20 @@ function setHackHover(key) {
     hackHoverText = Array.from(els).map(el => el.textContent).join('');
   }
   renderHackInputPreview();
+}
+
+function cancelHackHoverClear() {
+  if (hackHoverClearTimer === null) return;
+  clearTimeout(hackHoverClearTimer);
+  hackHoverClearTimer = null;
+}
+
+function scheduleHackHoverClear(key) {
+  cancelHackHoverClear();
+  hackHoverClearTimer = setTimeout(() => {
+    hackHoverClearTimer = null;
+    if (hackHoverKey === key) setHackHover(null, true);
+  }, 0);
 }
 
 function patternAtCell(cell) {
@@ -954,11 +995,14 @@ function setHackPatternHover(pattern) {
 
 function previewHackCell(cell) {
   if (!cell) return;
+  cancelHackHoverClear();
   const pattern = patternAtCell(cell);
   if (pattern) {
     if (pattern.used) setHackPatternHover(null);
-    else setHackPatternHover(pattern);
-    if (!pattern.used) playMultiple();
+    else if (pattern.id !== hackHoverKey) {
+      setHackPatternHover(pattern);
+      playMultiple();
+    }
     return;
   }
   const key = cell.dataset.target;
@@ -972,19 +1016,25 @@ hackColumns.addEventListener('mouseover', (e) => {
 });
 hackColumns.addEventListener('mouseout', (e) => {
   const cell = e.target.closest('.hcell');
-  if (!cell) return;
-  if (patternAtCell(cell)) {
-    setHackPatternHover(null);
+  if (!cell || !cell.isConnected) return;
+  const pattern = patternAtCell(cell);
+  if (pattern) {
+    const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
+    const relatedPattern = patternAtCell(related);
+    if (!relatedPattern || relatedPattern.id !== pattern.id) scheduleHackHoverClear(pattern.id);
     return;
   }
   const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
-  if (!related || related.dataset.target !== cell.dataset.target) setHackHover(null);
+  if (!related || related.dataset.target !== cell.dataset.target) scheduleHackHoverClear(cell.dataset.target);
 });
 hackColumns.addEventListener('focusin', (e) => {
   previewHackCell(e.target.closest('.hcell'));
 });
 hackColumns.addEventListener('focusout', (e) => {
-  if (e.target.closest('.hcell')) setHackPatternHover(null);
+  const cell = e.target.closest('.hcell');
+  if (!cell || !cell.isConnected) return;
+  const pattern = patternAtCell(cell);
+  scheduleHackHoverClear(pattern ? pattern.id : cell.dataset.target);
 });
 hackColumns.addEventListener('click', (e) => {
   const cell = e.target.closest('.hcell');
@@ -1570,14 +1620,23 @@ function buildColumnHtml(col, colIndex, rowBase) {
 }
 
 function renderHackColumns() {
-  hackHoverKey = null;
-  hackHoverText = '';
   let rowBase = 0;
   hackColumns.innerHTML = hack.columns.map((col, ci) => {
     const html = buildColumnHtml(col, ci, rowBase);
     rowBase += Math.ceil(col.text.length / ROW_WIDTH);
     return html;
   }).join('');
+
+  if (hackHoverKey === null) return;
+  const hoveredPattern = (hack.patterns || []).find(pattern =>
+    pattern.id === hackHoverKey && !pattern.used
+  );
+  if (hoveredPattern) {
+    setHackPatternHover(hoveredPattern);
+    return;
+  }
+  const hoveredCells = hackColumns.querySelectorAll(`[data-target="${cssEscape(hackHoverKey)}"]`);
+  setHackHover(hoveredCells.length ? hackHoverKey : null, true);
 }
 
 function renderHackLog() {

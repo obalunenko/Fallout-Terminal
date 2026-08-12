@@ -120,6 +120,113 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 	}
 }
 
+func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	soundScript := read("client/sound.js")
+	for _, required := range []string{
+		"let webAudioEligible = false;",
+		"const folderLoads = new Map();",
+		"const rawLoads    = new Map();",
+		"const oneShotFolders = ['single', 'multiple', 'enter', 'hack-good', 'hack-bad', 'menu-focus', 'charscroll'];",
+		"function enableWebAudio()",
+		"function reportPlayback(url)",
+		"if (!webAudioReady || !await webAudioReady || !webAudioEligible) {",
+		"await Promise.all(oneShotFolders.map(loadFolder));",
+		"const buffer = await context.decodeAudioData(raw.slice(0));",
+		"if (!rawBufs.has(url)) await prefetch(url);",
+		"await Promise.all(supported.map(file =>",
+		"enableWebAudio();",
+		"reportPlayback(url);",
+		"playFromFolder('single', 0.55)",
+		"playFromFolder('multiple', 0.55)",
+		"playFromFolder('enter', 0.65)",
+		"playFirst('menu-focus', 0.5)",
+		"playFirst('hack-good', 0.8)",
+		"playFirst('hack-bad', 0.7)",
+		"playFromFolder('charscroll', 0.4)",
+	} {
+		if !strings.Contains(soundScript, required) {
+			t.Errorf("player sound adapter is missing outcome-audio contract %q", required)
+		}
+	}
+
+	playerScript := read("client/client.js")
+	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack) {")
+	if outcomeStart < 0 {
+		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
+	}
+	outcomeEnd := strings.Index(playerScript[outcomeStart:], "function scheduleHackSolvedNavigation() {")
+	if outcomeEnd < 0 {
+		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
+	}
+	outcomeBoundary := playerScript[outcomeStart : outcomeStart+outcomeEnd]
+	for _, required := range []string{
+		"nextHack.attemptsLeft < previousHack.attemptsLeft",
+		"playHackBad();",
+		"nextHack.solved && !previousHack.solved",
+		"playHackGood();",
+	} {
+		if !strings.Contains(outcomeBoundary, required) {
+			t.Errorf("common authoritative outcome handler is missing transition guard %q", required)
+		}
+	}
+	for _, required := range []string{
+		"let terminalLiveBaselinePending = true;",
+		"const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive",
+		"if (isContinuousTerminalUpdate) playHackOutcomeTransition(previousHack, hack);",
+		"terminalLiveBaselinePending = false;",
+		"playHackOutcomeTransition(previousHack, hack);",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("player script is missing revisioned live/hack outcome guard %q", required)
+		}
+	}
+
+	actionResultStart := strings.Index(playerScript, "} else if (msg.type === 'ACTION_RESULT') {")
+	if actionResultStart < 0 {
+		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+	}
+	actionResultEnd := strings.Index(playerScript[actionResultStart:], "} else if (msg.type === 'TERMINAL_LIVE') {")
+	if actionResultEnd < 0 {
+		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+	}
+	if strings.Contains(playerScript[actionResultStart:actionResultStart+actionResultEnd], "playHack") {
+		t.Error("ACTION_RESULT must not optimistically play hacking outcome audio")
+	}
+
+	beginActionStart := strings.Index(playerScript, "function beginSharedAction(type, fields) {")
+	if beginActionStart < 0 {
+		t.Fatal("player script is missing the shared-action presentation boundary")
+	}
+	beginActionEnd := strings.Index(playerScript[beginActionStart:], "function selectCharacter(characterID) {")
+	if beginActionEnd < 0 {
+		t.Fatal("player script is missing the shared-action presentation boundary")
+	}
+	beginAction := playerScript[beginActionStart : beginActionStart+beginActionEnd]
+	if !strings.Contains(beginAction, "renderPlayerContext();") || strings.Contains(beginAction, "render();") {
+		t.Error("beginSharedAction must update pending presentation without rebuilding the hacking board")
+	}
+	for _, required := range []string{
+		"pattern.id !== hackHoverKey",
+		"setHackHover(hoveredCells.length ? hackHoverKey : null, true);",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("player script is missing preview-audio replay guard %q", required)
+		}
+	}
+}
+
 func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 	t.Parallel()
 
@@ -137,6 +244,56 @@ func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 		}
 		if strings.ContainsRune(string(raw), '\t') {
 			t.Errorf("%s contains a tab; browser JavaScript uses two-space indentation", relative)
+		}
+	}
+}
+
+func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	facade := read("frontend/src/desktop-api.js")
+	app := read("app.go")
+	for _, required := range []string{
+		"requestTerminalActivation: 'RequestTerminalActivation'",
+		"requestTerminalClear: 'RequestTerminalClear'",
+		"updateLiveTerminal: 'UpdateLiveTerminal'",
+		"forceHackSuccess: 'ForceHackSuccess'",
+	} {
+		if !strings.Contains(facade, required) {
+			t.Errorf("master desktop facade is missing coordinator-owned command %q", required)
+		}
+	}
+	for _, forbidden := range []string{"SetLiveTerminal", "ClearLiveTerminal", "setLiveTerminal", "clearLiveTerminal"} {
+		if strings.Contains(facade, forbidden) {
+			t.Errorf("master desktop facade exposes legacy terminal command %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		"func (app *App) RequestTerminalActivation(",
+		"func (app *App) RequestTerminalClear(",
+		"func (app *App) UpdateLiveTerminal(",
+		"func (app *App) ForceHackSuccess(",
+	} {
+		if !strings.Contains(app, required) {
+			t.Errorf("Wails App is missing required terminal command %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"func (app *App) SetLiveTerminal(",
+		"func (app *App) ClearLiveTerminal(",
+	} {
+		if strings.Contains(app, forbidden) {
+			t.Errorf("Wails App still binds legacy terminal command %q", forbidden)
 		}
 	}
 }
@@ -550,7 +707,7 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 		"(hack.patterns || [])",
 		"pattern.row === row && pattern.start === offset",
 		"const pattern = patternAtCell(cell)",
-		"if (patternAtCell(cell))",
+		"const relatedPattern = patternAtCell(related)",
 		"offset >= pattern.start && offset <= pattern.end",
 		"`[data-row=\"${pattern.row}\"][data-offset]`",
 		"if (pattern.used) setHackPatternHover(null)",

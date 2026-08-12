@@ -44,6 +44,11 @@ async function emit(page, message) {
   }, message);
 }
 
+async function settleAndResetPlayedSounds(page) {
+  await page.waitForTimeout(50);
+  await page.evaluate(() => { window.__playedSoundURLs = []; });
+}
+
 async function expectSharedRequest(page, expected) {
   const requests = await page.evaluate(() => window.__outboundMessages.filter(message =>
     ['HACK_GUESS', 'HACK_PATTERN'].includes(message.type)
@@ -82,6 +87,37 @@ async function acceptHackRequest(page, request, revision, hack) {
 async function openControlledPuzzle(page) {
   await page.addInitScript(() => {
     window.__outboundMessages = [];
+    window.__audioStarts = 0;
+    window.__playedSoundURLs = [];
+    window.__falloutTerminalSoundObserver = url => window.__playedSoundURLs.push(url);
+    window.__soundGestureActive = false;
+    document.addEventListener('click', () => {
+      window.__soundGestureActive = true;
+      setTimeout(() => { window.__soundGestureActive = false; }, 0);
+    }, true);
+    class ObservableAudioContext {
+      constructor() {
+        this.state = 'suspended';
+        this.destination = {};
+        window.__soundTestContext = this;
+      }
+      resume() {
+        if (window.__soundGestureActive) this.state = 'running';
+        return Promise.resolve();
+      }
+      decodeAudioData() { return Promise.resolve({ decoded: true }); }
+      createBufferSource() {
+        return {
+          connect() {},
+          start() {
+            if (window.__soundTestContext.state !== 'running') throw new Error('audio context is not eligible');
+            window.__audioStarts += 1;
+          },
+        };
+      }
+      createGain() { return { gain: { value: 1 }, connect() {} }; }
+    }
+    window.AudioContext = ObservableAudioContext;
     class FakeWebSocket {
       static OPEN = 1;
       static CLOSED = 3;
@@ -142,10 +178,85 @@ async function openControlledPuzzle(page) {
   await page.evaluate(() => { window.__outboundMessages.length = 0; });
 }
 
+test('authoritative wrong-guess audio crosses the Web Audio source-start boundary after an enabling gesture', async ({ page }) => {
+  await openControlledPuzzle(page);
+  await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
+  await page.evaluate(() => { window.__audioStarts = 0; });
+
+  await page.locator('.hcell.word').click();
+  const request = await expectSharedRequest(page, { type: 'HACK_GUESS', targetId: 'A1' });
+  expect(await page.evaluate(() => window.__audioStarts)).toBeGreaterThan(0);
+  await page.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });
+  await emit(page, {
+    type: 'ACTION_RESULT', requestId: request.requestId, accepted: true,
+    reason: 'accepted', revision: 3,
+  });
+  expect(await page.evaluate(() => window.__playedSoundURLs.filter(url => url.includes('/sounds/hack-')))).toEqual([]);
+
+  const wrong = structuredClone(initialHack);
+  wrong.attemptsLeft = 3;
+  await emit(page, { type: 'HACK_STATE', revision: 3, terminalId: TERMINAL_ID, hack: wrong });
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url => url.includes('/sounds/hack-bad/')))).toHaveLength(1);
+  await emit(page, { type: 'HACK_STATE', revision: 3, terminalId: TERMINAL_ID, hack: wrong });
+  await emit(page, { type: 'HACK_STATE', revision: 2, terminalId: TERMINAL_ID, hack: wrong });
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url => url.includes('/sounds/hack-bad/')))).toHaveLength(1);
+});
+
+test('one word selection plays one enter cue without replaying preview audio during pending renders', async ({ page }) => {
+  await openControlledPuzzle(page);
+  await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
+
+  const word = page.locator('.hcell.word');
+  await word.hover();
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url =>
+    url.includes('/sounds/multiple/')
+  ))).toHaveLength(1);
+  await settleAndResetPlayedSounds(page);
+
+  await word.click();
+  const request = await expectSharedRequest(page, { type: 'HACK_GUESS', targetId: 'A1' });
+  await page.waitForTimeout(50);
+  expect(await page.evaluate(() => window.__playedSoundURLs.map(url =>
+    url.match(/\/sounds\/([^/]+)\//)?.[1]
+  ).filter(Boolean))).toEqual(['enter']);
+
+  await emit(page, {
+    type: 'ACTION_RESULT', requestId: request.requestId, accepted: true,
+    reason: 'accepted', revision: 3,
+  });
+  await page.waitForTimeout(50);
+  expect(await page.evaluate(() => window.__playedSoundURLs.map(url =>
+    url.match(/\/sounds\/([^/]+)\//)?.[1]
+  ).filter(Boolean))).toEqual(['enter']);
+
+  const wrong = structuredClone(initialHack);
+  wrong.attemptsLeft = 3;
+  await emit(page, {
+    type: 'TERMINAL_LIVE',
+    revision: 3,
+    terminalId: TERMINAL_ID,
+    terminalName: 'Controlled terminal',
+    tree: { id: 'root', type: 'folder', name: 'Root', children: [] },
+    hackLevel: 1,
+    introText: 'WELCOME',
+    hack: wrong,
+    nav: { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null },
+  });
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.map(url =>
+    url.match(/\/sounds\/([^/]+)\//)?.[1]
+  ).filter(Boolean))).toEqual(['enter', 'hack-bad']);
+});
+
 test('only a valid opening activates its whole pattern while all other symbols stay individually selectable', async ({ page }) => {
   await openControlledPuzzle(page);
+  await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
+  await settleAndResetPlayedSounds(page);
 
   const validOpening = page.locator('[data-row="0"][data-offset="0"]');
+  const sameOpening = page.locator('[data-row="0"][data-offset="1"]');
   const standaloneDecoy = page.locator('[data-row="0"][data-offset="5"]');
   const styleProperties = ['color', 'filter', 'font-family', 'font-size', 'opacity', 'text-shadow'];
   const styles = await Promise.all([validOpening, standaloneDecoy].map(locator =>
@@ -159,16 +270,27 @@ test('only a valid opening activates its whole pattern while all other symbols s
   await validOpening.hover();
   await expect(page.locator('.hcell.hi')).toHaveCount(4);
   await expect(page.locator('#hackInputPreview')).toHaveText('[!!]');
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url =>
+    url.includes('/sounds/multiple/')
+  ))).toHaveLength(1);
+  await sameOpening.hover();
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url =>
+    url.includes('/sounds/multiple/')
+  ))).toHaveLength(1);
   await validOpening.focus();
   await expect(page.locator('.hcell.hi')).toHaveCount(4);
 
   const boardBefore = await page.locator('#hackColumns').textContent();
   const attemptsBefore = await page.locator('#attemptsLine').textContent();
+  await settleAndResetPlayedSounds(page);
   await validOpening.click();
   const patternRequest = await expectSharedRequest(page, {
     type: 'HACK_PATTERN',
     patternId: 'pattern-initial',
   });
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.map(url =>
+    url.match(/\/sounds\/([^/]+)\//)?.[1]
+  ).filter(Boolean))).toEqual(['enter']);
   await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
   await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
   await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
@@ -270,6 +392,8 @@ test('word-interrupted spans stay ordinary until a server snapshot publishes a n
 
 test('invalid delimiter categories remain ordinary individual targets', async ({ page }) => {
   await openControlledPuzzle(page);
+  await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
 
   const boardBefore = await page.locator('#hackColumns').textContent();
   const attemptsBefore = await page.locator('#attemptsLine').textContent();
@@ -284,16 +408,24 @@ test('invalid delimiter categories remain ordinary individual targets', async ({
     const cell = page.locator(`[data-row="${target.row}"][data-offset="${target.offset}"]`);
 
     await test.step(target.name, async () => {
+      await settleAndResetPlayedSounds(page);
       await cell.hover();
       await expect(page.locator('.hcell.hi')).toHaveCount(1);
       await expect(page.locator('#hackInputPreview')).toHaveText(target.glyph);
+      await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.map(url =>
+        url.match(/\/sounds\/([^/]+)\//)?.[1]
+      ).filter(Boolean))).toEqual(['single']);
       await cell.focus();
       await expect(page.locator('.hcell.hi')).toHaveCount(1);
+      await settleAndResetPlayedSounds(page);
       await cell.click();
       const request = await expectSharedRequest(page, {
         type: 'HACK_GUESS',
         targetId: target.targetId,
       });
+      await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.map(url =>
+        url.match(/\/sounds\/([^/]+)\//)?.[1]
+      ).filter(Boolean))).toEqual(['enter']);
       await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
       await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
       await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);

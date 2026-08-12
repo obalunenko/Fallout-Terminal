@@ -13,6 +13,10 @@
 
 **Bugfix**: 2026-08-12 — BUG-005 restores a trusted same-terminal retry after hacking lockout without ending the broadcast or clearing player assignments.
 
+**Bugfix**: 2026-08-12 — BUG-006 clarifies that authoritative wrong-guess, unlock, and lockout transitions retain their established one-shot player audio feedback.
+
+**Bugfix**: 2026-08-12 — BUG-007 clarifies that the password-hacking screen must retain its complete established interaction and outcome sound set, not only CRT ambience and character-scroll audio.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Join as a Character (Priority: P1)
@@ -51,6 +55,8 @@ As the active character, I can operate the terminal while every other assigned c
 5. **Given** the active session submits an action, **when** the result is pending, **then** shared player input remains pending until an authoritative outcome is applied and no optimistic shared mutation appears.
 6. **Given** a player surface or crafted player request, **when** it attempts to invoke `ForceHackSuccess`, **then** no player operation is available and the game-master operation remains private.
 7. **Given** the connected assigned active session is viewing an unfinished hacking puzzle, **when** it selects a password candidate, filler character, or unused special pattern, **then** exactly one matching shared hacking request is processed and the authoritative result releases pending input while every assigned view converges.
+8. **Given** an audio-enabled connected assigned player has already applied the current unfinished hacking state, **when** it applies one newer authoritative state containing an ordinary wrong guess, a newly solved password, or the final wrong guess that locks the terminal, **then** it invokes exactly one bad, good/unlock, or bad/lockout cue respectively without invoking an outcome cue from the local click alone.
+9. **Given** an audio-enabled assigned player is viewing an unfinished hacking puzzle, **when** it newly previews an individual filler target, newly previews a password candidate or unused special pattern, or selects an actionable hacking target, **then** it invokes exactly one established single-character, grouped-target, or entry cue respectively as client-local feedback while the established ambient and character-scroll sounds remain available.
 
 ---
 
@@ -293,8 +299,8 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-057**: Rejected player actions MUST NOT consume attempts, activate patterns, advance randomness, navigate content, alter logs, trigger outcomes, or otherwise mutate puzzle or terminal state.
 - **FR-058**: An unassigned session MUST NOT submit or cause terminal actions before character selection completes.
 - **FR-059**: The system MUST accept existing player-side navigation, menu, password-candidate, filler-character, special-pattern, and other terminal actions for canonical processing only from the active controller. BUG-003 clarifies that this eligibility MUST remain actionable through the fully composed rendered-target, browser-gating, WebSocket, coordinator, runtime-mutation, projection, and correlated-result path rather than being proven only at isolated boundaries.
-- **FR-060**: Observer hover and focus feedback MUST remain local without submitting a shared action or changing canonical state.
-- **FR-061**: Any control available to an observer MUST be limited to client-local behavior that does not affect shared state.
+- **FR-060**: The player client MUST retain its established hover, focus, paging, and preview feedback for observers as client-local behavior that submits no shared action and changes no canonical state.
+- **FR-061**: Any other control exposed to an observer MUST be limited to client-local behavior and MUST NOT grant shared-action authority.
 - **FR-062**: The player surface MUST present observer controls as visibly read-only within the existing terminal aesthetic.
 - **FR-063**: The player surface MUST expose no operation that invokes `ForceHackSuccess`.
 - **FR-064**: Active-controller status MUST NOT grant access to any private game-master operation.
@@ -309,7 +315,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-070**: After submitting a shared action, player input MUST enter a pending state until an authoritative outcome is applied.
 - **FR-071**: Player clients MUST NOT optimistically mutate canonical shared state.
 - **FR-072**: The authoritative outcome of an accepted or rejected action MUST end its pending state without relying only on an arbitrary animation delay.
-- **FR-073**: Rapid duplicate submissions for a one-use action MUST produce no more than one accepted mutation.
+- **FR-073**: Repeated submission of the same logical request—identified by one logical session, `requestId`, and action fingerprint—for character selection or any shared navigation or hacking action MUST return its original authoritative result and produce no more than one canonical mutation. Conflicting reuse of a `requestId` MUST be rejected without mutation.
 - **FR-074**: Every connected assigned session MUST receive accepted terminal navigation, hacking state, logs, loading transitions, and outcomes from the same canonical state.
 - **FR-075**: All tabs belonging to one logical session MUST receive the same assignment and controller status changes.
 
@@ -337,7 +343,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-092**: Ending a broadcast MUST remove the active terminal from player control and return connected clients to an immersive waiting or selection state. BUG-004 clarifies that this transition MUST remain actionable through the fully composed visible game-master control, confirmation, desktop facade, coordinator, player publication, and authoritative client-rendering path.
 - **FR-093**: Ending a broadcast MUST NOT delete configured terminals or silently alter durable unlocked-terminal state.
 - **FR-094**: Server restart MUST discard logical sessions, fallback-name changes, presence, character claims, controller assignment, and any active runtime puzzle allowed to expire by the existing persistence boundary.
-- **FR-095**: The game-master application MUST retain its existing trusted operations regardless of player connection, assignment, or controller state.
+- **FR-095**: Player connection, assignment, and controller status MUST NOT remove the private game-master capabilities for session and terminal authoring, roster and assignment management, broadcast lifecycle, terminal activation and switch resolution, or `ForceHackSuccess`; each operation remains subject only to its own canonical eligibility rules. `ResetFailedHack` remains available only under FR-116 through FR-121.
 - **FR-096**: This feature MUST NOT redesign existing terminal or hacking logs to add historical character ownership.
 - **FR-097**: This feature MUST NOT add accounts, authentication, persistent player profiles, individual invitation links, unassigned spectators, multiple simultaneous controllers, or automatic controller election after disconnect.
 - **FR-098**: This feature MUST NOT import or manage character sheets, attributes, skills, perks, eligibility, rules tests, inventory, or campaign history.
@@ -371,6 +377,20 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-120**: Failed-puzzle retry MUST commit under the coordinator order and publish exactly one revisioned fresh terminal/hacking projection to every connected assigned session; player requests carrying targets from the discarded generation MUST NOT mutate the replacement puzzle.
 - **FR-121**: `ResetFailedHack` MUST remain a trusted Wails-only game-master operation with no player WebSocket message, browser global, DOM control, keyboard shortcut, query parameter, or public endpoint, and it MUST NOT broaden or rename `ForceHackSuccess`.
 
+#### Authoritative hacking outcome audio — BUG-006
+
+- **FR-122**: ~~When a continuously connected assigned player applies one newer authoritative hacking state whose remaining-attempt count decreased without solving the puzzle, including the final decrease that newly fails and locks the terminal, the player MUST play the established bad-guess cue exactly once.~~ When an audio-enabled continuously connected assigned player applies that transition, the client MUST invoke the established bad-guess cue exactly once. BUG-006 limits the mandatory playback assertion to a document whose own audio eligibility has been established.
+- **FR-123**: ~~When a continuously connected assigned player applies one newer authoritative hacking state that changes the puzzle from unsolved to solved, the player MUST play the established good/unlock cue exactly once and retain the existing delayed transition to normal navigation.~~ When an audio-enabled continuously connected assigned player applies that transition, the client MUST invoke the established good/unlock cue exactly once and retain the existing delayed transition to normal navigation. BUG-006 limits the mandatory playback assertion to a document whose own audio eligibility has been established.
+- **FR-124**: A local target click, a correlated `ACTION_RESULT` without its authoritative hacking projection, a rejected action, an initial or reconnect `TERMINAL_LIVE` snapshot, a stale or duplicate revision, and a re-render of unchanged hacking state MUST NOT play a bad, good/unlock, or lockout outcome cue.
+- **FR-125**: Hacking outcome audio MUST remain a client-local, non-canonical side effect: playback MUST submit no player request, change no puzzle or terminal state, and neither delay nor prevent authoritative pending-input completion when browser audio is unavailable or playback fails.
+
+#### Complete hacking-screen audio — BUG-007
+
+- **FR-126**: In an audio-enabled assigned player document showing an unfinished hacking puzzle, newly previewing one individual filler target MUST invoke exactly one established `single` cue, while newly previewing one password candidate or unused special pattern MUST invoke exactly one established `multiple` cue. Repeated pointer movement within the same current target MUST NOT replay its preview cue.
+- **FR-127**: In an audio-enabled assigned player document, selecting an actionable password candidate, filler target, or unused special pattern MUST invoke exactly one established `enter` cue as client-local feedback. That cue MUST NOT authorize an observer, optimistically mutate canonical state, or replace the authoritative bad/good outcome behavior in FR-122 through FR-125.
+- **FR-128**: The packaged player MUST retain non-empty, browser-native-decodable assets and successful same-origin manifest/static delivery for the established `ambient`, `charscroll`, `single`, `multiple`, `enter`, `hack-bad`, and `hack-good` hacking-screen sound families.
+- **FR-129**: Verification of required hacking-screen audio MUST exercise the production sound adapter with the browser's native audio decoder and an output-capable runtime. A fake `AudioContext`, successful source-start callback, manifest response, or asset-presence assertion MAY support localization but MUST NOT alone be accepted as proof of audible playback.
+
 ## Key Entities
 
 - **Logical Connection Session**: A temporary identity for one recognized device and browser profile during one server process. It has an opaque identity, unique fallback name, aggregate connected presence, optional current-broadcast character assignment, and controller-or-observer status. It is not an account or campaign profile.
@@ -381,6 +401,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **Live Terminal Broadcast**: The runtime period in which the game master may present one configured terminal at a time to connected players. It owns the current character-assignment lifetime and controller assignment.
 - **Active Controller Assignment**: The exclusive designation of at most one character-assigned logical session as authorized to submit player terminal actions for the current broadcast.
 - **Observer Session**: Any character-assigned logical session that is not the active controller. It mirrors canonical state and may use only passive or client-local interactions.
+- **Audio-Enabled Player Client**: One player document with Web Audio support that has received its own user activation and successfully loaded the applicable sound asset. Audio eligibility belongs to that browser document and is never shared, inferred from another player, or treated as canonical state.
 - **Active Terminal**: The single configured terminal currently presented to players, or no terminal while assigned players wait.
 - **Suspended Puzzle**: An unfinished process-local puzzle preserved for an inactive terminal, unavailable for actions until that terminal is active again.
 - **Authoritative Action Outcome**: The accepted or rejected result that determines whether canonical state changes and releases the player's pending input state.
@@ -420,11 +441,15 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **SC-029**: A production-shaped game-master journey starts with a visible and enabled `ЗАВЕРШИТЬ ТРАНСЛЯЦИЮ` control, accepts its confirmation, observes exactly one `EndBroadcast` invocation, and verifies that all connected players receive the authoritative no-broadcast context and terminal clear while logical sessions, fallback names, authored roster, and configured durable terminals remain unchanged.
 - **SC-030**: A production-shaped game-master journey exhausts the active puzzle, observes the blocked state, activates `ПОВТОРИТЬ ВЗЛОМ`, observes exactly one `ResetFailedHack` invocation, and verifies that active and observer players converge on one fresh generation with full attempts while broadcast ID, active terminal, assignments, controller, sessions, roster, configured terminals, and durable unlocked state remain unchanged.
 - **SC-031**: Concurrent duplicate retry and stale-generation action tests create exactly one fresh puzzle and produce zero post-reset mutation from discarded-generation targets, while inspection of every player asset and protocol path finds zero way to invoke `ResetFailedHack`.
+- **SC-032**: ~~A production-shaped active-and-observer browser journey with observable Web Audio playback applies an ordinary wrong guess, a correct-password unlock, and a final-attempt lockout; every continuously connected assigned view records exactly one bad, good, and bad cue for those respective new authoritative transitions and records zero outcome cues for local pre-acknowledgement clicks, rejected actions, duplicate/stale projections, reconnect snapshots, and unchanged re-renders.~~ Across three fresh hacking-puzzle cases—ordinary wrong guess, correct-password unlock, and final-attempt lockout—every audio-enabled continuously connected active and observer view receives its own enabling gesture and records exactly one bad, good, and bad cue invocation respectively. Those views record zero outcome-cue invocations for local pre-acknowledgement clicks, rejected actions, duplicate or stale projections, reconnect snapshots, and unchanged re-renders.
+- **SC-033**: In an output-capable production browser served by the packaged player, one explicitly audio-enabled hacking journey audibly retains CRT ambience and character-scroll as working controls and produces the applicable `single`, `multiple`, `enter`, `hack-bad`, and `hack-good` cues across individual filler preview, word/pattern preview, target selection, ordinary wrong guess, final lockout, and unlock cases. Native decode/output evidence is recorded for every required family; synthetic source-start counters alone do not satisfy this criterion.
 
 ## Assumptions
 
 - The existing shared terminal, server-authoritative navigation, hacking puzzle, special-pattern behavior, player presentation, loading animation, and private game-master operation are stable dependencies of this feature.
 - BUG-005 clarifies that the migrated hacking feature's “restart live terminal” recovery means replacing only the failed active terminal runtime inside the current broadcast; it does not mean ending and recreating the broadcast epoch.
+- BUG-006 clarifies that existing incorrect-guess and correct-guess audio belongs to newly applied authoritative hacking transitions; it is not a new audio system or an optimistic response to local selection. The affected surfaces are player-side transition detection and Web Audio playback, player HTTP sound-manifest and static-asset delivery only if reproduced as defective, browser regression fixtures, and packaged native verification; no canonical model or WebSocket payload changes.
+- BUG-007 clarifies that the migrated hacking feature's established audio contract also includes individual-target preview, grouped word/pattern preview, and target-entry cues. The working ambient and character-scroll families are diagnostic controls, not sufficient proof that the remaining Web Audio assets decode and play audibly in the packaged player.
 - A browser identity can be recognized across ordinary reopen and reconnect behavior within a server process; the mechanism is deliberately deferred to planning.
 - ~~The roster definition is process-local, remains available across broadcast endings within that process, and is cleared on server restart; claims are still cleared at every broadcast end.~~ Superseded by BUG-001: authored roster IDs and names come from the active player config and survive restart, while availability, claims, controller state, and every other coordination value retain their existing runtime lifetimes.
 - When control has been cleared, the next newly completed eligible character assignment may establish control, but already assigned observers are never promoted automatically.
@@ -436,7 +461,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 
 ## Scope Boundaries
 
-This feature excludes user accounts and passwords, ~~persistent player or campaign profiles,~~ persistent player or campaign profiles beyond the BUG-001 roster-only player config, character-sheet and rules automation, hacking eligibility, individual invitation links, additional internet-access controls, unassigned spectators, simultaneous multi-session control, automatic controller election after disconnect, persistence of logical sessions or claims beyond their stated lifetimes, historical action attribution, per-terminal controller assignments, mobile-phone-specific presentation, localization, audio-system work, and any visual redesign.
+This feature excludes user accounts and passwords, ~~persistent player or campaign profiles,~~ persistent player or campaign profiles beyond the BUG-001 roster-only player config, character-sheet and rules automation, hacking eligibility, individual invitation links, additional internet-access controls, unassigned spectators, simultaneous multi-session control, automatic controller election after disconnect, persistence of logical sessions or claims beyond their stated lifetimes, historical action attribution, per-terminal controller assignments, mobile-phone-specific presentation, localization, ~~audio-system work,~~ ~~new audio controls, asset families, configuration, or audio-system redesign beyond restoring the established BUG-006 outcome cues,~~ new audio controls, new asset families, configuration, or audio-system redesign beyond restoring the established BUG-007 hacking-screen interaction and outcome cues, and any visual redesign.
 
 ## Verbatim Constraints
 

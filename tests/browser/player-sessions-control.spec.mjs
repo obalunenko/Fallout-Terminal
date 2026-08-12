@@ -7,8 +7,71 @@ async function openPlayer(page, storedToken = null) {
   await page.addInitScript(({ tokenKey, token }) => {
     window.__outboundMessages = [];
     window.__xssExecuted = false;
+    window.__audioStarts = 0;
+    window.__playedSoundURLs = [];
+    window.__falloutTerminalSoundObserver = url => window.__playedSoundURLs.push(url);
+    window.__failAudioStarts = false;
+    window.__loadedSoundURLs = [];
+    window.__soundGestureActive = false;
     if (token) localStorage.setItem(tokenKey, token);
     else localStorage.removeItem(tokenKey);
+
+    document.addEventListener('click', () => {
+      window.__soundGestureActive = true;
+      setTimeout(() => { window.__soundGestureActive = false; }, 0);
+    }, true);
+
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const response = await nativeFetch(...args);
+      if (response.url.includes('/sounds/')) {
+        const nativeArrayBuffer = response.arrayBuffer.bind(response);
+        response.arrayBuffer = async () => {
+          const buffer = await nativeArrayBuffer();
+          window.__loadedSoundURLs.push(response.url);
+          return buffer;
+        };
+      }
+      return response;
+    };
+
+    class ObservableAudioContext {
+      constructor() {
+        this.state = 'suspended';
+        this.destination = {};
+      }
+
+      resume() {
+        if (window.__soundGestureActive) this.state = 'running';
+        return Promise.resolve();
+      }
+
+      decodeAudioData() {
+        return Promise.resolve({ decoded: true });
+      }
+
+      createBufferSource() {
+        return {
+          buffer: null,
+          connect() {},
+          start() {
+            if (window.__soundTestContext.state !== 'running') throw new Error('audio context is not eligible');
+            if (window.__failAudioStarts) throw new Error('simulated playback failure');
+            window.__audioStarts += 1;
+          },
+        };
+      }
+
+      createGain() {
+        return { gain: { value: 1 }, connect() {} };
+      }
+    }
+    window.AudioContext = class extends ObservableAudioContext {
+      constructor() {
+        super();
+        window.__soundTestContext = this;
+      }
+    };
 
     class FakeWebSocket {
       static OPEN = 1;
@@ -48,6 +111,26 @@ async function openPlayer(page, storedToken = null) {
 
   await page.goto('/');
   await page.waitForFunction(() => window.__playerSocket);
+}
+
+async function enableOutcomeAudio(page) {
+  await expect.poll(() => page.evaluate(() =>
+    window.__loadedSoundURLs.some(url => url.includes('/sounds/hack-bad/')) &&
+    window.__loadedSoundURLs.some(url => url.includes('/sounds/hack-good/'))
+  )).toBe(true);
+  await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
+  await page.evaluate(() => { window.__audioStarts = 0; });
+}
+
+async function audioStarts(page) {
+  return page.evaluate(() => window.__audioStarts);
+}
+
+async function outcomeStarts(page) {
+  return page.evaluate(() => window.__playedSoundURLs.filter(url =>
+    url.includes('/sounds/hack-bad/') || url.includes('/sounds/hack-good/')
+  ));
 }
 
 async function emit(page, message) {
@@ -383,6 +466,12 @@ test('observer is visibly read-only while hover, keyboard selection, paging, and
   await expect(page.locator('#roleBadge')).toContainText(/наблюд|observer/i);
   await expect(page.locator('#roleBadge')).toHaveAttribute('data-role', 'observer');
   await expect(page.locator('#screen')).toHaveClass(/observer-read-only/);
+  await expect.poll(() => page.evaluate(() => window.__loadedSoundURLs.some(url =>
+    url.includes('/sounds/menu-focus/')
+  ))).toBe(true);
+  await page.locator('#normalHeader').click({ position: { x: 4, y: 4 } });
+  await page.waitForTimeout(0);
+  await page.evaluate(() => { window.__playedSoundURLs = []; });
 
   const firstRow = page.locator('.term-row').filter({ hasText: 'DOCS' });
   const secondRow = page.locator('.term-row').filter({ hasText: 'STATUS' });
@@ -390,6 +479,10 @@ test('observer is visibly read-only while hover, keyboard selection, paging, and
   await firstRow.hover();
   await expect(firstRow).toHaveClass(/sel/);
   await expect(firstRow).toHaveCSS('cursor', 'not-allowed');
+  await expect.poll(() => page.evaluate(() => window.__playedSoundURLs
+    .filter(url => url.includes('/sounds/menu-focus/'))
+    .map(url => url.match(/\/sounds\/([^/]+)\//)?.[1])
+    .filter(Boolean))).toEqual(['menu-focus']);
 
   await page.keyboard.press('ArrowDown');
   await expect(secondRow).toHaveClass(/sel/);
@@ -523,6 +616,153 @@ test('active controller can select password, filler, and pattern targets with au
   await emit(page, { type: 'HACK_STATE', revision: 7, terminalId: 'terminal-1', hack: usedHack });
   await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
   expect(await sharedOutbound(page)).toHaveLength(3);
+});
+
+test('BUG-006 audio-enabled active and observer views play authoritative wrong, unlock, and lockout cues exactly once', async ({ context }) => {
+  const cases = [
+    { name: 'ordinary wrong', attemptsLeft: 3, solved: false, failed: false },
+    { name: 'newly solved', attemptsLeft: 4, solved: true, failed: false },
+    { name: 'final lockout', attemptsLeft: 0, solved: false, failed: true },
+  ];
+
+  for (const outcome of cases) {
+    await test.step(outcome.name, async () => {
+      const active = await context.newPage();
+      const observer = await context.newPage();
+      try {
+        await openAssignedPlayer(active, 'active');
+        await openAssignedPlayer(observer, 'observer');
+        const baseline = {
+          level: 1,
+          wordLength: 5,
+          attemptsMax: 4,
+          attemptsLeft: 4,
+          solved: false,
+          failed: false,
+          log: [],
+          columns: [{
+            addresses: ['0xC000'],
+            text: '[!!]VAULT...',
+            words: [{ id: 'A1', start: 4, length: 5 }],
+          }],
+          patterns: [{ id: 'pattern-1', row: 0, start: 0, end: 3, used: false }],
+        };
+        await emit(active, terminalLive({ revision: 10, hackLevel: 1, hack: baseline }));
+        await emit(observer, terminalLive({ revision: 10, hackLevel: 1, hack: baseline }));
+        await enableOutcomeAudio(active);
+        await enableOutcomeAudio(observer);
+        await active.locator('.hcell.word').first().hover();
+        await observer.locator('.hcell.word').first().hover();
+        await expect.poll(() => audioStarts(active)).toBe(1);
+        await expect.poll(() => audioStarts(observer)).toBe(1);
+        await active.evaluate(() => { window.__audioStarts = 0; });
+        await observer.evaluate(() => { window.__audioStarts = 0; });
+
+        await active.locator('.hcell.word').first().click();
+        const request = (await sharedOutbound(active)).at(-1);
+        expect(request).toMatchObject({ type: 'HACK_GUESS', targetId: 'A1' });
+        await observer.locator('.hcell.word').first().click();
+        expect(await sharedOutbound(observer)).toEqual([]);
+        expect(await audioStarts(active)).toBeGreaterThan(0);
+        expect(await audioStarts(observer)).toBeGreaterThan(0);
+        await active.waitForTimeout(300);
+        await observer.waitForTimeout(300);
+        await active.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });
+        await observer.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });
+
+        await emit(active, {
+          type: 'ACTION_RESULT', requestId: request.requestId, accepted: true,
+          reason: 'accepted', revision: 11,
+        });
+        await expect(active.locator('#screen')).toHaveClass(/shared-input-pending/);
+        expect(await outcomeStarts(active)).toEqual([]);
+
+        const next = {
+          ...structuredClone(baseline),
+          attemptsLeft: outcome.attemptsLeft,
+          solved: outcome.solved,
+          failed: outcome.failed,
+        };
+        const update = terminalLive({ revision: 11, hackLevel: 1, hack: next });
+        await emit(active, update);
+        await emit(observer, update);
+        await expect(active.locator('#screen')).not.toHaveClass(/shared-input-pending/);
+        const expectedFolder = outcome.solved ? '/sounds/hack-good/' : '/sounds/hack-bad/';
+        await expect.poll(() => outcomeStarts(active)).toEqual([expect.stringContaining(expectedFolder)]);
+        await expect.poll(() => outcomeStarts(observer)).toEqual([expect.stringContaining(expectedFolder)]);
+
+        await emit(active, update);
+        await emit(observer, update);
+        await emit(active, { ...update, revision: 9 });
+        await emit(observer, { ...update, revision: 9 });
+        await expect.poll(() => outcomeStarts(active)).toHaveLength(1);
+        await expect.poll(() => outcomeStarts(observer)).toHaveLength(1);
+      } finally {
+        await active.close();
+        await observer.close();
+      }
+    });
+  }
+});
+
+test('BUG-006 reconnect, rejection, ineligible audio, and playback failure remain silent and non-blocking', async ({ context }) => {
+  const baseline = {
+    level: 1,
+    wordLength: 5,
+    attemptsMax: 4,
+    attemptsLeft: 4,
+    solved: false,
+    failed: false,
+    log: [],
+    columns: [{ addresses: ['0xC000'], text: 'VAULT.......', words: [{ id: 'A1', start: 0, length: 5 }] }],
+    patterns: [],
+  };
+  const wrong = { ...structuredClone(baseline), attemptsLeft: 3 };
+
+  const ineligible = await context.newPage();
+  const failing = await context.newPage();
+  try {
+    await openAssignedPlayer(ineligible, 'observer');
+    await emit(ineligible, terminalLive({ revision: 20, hackLevel: 1, hack: baseline }));
+    await emit(ineligible, { type: 'HACK_STATE', revision: 21, terminalId: 'terminal-1', hack: wrong });
+    expect(await outcomeStarts(ineligible)).toEqual([]);
+    await expect(ineligible.locator('#attemptsLine')).toContainText('3');
+
+    await openAssignedPlayer(failing, 'active');
+    await emit(failing, terminalLive({ revision: 20, hackLevel: 1, hack: baseline }));
+    await enableOutcomeAudio(failing);
+    await failing.evaluate(() => { window.__failAudioStarts = true; });
+    await failing.locator('.hcell.word').click();
+    const rejected = (await sharedOutbound(failing)).at(-1);
+    await emit(failing, {
+      type: 'ACTION_RESULT', requestId: rejected.requestId, accepted: false,
+      reason: 'invalid-action', revision: 20,
+    });
+    await expect(failing.locator('#screen')).not.toHaveClass(/shared-input-pending/);
+    expect(await outcomeStarts(failing)).toEqual([]);
+
+    await failing.locator('.hcell.word').click();
+    const accepted = (await sharedOutbound(failing)).at(-1);
+    await emit(failing, {
+      type: 'ACTION_RESULT', requestId: accepted.requestId, accepted: true,
+      reason: 'accepted', revision: 21,
+    });
+    await emit(failing, { type: 'HACK_STATE', revision: 21, terminalId: 'terminal-1', hack: wrong });
+    await expect(failing.locator('#screen')).not.toHaveClass(/shared-input-pending/);
+    await expect(failing.locator('#attemptsLine')).toContainText('3');
+    expect(await outcomeStarts(failing)).toEqual([]);
+
+    await failing.evaluate(() => { window.__failAudioStarts = false; });
+    await emit(failing, {
+      type: 'SESSION_WELCOME', browserToken: 'token-1', state: assignedState('active', 22),
+    });
+    const reconnect = terminalLive({ revision: 22, hackLevel: 1, hack: { ...wrong, failed: true, attemptsLeft: 0 } });
+    await emit(failing, reconnect);
+    expect(await outcomeStarts(failing)).toEqual([]);
+  } finally {
+    await ineligible.close();
+    await failing.close();
+  }
 });
 
 test('BUG-003 composed server lets the active controller mutate every hacking target category while observers stay silent', async ({ browser }, testInfo) => {

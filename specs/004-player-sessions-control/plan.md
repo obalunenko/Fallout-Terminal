@@ -12,6 +12,10 @@
 
 **Bugfix**: 2026-08-12 — BUG-005 Updated from bugfix patch
 
+**Bugfix**: 2026-08-12 — BUG-006 Updated from bugfix patch
+
+**Bugfix**: 2026-08-12 — BUG-007 Updated from bugfix patch
+
 ## Summary
 
 Add process-local logical browser sessions, a game-master-managed character roster, broadcast-scoped exclusive claims, and one explicitly assigned controller while preserving the existing server-authoritative navigation and hacking rules. A single ordered coordinator will serialize browser presence, roster and assignment changes, controller changes, player actions, broadcast lifecycle, active-terminal switches, and puzzle-preservation decisions; it will emit detached revisioned projections to the Wails master and browser clients before another transition can overtake them. The browser will use a profile-scoped opaque recognition token, personalized player context, and correlated authoritative action results so refreshes and multiple tabs converge without optimistic shared mutation. ~~Durable version-1 session JSON remains unchanged~~ BUG-001 adds only an optional relative `playerConfig` reference to version-1 session JSON and stores reusable roster IDs and names in a separate versioned player-config file; all live coordination state remains excluded. `ForceHackSuccess` remains an exact private Wails-only operation.
@@ -48,6 +52,8 @@ internal/
 ├── player/
 │   ├── client.go                           # Connection-to-logical-session dispatch context
 │   ├── client_test.go                      # Queue and sender-context behavior
+│   ├── http.go                             # Player assets, sound manifests, and static sound delivery
+│   ├── http_test.go                        # Sound-manifest, asset-delivery, and HTTP security regressions
 │   ├── protocol.go                         # Strict handshake, selection, action, context, and result envelopes
 │   ├── protocol_test.go                    # Exact-field decoding and secret-free projection contracts
 │   ├── server.go                           # Presence aggregation and selective/session-wide fanout
@@ -65,7 +71,9 @@ frontend/src/
 client/
 ├── index.html                              # Selection, waiting, role, and pending surfaces
 ├── client.css                              # Terminal-styled observer/read-only and selection states
-└── client.js                               # Browser identity, personalized context, gating, and outcomes
+├── client.js                               # Browser identity, personalized context, gating, and outcomes
+├── sound.js                                # Web Audio loading and local one-shot playback
+└── sounds/                                 # Retained hack-bad and hack-good player assets
 
 tests/browser/
 ├── playwright.config.mjs                   # Run all player browser specifications
@@ -108,6 +116,8 @@ The post-design re-check uses the same assessments. `data-model.md` keeps runtim
 15. Make player-config selection/replacement legal only with no active broadcast. Persist the relative session association before activating it, and atomically persist every candidate add/rename/unclaimed-delete before committing the matching coordinator revision. Failed session or player-config writes retain the prior association, roster, claims, controller, and terminal/puzzle state.
 16. Add restart/reopen and compatibility coverage proving stable roster restoration, unchanged legacy session loading, safe missing/invalid/cancel paths, reuse of one player config from multiple sessions, and complete exclusion of browser recognition and runtime coordination values from both durable files.
 17. Under BUG-005, add exact trusted `ResetFailedHack` handling through `internal/live`, the coordinator, Wails facade, master UI, and existing ordered player publication. Accept it only for the current failed active hacking puzzle; atomically replace that runtime with a fresh generation from the latest authored terminal settings; preserve the broadcast, active terminal, sessions, claims, controller, roster, other runtime slots, and durable state; reject stale or ineligible calls without mutation; and expose no player reset capability.
+18. Under BUG-006, retain bad-guess and good/unlock audio as idempotent client-local effects of applying a newer authoritative hacking projection. Compare the previously applied puzzle state with each applicable newer accepted revisioned terminal projection—`TERMINAL_LIVE` on the composed live path and `HACK_STATE` where that focused projection is emitted—through one shared transition function; for each audio-enabled player document, invoke bad once for an attempt-decreasing wrong selection including final lockout, invoke good once for a new solved transition, and invoke neither from the click or `ACTION_RESULT` alone, rejected actions, initial/reconnect snapshots, stale/duplicate projections, or unchanged re-renders. Audio eligibility requires that document's own user activation and applicable loaded asset. Keep ineligible or failed playback non-fatal to canonical rendering and pending completion.
+19. Under BUG-007, preserve the complete established hacking-screen audio matrix. Use `single` for a newly previewed individual filler target, `multiple` for a newly previewed password or unused pattern, `enter` for selection, and the BUG-006 `hack-bad`/`hack-good` mapping for authoritative outcomes, while retaining ambient and character-scroll as working controls. Trace every failing family through event dispatch, manifest readiness, asset fetch, native decode, eligible context state, source/gain/destination routing, and audible packaged output. Synthetic audio adapters remain useful diagnostics but cannot be the terminal proof of native playback.
 
 ## BUG-001 Complexity Notes
 
@@ -132,6 +142,18 @@ The post-design re-check uses the same assessments. `data-model.md` keeps runtim
 - **Retained state**: The transition changes the active runtime generation, attempts, board, log, outcome, and gated navigation only. Broadcast identity, terminal selection, sessions, presence, assignments, controller, roster, other runtime slots, authored configuration, and durable unlocked state remain unchanged.
 - **Composed private path**: Unit tests for puzzle generation and generic player fanout do not prove that the blocked master control invokes one trusted command and that every assigned browser converges on the same fresh state. The production-shaped master-to-player journey and explicit absence of every player reset path are required.
 
+## BUG-006 Integration Verification Note
+
+- **Authoritative transition boundary**: Cursor sounds prove only that some local audio works. Outcome cues must be derived from the difference between the previously applied hacking state and one newer accepted projection, not from pointer selection or an `ACTION_RESULT` without the corresponding canonical state.
+- **Idempotence and recovery**: Duplicate or stale revisions, unchanged rendering, initial terminal delivery, and reconnect restoration must establish or retain the comparison baseline without replaying historical bad, good, or lockout cues.
+- **Observable playback boundary**: Asset presence and an `HTMLMediaElement.play` stub do not exercise the Web Audio buffer path used by the one-shot hacking cues. Browser coverage must observe the actual sound adapter or `AudioContext` decode/source-start boundary, explicitly enable audio in every tested player document, and use separate fresh puzzle cases for ordinary wrong, unlock, and final lockout. The packaged native player journey must prove the retained `hack-bad` and `hack-good` assets are audible after each tested document's own gesture.
+
+## BUG-007 Integration Verification Note
+
+- **Complete family boundary**: The working CRT loop and character-scroll cue do not prove `single`, `multiple`, `enter`, `hack-bad`, or `hack-good`. Exercise each family through its real hacking-screen event and keep the two working families as controls in the same output-capable document.
+- **Native decode and output boundary**: Existing browser fixtures replace `AudioContext.decodeAudioData()` and source output with unconditional synthetic success. Those fixtures may localize event and adapter invocation, but BUG-007 completion requires the production sound adapter, native browser decoder, real destination routing, and directly monitored audible output from the packaged player.
+- **Authority boundary**: Preview and entry cues remain client-local for harmless interaction. Bad/good cues remain derived only from newly applied authoritative hacking transitions, and audio failure must never change observer authorization, canonical state, pending completion, or replay guards.
+
 ## Verification Gates
 
 - `gofmt -l .` reports no Go source paths.
@@ -149,4 +171,8 @@ The post-design re-check uses the same assessments. `data-model.md` keeps runtim
 - A production-shaped BUG-004 game-master journey activates and confirms the visible end-broadcast control, observes exactly one `EndBroadcast` call through the real facade/coordinator boundary, and proves authoritative no-broadcast context plus terminal clear reaches every connected player without changing retained process/authored/durable state.
 - A production-shaped BUG-005 journey fails the current puzzle, activates the visible `ПОВТОРИТЬ ВЗЛОМ` control, observes exactly one `ResetFailedHack` call, and proves all assigned players receive one fresh generation with full attempts while broadcast identity, active terminal, assignments, controller, sessions, roster, other runtimes, and durable state remain unchanged.
 - Concurrent retry/stale-action coverage proves exactly one replacement generation, no mutation from discarded-generation targets, and no player asset or protocol path to `ResetFailedHack`.
+- A production-shaped BUG-006 active-and-observer journey observes the Web Audio boundary across separate fresh ordinary-wrong, newly-solved, and final-lockout puzzle cases; every tested player document receives its own enabling gesture and records exactly one bad, good, and bad cue invocation respectively, with zero outcome cues from click-only, rejected, stale, duplicate, reconnect, or re-render paths.
+- A packaged native BUG-006 player journey confirms that `hack-bad` and `hack-good` folders load and decode after each tested document's own user gesture and that ineligible or failed playback remains non-fatal to authoritative rendering and pending completion.
+- A BUG-007 production-browser matrix uses the native audio implementation after one explicit enabling gesture and exercises individual filler preview, password/pattern preview, actionable selection, ordinary wrong, unlock, and final lockout. It verifies `single`, `multiple`, `enter`, `hack-bad`, and `hack-good` independently while ambient and character-scroll remain working controls.
+- A packaged BUG-007 player journey records successful manifest delivery, native decode, connected destination routing, and directly monitored audible output for every required hacking-screen family. A fake decoder, source-start counter, or playback observer alone is insufficient evidence.
 - Review confirms ~~there are no new version-1 session fields~~ the only new version-1 session field is the optional relative `playerConfig` reference, there is no player path to `ForceHackSuccess`, no private connection data in player projections or either durable file, and no optimistic canonical browser transition.

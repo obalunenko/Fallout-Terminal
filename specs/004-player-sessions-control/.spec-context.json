@@ -1457,9 +1457,256 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-12T15:49:32.390Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T16:43:29.000Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T148",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:46:25.064Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T149",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:47:06.464Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:39.504Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:39.617Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:39.720Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:39.823Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T132",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:39.924Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T150",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T16:51:40.026Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T133",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T17:01:08.885Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T151",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T17:01:08.996Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T17:32:39.465Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T152",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:11:15.321Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T153",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:12:29.270Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:36.763Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:37.012Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:37.251Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T132",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:37.501Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T148",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:37.746Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T149",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:37.987Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T150",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:38.229Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T154",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:48:38.471Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T133",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:52:26.843Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T151",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:52:27.088Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T155",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T18:52:27.330Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T19:13:19.060Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T156",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T19:18:54.515Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T19:46:39.496Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T157",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T19:50:43.512Z"
     }
   ],
-  "last_action": "all 147 tasks complete — Go, race, frontend, 30 browser journeys, and Wails package pass",
+  "last_action": "T157 complete — full Go/race/frontend/browser/Wails validation passes",
   "coverage": {
     "FR-001": {
       "title": "The system MUST resolve every player connection to exactly one server-recognized logical session.",
@@ -2068,6 +2315,10 @@
         "T062",
         "T077",
         "T082"
+      ],
+      "tests": [
+        "app_test.go::TestCoordinationBridgeOrdersTerminalActivationClearAndUpdateWithoutLegacyMutation",
+        "internal/platform/assets_test.go::TestMasterTerminalCommandsCannotBypassCoordinator"
       ]
     },
     "FR-067": {
@@ -2170,6 +2421,10 @@
         "T082",
         "T083",
         "T087"
+      ],
+      "tests": [
+        "app_test.go::TestBridgeCoordinatorActivationAndLifecycleCleanup",
+        "app_test.go::TestCoordinationBridgeOrdersTerminalActivationClearAndUpdateWithoutLegacyMutation"
       ]
     },
     "FR-077": {
@@ -2373,8 +2628,8 @@
         "T113"
       ],
       "tests": [
-        "app_test.go::TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime",
-        "internal/player/server_test.go::TestCoordinatedForceHackSuccessPublishesOneSolvedCanonicalProjection"
+        "internal/platform/assets_test.go::TestMasterTerminalCommandsCannotBypassCoordinator",
+        "app_test.go::TestForceHackSuccessPrefersOrderedCoordinatorAndPublishesHackStatus"
       ]
     },
     "FR-096": {
@@ -2546,6 +2801,125 @@
         "internal/control/service_test.go::TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates",
         "internal/player/server_test.go::TestCoordinatedServerPublishesFreshFailedHackResetToActiveAndObserver"
       ]
+    },
+    "FR-122": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ],
+      "title": "New authoritative wrong and lockout transitions invoke exactly one bad cue",
+      "tasks": [
+        "T148",
+        "T149",
+        "T150",
+        "T154"
+      ]
+    },
+    "FR-123": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ],
+      "title": "New authoritative solved transitions invoke exactly one good cue and retain delayed navigation",
+      "tasks": [
+        "T148",
+        "T149",
+        "T150",
+        "T154"
+      ]
+    },
+    "FR-124": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ],
+      "title": "Clicks acknowledgements reconnects stale updates and unchanged renders do not play outcomes",
+      "tasks": [
+        "T148",
+        "T150",
+        "T154"
+      ]
+    },
+    "FR-125": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ],
+      "title": "Outcome audio is client-local non-canonical and non-blocking on failure",
+      "tasks": [
+        "T149",
+        "T150",
+        "T154"
+      ]
+    },
+    "FR-126": {
+      "title": "Individual targets play single and words or patterns play multiple exactly once per preview",
+      "tasks": [
+        "T152",
+        "T153",
+        "T154"
+      ],
+      "tests": [
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-127": {
+      "title": "Each actionable hacking target selection plays exactly one enter cue without granting authority",
+      "tasks": [
+        "T152",
+        "T153",
+        "T154"
+      ],
+      "tests": [
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "FR-128": {
+      "title": "Every established hacking sound family has non-empty decodable same-origin packaged assets",
+      "tasks": [
+        "T152",
+        "T154"
+      ],
+      "tests": [
+        "internal/player/http_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "FR-129": {
+      "title": "Required hacking audio is verified with native decode and output-capable runtime evidence",
+      "tasks": [
+        "T152",
+        "T154",
+        "T155"
+      ],
+      "tests": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "SC-032": {
+      "title": "Fresh active and observer wrong unlock and lockout cases play exact bad good bad outcomes without replay",
+      "tasks": [
+        "T148",
+        "T150",
+        "T151",
+        "T154",
+        "T155"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "SC-033": {
+      "title": "Packaged output-capable player audibly produces the complete hacking sound-family matrix",
+      "tasks": [
+        "T152",
+        "T153",
+        "T154",
+        "T155"
+      ],
+      "tests": [
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "specs/004-player-sessions-control/validation.md"
+      ]
     }
   },
   "size": "oversized",
@@ -2696,6 +3070,31 @@
       "decision": "Run production reconnect continuity inside the composed active-controller browser journey",
       "why": "The suite intentionally retains disconnected claims in one fixture process, so a separate later test cannot claim another character deterministically",
       "rejected": "Resetting canonical fixture state between tests or weakening the production composition"
+    },
+    {
+      "decision": "Prime and resume each player document Web Audio context during its first user gesture and gate one-shot playback on a running context",
+      "why": "The failing regression proved outcome projections arrived after the gesture, when first-time resume was no longer eligible; revision comparison and asset serving were already correct",
+      "rejected": "Resume for the first time from HACK_STATE or play optimistically from the click/ACTION_RESULT"
+    },
+    {
+      "decision": "Compare authoritative hacking outcomes through one shared transition function for both TERMINAL_LIVE and HACK_STATE",
+      "why": "The production coordinator publishes accepted gameplay in revisioned TERMINAL_LIVE envelopes while focused legacy fixtures also exercise HACK_STATE",
+      "rejected": "Keep outcome detection only in HACK_STATE or play outcomes from local clicks and ACTION_RESULT"
+    },
+    {
+      "decision": "Preserve stable hacking hover identity across pending and authoritative presentation updates and ignore exit events from detached cells",
+      "why": "Board replacement under a stationary pointer otherwise re-enters the same target and replays its preview cue",
+      "rejected": "Rebuild the board and reset hover state on every pending or authoritative update"
+    },
+    {
+      "decision": "Use one shared gesture-time readiness promise that loads and decodes every one-shot sound family before playback eligibility",
+      "why": "First-use asynchronous decode must not reorder a preview cue after a later entry cue",
+      "rejected": "Fire independent lazy decode requests for each first playback"
+    },
+    {
+      "decision": "Remove legacy SetLiveTerminal and ClearLiveTerminal from the bound App and desktop facade.",
+      "why": "Aliases would retain a callable path to the secondary live slot and contradict the single coordinator and narrow bridge requirements.",
+      "rejected": "Keeping exported compatibility aliases that delegate directly or remain unused."
     }
   ],
   "step_summaries": {
@@ -2707,10 +3106,12 @@
       "summary": "115 tasks across Setup, Foundational, nine user-story phases, and Polish; every phase uses explicit test-first dependency waves and all FR-001 through FR-099 are mapped."
     },
     "implement": {
-      "summary": "Idempotent Companion implementation validation confirmed all 147 tasks and all current automated/package gates."
+      "summary": "Completed T157 post-convergence validation; all automated, development-smoke, binding-surface, and clean-package gates pass.",
+      "key_finding": "Production accepted hacking mutations arrive through TERMINAL_LIVE and authoritative board replacement can emit detached-node exit events under a stationary pointer.",
+      "risks": "Audio remains subject to browser gesture eligibility as required; playback failures are non-fatal."
     }
   },
-  "currentTask": "T147",
+  "currentTask": "T157",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -2902,14 +3303,15 @@
     },
     "T030": {
       "status": "DONE",
-      "did": "Hardened asset contracts so role and pending presentation cannot disable focusable hacking hit targets.",
+      "did": "Verified packaged sound manifests, assets, native-decode readiness, and guarded hacking interaction paths",
       "files": [
-        "internal/platform/assets_test.go"
+        "internal/platform/assets_test.go",
+        "internal/player/http_test.go"
       ]
     },
     "T029": {
       "status": "DONE",
-      "did": "Covered active password, filler, and pattern target requests plus accepted and rejected authoritative pending completion in Playwright.",
+      "did": "Completed active-controller and observer browser coverage for exact-once single, multiple, enter, bad, good, and lockout audio behavior",
       "files": [
         "tests/browser/player-sessions-control.spec.mjs"
       ]
@@ -2944,10 +3346,10 @@
     },
     "T034": {
       "status": "DONE",
-      "did": "Revalidated client request preconditions, role and pending gates, revision application, and authoritative completion across all hacking target categories.",
+      "did": "Retained revision guards and authoritative pending behavior while restoring eligible exact-once outcome audio",
       "files": [
         "client/client.js",
-        "tests/browser/player-sessions-control.spec.mjs"
+        "client/sound.js"
       ]
     },
     "T033": {
@@ -2968,7 +3370,7 @@
     },
     "T037": {
       "status": "DONE",
-      "did": "Re-ran password, filler, and pattern browser regressions with exact preconditions, pending state, and authoritative results.",
+      "did": "Completed production-shaped hacking fixture coverage for actionable targets, pending authority, exact-once cues, and no replay",
       "files": [
         "tests/browser/hacking-camouflage.spec.mjs"
       ]
@@ -3672,7 +4074,7 @@
     },
     "T132": {
       "status": "DONE",
-      "did": "Completed focused coordinator, server, asset, and browser regressions for active, observer, stale, duplicate, and pending-result behavior.",
+      "did": "Completed cross-boundary authorization, convergence, and complete audio-family regressions without observer mutation or replay",
       "files": [
         "internal/control/service_test.go",
         "internal/player/server_test.go",
@@ -3683,7 +4085,7 @@
     },
     "T133": {
       "status": "DONE",
-      "did": "Passed formatting, vet, full and race Go suites, frontend build, 27 browser journeys, Wails development launch, and Darwin package build; recorded SC-028 evidence.",
+      "did": "Completed full BUG-003 through BUG-007 formatting, vet, Go, race, frontend, browser, native audio, and package verification",
       "files": [
         "specs/004-player-sessions-control/validation.md"
       ]
@@ -3816,6 +4218,95 @@
         "frontend/src/desktop-api.js",
         "frontend/src/master.js",
         "internal/platform/assets_test.go"
+      ]
+    },
+    "T148": {
+      "status": "DONE",
+      "did": "Added observable production-shaped interaction and authoritative outcome audio regressions plus packaged manifest and asset assertions",
+      "files": [
+        "internal/player/http_test.go",
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T149": {
+      "status": "DONE",
+      "did": "Corrected shared audio readiness and authoritative terminal-live outcome detection with exact-once non-fatal playback",
+      "files": [
+        "client/client.js",
+        "client/sound.js"
+      ]
+    },
+    "T150": {
+      "status": "DONE",
+      "did": "Completed BUG-006 exact-once outcome and no-replay coverage across fresh active and observer documents",
+      "files": [
+        "client/client.js",
+        "client/sound.js",
+        "internal/player/http_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T151": {
+      "status": "DONE",
+      "did": "Completed BUG-006 exact-once authoritative outcome audio verification without weakening prior authority and replay gates",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T152": {
+      "status": "DONE",
+      "did": "Reproduced native word-selection audio overlap and traced it to full hacking-board rerenders replaying preview audio",
+      "files": [
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T153": {
+      "status": "DONE",
+      "did": "Stopped pending and authoritative renders from replaying preview audio over enter and outcome cues",
+      "files": [
+        "client/client.js",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T154": {
+      "status": "DONE",
+      "did": "Completed BUG-007 interaction, asset, native playback, authoritative outcome, observer-silence, and failure-tolerance coverage",
+      "files": [
+        "client/client.js",
+        "client/sound.js",
+        "internal/player/http_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T155": {
+      "status": "DONE",
+      "did": "Completed BUG-007 full sound-family verification, anti-replay stress coverage, 34-case browser suite, and clean Wails package build",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T156": {
+      "status": "DONE",
+      "did": "Removed legacy SetLiveTerminal/ClearLiveTerminal Wails and facade paths, migrated bridge coverage to coordinator commands, and added a binding regression.",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "frontend/src/desktop-api.js",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T157": {
+      "status": "DONE",
+      "did": "Ran and recorded the post-T156 full Go, race, frontend, browser, Wails development, clean package, binding-surface, and diff validation gates.",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
       ]
     }
   },
@@ -4154,6 +4645,152 @@
       "command": "wails build",
       "result": "PASS; darwin/arm64 app packaged and self-signed",
       "warnings": []
+    },
+    {
+      "what": "Focused BUG-006 browser and Web Audio regressions",
+      "command": "npm --prefix tests/browser test -- --grep BUG-006|authoritative wrong-guess audio",
+      "result": "3 passed",
+      "warnings": []
+    },
+    {
+      "what": "Formatting and static analysis",
+      "command": "gofmt -l . && GOCACHE=/private/tmp/fallout-go-cache go vet ./...",
+      "result": "passed; gofmt reported no files",
+      "warnings": []
+    },
+    {
+      "what": "Full Go race suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "all packages passed",
+      "warnings": []
+    },
+    {
+      "what": "Complete Playwright suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "33/33 passed on clean rerun",
+      "warnings": [
+        "first run hit one randomized BUG-003 no-change assertion after dud removal; immediate full rerun passed without code changes",
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Packaged active and observer audio smoke",
+      "command": "node /private/tmp/fallout-bug006-native-smoke.mjs",
+      "result": "ordinary wrong bad, unlock good, and lockout bad each started exactly once in active and observer documents",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 formatting and static analysis",
+      "command": "gofmt -l .; GOCACHE=/private/tmp/fallout-go-cache go vet ./...; git diff --check; node --check client/client.js; node --check client/sound.js",
+      "result": "PASS; no formatting or diff-check output and all static checks exited 0",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 complete Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "PASS; all packages",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 race-enabled Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS; all packages",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 frontend production build",
+      "command": "npm --prefix frontend run build",
+      "result": "PASS; Vite production bundle generated",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 complete browser regression suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "PASS; 34/34 Playwright journeys",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "BUG-007 hover anti-replay stress regression",
+      "command": "npx playwright test hacking-camouflage.spec.mjs --grep one-word-selection --repeat-each=10",
+      "result": "PASS; 10/10 exact hover-entry-outcome sequences",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 Darwin production package",
+      "command": "/Users/olegbalunenko/go/bin/wails build",
+      "result": "PASS; darwin/arm64 app compiled packaged self-signed and post-build hook completed",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 directly monitored output-capable player journey",
+      "command": "packaged player in output-capable Chrome with explicit enabling gesture",
+      "result": "PASS; audible ambient and charscroll controls plus exactly one multiple hover one enter click and one authoritative outcome cue",
+      "warnings": []
+    },
+    {
+      "what": "BUG-007 direct Core Audio outcome assets",
+      "command": "afplay packaged hack-bad and hack-good WAV assets",
+      "result": "PASS; user confirmed both outcome assets audible",
+      "warnings": []
+    },
+    {
+      "what": "Focused coordinator bridge and binding-contract tests",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test . ./internal/platform -count=1",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Full Go test suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Frontend and browser validation",
+      "command": "npm --prefix frontend run build; npm --prefix tests/browser test",
+      "result": "PASS — 34/34 browser tests",
+      "warnings": [
+        "An initial BUG-003 sibling-resume case was transiently hidden; the first fresh focused rerun and a fresh complete run passed. repeat-each is not isolated because the composed fixture intentionally retains claims for one runner lifetime.",
+        "NO_COLOR was ignored because FORCE_COLOR is set."
+      ]
+    },
+    {
+      "what": "Production Wails binding and package build",
+      "command": "wails build",
+      "result": "PASS — generated bindings omit SetLiveTerminal/ClearLiveTerminal and retain coordinator commands",
+      "warnings": []
+    },
+    {
+      "what": "Complete Go test suite",
+      "command": "GOCACHE=/private/tmp/fallout-t157-go-cache go test ./... -count=1",
+      "result": "PASS across every package with loopback access",
+      "warnings": [
+        "Restricted sandbox attempt could not bind loopback listeners; authorized rerun passed"
+      ]
+    },
+    {
+      "what": "Wails development boundary smoke",
+      "command": "/Users/olegbalunenko/go/bin/wails dev; curl http://127.0.0.1:34115; Ctrl+C",
+      "result": "PASS; development bridge returned HTTP 200 and shutdown was graceful",
+      "warnings": [
+        "Expected development-only private-API/App Store warning"
+      ]
+    },
+    {
+      "what": "Post-T156 generated binding surface",
+      "command": "rg SetLiveTerminal|ClearLiveTerminal and authoritative replacement methods across generated bindings, desktop facade, and App",
+      "result": "PASS; legacy methods absent and authoritative replacements retained",
+      "warnings": []
+    },
+    {
+      "what": "Clean Wails package and diff hygiene",
+      "command": "/Users/olegbalunenko/go/bin/wails build -clean; git diff --check",
+      "result": "PASS; Darwin/arm64 app packaged and diff clean",
+      "warnings": [
+        "Distribution signing, notarization, stapling, and DMG smoke remain release-only"
+      ]
     }
   ],
   "concerns": [
@@ -4171,6 +4808,23 @@
     },
     {
       "note": "Native production app launch passed, but macOS denied assistive click automation with error -25211; T138 and reopened T114 remain open until Accessibility access is granted",
+      "step": "implement"
+    },
+    {
+      "note": "The first full browser run hit one randomized BUG-003 password no-change assertion after dud removal; an immediate unchanged full rerun passed 33/33, so the validation records this residual fixture flake",
+      "step": "implement"
+    },
+    {
+      "note": "Frontend compilation and Wails packaging both write frontend/dist and can race when launched together; the final package gate was deliberately rerun sequentially and passed",
+      "step": "implement",
+      "kind": "tooling"
+    },
+    {
+      "note": "The stateful BUG-003 composed fixture is not repeat-each isolated; repeated cases inherit claimed characters. A fresh complete Playwright run passed 34/34.",
+      "step": "implement"
+    },
+    {
+      "note": "Loopback-dependent Go and Playwright gates require execution outside the restricted sandbox; authorized reruns passed.",
       "step": "implement"
     }
   ]

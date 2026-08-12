@@ -12,6 +12,10 @@
 
 **Bugfix**: 2026-08-12 — BUG-005 Updated from bugfix patch
 
+**Bugfix**: 2026-08-12 — BUG-006 Updated from bugfix patch
+
+**Bugfix**: 2026-08-12 — BUG-007 Updated from bugfix patch
+
 **Tests**: Required by the specification and constitution. Each user-story phase writes its focused tests before implementation; the final phase owns the complete Success Criteria suite run.
 
 **Task format**: `T### [P?] [US#] Description · exact/file/path`
@@ -114,14 +118,18 @@ This phase establishes the transport-independent types, strict wire shapes, send
 
 **Independent Test**: Connect one controller and two observers, exercise every navigation/hacking action from each, and verify only controller requests mutate state while all clients converge and every pending request resolves.
 
+**BUG-006 deferral**: T029, T030, T034, and T037 were reopened for traceability and were re-completed through T150 after T148 reproduced the outcome-audio failure and T149 corrected the confirmed boundary; the original Phase 4 wave placement is historical and does not override the Phase 19 DAG.
+
+**BUG-007 deferral**: T029, T030, and T037 were reopened again for traceability and were re-completed through T154 after T152 reproduced the complete sound-family failure and T153 corrected the confirmed production boundary; T034 remained completed BUG-006 work and received focused regression review in T153–T154.
+
 ### Tests
 
 **Wave 1 — independent (different files; write failing tests first):**
 
 - [x] **T027** [P] [US2] Cover controller/unassigned/observer/unknown/stale-terminal authorization, exact no-mutation and zero-RNG rejection, duplicate request fingerprints, request/reassignment ordering, and unchanged gameplay rules · `internal/control/service_test.go`
 - [x] **T028** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Cover 4–7 client convergence, initiating-socket action results, shared revision order, crafted observer rejection, duplicate one-use requests, slow-client isolation, and production-shaped active-controller hacking dispatch · `internal/player/server_test.go`
-- [x] **T029** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Cover visibly read-only observers, local hover/focus/paging/preview, zero outbound observer actions, active-controller password/filler/pattern selection, controller pending state, and accepted/rejected result completion without optimistic mutation · `tests/browser/player-sessions-control.spec.mjs`
-- [x] **T030** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Assert every pointer/keyboard/back/guess/pattern send path is role/pending gated, active hacking targets are not disabled by observer/pending presentation, and `ForceHackSuccess` and `HACK_ADMIN` remain absent from player assets/protocol · `internal/platform/assets_test.go`
+- [x] **T029** [P] [US2] ⚠️ Reopened (reopened — BUG-003; reopened — BUG-006; reopened — BUG-007): Cover visibly read-only observers, local hover/focus/paging/preview, zero outbound observer actions, active-controller password/filler/pattern selection, controller pending state, accepted/rejected result completion without optimistic mutation, and the complete exact-once `single`/`multiple`/`enter` plus authoritative bad/good/lockout audio matrix · `tests/browser/player-sessions-control.spec.mjs`
+- [x] **T030** [P] [US2] ⚠️ Reopened (reopened — BUG-003; reopened — BUG-006; reopened — BUG-007): Assert every pointer/keyboard/back/guess/pattern send path is role/pending gated, active hacking targets are not disabled by observer/pending presentation, `ForceHackSuccess` and `HACK_ADMIN` remain absent from player assets/protocol, and all established hacking-screen sound manifests/assets plus native-decode verification remain packaged · `internal/platform/assets_test.go`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
@@ -137,7 +145,7 @@ This phase establishes the transport-independent types, strict wire shapes, send
 **Wave 3 — independent canonical/client behavior (different files):**
 
 - [x] **T033** [P] [US2] Implement request fingerprinting, assignment/controller/connected/terminal authorization, ordered live mutation, revisioned effects, and accepted/rejected cached action results · `internal/control/service.go`
-- [x] **T034** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Add request IDs and broadcast/terminal preconditions, gate all shared send paths by role/pending without blocking the current active controller's rendered hacking targets, apply revisioned snapshots, and clear pending only from authoritative results · `client/client.js`
+- [x] **T034** [P] [US2] ⚠️ Reopened (reopened — BUG-003; reopened — BUG-006): Add request IDs and broadcast/terminal preconditions, gate all shared send paths by role/pending without blocking the current active controller's rendered hacking targets, apply revisioned snapshots, clear pending only from authoritative results, and derive idempotent bad/good/lockout audio only from newly applied authoritative hacking transitions · `client/client.js`
 
 **⟶ Wait for Wave 3 to finish, then:**
 
@@ -145,7 +153,7 @@ This phase establishes the transport-independent types, strict wire shapes, send
 
 - [x] **T035** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Dispatch active-controller sender-aware navigation/hacking commands through the coordinator, enqueue canonical fanout before per-request results, and reject all pre-handshake or unauthorized actions · `internal/player/server.go`
 - [x] **T036** [P] [US2] Route exact private `ForceHackSuccess` through the same ordered coordinator revision without granting any player capability · `app.go`
-- [x] **T037** [P] [US2] ⚠️ Reopened (reopened — BUG-003): Update the existing hacking browser fixture for hello/welcome, request preconditions, revisions, action results, and explicit active-controller password/filler/pattern actionability while preserving camouflage and no-optimistic-mutation assertions · `tests/browser/hacking-camouflage.spec.mjs`
+- [x] **T037** [P] [US2] ⚠️ Reopened (reopened — BUG-003; reopened — BUG-006; reopened — BUG-007): Update the existing hacking browser fixture for hello/welcome, request preconditions, revisions, action results, explicit active-controller password/filler/pattern actionability, and the complete interaction/outcome audio matrix while preserving camouflage, no-optimistic-mutation, and no-reconnect-replay assertions · `tests/browser/hacking-camouflage.spec.mjs`
 
 **⟶ Wait for Wave 4 to finish, then:**
 
@@ -456,7 +464,7 @@ This phase establishes the transport-independent types, strict wire shapes, send
 
 ## Phase 12: Polish and Cross-Cutting Validation
 
-Finalize operational documentation, enforce security/presentation contracts across the complete surface, and run the Success Criteria suite exactly once here because no post-implement hook owns validation.
+Finalize operational documentation, enforce security/presentation contracts across the complete surface, and run the baseline SC-001 through SC-022 validation suite here; later bugfix and convergence phases rerun the affected and full gates after subsequent changes.
 
 **Wave 1 — independent (different files):**
 
@@ -558,6 +566,10 @@ Finalize operational documentation, enforce security/presentation contracts acro
 
 **Task disposition**: T028–T030, T034–T035, T037, and T038 are reopened because their completed layer checks and fake-WebSocket journeys did not establish the production-composed active-controller path. T027 and T033 remain complete but require regression review against the reproduced failure before the correction is accepted.
 
+**BUG-006 deferral**: T132 and T133 were reopened for traceability and were re-completed through T150 and T151 respectively after T148–T149; their original BUG-003 wave placement is historical and does not override the Phase 19 DAG.
+
+**BUG-007 deferral**: T132 and T133 were reopened again for traceability and were re-completed through T154 and T155 respectively after T152–T153; their original BUG-003/BUG-006 wave placement is historical and does not override the Phase 20 DAG.
+
 ### Reproduction and failing coverage
 
 **Wave 1 — production-composed regression first:**
@@ -578,19 +590,35 @@ Finalize operational documentation, enforce security/presentation contracts acro
 
 **Wave 3 — focused regressions:**
 
-- [x] **T132** [US2] Complete the reopened T028–T030, T034–T035, T037, and T038 checks; add focused regressions for the corrected boundary and confirm T027/T033 authorization invariants still reject observers, stale terminals, and duplicate actions without mutation · `internal/control/service_test.go`, `internal/player/server_test.go`, `internal/platform/assets_test.go`, `tests/browser/hacking-camouflage.spec.mjs`, `tests/browser/player-sessions-control.spec.mjs`
+- [x] **T132** [US2] ⚠️ Reopened (reopened — BUG-006; reopened — BUG-007): Complete the reopened T028–T030, T034–T035, T037, and T038 checks; add focused regressions for the corrected action and complete audio-family boundaries, and confirm T027/T033 authorization invariants still reject observers, stale terminals, and duplicate actions without mutation or outcome-audio replay · `internal/control/service_test.go`, `internal/player/server_test.go`, `internal/platform/assets_test.go`, `tests/browser/hacking-camouflage.spec.mjs`, `tests/browser/player-sessions-control.spec.mjs`
 
 **⟶ Wait for Wave 3 to finish, then:**
 
 **Wave 4 — complete BUG-003 verification:**
 
-- [x] **T133** [US2] Run formatting, vet, full and race Go suites, frontend build, browser suite, a native composed active-controller hacking journey, and package build; append SC-028 and BUG-003 evidence without weakening SC-007, SC-021, or SC-022 · `specs/004-player-sessions-control/validation.md`
+- [x] **T133** [US2] ⚠️ Reopened (reopened — BUG-006; reopened — BUG-007): Run formatting, vet, full and race Go suites, frontend build, browser suite, a native composed active-controller hacking journey including all established interaction and outcome cues, and package build; append SC-028/SC-032/SC-033 and BUG-003/BUG-006/BUG-007 evidence without weakening SC-007, SC-021, or SC-022 · `specs/004-player-sessions-control/validation.md`
 
 **Checkpoint**: BUG-003 is complete only when a real active browser can select every hacking target category through the composed server-authoritative path, all assigned views converge, pending input resolves, and observers remain unable to emit shared actions.
 
 ---
 
 ## Dependencies & Execution Order
+
+### Requirement Traceability
+
+| Requirement range | Primary task coverage |
+|---|---|
+| FR-001–FR-018 | T002–T016, T039–T045, T101–T126 |
+| FR-019–FR-052 | T010–T027, T039–T075, T116–T129 |
+| FR-053–FR-075 | T027–T038, T058–T066, T130–T146 |
+| FR-076–FR-099 | T076–T115, T135–T146, T156 |
+| FR-100–FR-115 | T116–T129, T134 |
+| FR-116–FR-121 | T139–T144 |
+| FR-122–FR-125 | T029–T037, T132–T155 |
+| FR-126–FR-129 | T029–T037, T132–T155 |
+| SC-001–SC-022 | T010–T115, T145–T147 |
+| SC-023–SC-027 | T116–T129, T134 |
+| SC-028–SC-033 | T130–T155 |
 
 ### Phase dependencies
 
@@ -613,6 +641,9 @@ Finalize operational documentation, enforce security/presentation contracts acro
 17. **Phase 16: BUG-004** depends on the completed US9 lifecycle layers and Phase 15 convergence. T135 must reproduce the game-master interaction failure first; T136 then repairs only the confirmed boundary; T137 completes reopened T111 and runs regression review for T104–T110/T115; T138 completes reopened T114 and full validation only after T135–T137 pass.
 18. **Phase 17: BUG-005** depends on the completed US2 authoritative hacking path, US7 terminal runtime ownership, US8 private discard helpers, and Phase 16 composition. T139–T141 add independent failing coverage; T142 implements the canonical runtime replacement after those tests fail; T143 completes the trusted master-to-player composition after T142; T144 runs only after T139–T143 pass.
 19. **Phase 18: Convergence** depends on Phase 17 completion. T145 restores assigned-session reconnect projection first; T146 then completes the coordinator-owned private `ForceHackSuccess` composition; T147 applies the final scoped JavaScript convention enforcement after the behavioral convergence tasks.
+20. **Phase 19: BUG-006** depends on the completed US2/BUG-003 authoritative hacking path and Phase 18 convergence. T148 must reproduce and localize the missing outcome playback first; T149 then repairs only the confirmed client/audio boundary; T150 completes the reopened T029/T030/T034/T037/T132 regressions; T151 completes reopened T133 and full verification only after T148–T150 pass.
+21. **Phase 20: BUG-007** depends on the BUG-006 outcome mapping and the complete US2 interaction path. T152 must reproduce every required hacking-screen family with the native browser audio stack and localize the first failing production boundary; T153 then repairs only that confirmed boundary; T154 completes reopened T029/T030/T037/T132/T148–T150 plus T034 regression review; T155 completes reopened T133/T151 and full packaged verification only after T152–T154 pass.
+22. **Phase 21: Convergence** depends on Phase 20 completion. T156 runs after T155 to remove the remaining production coordinator bypass while preserving the authoritative activation, clear, update, and private forced-success boundaries. T157 runs only after T156 and is the final constitution-mandated validation gate.
 
 ### Wave restatement
 
@@ -635,6 +666,9 @@ Finalize operational documentation, enforce security/presentation contracts acro
 - **BUG-004**: production-shaped failing game-master click journey → confirmed-boundary correction → reopened master integration and lifecycle regression review → full suites, native click-through journey, and SC-029 evidence.
 - **BUG-005**: failing runtime/coordinator, private-boundary/fanout, and production-shaped browser journeys → canonical failed-runtime replacement → trusted master-to-player composition → full suites, native retry journey, and SC-030/SC-031 evidence.
 - **Phase 18 Convergence**: BUG-005 completion → T145 assigned-session reconnect projection → T146 coordinator-owned private forced-success composition → T147 scoped JavaScript convention enforcement.
+- **BUG-006**: observable Web Audio failing journey → confirmed client/audio-boundary correction → reopened interaction/asset/idempotence regressions → full suites, packaged native wrong/unlock/lockout journey, and SC-032 evidence.
+- **BUG-007**: native production-audio family matrix with ambient/charscroll controls → confirmed event/manifest/decode/context/routing/output correction → reopened interaction/outcome regressions → full suites, directly monitored packaged playback, and SC-033 evidence.
+- **Phase 21 Convergence**: BUG-007 completion → remove the legacy `SetLiveTerminal` and `ClearLiveTerminal` production bindings → migrate focused tests to authoritative activation/clear commands → verify the legacy bindings are unavailable → run and record the final full validation suite.
 
 Tasks tagged `[P]` are parallel only inside their declared wave. Same-file work in later phases remains sequential even when conceptually independent, preserving one writer and the story checkpoint order.
 
@@ -735,3 +769,90 @@ Tasks tagged `[P]` are parallel only inside their declared wave. Same-file work 
 - [x] T145 Deliver the coordinator-owned active terminal snapshot to every recognized assigned reconnect and new tab, and add a production-composed WebSocket/browser regression proving role, assignment, puzzle, and current-terminal resume without regeneration per FR-005, FR-074, US3/AC1–AC2 (partial) · `internal/control/service.go`, `internal/player/server.go`, `main.go`, `internal/player/server_test.go`, `tests/browser/player-sessions-control.spec.mjs`
 - [x] T146 Route exact private `ForceHackSuccess` through the coordinator-owned current active terminal runtime, publish one ordered sanitized solved projection to all assigned players, and add a production-composed regression while preserving player-side absence and failed-puzzle ineligibility per FR-095, FR-099, SC-021, plan: Implementation Strategy 10 (contradicts) · `internal/control/service.go`, `internal/live/service.go`, `app.go`, `main.go`, `internal/control/service_test.go`, `internal/player/server_test.go`, `app_test.go`
 - [x] T147 Normalize tab-indented scoped browser source to the required two-space convention and enforce that convention for frontend/client JavaScript per Constitution V, plan: Constitution Check V (partial) · `frontend/src/desktop-api.js`, `frontend/src/master.js`, `internal/platform/assets_test.go`
+
+---
+
+## Phase 19: BUG-006 — Restore Authoritative Hacking Outcome Audio (User Story 2)
+
+**Goal**: Every audio-enabled continuously connected assigned player invokes the established bad cue for an ordinary wrong password selection and final lockout, and the established good cue for a successful unlock, exactly once when the corresponding newer authoritative hacking state is applied.
+
+**Independent Test**: Start the production-composed player server with active and observer browsers, enable audio with a separate gesture in every tested player document, and use three fresh puzzle cases for an ordinary wrong candidate, a correct candidate, and a final-attempt wrong candidate. Observe one bad, good, and bad Web Audio invocation respectively on each audio-enabled continuously connected assigned view while click-only, rejected, duplicate/stale, reconnect, and unchanged-render paths remain silent.
+
+**Task disposition**: T029, T030, T034, T037, T132, and T133 are reopened because their completed browser, asset, client-state, and full-validation scopes did not observe Web Audio outcome playback. T020 in `specs/hacking-game/tasks.md` remains historical evidence of the required behavior; BUG-006 restores its regressed result in the active feature rather than rewriting that completed dependency artifact.
+
+**BUG-007 deferral**: T148–T151 were reopened because their synthetic source-start and headless packaged evidence did not establish audible production playback and because T148 assumed cursor/click audio was working. They were re-completed through T152–T155; the original Phase 19 wave placement is historical and does not override the Phase 20 DAG.
+
+### Reproduction and failing coverage
+
+**Wave 1 — observable browser regression first:**
+
+- [x] **T148** [US2] ⚠️ Reopened (reopened — BUG-007): Add failing production-shaped active-and-observer coverage with an observable sound adapter or `AudioContext` decode/source-start spy and colocated sound-manifest/static-asset HTTP assertions; explicitly enable audio in every tested player document, distinguish working cursor audio from missing outcome audio, use separate fresh puzzles for ordinary wrong, newly solved, and final lockout, and expect one bad, good, and bad cue while click-only, rejected, stale/duplicate, reconnect, and unchanged-render paths expect none · `internal/player/http_test.go`, `tests/browser/player-sessions-control.spec.mjs`, `tests/browser/hacking-camouflage.spec.mjs`
+
+**⟶ Wait for Wave 1 to finish, then:**
+
+### Correction
+
+**Wave 2 — repair only the first reproduced audio boundary:**
+
+- [x] **T149** [US2] ⚠️ Reopened (reopened — BUG-007): Trace T148 through accepted revision filtering, previous-to-next hacking-state comparison, `playHackBad`/`playHackGood`, folder readiness, Web Audio decode/resume/source start, and packaged sound serving; implement the smallest confirmed correction with exact-once transition guards and non-fatal playback failure, without playing optimistically or changing canonical/pending behavior · `client/client.js`, `client/sound.js`, `internal/player/http.go`
+
+**⟶ Wait for Wave 2 to finish, then:**
+
+### Regression and validation
+
+**Wave 3 — complete reopened interaction and asset coverage:**
+
+- [x] **T150** [US2] ⚠️ Reopened (reopened — BUG-007): Complete reopened T029, T030, T034, T037, and T132; retain hover/cursor sounds, assert bad/good HTTP assets and runtime playback are observable, give each tested active and observer document its own enabling gesture, verify exact-once cues across separate fresh wrong/unlock/lockout puzzles, and prove initial/reconnect snapshots, repeated render, rejected actions, stale/duplicate revisions, `ACTION_RESULT` alone, ineligible audio, and playback failures cause no replay, canonical mutation, or pending-input stall · `client/client.js`, `client/sound.js`, `internal/player/http_test.go`, `internal/platform/assets_test.go`, `tests/browser/hacking-camouflage.spec.mjs`, `tests/browser/player-sessions-control.spec.mjs`
+
+**⟶ Wait for Wave 3 to finish, then:**
+
+**Wave 4 — complete BUG-006 verification:**
+
+- [x] **T151** [US2] ⚠️ Reopened (reopened — BUG-007): Complete reopened T133 by running formatting, vet, full and race Go suites, frontend build, complete browser suite, three packaged native active/observer audio cases using fresh puzzles and a separate enabling gesture in every tested document, and package build; append BUG-006 and SC-032 evidence without weakening SC-007, SC-014, SC-022, SC-028, or prior bugfix gates · `specs/004-player-sessions-control/validation.md`
+
+**Checkpoint**: BUG-006 is complete only when three fresh packaged puzzle cases invoke exactly one bad, good, and bad cue at the production Web Audio boundary for the corresponding newly applied authoritative wrong, unlock, and lockout transitions in every explicitly audio-enabled tested document; all replay/no-op paths remain silent; and ineligible or failed playback cannot affect canonical state or pending completion.
+
+---
+
+## Phase 20: BUG-007 — Restore Complete Hacking-Screen Audio (User Story 2)
+
+**Goal**: In an explicitly audio-enabled packaged player document, the password-hacking screen audibly retains individual-target preview, grouped-target preview, entry, wrong/lockout, and unlock cues in addition to the already working CRT ambience and character-scroll sounds, without changing canonical gameplay or player authority.
+
+**Independent Test**: Use one output-capable production browser served by the packaged player, perform a separate enabling gesture, and exercise individual filler hover, password and unused-pattern hover, target selection, ordinary wrong guess, correct unlock, and final lockout. Directly monitor audible output and native decode/routing for `single`, `multiple`, `enter`, `hack-bad`, and `hack-good`, with ambient and character-scroll as working controls; repeat outcome cases in active and observer documents to retain BUG-006 exact-once/no-replay behavior.
+
+**Task disposition**: T029, T030, T037, T132, T133, and T148–T151 are reopened because their completed interaction, asset, browser, correction, and packaged-validation scopes relied on synthetic `AudioContext` success or assumed cursor audio was working. T034 remains completed but receives focused review because authoritative outcome detection may still be implicated. Historical T020 in `specs/hacking-game/tasks.md` remains the original complete-audio contract rather than being rewritten.
+
+### Reproduction and failing coverage
+
+**Wave 1 — native production-audio matrix first:**
+
+- [x] **T152** [US2] Reproduce BUG-007 in an output-capable real browser served by the packaged player without replacing the native `AudioContext`; after one explicit enabling gesture, exercise `ambient`, `charscroll`, `single`, `multiple`, `enter`, `hack-bad`, and `hack-good`, record DOM/public-function dispatch, manifest and asset readiness, native decode, context state, source/gain/destination routing, source start, and directly monitored audible output, and identify the first failing boundary for every silent family · `client/client.js`, `client/sound.js`, `internal/player/http_test.go`, `tests/browser/hacking-camouflage.spec.mjs`, `tests/browser/player-sessions-control.spec.mjs`, `specs/004-player-sessions-control/validation.md`
+
+**⟶ Wait for Wave 1 to finish, then:**
+
+### Correction
+
+**Wave 2 — repair only the reproduced production boundary:**
+
+- [x] **T153** [US2] Trace T152 across target-preview deduplication, selection dispatch, authoritative revision comparison, sound-folder readiness, asset selection/fetch, native decoding, per-document eligibility/resume timing, and source/gain/destination routing; implement the smallest confirmed correction for all affected families while preserving ambient/charscroll controls, observer local-only behavior, exact-once outcome guards, canonical state, and pending completion · `client/client.js`, `client/sound.js`, `internal/player/http.go`
+
+**⟶ Wait for Wave 2 to finish, then:**
+
+### Regression and validation
+
+**Wave 3 — complete reopened interaction, asset, and outcome coverage:**
+
+- [x] **T154** [US2] Complete reopened T029, T030, T037, T132, and T148–T150 and review T034 against the reproduced boundary; retain synthetic adapter tests only as unit-level diagnostics, add native-decode/output-capable coverage for `single`, `multiple`, `enter`, `hack-bad`, and `hack-good`, keep ambient/charscroll as controls, and prove observer silence on the wire, exact-once authoritative outcomes, no replay, and non-fatal audio failure · `client/client.js`, `client/sound.js`, `internal/player/http_test.go`, `internal/platform/assets_test.go`, `tests/browser/hacking-camouflage.spec.mjs`, `tests/browser/player-sessions-control.spec.mjs`
+
+**⟶ Wait for Wave 3 to finish, then:**
+
+**Wave 4 — complete BUG-007 verification:**
+
+- [x] **T155** [US2] Complete reopened T133 and T151 by running formatting, vet, full and race Go suites, frontend build, complete browser suite, clean Wails package build, and a directly monitored output-capable packaged-player journey for the complete sound-family matrix; append BUG-007 and SC-033 evidence without weakening BUG-006/SC-032, player authority, canonical convergence, pending-input, or prior bugfix gates · `specs/004-player-sessions-control/validation.md`
+
+**Checkpoint**: BUG-007 is complete only when the packaged password-hacking screen audibly produces `single`, `multiple`, `enter`, `hack-bad`, and `hack-good` for their specified real interactions after explicit document eligibility, retains ambient and character-scroll, preserves exact-once/no-replay authoritative outcomes, and records native decode/routing plus directly monitored output rather than relying only on synthetic source starts.
+
+## Phase 21: Convergence
+
+- [x] T156 CRITICAL Eliminate the production terminal-state coordinator bypass by removing `SetLiveTerminal` and `ClearLiveTerminal` from the Wails-bound App and desktop facade (or moving compatibility helpers behind an unbound test-only seam), migrate remaining focused tests to `RequestTerminalActivation` and `RequestTerminalClear`, and assert that the legacy binding names are unavailable while `UpdateLiveTerminal` and exact private `ForceHackSuccess` remain per Constitution II, Constitution III, plan: Implementation Strategy 2/10, T083–T084 (contradicts) · `app.go`, `app_test.go`, `frontend/src/desktop-api.js`, `internal/platform/assets_test.go`
+- [x] T157 Run `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, `npm --prefix frontend run build`, and `npm --prefix tests/browser test`; run the affected `wails dev` boundary smoke and a clean `wails build`; record all post-T156 results and unavailable release-only checks in `specs/004-player-sessions-control/validation.md`

@@ -389,10 +389,14 @@ func TestApplicationPlayerStartFailureNeverReportsReady(t *testing.T) {
 }
 
 func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
-	live := &recordingLiveService{}
-	app := NewAppWithDependencies(AppDependencies{Live: live})
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 1, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1"},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{Coordination: coordination})
 
-	setResult := app.SetLiveTerminal(LiveTerminalPayload{
+	activationResult := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID:   "terminal-1",
 		TerminalName: "Overseer",
 		Tree: domain.ContentNode{
@@ -400,8 +404,8 @@ func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
 		},
 		HackLevel: 1,
 	})
-	if setResult.OK || setResult.Error == "" {
-		t.Fatalf("SetLiveTerminal(invalid) = %#v, want structured validation error", setResult)
+	if activationResult.OK || activationResult.Error == "" {
+		t.Fatalf("RequestTerminalActivation(invalid) = %#v, want structured validation error", activationResult)
 	}
 
 	updateResult := app.UpdateLiveTerminal(LiveUpdatePayload{
@@ -410,8 +414,8 @@ func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
 	if updateResult.OK || updateResult.Error == "" {
 		t.Fatalf("UpdateLiveTerminal(invalid) = %#v, want structured validation error", updateResult)
 	}
-	if live.setCalls != 0 || live.updateCalls != 0 {
-		t.Fatalf("invalid live payloads reached canonical service: set=%d update=%d", live.setCalls, live.updateCalls)
+	if len(coordination.targets) != 0 || coordination.updateCalls != 0 {
+		t.Fatalf("invalid live payloads reached coordinator: activations=%d updates=%d", len(coordination.targets), coordination.updateCalls)
 	}
 }
 
@@ -1156,13 +1160,14 @@ func TestOpenURLAllowsOnlyHTTPAndHTTPS(t *testing.T) {
 	}
 }
 
-func TestBridgeLiveLifecycleEmitsPublicStateAndCleansUp(t *testing.T) {
+func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 	recorder := &callRecorder{}
-	live := &recordingLiveService{
-		setState: &domain.PublicLiveState{
-			TerminalID: "terminal-1",
-			Hack:       &domain.PublicHackState{Level: 1, AttemptsMax: 4, AttemptsLeft: 4},
-		},
+	live := &recordingLiveService{}
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 1, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1"},
+		}},
+		order: recorder,
 	}
 	events := &recordingEventSink{recorder: recorder}
 	app := NewAppWithDependencies(AppDependencies{
@@ -1171,15 +1176,16 @@ func TestBridgeLiveLifecycleEmitsPublicStateAndCleansUp(t *testing.T) {
 			recorder: recorder,
 			info:     domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"},
 		},
-		Desktop: &recordingDesktop{recorder: recorder},
-		Events:  events,
-		Live:    live,
+		Desktop:      &recordingDesktop{recorder: recorder},
+		Events:       events,
+		Live:         live,
+		Coordination: coordination,
 	})
 	if err := app.Start(context.Background()); err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	result := app.SetLiveTerminal(LiveTerminalPayload{
+	result := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID:   "terminal-1",
 		TerminalName: "Overseer",
 		Tree: domain.ContentNode{
@@ -1189,16 +1195,16 @@ func TestBridgeLiveLifecycleEmitsPublicStateAndCleansUp(t *testing.T) {
 		IntroText: "ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM",
 	})
 	if !result.OK || result.Error != "" {
-		t.Fatalf("SetLiveTerminal(valid) = %#v", result)
+		t.Fatalf("RequestTerminalActivation(valid) = %#v", result)
 	}
 	records := events.Records()
 	last := records[len(records)-1]
-	if last.Name != "hack-state" {
-		t.Fatalf("last bridge event = %#v, want hack-state", last)
+	if last.Name != coordinationStateEvent {
+		t.Fatalf("last bridge event = %#v, want coordination-state", last)
 	}
-	hackState, ok := last.Payload.(*domain.PublicHackState)
-	if !ok || hackState == nil || hackState.AttemptsLeft != 4 {
-		t.Fatalf("hack-state payload = %#v", last.Payload)
+	coordinationState, ok := last.Payload.(*domain.MasterCoordinationState)
+	if !ok || coordinationState == nil || coordinationState.Broadcast == nil || coordinationState.Broadcast.ActiveTerminalID == nil || *coordinationState.Broadcast.ActiveTerminalID != "terminal-1" {
+		t.Fatalf("coordination-state payload = %#v", last.Payload)
 	}
 
 	if err := app.Shutdown(context.Background()); err != nil {
@@ -1206,57 +1212,6 @@ func TestBridgeLiveLifecycleEmitsPublicStateAndCleansUp(t *testing.T) {
 	}
 	if live.clearCalls != 1 {
 		t.Fatalf("live Clear calls after shutdown = %d, want 1", live.clearCalls)
-	}
-}
-
-func TestBridgeLiveCommandsPublishPlayerAndPublicHackState(t *testing.T) {
-	recorder := &callRecorder{}
-	player := &recordingPlayerServer{recorder: recorder}
-	live := &recordingLiveService{
-		setState: &domain.PublicLiveState{
-			TerminalID: "terminal-1",
-			Hack:       &domain.PublicHackState{Level: 2, AttemptsMax: 4, AttemptsLeft: 4},
-		},
-		updateState: &domain.PublicLiveState{
-			TerminalID: "terminal-1",
-			Hack:       &domain.PublicHackState{Level: 2, AttemptsMax: 4, AttemptsLeft: 3},
-		},
-		forceState: &domain.PublicHackState{Level: 2, AttemptsMax: 4, AttemptsLeft: 3, Solved: true},
-	}
-	app := NewAppWithDependencies(AppDependencies{
-		Live:   live,
-		Player: player,
-		Events: &recordingEventSink{recorder: recorder},
-	})
-	tree := domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}}
-
-	if result := app.SetLiveTerminal(LiveTerminalPayload{
-		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: tree, HackLevel: 2,
-	}); !result.OK {
-		t.Fatalf("SetLiveTerminal() = %#v", result)
-	}
-	if result := app.UpdateLiveTerminal(LiveUpdatePayload{Tree: tree}); !result.OK {
-		t.Fatalf("UpdateLiveTerminal() = %#v", result)
-	}
-	if result := app.ForceHackSuccess(); !result.OK {
-		t.Fatalf("ForceHackSuccess() = %#v", result)
-	}
-	if result := app.ClearLiveTerminal(); !result.OK {
-		t.Fatalf("ClearLiveTerminal() = %#v", result)
-	}
-
-	want := []string{
-		"player:publish-live", "event:hack-state",
-		"player:publish-update", "event:hack-state",
-		"player:publish-hack", "event:hack-state",
-		"player:publish-clear", "event:hack-state",
-	}
-	if got := recorder.Calls(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("live publication calls = %v, want %v", got, want)
-	}
-	status := app.GetRuntimeStatus()
-	if status.HackState != nil {
-		t.Fatalf("hack state after clear = %#v, want nil", status.HackState)
 	}
 }
 
