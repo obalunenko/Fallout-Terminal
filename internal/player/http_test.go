@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -122,6 +124,79 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(playerAssets())
+	const secretToken = "opaque-browser-token-that-must-not-be-reflected"
+
+	for _, requestPath := range []string{
+		"/api/session",
+		"/api/token",
+		"/api/browser-token",
+		"/api/identity",
+	} {
+		recorder := serveRequest(t, handler, requestPath)
+		if recorder.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want no recognition endpoint", requestPath, recorder.Code)
+		}
+	}
+
+	for _, requestPath := range []string{
+		"/?browserToken=" + secretToken,
+		"/client.js?token=" + secretToken,
+		"/terminal/root?session=" + secretToken,
+	} {
+		recorder := serveRequest(t, handler, requestPath)
+		serialized := recorder.Body.String() + recorder.Header().Get("Location") + recorder.Header().Get("Set-Cookie")
+		if strings.Contains(serialized, secretToken) {
+			t.Errorf("GET %s reflected recognition material in an HTTP response", requestPath)
+		}
+		if recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("GET %s lost nosniff", requestPath)
+		}
+		if policy := recorder.Header().Get("Content-Security-Policy"); policy != playerContentSecurityPolicy {
+			t.Errorf("GET %s CSP changed: %q", requestPath, policy)
+		}
+	}
+
+	for _, test := range []struct {
+		origin string
+		want   bool
+	}{
+		{origin: "", want: true},
+		{origin: "https://player.test", want: true},
+		{origin: "http://player.test", want: true},
+		{origin: "https://evil.example", want: false},
+	} {
+		request := httptest.NewRequest(http.MethodGet, "http://player.test/", nil)
+		request.Host = "player.test"
+		if test.origin != "" {
+			request.Header.Set("Origin", test.origin)
+		}
+		if got := sameHostOrigin(request); got != test.want {
+			t.Errorf("sameHostOrigin(%q) = %t, want %t", test.origin, got, test.want)
+		}
+	}
+
+	clientScript, err := os.ReadFile(filepath.Join("..", "..", "client", "client.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := string(clientScript)
+	start := strings.Index(js, "function playerWebSocketURL()")
+	end := strings.Index(js, "function connect()")
+	if start < 0 || end <= start {
+		t.Fatal("player script is missing the WebSocket URL construction boundary")
+	}
+	urlBoundary := js[start:end]
+	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "searchParams", "?token", "?session"} {
+		if strings.Contains(urlBoundary, forbidden) {
+			t.Errorf("WebSocket URL construction exposes recognition material through %q", forbidden)
+		}
 	}
 }
 

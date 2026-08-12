@@ -263,6 +263,251 @@ func TestAcceptedPatternPublishesOnceAfterMutationAndDuplicatePublishesNever(t *
 	}
 }
 
+func TestTerminalRuntimeLifecycleCreatesUpdatesAndProjectsDetachedCheckpoints(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	service.generationIDs = &sequenceGenerationIDs{values: []string{"runtime-generation-1", "runtime-generation-2"}}
+	target := domain.TerminalTarget{
+		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: testTree(), HackLevel: 1, IntroText: "OLD",
+	}
+	runtime, created := service.CreateRuntime(target)
+	if runtime == nil || created == nil || runtime.Hack == nil || runtime.Hack.GenerationID != "runtime-generation-1" {
+		t.Fatalf("CreateRuntime() = runtime %#v projection %#v", runtime, created)
+	}
+	if runtime.Lifecycle != domain.TerminalLifecycleActive || !reflect.DeepEqual(runtime.Nav.Path, []string{"root"}) {
+		t.Fatalf("fresh runtime lifecycle/nav = %#v", runtime)
+	}
+	if created.Hack == nil || created.TerminalID != target.TerminalID {
+		t.Fatalf("fresh public projection = %#v", created)
+	}
+	created.Tree.Name = "MUTATED PROJECTION"
+	created.Nav.Path[0] = "mutated"
+	created.Hack.Log = append(created.Hack.Log, "mutated")
+	projected := service.ProjectRuntime(runtime)
+	if projected.Tree.Name != "ROOT" || !reflect.DeepEqual(projected.Nav.Path, []string{"root"}) || len(projected.Hack.Log) != 0 {
+		t.Fatalf("projection aliases private runtime: %#v", projected)
+	}
+
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
+		t.Fatal("Apply() rejected created runtime")
+	}
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
+		t.Fatal("Apply() rejected created runtime entry")
+	}
+	privateHackBefore := cloneHackForLifecycleTest(runtime.Hack)
+	updatedTarget := target
+	updatedTarget.TerminalName = "Overseer Updated"
+	updatedTarget.Tree = treeWithoutReport()
+	updatedTarget.IntroText = "NEW"
+	updated := service.UpdateRuntime(runtime, updatedTarget)
+	if updated == nil || updated.TerminalName != "Overseer Updated" || updated.IntroText != "NEW" || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil {
+		t.Fatalf("UpdateRuntime() did not update metadata/revalidate nav: %#v", updated)
+	}
+	if !reflect.DeepEqual(runtime.Hack, privateHackBefore) || runtime.Hack.GenerationID != "runtime-generation-1" {
+		t.Fatal("UpdateRuntime() regenerated or changed private puzzle")
+	}
+	if service.generationIDs.(*sequenceGenerationIDs).next != 1 {
+		t.Fatalf("UpdateRuntime() consumed a new generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
+	}
+
+	second, _ := service.CreateRuntime(domain.TerminalTarget{
+		TerminalID: "terminal-2", TerminalName: "Archive", Tree: testTree(), HackLevel: 1,
+	})
+	if second.Hack == nil || second.Hack.GenerationID != "runtime-generation-2" {
+		t.Fatalf("second fresh runtime did not generate a fresh puzzle: %#v", second.Hack)
+	}
+}
+
+func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegenerates(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	service.generationIDs = &sequenceGenerationIDs{values: []string{"checkpoint-generation-1", "checkpoint-generation-2"}}
+	target := domain.TerminalTarget{
+		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: testTree(), HackLevel: 1, IntroText: "OLD",
+	}
+	runtime, initial := service.CreateRuntime(target)
+	if runtime == nil || runtime.Hack == nil || initial == nil || initial.Hack == nil {
+		t.Fatalf("CreateRuntime() = runtime %#v projection %#v", runtime, initial)
+	}
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
+		t.Fatal("navigation into checkpoint was rejected")
+	}
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
+		t.Fatal("entry navigation into checkpoint was rejected")
+	}
+	wrongTarget := ""
+	for id, candidate := range runtime.Hack.WordsByID {
+		if candidate.Text != runtime.Hack.SecretWord {
+			wrongTarget = id
+			break
+		}
+	}
+	if wrongTarget == "" {
+		t.Fatal("generated puzzle has no non-secret candidate")
+	}
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: wrongTarget}); !ok {
+		t.Fatal("wrong guess was rejected")
+	}
+	patternID := service.ProjectRuntime(runtime).Hack.Patterns[0].ID
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackPattern, PatternID: patternID}); !ok {
+		t.Fatal("pattern use was rejected")
+	}
+
+	privateBefore := cloneHackForLifecycleTest(runtime.Hack)
+	navBefore := cloneNav(runtime.Nav)
+	service.SuspendRuntime(runtime)
+	if runtime.Lifecycle != domain.TerminalLifecycleSuspended || !reflect.DeepEqual(runtime.Hack, privateBefore) || !reflect.DeepEqual(runtime.Nav, navBefore) {
+		t.Fatalf("SuspendRuntime() changed exact checkpoint: %#v", runtime)
+	}
+
+	latest := target
+	latest.TerminalName = "Overseer Renamed"
+	latest.IntroText = "LATEST"
+	latest.Tree = treeWithoutReport()
+	restored := service.ReactivateRuntime(runtime, latest)
+	if restored == nil || runtime.Lifecycle != domain.TerminalLifecycleActive {
+		t.Fatalf("ReactivateRuntime() = %#v, lifecycle %q", restored, runtime.Lifecycle)
+	}
+	if runtime.TerminalName != latest.TerminalName || runtime.IntroText != latest.IntroText || runtime.Tree.ID != latest.Tree.ID || len(runtime.Tree.Children) != 1 || len(runtime.Tree.Children[0].Children) != 1 || runtime.Tree.Children[0].Children[0].ID != "read" {
+		t.Fatalf("reactivation did not apply latest authored content: %#v", runtime)
+	}
+	if !reflect.DeepEqual(runtime.Hack, privateBefore) {
+		t.Fatalf("reactivation changed secret/generation/board/attempts/candidates/patterns/log/outcome:\n got %#v\nwant %#v", runtime.Hack, privateBefore)
+	}
+	if runtime.Nav.Mode != "list" || runtime.Nav.ViewEntryID != nil || !reflect.DeepEqual(runtime.Nav.Path, []string{"root", "docs"}) {
+		t.Fatalf("reactivation did not revalidate navigation against refreshed content: %#v", runtime.Nav)
+	}
+	if service.generationIDs.(*sequenceGenerationIDs).next != 1 {
+		t.Fatalf("preserve consumed a fresh generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
+	}
+
+	discarded, fresh := service.DiscardRuntime(latest)
+	if discarded == nil || fresh == nil || discarded.Hack == nil {
+		t.Fatalf("DiscardRuntime() = runtime %#v projection %#v", discarded, fresh)
+	}
+	if discarded.Hack.GenerationID != "checkpoint-generation-2" || discarded.Hack.GenerationID == privateBefore.GenerationID {
+		t.Fatalf("discard retained prior generation: old %q new %#v", privateBefore.GenerationID, discarded.Hack)
+	}
+	if discarded.Hack.AttemptsLeft != discarded.Hack.AttemptsMax || discarded.Hack.Solved || discarded.Hack.Failed || len(discarded.Hack.Log) != 0 || len(discarded.Hack.UsedPatterns) != 0 {
+		t.Fatalf("discard did not create a fresh puzzle: %#v", discarded.Hack)
+	}
+	if !reflect.DeepEqual(discarded.Nav, domain.NavState{Mode: "list", Path: []string{"root"}}) {
+		t.Fatalf("discard did not reset navigation: %#v", discarded.Nav)
+	}
+	// Generation identity remains private; the fresh public board proves the
+	// replacement without exposing that identifier.
+	if fresh.Hack == nil {
+		t.Fatal("discard projection omitted fresh public puzzle")
+	}
+}
+
+func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	service.generationIDs = &sequenceGenerationIDs{values: []string{"failed-generation", "retry-generation"}}
+	original := domain.TerminalTarget{
+		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: testTree(), HackLevel: 1, IntroText: "OLD",
+	}
+	runtime, _ := service.CreateRuntime(original)
+	oldTargetID := ""
+	for targetID := range runtime.Hack.WordsByID {
+		oldTargetID = targetID
+		break
+	}
+	runtime.Hack.AttemptsLeft = 0
+	runtime.Hack.Failed = true
+	runtime.Hack.Log = []string{"TERMINAL LOCKED"}
+
+	latest := original
+	latest.TerminalName = "Overseer Renamed"
+	latest.Tree = treeWithoutReport()
+	latest.HackLevel = 2
+	latest.IntroText = "LATEST"
+	replacement, projection := service.ResetFailedHack(runtime, latest)
+	if replacement == nil || projection == nil || replacement.Hack == nil {
+		t.Fatalf("ResetFailedHack() = runtime %#v projection %#v", replacement, projection)
+	}
+	if replacement.Hack.GenerationID != "retry-generation" || replacement.Hack.Level != 2 || replacement.Hack.AttemptsLeft != replacement.Hack.AttemptsMax || replacement.Hack.Failed || replacement.Hack.Solved || len(replacement.Hack.Log) != 0 {
+		t.Fatalf("replacement puzzle = %#v, want fresh level-2 generation", replacement.Hack)
+	}
+	if replacement.TerminalID != latest.TerminalID || replacement.TerminalName != latest.TerminalName || replacement.IntroText != latest.IntroText || replacement.Tree.ID != latest.Tree.ID || len(replacement.Tree.Children) != len(latest.Tree.Children) {
+		t.Fatalf("replacement authored state = %#v, want latest target %#v", replacement, latest)
+	}
+	if projection.Hack == nil || projection.Hack.AttemptsLeft != projection.Hack.AttemptsMax || projection.Hack.Failed {
+		t.Fatalf("replacement projection = %#v", projection)
+	}
+	if _, reused := replacement.Hack.WordsByID[oldTargetID]; reused {
+		t.Fatalf("fresh generation reused stale candidate identity %q", oldTargetID)
+	}
+	freshBeforeStaleAction := cloneRuntimeForLifecycleTest(replacement)
+	if _, accepted := service.Apply(replacement, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: oldTargetID}); accepted || !reflect.DeepEqual(replacement, freshBeforeStaleAction) {
+		t.Fatalf("stale generation action was accepted or mutated replacement: accepted=%t", accepted)
+	}
+
+	for name, mutate := range map[string]func(*domain.TerminalRuntime, *domain.TerminalTarget){
+		"unfinished": func(candidate *domain.TerminalRuntime, _ *domain.TerminalTarget) {
+			candidate.Hack.Failed = false
+			candidate.Hack.AttemptsLeft = 1
+		},
+		"solved":         func(candidate *domain.TerminalRuntime, _ *domain.TerminalTarget) { candidate.Hack.Solved = true },
+		"wrong terminal": func(_ *domain.TerminalRuntime, target *domain.TerminalTarget) { target.TerminalID = "terminal-2" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := cloneRuntimeForLifecycleTest(runtime)
+			target := latest
+			mutate(candidate, &target)
+			before := cloneRuntimeForLifecycleTest(candidate)
+			beforeGeneration := service.generationIDs.(*sequenceGenerationIDs).next
+			got, public := service.ResetFailedHack(candidate, target)
+			if got != nil || public != nil || !reflect.DeepEqual(candidate, before) || service.generationIDs.(*sequenceGenerationIDs).next != beforeGeneration {
+				t.Fatalf("ineligible reset = runtime %#v projection %#v candidate %#v", got, public, candidate)
+			}
+		})
+	}
+}
+
+func cloneRuntimeForLifecycleTest(state *domain.TerminalRuntime) *domain.TerminalRuntime {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	clone.Tree = cloneNode(state.Tree)
+	clone.Nav = cloneNav(state.Nav)
+	clone.Hack = cloneHackForLifecycleTest(state.Hack)
+	return &clone
+}
+
+func cloneHackForLifecycleTest(state *domain.HackState) *domain.HackState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	clone.WordsByID = make(map[string]domain.HackCandidate, len(state.WordsByID))
+	for id, candidate := range state.WordsByID {
+		clone.WordsByID[id] = candidate
+	}
+	clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(state.UsedPatterns))
+	for identity := range state.UsedPatterns {
+		clone.UsedPatterns[identity] = struct{}{}
+	}
+	if state.Log != nil {
+		clone.Log = make([]string, len(state.Log))
+		copy(clone.Log, state.Log)
+	}
+	if state.Columns != nil {
+		clone.Columns = make([]domain.HackColumn, len(state.Columns))
+		copy(clone.Columns, state.Columns)
+	}
+	for index := range clone.Columns {
+		if state.Columns[index].Addresses != nil {
+			clone.Columns[index].Addresses = make([]string, len(state.Columns[index].Addresses))
+			copy(clone.Columns[index].Addresses, state.Columns[index].Addresses)
+		}
+		if state.Columns[index].Words != nil {
+			clone.Columns[index].Words = make([]domain.HackWord, len(state.Columns[index].Words))
+			copy(clone.Columns[index].Words, state.Columns[index].Words)
+		}
+	}
+	return &clone
+}
+
 func activatePattern(service *Service, patternID string) (*domain.PublicHackState, bool) {
 	var result *domain.PublicHackState
 	ok := service.ApplyHackPattern(patternID, func(state *domain.PublicHackState) { result = state })

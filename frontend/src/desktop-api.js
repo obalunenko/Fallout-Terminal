@@ -13,10 +13,27 @@ const APP_METHODS = Object.freeze({
   newSession: 'NewSession',
   openSession: 'OpenSession',
   saveSession: 'SaveSession',
+  loadReferencedPlayerConfig: 'LoadReferencedPlayerConfig',
+  newPlayerConfig: 'NewPlayerConfig',
+  openPlayerConfig: 'OpenPlayerConfig',
   setLiveTerminal: 'SetLiveTerminal',
+  requestTerminalActivation: 'RequestTerminalActivation',
   updateLiveTerminal: 'UpdateLiveTerminal',
   clearLiveTerminal: 'ClearLiveTerminal',
+  requestTerminalClear: 'RequestTerminalClear',
+  resolveTerminalSwitch: 'ResolveTerminalSwitch',
   forceHackSuccess: 'ForceHackSuccess',
+  resetFailedHack: 'ResetFailedHack',
+  addCharacter: 'AddCharacter',
+  renameCharacter: 'RenameCharacter',
+  deleteCharacter: 'DeleteCharacter',
+  renameLogicalSession: 'RenameLogicalSession',
+  assignCharacter: 'AssignCharacter',
+  releaseCharacter: 'ReleaseCharacter',
+  moveCharacter: 'MoveCharacter',
+  setActiveController: 'SetActiveController',
+  startBroadcast: 'StartBroadcast',
+  endBroadcast: 'EndBroadcast',
   openUrl: 'OpenURL',
 });
 
@@ -50,6 +67,47 @@ function command(method, ...args) {
     ok: false,
     error: error instanceof Error ? error.message : String(error),
   }));
+}
+
+const TERMINAL_SWITCH_STATUSES = new Set([
+  'activated',
+  'cleared',
+  'decision-required',
+  'cancelled',
+]);
+
+function normalizeSwitchCommandResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  const status = typeof value.status === 'string' && TERMINAL_SWITCH_STATUSES.has(value.status)
+    ? value.status
+    : '';
+  const switchId = typeof value.switchId === 'string' ? value.switchId : '';
+  const state = value.state && typeof value.state === 'object' ? value.state : null;
+  let error = typeof value.error === 'string' ? value.error : '';
+  if (!ok && !error) error = 'Terminal switch command failed';
+
+  return Object.freeze({ ok, error, status, switchId, state });
+}
+
+function switchCommand(method, ...args) {
+  return command(method, ...args).then(normalizeSwitchCommandResult);
+}
+
+function normalizePlayerConfigResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  const canceled = value.canceled === true;
+  const config = value.playerConfig && typeof value.playerConfig === 'object' ? value.playerConfig : null;
+  const session = value.session && typeof value.session === 'object' ? value.session : null;
+  const state = value.state && typeof value.state === 'object' ? value.state : null;
+  let error = typeof value.error === 'string' ? value.error : '';
+  if (!ok && !canceled && !error) error = 'Player config command failed';
+  return Object.freeze({ ok, canceled, error, config, session, state });
+}
+
+function playerConfigCommand(method, ...args) {
+  return command(method, ...args).then(normalizePlayerConfigResult);
 }
 
 let runtimeStatusPromise;
@@ -136,16 +194,34 @@ const desktopAPI = {
   onServerInfo: (callback) => subscribe('server-info', 'serverInfo', callback, normalizeServerInfo),
   onClientCount: (callback) => subscribe('client-count', 'clientCount', callback),
   onHackState: (callback) => subscribe('hack-state', 'hackState', callback),
+  onCoordinationState: (callback) => subscribe('coordination-state', 'coordinationState', callback),
   // Deliberately perform no privileged browser operation here. App.OpenURL
   // parses and validates the final HTTP(S) URL immediately before opening it.
   openUrl: (url) => command(APP_METHODS.openUrl, url),
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),
   saveSession: (session) => command(APP_METHODS.saveSession, session),
+  loadReferencedPlayerConfig: () => playerConfigCommand(APP_METHODS.loadReferencedPlayerConfig),
+  newPlayerConfig: () => playerConfigCommand(APP_METHODS.newPlayerConfig),
+  openPlayerConfig: () => playerConfigCommand(APP_METHODS.openPlayerConfig),
   setLiveTerminal: (payload) => command(APP_METHODS.setLiveTerminal, payload),
+  requestTerminalActivation: (payload) => switchCommand(APP_METHODS.requestTerminalActivation, payload),
   updateLiveTerminal: (payload) => command(APP_METHODS.updateLiveTerminal, payload),
   clearLiveTerminal: () => command(APP_METHODS.clearLiveTerminal),
+  requestTerminalClear: () => switchCommand(APP_METHODS.requestTerminalClear),
+  resolveTerminalSwitch: (payload) => switchCommand(APP_METHODS.resolveTerminalSwitch, payload),
   forceHackSuccess: () => command(APP_METHODS.forceHackSuccess),
+  resetFailedHack: (payload) => command(APP_METHODS.resetFailedHack, payload),
+  addCharacter: (name) => command(APP_METHODS.addCharacter, name),
+  renameCharacter: (payload) => command(APP_METHODS.renameCharacter, payload),
+  deleteCharacter: (characterId) => command(APP_METHODS.deleteCharacter, characterId),
+  renameLogicalSession: (payload) => command(APP_METHODS.renameLogicalSession, payload),
+  assignCharacter: (payload) => command(APP_METHODS.assignCharacter, payload),
+  releaseCharacter: (sessionId) => command(APP_METHODS.releaseCharacter, sessionId),
+  moveCharacter: (payload) => command(APP_METHODS.moveCharacter, payload),
+  setActiveController: (sessionId) => command(APP_METHODS.setActiveController, sessionId),
+  startBroadcast: () => command(APP_METHODS.startBroadcast),
+  endBroadcast: () => command(APP_METHODS.endBroadcast),
 };
 
 Object.defineProperty(desktopAPI, DISPOSE, {

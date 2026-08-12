@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+const BROADCAST_ID = 'broadcast-1';
+const TERMINAL_ID = 'terminal-1';
+
 const initialHack = {
   level: 1,
   wordLength: 4,
@@ -20,6 +23,61 @@ const initialHack = {
     { id: 'pattern-first-closer', row: 3, start: 0, end: 3, used: false },
   ],
 };
+
+function controllingState() {
+  return {
+    revision: 1,
+    sessionId: 'session-1',
+    fallbackName: 'PLAYER 1',
+    character: { id: 'character-1', name: 'Mara' },
+    role: 'active',
+    phase: 'controlling',
+    broadcastId: BROADCAST_ID,
+    activeTerminalId: TERMINAL_ID,
+    roster: [{ id: 'character-1', name: 'Mara', status: 'claimed' }],
+  };
+}
+
+async function emit(page, message) {
+  await page.evaluate(value => {
+    window.__playerSocket.emit('message', { data: JSON.stringify(value) });
+  }, message);
+}
+
+async function expectSharedRequest(page, expected) {
+  const requests = await page.evaluate(() => window.__outboundMessages.filter(message =>
+    ['HACK_GUESS', 'HACK_PATTERN'].includes(message.type)
+  ));
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toEqual({
+    ...expected,
+    requestId: expect.any(String),
+    broadcastId: BROADCAST_ID,
+    terminalId: TERMINAL_ID,
+  });
+  expect(requests[0].requestId.length).toBeGreaterThan(0);
+  return requests[0];
+}
+
+async function acceptHackRequest(page, request, revision, hack) {
+  await emit(page, {
+    type: 'ACTION_RESULT',
+    requestId: request.requestId,
+    accepted: true,
+    reason: 'accepted',
+    revision,
+  });
+  await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
+
+  await emit(page, {
+    type: 'HACK_STATE',
+    revision,
+    terminalId: TERMINAL_ID,
+    hack,
+  });
+  await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
+  await page.evaluate(() => { window.__outboundMessages.length = 0; });
+}
 
 async function openControlledPuzzle(page) {
   await page.addInitScript(() => {
@@ -61,19 +119,27 @@ async function openControlledPuzzle(page) {
 
   await page.goto('/');
   await page.waitForFunction(() => window.__playerSocket);
-  await page.evaluate(hack => {
-    window.__playerSocket.emit('message', {
-      data: JSON.stringify({
-        type: 'TERMINAL_LIVE',
-        terminalName: 'Controlled terminal',
-        tree: { id: 'root', type: 'folder', name: 'Root', children: [] },
-        hackLevel: 1,
-        hack,
-        nav: { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null },
-      }),
-    });
-  }, initialHack);
+  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
+    { type: 'SESSION_HELLO' },
+  ]);
+
+  await emit(page, {
+    type: 'SESSION_WELCOME',
+    browserToken: 'token-1',
+    state: controllingState(),
+  });
+  await emit(page, {
+    type: 'TERMINAL_LIVE',
+    revision: 2,
+    terminalId: TERMINAL_ID,
+    terminalName: 'Controlled terminal',
+    tree: { id: 'root', type: 'folder', name: 'Root', children: [] },
+    hackLevel: 1,
+    hack: initialHack,
+    nav: { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null },
+  });
   await expect(page.locator('#hackBoard')).toBeVisible();
+  await page.evaluate(() => { window.__outboundMessages.length = 0; });
 }
 
 test('only a valid opening activates its whole pattern while all other symbols stay individually selectable', async ({ page }) => {
@@ -99,12 +165,19 @@ test('only a valid opening activates its whole pattern while all other symbols s
   const boardBefore = await page.locator('#hackColumns').textContent();
   const attemptsBefore = await page.locator('#attemptsLine').textContent();
   await validOpening.click();
-  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-    { type: 'HACK_PATTERN', patternId: 'pattern-initial' },
-  ]);
+  const patternRequest = await expectSharedRequest(page, {
+    type: 'HACK_PATTERN',
+    patternId: 'pattern-initial',
+  });
+  await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
   await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
   await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
 
+  const usedHack = structuredClone(initialHack);
+  usedHack.patterns[0].used = true;
+  await acceptHackRequest(page, patternRequest, 3, usedHack);
+
+  let revision = 4;
   for (const target of [
     { offset: 1, glyph: '!', targetId: '0:1' },
     { offset: 2, glyph: '!', targetId: '0:2' },
@@ -119,19 +192,17 @@ test('only a valid opening activates its whole pattern while all other symbols s
     await cell.focus();
     await expect(page.locator('.hcell.hi')).toHaveCount(1);
     await cell.click();
-    await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-      { type: 'HACK_GUESS', targetId: target.targetId },
-    ]);
+    const guessRequest = await expectSharedRequest(page, {
+      type: 'HACK_GUESS',
+      targetId: target.targetId,
+    });
+    await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
     await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
     await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
+    await acceptHackRequest(page, guessRequest, revision, usedHack);
+    revision += 1;
   }
 
-  const usedHack = structuredClone(initialHack);
-  usedHack.patterns[0].used = true;
-  await page.evaluate(hack => {
-    window.__outboundMessages.length = 0;
-    window.__playerSocket.emit('message', { data: JSON.stringify({ type: 'HACK_STATE', hack }) });
-  }, usedHack);
   await validOpening.hover();
   await expect(page.locator('.hcell.hi')).toHaveCount(0);
   await validOpening.click();
@@ -141,46 +212,60 @@ test('only a valid opening activates its whole pattern while all other symbols s
 test('word-interrupted spans stay ordinary until a server snapshot publishes a new pattern', async ({ page }) => {
   await openControlledPuzzle(page);
 
+  const boardBefore = await page.locator('#hackColumns').textContent();
+  const attemptsBefore = await page.locator('#attemptsLine').textContent();
   const interruptedOpening = page.locator('[data-row="1"][data-offset="0"]');
   await interruptedOpening.click();
-  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-    { type: 'HACK_GUESS', targetId: '0:12' },
-  ]);
+  const interruptedRequest = await expectSharedRequest(page, {
+    type: 'HACK_GUESS',
+    targetId: '0:12',
+  });
+  await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
+  await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
+  await acceptHackRequest(page, interruptedRequest, 3, initialHack);
 
-  await page.evaluate(() => { window.__outboundMessages.length = 0; });
   await page.locator('.hcell.word[data-target="A1"]').click();
-  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-    { type: 'HACK_GUESS', targetId: 'A1' },
-  ]);
+  const wordRequest = await expectSharedRequest(page, {
+    type: 'HACK_GUESS',
+    targetId: 'A1',
+  });
+  await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
+  await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
+  await acceptHackRequest(page, wordRequest, 4, initialHack);
 
   const postDudHack = structuredClone(initialHack);
   postDudHack.columns[0].text = postDudHack.columns[0].text.replace('(DUST)', '(....)');
   postDudHack.columns[0].words = [];
   postDudHack.patterns.push({ id: 'pattern-after-dud', row: 1, start: 0, end: 5, used: false });
-  await page.evaluate(hack => {
-    window.__outboundMessages.length = 0;
-    window.__playerSocket.emit('message', {
-      data: JSON.stringify({ type: 'HACK_STATE', hack }),
-    });
-  }, postDudHack);
+  await emit(page, {
+    type: 'HACK_STATE',
+    revision: 5,
+    terminalId: TERMINAL_ID,
+    hack: postDudHack,
+  });
 
   const publishedOpening = page.locator('[data-row="1"][data-offset="0"]');
   await publishedOpening.hover();
   await expect(page.locator('.hcell.hi')).toHaveCount(6);
   await publishedOpening.click();
-  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-    { type: 'HACK_PATTERN', patternId: 'pattern-after-dud' },
-  ]);
+  const publishedPatternRequest = await expectSharedRequest(page, {
+    type: 'HACK_PATTERN',
+    patternId: 'pattern-after-dud',
+  });
+  const postPatternHack = structuredClone(postDudHack);
+  postPatternHack.patterns.at(-1).used = true;
+  await acceptHackRequest(page, publishedPatternRequest, 6, postPatternHack);
 
-  await page.evaluate(() => { window.__outboundMessages.length = 0; });
   const publishedClosing = page.locator('[data-row="1"][data-offset="5"]');
   await publishedClosing.hover();
   await expect(page.locator('.hcell.hi')).toHaveCount(1);
   await expect(page.locator('#hackInputPreview')).toHaveText(')');
   await publishedClosing.click();
-  await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-    { type: 'HACK_GUESS', targetId: '0:17' },
-  ]);
+  const closingRequest = await expectSharedRequest(page, {
+    type: 'HACK_GUESS',
+    targetId: '0:17',
+  });
+  await acceptHackRequest(page, closingRequest, 7, postPatternHack);
 });
 
 test('invalid delimiter categories remain ordinary individual targets', async ({ page }) => {
@@ -188,6 +273,7 @@ test('invalid delimiter categories remain ordinary individual targets', async ({
 
   const boardBefore = await page.locator('#hackColumns').textContent();
   const attemptsBefore = await page.locator('#attemptsLine').textContent();
+  let revision = 3;
   for (const target of [
     { name: 'unmatched opening', row: 2, offset: 0, glyph: '[', targetId: '0:24' },
     { name: 'mismatched closer', row: 2, offset: 1, glyph: ')', targetId: '0:25' },
@@ -204,11 +290,15 @@ test('invalid delimiter categories remain ordinary individual targets', async ({
       await cell.focus();
       await expect(page.locator('.hcell.hi')).toHaveCount(1);
       await cell.click();
-      await expect.poll(() => page.evaluate(() => window.__outboundMessages)).toEqual([
-        { type: 'HACK_GUESS', targetId: target.targetId },
-      ]);
+      const request = await expectSharedRequest(page, {
+        type: 'HACK_GUESS',
+        targetId: target.targetId,
+      });
+      await expect(page.locator('#screen')).toHaveClass(/shared-input-pending/);
       await expect(page.locator('#hackColumns')).toHaveText(boardBefore);
       await expect(page.locator('#attemptsLine')).toHaveText(attemptsBefore);
+      await acceptHackRequest(page, request, revision, initialHack);
+      revision += 1;
     });
   }
 });

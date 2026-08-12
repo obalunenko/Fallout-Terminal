@@ -1,6 +1,8 @@
 # Data Model: Player Sessions, Character Assignment, and Shared Terminal Control
 
-All entities in this document are process-local unless explicitly identified as an existing durable authored model. None is added to version-1 session JSON.
+**Bugfix**: 2026-08-12 — BUG-001 Updated from bugfix patch
+
+All entities in this document are process-local unless explicitly identified as a durable authored model. ~~None is added to version-1 session JSON.~~ BUG-001 adds only an optional relative `playerConfig` reference to session JSON and stores the reusable authored roster in a separate player-config JSON file.
 
 ## ProcessRuntime
 
@@ -11,7 +13,8 @@ All entities in this document are process-local unless explicitly identified as 
 | `Revision` | unsigned integer | Monotonically increases once for each accepted canonical transition; never supplied by a client. |
 | `SessionsByID` | map of `LogicalSessionID` to `LogicalSession` | Retained until process restart. |
 | `SessionIDByBrowserToken` | map of opaque token to `LogicalSessionID` | Private recognition index; token values never enter logs, URLs, master state, or player state. |
-| `RosterByID` | ordered map of `CharacterID` to `CharacterRosterEntry` | Retained across broadcast endings; cleared on process restart. |
+| `RosterByID` | ordered map of `CharacterID` to `CharacterRosterEntry` | ~~Retained across broadcast endings; cleared on process restart.~~ Loaded from the active player config, retained across broadcast endings, discarded from memory on restart, and restored only by reopening that config. |
+| `ActivePlayerConfig` | optional detached `PlayerConfigHandle` | Active only after a referenced, selected, or newly created config and its session association succeed; nil disables roster mutation and broadcast start. |
 | `Broadcast` | optional `LiveBroadcast` | Nil when no broadcast exists. |
 | `PendingSwitch` | optional `TerminalSwitchDecision` | At most one unresolved game-master terminal-switch request. |
 
@@ -41,10 +44,33 @@ The browser serializes a first-use handshake across tabs so only one token-issui
 
 | Field | Type | Rules |
 |---|---|---|
-| `ID` | opaque `CharacterID` | Stable and unique for the server process. |
+| `ID` | opaque `CharacterID` | ~~Stable and unique for the server process.~~ Stable and unique within the player config; reused when that config is reopened. |
 | `Name` | string | Trimmed, nonblank, at most 80 Unicode code points; duplicate visible names are allowed. |
 
 Availability is derived from the current broadcast's assignment index. Renaming retains identity and every existing claim. Deletion is rejected while the current broadcast claims the entry.
+
+## PlayerConfig — Durable Authored Model (BUG-001)
+
+```text
+PlayerConfig
+├── version: 1
+├── name: nonblank string
+└── roster: ordered CharacterRosterEntry[]
+```
+
+The application creates and reads this UTF-8 JSON independently from the terminal session file. It validates the supported version, nonblank name, roster array, unique nonblank IDs, and existing character-name limit before replacing `RosterByID`. Unknown, missing, invalid, or partially valid roster data never enters the runtime.
+
+`PlayerConfigHandle` contains the canonical active file path for privileged Go-side saves plus its detached version/name metadata for master status. The path is never sent to player clients. Roster add, rename, and unclaimed delete build a complete candidate `PlayerConfig`, atomically replace the file, and only then commit and publish the matching coordinator revision. A failed write changes neither the file nor runtime state.
+
+## Session Player-Config Association — Durable Authored Model (BUG-001)
+
+The existing version-1 `Session` gains one optional string field:
+
+```text
+playerConfig: normalized path relative to the session file directory
+```
+
+An absent field preserves legacy loading. A referenced config is resolved only against the active session directory. Selecting or creating a config while no broadcast is active computes the relative path and saves the session association before installing the new `PlayerConfigHandle` and roster. If association save fails, the prior handle and roster remain active; a newly created unassociated file remains independently reusable.
 
 ## LiveBroadcast
 
@@ -130,7 +156,7 @@ Stable rejection reasons are `invalid-session`, `stale-broadcast`, `unassigned`,
 The private Wails projection is one detached revision:
 
 - `revision`;
-- process-local roster entries with claim status;
+- ~~process-local roster entries~~ player-config-backed roster entries with runtime claim status;
 - all recognized logical sessions with fallback name, connected presence, character identity/name when assigned, and `active`, `observer`, or `unassigned` role;
 - optional broadcast ID, controller session ID, active terminal ID, and pending switch metadata.
 
@@ -156,7 +182,11 @@ After assignment, character name is the primary displayed identity and fallback 
 ProcessRuntime 1 ── * BrowserRecognition * ── 1 LogicalSession
 ProcessRuntime 1 ── * LogicalSession
 ProcessRuntime 1 ── * CharacterRosterEntry
+ProcessRuntime 1 ── 0..1 PlayerConfigHandle
 ProcessRuntime 1 ── 0..1 LiveBroadcast
+
+Session * ── 0..1 PlayerConfig
+PlayerConfig 1 ── * CharacterRosterEntry
 
 LiveBroadcast 1 ── * CharacterAssignment
 CharacterAssignment * ── 1 LogicalSession
@@ -243,10 +273,13 @@ start new broadcast
   → every session is unassigned; controller nil
 
 server process restart
-  → discard complete ProcessRuntime
+  → discard complete ProcessRuntime, including the in-memory roster
   → any presented old browser token is unknown and creates a fresh session/token
+  → reopening a session resolves its playerConfig reference
+  → load only authored roster IDs/names into a fresh ProcessRuntime
+  → availability begins unclaimed; no prior assignment/controller/broadcast/runtime returns
 ```
 
 ## Persistence Boundary
 
-The existing version-1 JSON remains limited to campaign name and authored terminals with ID, name, hack level, intro text, and content tree. It gains no browser token, logical session, fallback name, connection, presence, roster, claim, assignment, role, controller, broadcast ID, active terminal, revision, request result, pending switch, suspended terminal, navigation, puzzle, attempts, board, patterns, log, or outcome field.
+The existing version-1 session JSON remains limited to campaign name, authored terminals with ID, name, hack level, intro text, and content tree, plus the optional relative `playerConfig` reference added by BUG-001. ~~It gains no roster field or player-config association.~~ The roster itself is stored only in the separate player-config JSON. Neither durable file gains a browser token, logical session, fallback name, connection, presence, claim, assignment, role, controller, broadcast ID, active terminal, revision, request result, pending switch, suspended terminal, navigation, puzzle, attempts, board, patterns, log, or outcome field.

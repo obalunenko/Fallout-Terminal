@@ -8,10 +8,43 @@ import (
 )
 
 var (
-	sessionFields  = fieldSet("version", "name", "terminals")
+	sessionFields  = fieldSet("version", "name", "playerConfig", "terminals")
 	terminalFields = fieldSet("id", "name", "hackLevel", "introText", "root")
 	nodeFields     = fieldSet("id", "type", "name", "children", "text", "description")
 )
+
+// DecodePlayerConfig strictly decodes one standalone version-1 authored roster.
+func DecodePlayerConfig(data []byte) (PlayerConfig, error) {
+	var config PlayerConfig
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&config); err != nil {
+		return PlayerConfig{}, fmt.Errorf("decode player config: %w", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return PlayerConfig{}, fmt.Errorf("decode player config: trailing JSON value")
+		}
+		return PlayerConfig{}, fmt.Errorf("decode player config: %w", err)
+	}
+	if err := ValidatePlayerConfig(config); err != nil {
+		return PlayerConfig{}, fmt.Errorf("validate player config: %w", err)
+	}
+	return config, nil
+}
+
+// EncodePlayerConfig emits stable, human-readable version-1 JSON.
+func EncodePlayerConfig(config PlayerConfig) ([]byte, error) {
+	if err := ValidatePlayerConfig(config); err != nil {
+		return nil, fmt.Errorf("validate player config: %w", err)
+	}
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encode player config: %w", err)
+	}
+	return append(data, '\n'), nil
+}
 
 // DecodeSession decodes a version-1 document while retaining compatible unknown fields.
 func DecodeSession(data []byte) (Session, error) {

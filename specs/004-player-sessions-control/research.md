@@ -1,5 +1,7 @@
 # Research: Player Sessions, Character Assignment, and Shared Terminal Control
 
+**Bugfix**: 2026-08-12 — BUG-001 Updated from bugfix patch
+
 ## Decision 1: Use one outer coordinator for every authoritative runtime transition
 
 **Decision**: Add `internal/control.Service` as the single serialized owner of logical sessions, presence, roster, broadcast lifetime, assignments, controller identity, active-terminal selection, suspended terminal runtimes, player authorization, and ordered revision issuance. It delegates terminal mechanics to `internal/live` while committing detached publication effects through a non-reentrant callback before the coordinator mutex is released.
@@ -27,9 +29,9 @@
 
 ## Decision 3: Model process, broadcast, and terminal lifetimes independently
 
-**Decision**: Keep logical sessions, fallback names, and roster entries at process scope. Put exclusive claims, controller identity, active terminal, and per-terminal runtime slots inside an opaque broadcast epoch. Ending a broadcast removes the entire broadcast aggregate but retains the process-scoped registry and roster; starting another broadcast issues a fresh `broadcastId` and requires new claims.
+**Decision**: Keep logical sessions and fallback names at process scope. ~~Keep roster entries at process scope.~~ BUG-001 supersedes that roster lifetime: load authored roster IDs/names from the active player config into the process runtime, while availability remains derived from the current broadcast. Put exclusive claims, controller identity, active terminal, and per-terminal runtime slots inside an opaque broadcast epoch. Ending a broadcast removes the entire broadcast aggregate but retains the process-scoped registry and loaded roster; starting another broadcast issues a fresh `broadcastId` and requires new claims.
 
-**Rationale**: The requirements explicitly retain recognized devices and roster configuration across broadcast endings while clearing assignments and control. A broadcast may also remain live with no active terminal, so terminal clearing cannot continue to mean broadcast termination.
+**Rationale**: The requirements explicitly retain recognized devices and loaded roster configuration across broadcast endings while clearing assignments and control. BUG-001 additionally requires the authored roster to survive process restart through an explicit reload from durable configuration; this does not extend any logical-session or claim lifetime. A broadcast may also remain live with no active terminal, so terminal clearing cannot continue to mean broadcast termination.
 
 **Alternatives considered**:
 
@@ -93,6 +95,20 @@
 
 **Alternatives considered**:
 
-- Add a database or durable session store: rejected because all new state intentionally expires at process or broadcast boundaries.
+- ~~Add a database or durable session store: rejected because all new state intentionally expires at process or broadcast boundaries.~~ Add a database or general durable runtime store: rejected because browser recognition, presence, claims, controller, broadcasts, and puzzles still intentionally expire at process or broadcast boundaries. BUG-001 uses only ordinary JSON filesystem persistence for the authored roster.
 - Add a frontend state framework: rejected because the established master and player surfaces use small plain-DOM render functions.
 - Add a second browser-testing tool: rejected because Playwright already covers executable interaction and multi-page contexts.
+
+## Decision 9: Persist the authored roster in a separate player-config file
+
+**Decision**: Store reusable roster IDs and names in a separate version-1 JSON player config. Add only an optional normalized relative `playerConfig` reference to version-1 session JSON. After session creation/opening, automatically load that reference or offer native select-existing/create-new actions. Player-config selection or replacement is allowed only without an active broadcast, and successful roster CRUD atomically saves the complete candidate roster before the coordinator publishes it.
+
+**Rationale**: Authored character names are repeatable campaign setup, unlike browser tokens, logical sessions, presence, claims, controller identity, and puzzles. A separate file lets one roster be reused by multiple terminal sessions, preserves the existing terminal-session body, and keeps the privacy and lifetime boundary explicit. A relative session reference makes the pair portable when moved together. Saving before publication prevents the UI and connected players from observing a roster revision that was not durably recorded.
+
+**Alternatives considered**:
+
+- Embed the full roster in session JSON: rejected because it duplicates a roster when several terminal configurations use the same player group and makes reuse require copying or merging session files.
+- Prompt for a player config on every open without remembering the selection: rejected because it removes name re-entry but does not restore the session-to-roster association requested by BUG-001.
+- Store an absolute player-config path in session JSON: rejected because it breaks when the session directory is moved or shared to another machine.
+- Persist logical sessions, claims, controller state, or browser tokens beside the roster: rejected because those values retain their existing process/broadcast lifetimes and would create stale ownership and privacy risks.
+- Add a database or background file watcher: rejected as unnecessary for the explicit open/save workflow; concurrent multi-process editing remains outside this bugfix.

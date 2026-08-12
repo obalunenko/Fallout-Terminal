@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 )
 
@@ -16,6 +17,7 @@ const (
 	serverInfoEvent             = "server-info"
 	clientCountEvent            = "client-count"
 	hackStateEvent              = "hack-state"
+	coordinationStateEvent      = "coordination-state"
 	tunnelStartupFailureMessage = "public tunnel could not start; verify credentials, tunnel executable, endpoint, and network access"
 	tunnelAddressFailureMessage = "public tunnel returned an invalid protected HTTPS address; local access remains available"
 )
@@ -34,12 +36,79 @@ type sessionCommands interface {
 	Snapshot() sessionservice.ActiveSession
 }
 
+type sessionPlayerConfigCommands interface {
+	Snapshot() sessionservice.ActiveSession
+	AssociatePlayerConfig(context.Context, string) sessionservice.SessionResult
+}
+
+// PlayerConfigService owns trusted native selection and strict durable files.
+type PlayerConfigService interface {
+	Create(context.Context) playerconfigservice.Result
+	Open(context.Context) playerconfigservice.Result
+	LoadReferenced(string, string) playerconfigservice.Result
+}
+
 // LiveService owns canonical shared player state.
 type LiveService interface {
 	Set(string, string, domain.ContentNode, int, string) *domain.PublicLiveState
 	Update(domain.ContentNode, *string) (*domain.PublicLiveState, bool)
 	Clear()
 	Snapshot() *domain.PublicLiveState
+	ForceHackSuccess() (*domain.PublicHackState, bool)
+}
+
+// CoordinationService owns process-local logical sessions, roster, claims,
+// broadcast lifetime, and controller state behind one transaction boundary.
+type CoordinationService interface {
+	Snapshot() *domain.MasterCoordinationState
+	AddCharacter(string) (*domain.MasterCoordinationState, error)
+	StartBroadcast() (*domain.MasterCoordinationState, error)
+}
+
+// coordinationCorrectionService is the additive trusted roster/session seam.
+// Keeping it additive lets focused lifecycle fakes provide only the commands
+// they exercise while production control.Service implements the complete set.
+type coordinationCorrectionService interface {
+	RenameCharacter(domain.CharacterID, string) (*domain.MasterCoordinationState, error)
+	DeleteCharacter(domain.CharacterID) (*domain.MasterCoordinationState, error)
+	RenameLogicalSession(domain.LogicalSessionID, string) (*domain.MasterCoordinationState, error)
+	AssignCharacter(domain.LogicalSessionID, domain.CharacterID) (*domain.MasterCoordinationState, error)
+	ReleaseCharacter(domain.LogicalSessionID) (*domain.MasterCoordinationState, error)
+	MoveCharacter(domain.CharacterID, domain.LogicalSessionID) (*domain.MasterCoordinationState, error)
+}
+
+type coordinationControllerService interface {
+	SetActiveController(domain.LogicalSessionID) (*domain.MasterCoordinationState, error)
+}
+
+// coordinationTerminalService is the trusted terminal-selection boundary. It
+// keeps terminal choice, runtime checkpoints, and publication ordered by the
+// same coordinator that owns assignments and controller authority.
+type coordinationTerminalService interface {
+	RequestTerminalActivation(domain.TerminalTarget) (*domain.MasterCoordinationState, error)
+	RequestTerminalClear() (*domain.MasterCoordinationState, error)
+	UpdateLiveTerminal(domain.ContentNode, *string) (*domain.MasterCoordinationState, error)
+	ResetFailedHack(domain.TerminalTarget) (*domain.MasterCoordinationState, error)
+}
+
+type coordinationTerminalDecisionService interface {
+	ResolveTerminalSwitch(domain.SwitchID, domain.TerminalSwitchChoice) (*domain.MasterCoordinationState, error)
+}
+
+type coordinationBroadcastLifecycleService interface {
+	EndBroadcast() (*domain.MasterCoordinationState, error)
+}
+
+type coordinationPlayerConfigService interface {
+	InstallPlayerConfig(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) (*domain.MasterCoordinationState, error)
+	ClearPlayerConfig() (*domain.MasterCoordinationState, error)
+}
+
+type coordinationShutdownService interface {
+	Shutdown()
+}
+
+type coordinatedHackSuccess interface {
 	ForceHackSuccess() (*domain.PublicHackState, bool)
 }
 
@@ -90,7 +159,9 @@ type EventSink interface {
 // external resources; Start owns acquisition in contract order.
 type AppDependencies struct {
 	Sessions      SessionService
+	PlayerConfigs PlayerConfigService
 	Live          LiveService
+	Coordination  CoordinationService
 	Player        PlayerServer
 	Tunnel        TunnelService
 	Desktop       DesktopRuntime
@@ -102,19 +173,75 @@ type AppDependencies struct {
 // RuntimeStatus is the synchronous startup/status snapshot used to avoid
 // losing events emitted before the frontend subscribes.
 type RuntimeStatus struct {
-	ServerInfo        *domain.ServerInfo      `json:"serverInfo"`
-	ClientCount       int                     `json:"clientCount"`
-	HackState         *domain.PublicHackState `json:"hackState"`
-	StartupError      string                  `json:"startupError,omitempty"`
-	SaveState         string                  `json:"saveState"`
-	RequestedRevision uint64                  `json:"requestedRevision"`
-	SavedRevision     uint64                  `json:"savedRevision"`
+	ServerInfo        *domain.ServerInfo              `json:"serverInfo"`
+	ClientCount       int                             `json:"clientCount"`
+	HackState         *domain.PublicHackState         `json:"hackState"`
+	StartupError      string                          `json:"startupError,omitempty"`
+	SaveState         string                          `json:"saveState"`
+	RequestedRevision uint64                          `json:"requestedRevision"`
+	SavedRevision     uint64                          `json:"savedRevision"`
+	CoordinationState *domain.MasterCoordinationState `json:"coordinationState"`
 }
 
 // CommandResult is used for privileged commands that do not return a model.
 type CommandResult struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+}
+
+// CoordinationCommandResult returns the authoritative detached state for
+// both accepted and rejected roster/broadcast commands.
+type CoordinationCommandResult struct {
+	OK    bool                            `json:"ok"`
+	Error string                          `json:"error,omitempty"`
+	State *domain.MasterCoordinationState `json:"state"`
+}
+
+// PlayerConfigCommandResult combines durable metadata with authoritative roster state.
+type PlayerConfigCommandResult struct {
+	OK       bool                            `json:"ok"`
+	Canceled bool                            `json:"canceled"`
+	Error    string                          `json:"error,omitempty"`
+	Config   *domain.PlayerConfigMetadata    `json:"playerConfig,omitempty"`
+	Session  *domain.Session                 `json:"session,omitempty"`
+	State    *domain.MasterCoordinationState `json:"state"`
+}
+
+// TerminalSwitchCommandResult describes either a completed terminal selection
+// or a later decision gate. SwitchID remains empty for direct activation and
+// clear operations; unfinished-puzzle choices populate it in the US8 flow.
+type TerminalSwitchCommandResult struct {
+	OK       bool                            `json:"ok"`
+	Error    string                          `json:"error,omitempty"`
+	Status   string                          `json:"status,omitempty"`
+	SwitchID domain.SwitchID                 `json:"switchId,omitempty"`
+	State    *domain.MasterCoordinationState `json:"state"`
+}
+
+// CharacterRenamePayload identifies one stable roster entry and its new
+// player-facing display name.
+type CharacterRenamePayload struct {
+	CharacterID domain.CharacterID `json:"characterId"`
+	Name        string             `json:"name"`
+}
+
+// LogicalSessionRenamePayload changes only a process-local fallback label.
+type LogicalSessionRenamePayload struct {
+	SessionID    domain.LogicalSessionID `json:"sessionId"`
+	FallbackName string                  `json:"fallbackName"`
+}
+
+// AssignmentPayload assigns one available character to one unassigned
+// logical session.
+type AssignmentPayload struct {
+	SessionID   domain.LogicalSessionID `json:"sessionId"`
+	CharacterID domain.CharacterID      `json:"characterId"`
+}
+
+// MoveCharacterPayload atomically transfers one stable character identity.
+type MoveCharacterPayload struct {
+	CharacterID domain.CharacterID      `json:"characterId"`
+	ToSessionID domain.LogicalSessionID `json:"toSessionId"`
 }
 
 // LiveTerminalPayload is the validated set-live bridge input.
@@ -132,11 +259,19 @@ type LiveUpdatePayload struct {
 	IntroText *string            `json:"introText,omitempty"`
 }
 
+// TerminalSwitchDecisionPayload resolves one opaque unfinished-puzzle switch
+// request with an exact allowlisted decision.
+type TerminalSwitchDecisionPayload struct {
+	SwitchID domain.SwitchID             `json:"switchId"`
+	Decision domain.TerminalSwitchChoice `json:"decision"`
+}
+
 // App is the Wails composition root. Domain behavior remains in internal
 // packages; App owns lifecycle and the narrow desktop facade.
 type App struct {
-	lifecycleMu sync.Mutex
-	mu          sync.RWMutex
+	lifecycleMu           sync.Mutex
+	coordinationCommandMu sync.Mutex
+	mu                    sync.RWMutex
 
 	deps AppDependencies
 	ctx  context.Context
@@ -145,6 +280,7 @@ type App struct {
 	serverInfo        *domain.ServerInfo
 	clientCount       int
 	hackState         *domain.PublicHackState
+	coordinationState *domain.MasterCoordinationState
 	startupError      string
 	saveState         string
 	requestedRevision uint64
@@ -163,7 +299,11 @@ func NewApp() *App {
 
 // NewAppWithDependencies constructs a testable composition root.
 func NewAppWithDependencies(deps AppDependencies) *App {
-	return &App{deps: deps, phase: "constructed", saveState: string(sessionservice.SaveStateIdle)}
+	app := &App{deps: deps, phase: "constructed", saveState: string(sessionservice.SaveStateIdle)}
+	if deps.Coordination != nil {
+		app.coordinationState = domain.CloneMasterCoordinationState(deps.Coordination.Snapshot())
+	}
+	return app
 }
 
 // Start acquires the player listener, publishes local status, allows the
@@ -236,6 +376,7 @@ func (app *App) GetRuntimeStatus() RuntimeStatus {
 		SaveState:         app.saveState,
 		RequestedRevision: app.requestedRevision,
 		SavedRevision:     app.savedRevision,
+		CoordinationState: domain.CloneMasterCoordinationState(app.coordinationState),
 	}
 }
 
@@ -248,6 +389,7 @@ func (app *App) NewSession() sessionservice.SessionResult {
 	}
 	result := commands.Create(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	app.resetPlayerConfigForSession(result)
 	return result
 }
 
@@ -259,6 +401,7 @@ func (app *App) OpenSession() sessionservice.SessionResult {
 	}
 	result := commands.Open(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	app.resetPlayerConfigForSession(result)
 	return result
 }
 
@@ -270,6 +413,7 @@ func (app *App) CopyDemo() sessionservice.SessionResult {
 	}
 	result := commands.CopyDemo(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	app.resetPlayerConfigForSession(result)
 	return result
 }
 
@@ -302,6 +446,304 @@ func (app *App) SaveSession(session domain.Session) sessionservice.SaveResult {
 	return result
 }
 
+// LoadReferencedPlayerConfig reloads the active session's durable roster.
+func (app *App) LoadReferencedPlayerConfig() PlayerConfigCommandResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+	sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands)
+	if !ok || app.deps.PlayerConfigs == nil {
+		return app.playerConfigFailure("player config service is unavailable", false)
+	}
+	if failure := app.playerConfigChangePrecondition(); failure != nil {
+		return *failure
+	}
+	active := sessions.Snapshot()
+	if strings.TrimSpace(active.Session.PlayerConfig) == "" {
+		return app.playerConfigFailure("no player config is associated with this session", false)
+	}
+	loaded := app.deps.PlayerConfigs.LoadReferenced(active.Path, active.Session.PlayerConfig)
+	return app.installPlayerConfig(loaded, false)
+}
+
+// NewPlayerConfig creates, associates, and installs one empty durable roster.
+func (app *App) NewPlayerConfig() PlayerConfigCommandResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+	if app.deps.PlayerConfigs == nil {
+		return app.playerConfigFailure("player config service is unavailable", false)
+	}
+	if failure := app.playerConfigChangePrecondition(); failure != nil {
+		return *failure
+	}
+	return app.installPlayerConfig(app.deps.PlayerConfigs.Create(app.contextSnapshot()), true)
+}
+
+// OpenPlayerConfig selects, associates, and installs an existing durable roster.
+func (app *App) OpenPlayerConfig() PlayerConfigCommandResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+	if app.deps.PlayerConfigs == nil {
+		return app.playerConfigFailure("player config service is unavailable", false)
+	}
+	if failure := app.playerConfigChangePrecondition(); failure != nil {
+		return *failure
+	}
+	return app.installPlayerConfig(app.deps.PlayerConfigs.Open(app.contextSnapshot()), true)
+}
+
+func (app *App) playerConfigChangePrecondition() *PlayerConfigCommandResult {
+	sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands)
+	if !ok {
+		result := app.playerConfigFailure("session service cannot associate player configs", false)
+		return &result
+	}
+	active := sessions.Snapshot()
+	if active.Path == "" || active.Session == nil {
+		result := app.playerConfigFailure("there is no active session", false)
+		return &result
+	}
+	app.mu.RLock()
+	broadcastActive := app.coordinationState != nil && app.coordinationState.Broadcast != nil
+	app.mu.RUnlock()
+	if broadcastActive {
+		result := app.playerConfigFailure("player config cannot change during a broadcast", false)
+		return &result
+	}
+	return nil
+}
+
+func (app *App) installPlayerConfig(result playerconfigservice.Result, associate bool) PlayerConfigCommandResult {
+	if result.Canceled {
+		return app.playerConfigFailure("", true)
+	}
+	if !result.OK || result.Config == nil || result.FilePath == "" {
+		message := result.Error
+		if message == "" {
+			message = "player config could not be loaded"
+		}
+		return app.playerConfigFailure(message, false)
+	}
+	coordination, ok := app.deps.Coordination.(coordinationPlayerConfigService)
+	if !ok {
+		return app.playerConfigFailure("coordination service cannot install player configs", false)
+	}
+	var associatedSession *domain.Session
+	if associate {
+		sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands)
+		if !ok {
+			return app.playerConfigFailure("session service cannot associate player configs", false)
+		}
+		associated := sessions.AssociatePlayerConfig(app.contextSnapshot(), result.FilePath)
+		if !associated.OK {
+			message := associated.Error
+			if message == "" {
+				message = "player config association could not be saved"
+			}
+			return app.playerConfigFailure(message, associated.Canceled)
+		}
+		associatedSession = associated.Session
+	} else if sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands); ok {
+		associatedSession = sessions.Snapshot().Session
+	}
+	handle := domain.PlayerConfigHandle{Path: result.FilePath, Version: result.Config.Version, Name: result.Config.Name}
+	state, err := coordination.InstallPlayerConfig(handle, result.Config.Roster)
+	if err != nil {
+		return app.playerConfigFailure(err.Error(), false)
+	}
+	app.publishCoordinationState(state)
+	return PlayerConfigCommandResult{
+		OK:      true,
+		Config:  &domain.PlayerConfigMetadata{Status: "loaded", FilePath: handle.Path, Version: handle.Version, Name: handle.Name},
+		Session: associatedSession,
+		State:   domain.CloneMasterCoordinationState(state),
+	}
+}
+
+func (app *App) playerConfigFailure(message string, canceled bool) PlayerConfigCommandResult {
+	app.mu.RLock()
+	state := domain.CloneMasterCoordinationState(app.coordinationState)
+	app.mu.RUnlock()
+	return PlayerConfigCommandResult{Canceled: canceled, Error: message, State: state}
+}
+
+func (app *App) resetPlayerConfigForSession(result sessionservice.SessionResult) {
+	if !result.OK {
+		return
+	}
+	coordination, ok := app.deps.Coordination.(coordinationPlayerConfigService)
+	if !ok {
+		return
+	}
+	state, err := coordination.ClearPlayerConfig()
+	if err == nil && state != nil {
+		app.publishCoordinationState(state)
+	}
+}
+
+// AddCharacter validates the game-master display name before entering the
+// coordinator and publishes only its detached authoritative projection.
+func (app *App) AddCharacter(name string) CoordinationCommandResult {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return app.coordinationFailure("character name must not be blank")
+	}
+	if len([]rune(name)) > 80 {
+		return app.coordinationFailure("character name must be at most 80 characters")
+	}
+	if app.deps.Coordination == nil {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := app.deps.Coordination.AddCharacter(name)
+	if err != nil {
+		return app.coordinationFailure(err.Error())
+	}
+	if state == nil {
+		return app.coordinationFailure("character could not be added")
+	}
+	app.publishCoordinationState(state)
+	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+}
+
+// RenameCharacter validates the stable roster ID and display name before
+// entering the coordinator transaction.
+func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
+	if strings.TrimSpace(string(payload.CharacterID)) == "" {
+		return app.coordinationFailure("character ID must not be blank")
+	}
+	name, err := validatedCoordinationDisplayName(payload.Name, "character name")
+	if err != nil {
+		return app.coordinationFailure(err.Error())
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, commandErr := coordination.RenameCharacter(payload.CharacterID, name)
+	return app.completeCoordinationCommand(state, commandErr, "character could not be renamed")
+}
+
+// DeleteCharacter removes only an existing unclaimed roster identity.
+func (app *App) DeleteCharacter(characterID string) CoordinationCommandResult {
+	if strings.TrimSpace(characterID) == "" {
+		return app.coordinationFailure("character ID must not be blank")
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.DeleteCharacter(domain.CharacterID(characterID))
+	return app.completeCoordinationCommand(state, err, "character could not be deleted")
+}
+
+// RenameLogicalSession validates and trims the private fallback label without
+// exposing it to durable session persistence.
+func (app *App) RenameLogicalSession(payload LogicalSessionRenamePayload) CoordinationCommandResult {
+	if strings.TrimSpace(string(payload.SessionID)) == "" {
+		return app.coordinationFailure("session ID must not be blank")
+	}
+	fallbackName, err := validatedCoordinationDisplayName(payload.FallbackName, "session fallback name")
+	if err != nil {
+		return app.coordinationFailure(err.Error())
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, commandErr := coordination.RenameLogicalSession(payload.SessionID, fallbackName)
+	return app.completeCoordinationCommand(state, commandErr, "logical session could not be renamed")
+}
+
+// AssignCharacter installs one authoritative current-broadcast claim.
+func (app *App) AssignCharacter(payload AssignmentPayload) CoordinationCommandResult {
+	if strings.TrimSpace(string(payload.SessionID)) == "" {
+		return app.coordinationFailure("session ID must not be blank")
+	}
+	if strings.TrimSpace(string(payload.CharacterID)) == "" {
+		return app.coordinationFailure("character ID must not be blank")
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.AssignCharacter(payload.SessionID, payload.CharacterID)
+	return app.completeCoordinationCommand(state, err, "character could not be assigned")
+}
+
+// ReleaseCharacter removes one claim and leaves controller selection to an
+// explicit trusted command.
+func (app *App) ReleaseCharacter(sessionID string) CoordinationCommandResult {
+	if strings.TrimSpace(sessionID) == "" {
+		return app.coordinationFailure("session ID must not be blank")
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.ReleaseCharacter(domain.LogicalSessionID(sessionID))
+	return app.completeCoordinationCommand(state, err, "character could not be released")
+}
+
+// MoveCharacter transfers a stable roster identity to one unassigned logical
+// session in the coordinator's single authoritative order.
+func (app *App) MoveCharacter(payload MoveCharacterPayload) CoordinationCommandResult {
+	if strings.TrimSpace(string(payload.CharacterID)) == "" {
+		return app.coordinationFailure("character ID must not be blank")
+	}
+	if strings.TrimSpace(string(payload.ToSessionID)) == "" {
+		return app.coordinationFailure("destination session ID must not be blank")
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.MoveCharacter(payload.CharacterID, payload.ToSessionID)
+	return app.completeCoordinationCommand(state, err, "character could not be moved")
+}
+
+// SetActiveController atomically designates one connected assigned logical
+// session as the sole controller for the current broadcast.
+func (app *App) SetActiveController(sessionID string) CoordinationCommandResult {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return app.coordinationFailure("session ID must not be blank")
+	}
+	coordination, ok := app.deps.Coordination.(coordinationControllerService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.SetActiveController(domain.LogicalSessionID(sessionID))
+	return app.completeCoordinationCommand(state, err, "active controller could not be changed")
+}
+
+// StartBroadcast creates a fresh broadcast epoch through the coordinator.
+func (app *App) StartBroadcast() CoordinationCommandResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+	if app.deps.Coordination == nil {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := app.deps.Coordination.StartBroadcast()
+	if err != nil {
+		return app.coordinationFailure(err.Error())
+	}
+	if state == nil {
+		return app.coordinationFailure("broadcast could not be started")
+	}
+	app.publishCoordinationState(state)
+	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+}
+
+// EndBroadcast ends only the process-local broadcast epoch. Authored durable
+// terminals and the active session document remain outside this boundary.
+func (app *App) EndBroadcast() CoordinationCommandResult {
+	coordination, ok := app.deps.Coordination.(coordinationBroadcastLifecycleService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.EndBroadcast()
+	return app.completeCoordinationCommand(state, err, "broadcast could not be ended")
+}
+
 // SetLiveTerminal validates privileged input before installing canonical live
 // state and emits only the public hacking projection.
 func (app *App) SetLiveTerminal(payload LiveTerminalPayload) CommandResult {
@@ -322,28 +764,112 @@ func (app *App) SetLiveTerminal(payload LiveTerminalPayload) CommandResult {
 	return CommandResult{OK: true}
 }
 
-// UpdateLiveTerminal validates replacement content and preserves the current
-// puzzle through the live service.
-func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CommandResult {
-	if app.deps.Live == nil {
-		return commandFailure("live service is unavailable")
+// RequestTerminalActivation validates and normalizes authored content before
+// asking the coordinator to atomically select the broadcast-wide terminal.
+func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalSwitchCommandResult {
+	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
+	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
+	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+		return app.terminalSwitchFailure(err.Error(), nil)
 	}
+	coordination, ok := app.deps.Coordination.(coordinationTerminalService)
+	if !ok {
+		return app.terminalSwitchFailure("coordination service is unavailable", nil)
+	}
+	state, err := coordination.RequestTerminalActivation(domain.TerminalTarget{
+		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
+		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
+	})
+	return app.completeTerminalSwitchRequest(state, err, "activated", "terminal could not be activated")
+}
+
+// RequestTerminalClear clears only the active terminal selection. The
+// broadcast, assignments, identities, and controller remain authoritative.
+func (app *App) RequestTerminalClear() TerminalSwitchCommandResult {
+	coordination, ok := app.deps.Coordination.(coordinationTerminalService)
+	if !ok {
+		return app.terminalSwitchFailure("coordination service is unavailable", nil)
+	}
+	state, err := coordination.RequestTerminalClear()
+	return app.completeTerminalSwitchRequest(state, err, "cleared", "active terminal could not be cleared")
+}
+
+// ResolveTerminalSwitch validates the opaque decision payload and lets the
+// coordinator re-evaluate the latest private source state before committing.
+func (app *App) ResolveTerminalSwitch(payload TerminalSwitchDecisionPayload) TerminalSwitchCommandResult {
+	if payload.SwitchID == "" {
+		return app.terminalSwitchFailure("switch ID must not be blank", nil)
+	}
+	if payload.Decision != domain.TerminalSwitchPreserve && payload.Decision != domain.TerminalSwitchDiscard && payload.Decision != domain.TerminalSwitchCancel {
+		return app.terminalSwitchFailure("terminal switch decision must be preserve, discard, or cancel", nil)
+	}
+	coordination, ok := app.deps.Coordination.(coordinationTerminalDecisionService)
+	if !ok {
+		return app.terminalSwitchFailure("coordination service is unavailable", nil)
+	}
+	app.mu.RLock()
+	pending := domain.CloneMasterCoordinationState(app.coordinationState)
+	app.mu.RUnlock()
+	status := "activated"
+	if payload.Decision == domain.TerminalSwitchCancel {
+		status = "cancelled"
+	} else if pending != nil && pending.PendingSwitch != nil && pending.PendingSwitch.SwitchID == payload.SwitchID && pending.PendingSwitch.TargetTerminalID == nil {
+		status = "cleared"
+	}
+	state, err := coordination.ResolveTerminalSwitch(payload.SwitchID, payload.Decision)
+	return app.completeTerminalSwitchCommand(state, err, status, "terminal switch could not be resolved")
+}
+
+// UpdateLiveTerminal validates replacement content and preserves the current
+// puzzle through the ordered coordinator boundary. The legacy fallback keeps
+// older focused hosts compatible while production always provides coordination.
+func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationCommandResult {
 	intro := ""
 	if payload.IntroText != nil {
 		intro = *payload.IntroText
 	}
 	if err := validateLiveTerminal("live-terminal", "Live Terminal", payload.Tree, 0, intro); err != nil {
-		return commandFailure(err.Error())
+		return app.coordinationFailure(err.Error())
+	}
+	if coordination, ok := app.deps.Coordination.(coordinationTerminalService); ok {
+		state, err := coordination.UpdateLiveTerminal(payload.Tree, payload.IntroText)
+		return app.completeCoordinationCommand(state, err, "no terminal is active")
+	}
+	if app.deps.Live == nil {
+		return app.coordinationFailure("live service is unavailable")
 	}
 	state, ok := app.deps.Live.Update(payload.Tree, payload.IntroText)
 	if !ok || state == nil {
-		return commandFailure("no terminal is live")
+		return app.coordinationFailure("no terminal is live")
 	}
 	if publisher, ok := app.deps.Player.(playerPublisher); ok {
 		publisher.PublishUpdate()
 	}
 	app.updateHackState(state.Hack)
-	return CommandResult{OK: true}
+	app.mu.RLock()
+	coordinationState := domain.CloneMasterCoordinationState(app.coordinationState)
+	app.mu.RUnlock()
+	return CoordinationCommandResult{OK: true, State: coordinationState}
+}
+
+// ResetFailedHack validates the latest authored terminal payload at the
+// trusted desktop edge, then asks the coordinator to replace only the failed
+// active puzzle. Player transports never receive this command surface.
+func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommandResult {
+	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
+	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
+	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+		return app.coordinationFailure(err.Error())
+	}
+	coordination, ok := app.deps.Coordination.(coordinationTerminalService)
+	if !ok {
+		return app.coordinationFailure("coordination service is unavailable")
+	}
+	state, err := coordination.ResetFailedHack(domain.TerminalTarget{
+		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
+		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
+	})
+	return app.completeCoordinationCommand(state, err, "failed hacking puzzle could not be reset")
 }
 
 // ClearLiveTerminal clears process-only live state and its public status.
@@ -362,6 +888,17 @@ func (app *App) ClearLiveTerminal() CommandResult {
 // ForceHackSuccess completes an eligible puzzle and publishes the sanitized
 // result.
 func (app *App) ForceHackSuccess() CommandResult {
+	if coordination, ok := app.deps.Coordination.(coordinatedHackSuccess); ok {
+		state, accepted := coordination.ForceHackSuccess()
+		if !accepted {
+			return commandFailure("no active hacking puzzle")
+		}
+		app.updateHackState(state)
+		return CommandResult{OK: true}
+	}
+
+	// Compatibility for partial compositions that predate the coordinator's
+	// trusted operation. Production injects the ordered coordinator path.
 	if app.deps.Live == nil {
 		return commandFailure("live service is unavailable")
 	}
@@ -404,6 +941,7 @@ func (app *App) domReady(ctx context.Context) {
 	info := cloneServerInfoPointer(app.serverInfo)
 	clientCount := app.clientCount
 	hackState := clonePublicHackState(app.hackState)
+	coordinationState := domain.CloneMasterCoordinationState(app.coordinationState)
 	app.mu.Unlock()
 	if app.deps.Events != nil {
 		if info != nil {
@@ -411,6 +949,7 @@ func (app *App) domReady(ctx context.Context) {
 		}
 		_ = app.deps.Events.Emit(clientCountEvent, clientCount)
 		_ = app.deps.Events.Emit(hackStateEvent, hackState)
+		_ = app.deps.Events.Emit(coordinationStateEvent, coordinationState)
 	}
 }
 
@@ -513,6 +1052,12 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 		app.hackState = nil
 		app.mu.Unlock()
 	}
+	if coordination, ok := app.deps.Coordination.(coordinationShutdownService); ok {
+		coordination.Shutdown()
+		app.mu.Lock()
+		app.coordinationState = nil
+		app.mu.Unlock()
+	}
 	if tunnelStarted && app.deps.Tunnel != nil {
 		if err := app.deps.Tunnel.Stop(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop public tunnel: %w", err))
@@ -610,15 +1155,116 @@ func (app *App) updateClientCount(count int) {
 	}
 }
 
+func (app *App) publishCoordinationState(state *domain.MasterCoordinationState) {
+	clone := domain.CloneMasterCoordinationState(state)
+	app.mu.Lock()
+	app.coordinationState = clone
+	app.mu.Unlock()
+	if app.deps.Events != nil {
+		_ = app.deps.Events.Emit(coordinationStateEvent, domain.CloneMasterCoordinationState(clone))
+	}
+}
+
+func (app *App) coordinationFailure(message string) CoordinationCommandResult {
+	app.mu.RLock()
+	state := domain.CloneMasterCoordinationState(app.coordinationState)
+	app.mu.RUnlock()
+	return CoordinationCommandResult{Error: message, State: state}
+}
+
+func (app *App) completeCoordinationCommand(state *domain.MasterCoordinationState, err error, nilStateMessage string) CoordinationCommandResult {
+	if err != nil {
+		if state == nil {
+			return app.coordinationFailure(err.Error())
+		}
+		return CoordinationCommandResult{Error: err.Error(), State: domain.CloneMasterCoordinationState(state)}
+	}
+	if state == nil {
+		return app.coordinationFailure(nilStateMessage)
+	}
+	app.publishCoordinationState(state)
+	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+}
+
+func (app *App) terminalSwitchFailure(message string, state *domain.MasterCoordinationState) TerminalSwitchCommandResult {
+	if state == nil {
+		app.mu.RLock()
+		state = domain.CloneMasterCoordinationState(app.coordinationState)
+		app.mu.RUnlock()
+	}
+	return TerminalSwitchCommandResult{Error: message, State: domain.CloneMasterCoordinationState(state)}
+}
+
+func (app *App) completeTerminalSwitchCommand(state *domain.MasterCoordinationState, err error, status, nilStateMessage string) TerminalSwitchCommandResult {
+	if err != nil {
+		return app.terminalSwitchFailure(err.Error(), state)
+	}
+	if state == nil {
+		return app.terminalSwitchFailure(nilStateMessage, nil)
+	}
+	app.publishCoordinationState(state)
+	return TerminalSwitchCommandResult{
+		OK: true, Status: status, State: domain.CloneMasterCoordinationState(state),
+	}
+}
+
+func (app *App) completeTerminalSwitchRequest(state *domain.MasterCoordinationState, err error, completedStatus, nilStateMessage string) TerminalSwitchCommandResult {
+	if err != nil {
+		return app.terminalSwitchFailure(err.Error(), state)
+	}
+	if state == nil {
+		return app.terminalSwitchFailure(nilStateMessage, nil)
+	}
+	status := completedStatus
+	var switchID domain.SwitchID
+	if state.PendingSwitch != nil {
+		status = "decision-required"
+		switchID = state.PendingSwitch.SwitchID
+	}
+	app.publishCoordinationState(state)
+	return TerminalSwitchCommandResult{
+		OK: true, Status: status, SwitchID: switchID,
+		State: domain.CloneMasterCoordinationState(state),
+	}
+}
+
+func validatedCoordinationDisplayName(value string, label string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("%s must not be blank", label)
+	}
+	if len([]rune(value)) > 80 {
+		return "", fmt.Errorf("%s must be at most 80 characters", label)
+	}
+	return value, nil
+}
+
 func validateLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
+	validationTree := cloneTreeForBridgeValidation(tree)
 	terminal := domain.Terminal{
-		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: tree,
+		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: validationTree,
 	}
 	return domain.ValidateSession(domain.Session{
 		Version:   1,
 		Name:      "Live Terminal",
 		Terminals: []domain.Terminal{terminal},
 	})
+}
+
+// Wails decodes an empty authored folder as either nil or an empty slice
+// depending on the JavaScript payload shape. Both represent the same empty
+// folder at this bridge; durable JSON decoding remains strict about arrays.
+func cloneTreeForBridgeValidation(node domain.ContentNode) domain.ContentNode {
+	clone := node
+	if node.Type == domain.NodeFolder && node.Children == nil {
+		clone.Children = []domain.ContentNode{}
+	} else {
+		clone.Children = make([]domain.ContentNode, len(node.Children))
+	}
+	for index := range node.Children {
+		clone.Children[index] = cloneTreeForBridgeValidation(node.Children[index])
+	}
+	return clone
 }
 
 func commandFailure(message string) CommandResult {
@@ -630,7 +1276,9 @@ func clonePublicHackState(state *domain.PublicHackState) *domain.PublicHackState
 		return nil
 	}
 	clone := *state
-	clone.Log = append([]string(nil), state.Log...)
+	if state.Log != nil {
+		clone.Log = append([]string{}, state.Log...)
+	}
 	clone.Patterns = append([]domain.PublicHackPattern(nil), state.Patterns...)
 	clone.Columns = make([]domain.HackColumn, len(state.Columns))
 	for index, column := range state.Columns {

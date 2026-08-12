@@ -2,12 +2,21 @@
 
 const MODE = { LIST: 'list', ENTRY: 'entry', HACK: 'hack' };
 const ROW_WIDTH = 12; // must match server/hack.js
+const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token';
+const PLAYER_SESSION_INIT_LOCK = 'fallout-terminal.player-session-init';
+const PLAYER_SESSION_INIT_LEASE_KEY = 'fallout-terminal.player-session-init-lease';
+const PLAYER_SESSION_INIT_CONTENDER_PREFIX = 'fallout-terminal.player-session-init-contender.';
+const PLAYER_SESSION_INIT_LEASE_MS = 5000;
+const PLAYER_SESSION_INIT_RETRY_MS = 100;
+const PLAYER_SESSION_INIT_ELECTION_MS = 100;
 
 // ── State ─────────────────────────────────────────────────
 // navStack / mode(list|entry) / viewEntryId / commandOutput are mirrors of
 // the server's shared nav state — every connected player sees the same
 // position. Only selIndex (the keyboard highlight) stays local per client.
 let hasLive       = false;
+let terminalID    = '';
+let terminalBroadcastID = '';
 let terminalName  = '';
 let introText     = '';
 let serverNum     = 1;
@@ -44,6 +53,14 @@ let hackHoverText     = '';
 let hackWasSolved     = false;
 let lastAttemptsLeft  = null;
 
+// Player identity and assignment are complete server projections. Selection
+// only creates a pending request; it never changes this state optimistically.
+let sessionReady = false;
+let playerState = null;
+let pendingSelection = null;
+let pendingSharedAction = null;
+let appliedSharedRevision = 0;
+
 // ── DOM refs ──────────────────────────────────────────────
 const normalHeader = document.getElementById('normalHeader');
 const introTextEl  = document.getElementById('introTextEl');
@@ -77,12 +94,258 @@ const pageIndicator = document.getElementById('pageIndicator');
 const connOverlay = document.getElementById('connOverlay');
 const connText    = document.getElementById('connText');
 
+const playerIdentity     = document.getElementById('playerIdentity');
+const playerCharacterName = document.getElementById('playerCharacterName');
+const playerFallbackName = document.getElementById('playerFallbackName');
+const roleBadge          = document.getElementById('roleBadge');
+const characterSelect    = document.getElementById('characterSelect');
+const characterOptions   = document.getElementById('characterOptions');
+const assignedWaiting    = document.getElementById('assignedWaiting');
+const playerNotice       = document.getElementById('playerNotice');
+
 // ════════════════════════════════════════════════════
 // WEBSOCKET
 // ════════════════════════════════════════════════════
 let ws;
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;
+const sessionInitOwner = (window.crypto && typeof window.crypto.randomUUID === 'function')
+  ? window.crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const recognitionWaiters = new Set();
+
+function readBrowserToken() {
+  try {
+    return localStorage.getItem(PLAYER_TOKEN_KEY) || '';
+  } catch (error) {
+    console.warn('Player recognition storage is unavailable', error);
+    return '';
+  }
+}
+
+function socketIsCurrentAndOpen(socket) {
+  return ws === socket && socket.readyState === WebSocket.OPEN;
+}
+
+function sendSessionHello(socket, browserToken) {
+  if (!socketIsCurrentAndOpen(socket) || socket.sessionHelloSent) return false;
+  const hello = { type: 'SESSION_HELLO' };
+  if (browserToken) hello.browserToken = browserToken;
+  socket.sessionHelloSent = true;
+  socket.send(JSON.stringify(hello));
+  return true;
+}
+
+function signalRecognitionChange() {
+  const waiters = Array.from(recognitionWaiters);
+  recognitionWaiters.clear();
+  for (const resolve of waiters) resolve();
+}
+
+function waitForRecognitionChange() {
+  return new Promise(resolve => {
+    let timer = null;
+    const finish = () => {
+      recognitionWaiters.delete(finish);
+      if (timer !== null) clearTimeout(timer);
+      resolve();
+    };
+    recognitionWaiters.add(finish);
+    timer = setTimeout(finish, PLAYER_SESSION_INIT_RETRY_MS);
+  });
+}
+
+window.addEventListener('storage', event => {
+  if (event.key === PLAYER_TOKEN_KEY || event.key === PLAYER_SESSION_INIT_LEASE_KEY ||
+      (event.key && event.key.startsWith(PLAYER_SESSION_INIT_CONTENDER_PREFIX))) {
+    signalRecognitionChange();
+  }
+});
+
+async function waitForIssuedToken(socket) {
+  while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
+    await waitForRecognitionChange();
+  }
+}
+
+function readSessionInitLease() {
+  try {
+    const raw = localStorage.getItem(PLAYER_SESSION_INIT_LEASE_KEY);
+    if (!raw) return null;
+    const lease = JSON.parse(raw);
+    if (!lease || typeof lease.owner !== 'string' || !Number.isFinite(lease.expiresAt)) return null;
+    return lease;
+  } catch (error) {
+    return null;
+  }
+}
+
+function acquireSessionInitLease() {
+  const now = Date.now();
+  const current = readSessionInitLease();
+  if (current && current.owner !== sessionInitOwner && current.expiresAt > now) return false;
+
+  try {
+    localStorage.setItem(PLAYER_SESSION_INIT_LEASE_KEY, JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: now + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+    const confirmed = readSessionInitLease();
+    return Boolean(confirmed && confirmed.owner === sessionInitOwner);
+  } catch (error) {
+    return true;
+  }
+}
+
+function sessionInitContenderKey(owner) {
+  return `${PLAYER_SESSION_INIT_CONTENDER_PREFIX}${owner}`;
+}
+
+function registerSessionInitContender() {
+  try {
+    localStorage.setItem(sessionInitContenderKey(sessionInitOwner), JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: Date.now() + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+  } catch (error) {
+    // Without shared storage the best available behavior is one session per tab.
+  }
+}
+
+function releaseSessionInitContender() {
+  try {
+    localStorage.removeItem(sessionInitContenderKey(sessionInitOwner));
+  } catch (error) {
+    // Storage-unavailable tabs have no contender record to release.
+  }
+}
+
+function electedSessionInitOwner() {
+  const now = Date.now();
+  const owners = [];
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(PLAYER_SESSION_INIT_CONTENDER_PREFIX)) continue;
+      let contender = null;
+      try { contender = JSON.parse(localStorage.getItem(key)); } catch (error) { /* stale */ }
+      if (!contender || typeof contender.owner !== 'string' ||
+          !Number.isFinite(contender.expiresAt) || contender.expiresAt <= now) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      owners.push(contender.owner);
+    }
+  } catch (error) {
+    return sessionInitOwner;
+  }
+  owners.sort();
+  return owners[0] || sessionInitOwner;
+}
+
+function waitForSessionInitElection() {
+  return new Promise(resolve => setTimeout(resolve, PLAYER_SESSION_INIT_ELECTION_MS));
+}
+
+function renewSessionInitLease() {
+  const current = readSessionInitLease();
+  if (!current || current.owner !== sessionInitOwner) return false;
+  try {
+    localStorage.setItem(PLAYER_SESSION_INIT_LEASE_KEY, JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: Date.now() + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function releaseSessionInitLease() {
+  const current = readSessionInitLease();
+  if (!current || current.owner !== sessionInitOwner) return;
+  try {
+    localStorage.removeItem(PLAYER_SESSION_INIT_LEASE_KEY);
+  } catch (error) {
+    // Storage-unavailable tabs have no shared lease to release.
+  }
+  signalRecognitionChange();
+}
+
+async function sendSessionHelloWithStorageLease(socket) {
+  while (socketIsCurrentAndOpen(socket) && !socket.sessionHelloSent) {
+    const browserToken = readBrowserToken();
+    if (browserToken) {
+      sendSessionHello(socket, browserToken);
+      return;
+    }
+
+    const activeLease = readSessionInitLease();
+    if (activeLease && activeLease.owner !== sessionInitOwner && activeLease.expiresAt > Date.now()) {
+      await waitForRecognitionChange();
+      continue;
+    }
+
+    registerSessionInitContender();
+    await waitForSessionInitElection();
+
+    const tokenAfterElection = readBrowserToken();
+    if (tokenAfterElection) {
+      releaseSessionInitContender();
+      sendSessionHello(socket, tokenAfterElection);
+      return;
+    }
+
+    const leaseAfterElection = readSessionInitLease();
+    if ((leaseAfterElection && leaseAfterElection.owner !== sessionInitOwner &&
+         leaseAfterElection.expiresAt > Date.now()) || electedSessionInitOwner() !== sessionInitOwner ||
+        !acquireSessionInitLease()) {
+      releaseSessionInitContender();
+      await waitForRecognitionChange();
+      continue;
+    }
+    releaseSessionInitContender();
+
+    try {
+      if (!sendSessionHello(socket, '')) return;
+      while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
+        await waitForRecognitionChange();
+        renewSessionInitLease();
+      }
+    } finally {
+      releaseSessionInitContender();
+      releaseSessionInitLease();
+    }
+    return;
+  }
+}
+
+async function beginSessionHandshake(socket) {
+  const browserToken = readBrowserToken();
+  if (browserToken) {
+    sendSessionHello(socket, browserToken);
+    return;
+  }
+
+  if (navigator.locks && typeof navigator.locks.request === 'function') {
+    try {
+      await navigator.locks.request(PLAYER_SESSION_INIT_LOCK, async () => {
+        if (!socketIsCurrentAndOpen(socket)) return;
+        const tokenAfterLock = readBrowserToken();
+        if (tokenAfterLock) {
+          sendSessionHello(socket, tokenAfterLock);
+          return;
+        }
+        if (sendSessionHello(socket, '')) await waitForIssuedToken(socket);
+      });
+      return;
+    } catch (error) {
+      console.warn('Player session lock unavailable; using storage coordination', error);
+    }
+  }
+
+  await sendSessionHelloWithStorageLease(socket);
+}
 
 function playerWebSocketURL() {
   const url = new URL('/', window.location.href);
@@ -101,7 +364,11 @@ function connect() {
     if (ws !== socket) return;
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
-    connOverlay.classList.add('hidden');
+    sessionReady = false;
+    connOverlay.classList.remove('hidden');
+    connText.textContent = 'УСТАНОВКА СВЯЗИ...';
+
+    void beginSessionHandshake(socket);
   });
 
   socket.addEventListener('message', ev => {
@@ -112,6 +379,8 @@ function connect() {
 
   socket.addEventListener('close', () => {
     if (ws !== socket) return;
+    sessionReady = false;
+    signalRecognitionChange();
     connOverlay.classList.remove('hidden');
     connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
     reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
@@ -137,9 +406,118 @@ function applyNavFromServer(nav) {
   }
 }
 
+function acceptSharedSnapshot(message) {
+  const revision = Number(message.revision);
+  if (!Number.isFinite(revision)) return true;
+  const playerRevision = playerState ? Number(playerState.revision) : -1;
+  if (Number.isFinite(playerRevision) && revision < playerRevision) return false;
+  if (revision < appliedSharedRevision) return false;
+  appliedSharedRevision = revision;
+  completeAcceptedSharedAction();
+  return true;
+}
+
+function matchesActiveTerminal(message) {
+  const activeTerminalID = playerState?.activeTerminalId;
+  if (!activeTerminalID || terminalID !== activeTerminalID) return false;
+  return !message.terminalId || message.terminalId === activeTerminalID;
+}
+
+function matchesExpectedTerminalLive(message) {
+  return sessionReady && playerState !== null && playerState.character !== null &&
+    playerState.activeTerminalId !== null &&
+    message.terminalId === playerState.activeTerminalId;
+}
+
+function expectsTerminalClear() {
+  return sessionReady && playerState !== null && playerState.activeTerminalId === null;
+}
+
+function hasCurrentTerminalMirror() {
+  return hasLive && playerState !== null && playerState.character !== null &&
+    playerState.broadcastId !== null && playerState.activeTerminalId !== null &&
+    playerState.broadcastId === terminalBroadcastID &&
+    playerState.activeTerminalId === terminalID;
+}
+
+function completeAcceptedSharedAction() {
+  if (!pendingSharedAction || pendingSharedAction.acceptedRevision == null) return;
+  if (appliedSharedRevision < pendingSharedAction.acceptedRevision) return;
+  pendingSharedAction = null;
+  showPlayerNotice('');
+}
+
+function clearBroadcastMirrors() {
+  hasLive = false;
+  terminalID = '';
+  terminalBroadcastID = '';
+  terminalName = '';
+  introText = '';
+  serverNum = 1;
+  tree = null;
+  navStack = ['root'];
+  selIndex = 0;
+  mode = MODE.LIST;
+  viewEntryId = null;
+  commandOutput = null;
+  currentCommandNodeId = null;
+  lastRenderedFolderKey = null;
+  lastRenderedEntryId = null;
+  lastRenderedCommandKey = null;
+  hackLevel = 0;
+  hack = null;
+  hackTyped = '';
+  hackHoverKey = null;
+  hackHoverText = '';
+  hackWasSolved = false;
+  lastAttemptsLeft = null;
+  appliedSharedRevision = 0;
+
+  clearTimeout(hackSolvedTimer);
+  hackSolvedTimer = null;
+  stopAmbient();
+  deactivatePagination();
+
+  for (const container of [termList, entryBody, termOutput]) {
+    if (container._revealTimer) clearTimeout(container._revealTimer);
+    container._revealTimer = null;
+    container.replaceChildren();
+  }
+  hackColumns.replaceChildren();
+  hackLog.replaceChildren();
+  introTextEl.textContent = '';
+  entryTitle.textContent = '';
+  attemptsLine.textContent = '';
+  hackInputPreview.textContent = '';
+}
+
 function dispatch(msg) {
-  if (msg.type === 'TERMINAL_LIVE') {
+  if (msg.type === 'SESSION_WELCOME') {
+    if (!msg.state || typeof msg.browserToken !== 'string' || !msg.browserToken) return;
+    try {
+      localStorage.setItem(PLAYER_TOKEN_KEY, msg.browserToken);
+    } catch (error) {
+      console.warn('Player recognition token could not be stored', error);
+    }
+    signalRecognitionChange();
+    sessionReady = true;
+    pendingSelection = null;
+    pendingSharedAction = null;
+    showPlayerNotice('');
+    applyPlayerState(msg.state, { authoritativeWelcome: true });
+    if (!hasCurrentTerminalMirror()) appliedSharedRevision = 0;
+    connOverlay.classList.add('hidden');
+  } else if (msg.type === 'PLAYER_STATE') {
+    if (!sessionReady || !msg.state) return;
+    applyPlayerState(msg.state);
+  } else if (msg.type === 'ACTION_RESULT') {
+    if (!sessionReady) return;
+    applyActionResult(msg);
+  } else if (msg.type === 'TERMINAL_LIVE') {
+    if (!matchesExpectedTerminalLive(msg) || !acceptSharedSnapshot(msg)) return;
     hasLive       = true;
+    terminalID    = msg.terminalId || '';
+    terminalBroadcastID = playerState?.broadcastId || '';
     terminalName  = msg.terminalName || '';
     introText     = msg.introText || '';
     tree          = msg.tree;
@@ -169,14 +547,17 @@ function dispatch(msg) {
     tryStartAmbient();
     render();
   } else if (msg.type === 'TERMINAL_UPDATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     tree = msg.tree;
     if (msg.introText != null) introText = msg.introText;
     if (msg.nav) applyNavFromServer(msg.nav);
     render();
   } else if (msg.type === 'NAV_STATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     applyNavFromServer(msg.nav);
     render();
   } else if (msg.type === 'HACK_STATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     hack = msg.hack;
     if (mode !== MODE.HACK || !hack) return;
 
@@ -199,7 +580,10 @@ function dispatch(msg) {
     }
     render();
   } else if (msg.type === 'TERMINAL_CLEAR') {
+    if (!expectsTerminalClear() || !acceptSharedSnapshot(msg)) return;
     hasLive = false;
+    terminalID = '';
+    terminalBroadcastID = '';
     tree = null;
     hack = null;
     clearTimeout(hackSolvedTimer);
@@ -207,6 +591,252 @@ function dispatch(msg) {
     stopAmbient();
     render();
   }
+}
+
+function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
+  const revision = Number(nextState.revision);
+  const currentRevision = playerState ? Number(playerState.revision) : -1;
+  if (!authoritativeWelcome && Number.isFinite(revision) &&
+      Number.isFinite(currentRevision) && revision < currentRevision) return;
+
+  const previousState = playerState;
+  const roster = [];
+  const rosterByID = new Map();
+  if (Array.isArray(nextState.roster)) {
+    for (const entry of nextState.roster) {
+      if (!entry || typeof entry !== 'object') continue;
+      const id = String(entry.id || '');
+      if (!id || rosterByID.has(id)) continue;
+      const normalized = {
+        id,
+        name: String(entry.name || ''),
+        status: entry.status === 'available' ? 'available' : 'claimed',
+      };
+      roster.push(normalized);
+      rosterByID.set(id, normalized);
+    }
+  }
+
+  let character = null;
+  if (nextState.character && typeof nextState.character === 'object') {
+    const id = String(nextState.character.id || '');
+    if (id) {
+      const rosterCharacter = rosterByID.get(id);
+      character = {
+        id,
+        name: rosterCharacter ? rosterCharacter.name : String(nextState.character.name || ''),
+      };
+    }
+  }
+
+  const nextPlayerState = {
+    revision: Number.isFinite(revision) ? revision : 0,
+    sessionId: String(nextState.sessionId || ''),
+    fallbackName: String(nextState.fallbackName || ''),
+    character,
+    role: String(nextState.role || 'unassigned'),
+    phase: String(nextState.phase || 'no-broadcast'),
+    broadcastId: nextState.broadcastId == null ? null : String(nextState.broadcastId),
+    activeTerminalId: nextState.activeTerminalId == null ? null : String(nextState.activeTerminalId),
+    roster,
+  };
+  playerState = nextPlayerState;
+
+  const broadcastChanged = previousState !== null &&
+    previousState.broadcastId !== nextPlayerState.broadcastId;
+  const outsideBroadcast = nextPlayerState.broadcastId === null ||
+    nextPlayerState.phase === 'no-broadcast';
+  if (broadcastChanged || outsideBroadcast) {
+    pendingSelection = null;
+    pendingSharedAction = null;
+    clearBroadcastMirrors();
+    showPlayerNotice('');
+  } else if (pendingSelection && nextPlayerState.phase !== 'selecting') {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+
+  if (pendingSelection && pendingSelection.acceptedRevision != null &&
+      playerState.revision >= pendingSelection.acceptedRevision) {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+
+  const terminalPhases = new Set(['controlling', 'observing']);
+  const retainsCurrentTerminalSurface = previousState !== null && hasLive &&
+    previousState.character !== null && nextPlayerState.character !== null &&
+    terminalPhases.has(previousState.phase) && terminalPhases.has(nextPlayerState.phase) &&
+    previousState.broadcastId === nextPlayerState.broadcastId &&
+    nextPlayerState.broadcastId === terminalBroadcastID &&
+    previousState.activeTerminalId === nextPlayerState.activeTerminalId &&
+    nextPlayerState.activeTerminalId === terminalID;
+  if (retainsCurrentTerminalSurface) {
+    renderPlayerContext();
+    return;
+  }
+  render();
+}
+
+function applyActionResult(result) {
+  if (pendingSharedAction && result.requestId === pendingSharedAction.requestId) {
+    if (!result.accepted) {
+      pendingSharedAction = null;
+      showPlayerNotice(`ДЕЙСТВИЕ ОТКЛОНЕНО: ${String(result.reason || 'invalid-action')}`);
+    } else {
+      pendingSharedAction.acceptedRevision = Number(result.revision) || 0;
+      completeAcceptedSharedAction();
+    }
+    render();
+    return;
+  }
+
+  if (!pendingSelection || result.requestId !== pendingSelection.requestId) return;
+
+  if (!result.accepted) {
+    pendingSelection = null;
+    const messages = {
+      conflict: 'ПЕРСОНАЖ УЖЕ ЗАНЯТ (conflict). ВЫБЕРИТЕ ДРУГОГО.',
+      'stale-broadcast': 'ТРАНСЛЯЦИЯ ИЗМЕНИЛАСЬ. ДОЖДИТЕСЬ НОВОГО СПИСКА.',
+      duplicate: 'ЗАПРОС УЖЕ БЫЛ ОБРАБОТАН.',
+    };
+    showPlayerNotice(messages[result.reason] || `ВЫБОР ОТКЛОНЕН: ${String(result.reason || 'invalid-action')}`);
+    render();
+    return;
+  }
+
+  pendingSelection.acceptedRevision = Number(result.revision) || 0;
+  if (playerState && playerState.revision >= pendingSelection.acceptedRevision) {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+  render();
+}
+
+function createRequestID() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function canControlSharedTerminal() {
+  return sessionReady && playerState !== null && hasCurrentTerminalMirror() &&
+    playerState.role === 'active' &&
+    playerState.phase === 'controlling' &&
+    playerState.broadcastId !== null &&
+    playerState.activeTerminalId !== null &&
+    playerState.activeTerminalId === terminalID &&
+    pendingSharedAction === null;
+}
+
+function beginSharedAction(type, fields) {
+  if (!canControlSharedTerminal()) return false;
+
+  const requestId = createRequestID();
+  pendingSharedAction = { requestId, type, acceptedRevision: null };
+  showPlayerNotice('');
+  render();
+  send({
+    type,
+    requestId,
+    broadcastId: playerState.broadcastId,
+    terminalId: playerState.activeTerminalId,
+    ...fields,
+  });
+  return true;
+}
+
+function selectCharacter(characterID) {
+  if (!sessionReady || !playerState || pendingSelection ||
+      playerState.phase !== 'selecting' || !playerState.broadcastId) return;
+
+  const entry = playerState.roster.find(candidate =>
+    candidate.id === characterID && candidate.status === 'available'
+  );
+  if (!entry) return;
+
+  const requestId = createRequestID();
+  pendingSelection = { requestId, acceptedRevision: null };
+  showPlayerNotice('');
+  render();
+  send({
+    type: 'CHARACTER_SELECT',
+    requestId,
+    broadcastId: playerState.broadcastId,
+    characterId: entry.id,
+  });
+}
+
+function showPlayerNotice(message) {
+  playerNotice.textContent = message;
+  playerNotice.hidden = !message;
+}
+
+function renderRoster() {
+  characterOptions.replaceChildren();
+  for (const entry of playerState.roster) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'character-option';
+    option.dataset.characterId = entry.id;
+    option.dataset.status = entry.status;
+    option.setAttribute('role', 'listitem');
+    option.textContent = entry.name;
+    option.disabled = entry.status !== 'available' || pendingSelection !== null;
+    option.addEventListener('click', () => selectCharacter(entry.id));
+    characterOptions.appendChild(option);
+  }
+}
+
+function renderPlayerContext() {
+  const hasState = sessionReady && playerState !== null;
+  playerIdentity.hidden = !hasState;
+  characterSelect.hidden = !hasState || playerState.phase !== 'selecting';
+  assignedWaiting.hidden = !hasState || playerState.phase !== 'waiting';
+
+  const observerReadOnly = hasState && playerState.role === 'observer';
+  roleBadge.dataset.role = hasState ? playerState.role : '';
+  screen.classList.toggle('observer-read-only', observerReadOnly);
+  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null);
+  screen.setAttribute('aria-readonly', String(observerReadOnly));
+
+  if (!hasState) return false;
+
+  if (playerState.character) {
+    playerCharacterName.textContent = playerState.character.name;
+    playerFallbackName.textContent = playerState.fallbackName;
+  } else {
+    playerCharacterName.textContent = playerState.fallbackName;
+    playerFallbackName.textContent = '';
+  }
+  const roleLabels = {
+    active: 'АКТИВНЫЙ КОНТРОЛЛЕР',
+    observer: 'НАБЛЮДАТЕЛЬ',
+    unassigned: 'НЕ НАЗНАЧЕН',
+  };
+  roleBadge.textContent = roleLabels[playerState.role] || playerState.role;
+
+  const selecting = playerState.phase === 'selecting';
+  characterSelect.classList.toggle('pending', selecting && pendingSelection !== null);
+  characterSelect.setAttribute('aria-busy', String(selecting && pendingSelection !== null));
+  if (selecting) renderRoster();
+
+  return selecting || playerState.phase === 'waiting';
+}
+
+function hideTerminalSurface() {
+  deactivatePagination();
+  normalHeader.hidden = true;
+  hackHeader.hidden = true;
+  termIdle.hidden = true;
+  termList.hidden = true;
+  termEntry.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  termOutput.hidden = true;
+  termPrompt.hidden = true;
+  backBtn.hidden = true;
+  pageNav.hidden = true;
 }
 
 // ════════════════════════════════════════════════════
@@ -239,17 +869,17 @@ function currentFolderNode() {
 // ════════════════════════════════════════════════════
 function activateRow(node) {
   if (node.type === 'folder') {
-    send({ type: 'NAV_ACTION', action: 'enter', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'enter', nodeId: node.id });
   } else if (node.type === 'command') {
-    send({ type: 'NAV_ACTION', action: 'command', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'command', nodeId: node.id });
   } else if (node.type === 'entry') {
-    send({ type: 'NAV_ACTION', action: 'entry', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'entry', nodeId: node.id });
   }
 }
 
 function goBack() {
   if (mode === MODE.HACK) return;
-  send({ type: 'NAV_ACTION', action: 'back' });
+  beginSharedAction('NAV_ACTION', { action: 'back' });
 }
 
 backBtn.addEventListener('click', goBack);
@@ -362,12 +992,12 @@ hackColumns.addEventListener('click', (e) => {
   const pattern = patternAtCell(cell);
   if (pattern && !pattern.used) {
     playEnter();
-    send({ type: 'HACK_PATTERN', patternId: pattern.id });
+    beginSharedAction('HACK_PATTERN', { patternId: pattern.id });
     return;
   }
   if (pattern) return;
   playEnter();
-  send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
+  beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target });
 });
 
 // ════════════════════════════════════════════════════
@@ -760,7 +1390,12 @@ function scheduleHackFit() {
 }
 
 function render() {
-  if (!hasLive) {
+  if (renderPlayerContext()) {
+    hideTerminalSurface();
+    return;
+  }
+
+  if (!hasCurrentTerminalMirror()) {
     deactivatePagination();
     normalHeader.hidden = true;
     hackHeader.hidden   = true;
@@ -946,7 +1581,8 @@ function renderHackColumns() {
 }
 
 function renderHackLog() {
-  hackLog.innerHTML = hack.log.map(line => `<div>${esc(line)}</div>`).join('');
+  const lines = Array.isArray(hack.log) ? hack.log : [];
+  hackLog.innerHTML = lines.map(line => `<div>${esc(line)}</div>`).join('');
 }
 
 function renderHackInputPreview() {

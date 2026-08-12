@@ -1,7 +1,17 @@
 # Feature Specification: Player Sessions, Character Assignment, and Shared Terminal Control
 
 **Feature directory**: `004-player-sessions-control`  
-**Scope**: Process-local browser sessions, broadcast-scoped character assignments, exclusive player control, observer behavior, game-master coordination, and active-terminal switching
+**Scope**: Durable authored roster configuration; process-local browser sessions; broadcast-scoped character assignments; exclusive player control; observer behavior; game-master coordination; and active-terminal switching
+
+**Bugfix**: 2026-08-12 — BUG-001 separates reusable authored roster configuration from transient player-session state and adds a durable player-config workflow.
+
+**Bugfix**: 2026-08-12 — BUG-002 clarifies that a newly created empty roster remains the required JSON array through creation, association, and coordinator installation.
+
+**Bugfix**: 2026-08-12 — BUG-003 clarifies that the active controller must remain able to select every hacking target category through the fully composed browser, WebSocket, coordinator, and runtime path.
+
+**Bugfix**: 2026-08-12 — BUG-004 clarifies that the visible game-master end-broadcast control must complete the fully composed master-to-player shutdown path.
+
+**Bugfix**: 2026-08-12 — BUG-005 restores a trusted same-terminal retry after hacking lockout without ending the broadcast or clearing player assignments.
 
 ## User Scenarios & Testing
 
@@ -40,6 +50,7 @@ As the active character, I can operate the terminal while every other assigned c
 4. **Given** an observer is viewing the shared terminal, **when** it hovers, focuses, or uses a client-local control, **then** passive local feedback may change but canonical state does not.
 5. **Given** the active session submits an action, **when** the result is pending, **then** shared player input remains pending until an authoritative outcome is applied and no optimistic shared mutation appears.
 6. **Given** a player surface or crafted player request, **when** it attempts to invoke `ForceHackSuccess`, **then** no player operation is available and the game-master operation remains private.
+7. **Given** the connected assigned active session is viewing an unfinished hacking puzzle, **when** it selects a password candidate, filler character, or unused special pattern, **then** exactly one matching shared hacking request is processed and the authoritative result releases pending input while every assigned view converges.
 
 ---
 
@@ -79,6 +90,12 @@ As the game master, I can maintain the character roster and correct, release, as
 5. **Given** a character is moved from one session to another, **when** the move completes, **then** the old session loses it, the new session receives it, and neither terminal state nor puzzle progress changes.
 6. **Given** two tabs of one session submit different character selections concurrently, **when** the requests are ordered, **then** the session receives no more than one assignment.
 7. **Given** a player has completed selection, **when** the player attempts to choose another character independently, **then** the existing assignment remains until the game master changes it.
+8. **Given** a session file references a valid player-config file, **when** the session is created or opened, **then** the authored roster is loaded automatically with the same stable character IDs and names.
+9. **Given** a session has no player-config reference, **when** it is created or opened, **then** the game master is offered the explicit choices to select an existing player config or create a new one.
+10. **Given** the game master cancels player-config selection or creation, **when** the session editor opens, **then** terminal authoring remains available, no error is shown, and roster and broadcast controls remain unavailable until a player config is selected or created.
+11. **Given** a player config is active, **when** the game master adds, renames, or deletes an unclaimed roster entry before or during a broadcast, **then** the complete authored roster is saved to that player-config file before the new roster is published.
+12. **Given** a referenced player config is missing, unreadable, or invalid, **when** session loading reaches the roster step, **then** the session remains open, a visible error is shown, and the game master can retry by selecting or creating a player config without receiving a partial roster.
+13. **Given** the application restarts, **when** the same session and valid referenced player config are reopened, **then** the authored roster returns but logical sessions, presence, claims, controller assignment, broadcast state, and puzzles do not.
 
 ---
 
@@ -143,7 +160,7 @@ As the game master, I explicitly preserve, discard, or keep playing an unfinishe
 
 **Why this priority**: Terminal switching introduces a destructive boundary for runtime puzzle progress that requires an explicit table decision.
 
-**Independent Test**: Attempt to switch away from an unfinished puzzle and exercise preserve, discard, and cancel, then return to the original terminal where applicable.
+**Independent Test**: Attempt to switch away from an unfinished puzzle and exercise preserve, discard, and cancel, then return to the original terminal where applicable. Separately fail the active puzzle, retry it from the game-master surface, and verify a fresh shared puzzle with unchanged broadcast identity, assignments, controller, and active terminal.
 
 **Acceptance Scenarios**:
 
@@ -153,6 +170,7 @@ As the game master, I explicitly preserve, discard, or keep playing an unfinishe
 4. **Given** discard is chosen, **when** the terminal is later activated and hacking begins, **then** a fresh puzzle is created under the existing generation rules.
 5. **Given** cancel is chosen, **when** the decision completes, **then** the original terminal and puzzle remain active and unchanged.
 6. **Given** the active terminal has no unfinished puzzle, **when** another terminal is activated, **then** no unfinished-puzzle decision is required.
+7. **Given** the active hacking puzzle is failed and every assigned player sees the blocked state, **when** the game master invokes the trusted retry control, **then** exactly one fresh puzzle for the same active terminal is published to every assigned player without ending the broadcast, changing character assignments, or changing the active controller.
 
 ---
 
@@ -171,6 +189,8 @@ As the game master, I can end one live broadcast and start another with clean ch
 3. **Given** a new broadcast starts in the same process, **when** recognized sessions join, **then** every session must select a character again and the first eligible completed assignment becomes the initial controller.
 4. **Given** the server application restarts, **when** players reconnect, **then** all prior logical sessions, fallback-name changes, presence, character claims, and controller assignment are gone.
 5. **Given** a broadcast ends or the server restarts, **when** durable terminal data is inspected, **then** configured terminals and existing unlocked-terminal behavior remain unchanged.
+6. **Given** the reopened session references a valid player config, **when** the server process restarts, **then** the authored roster is restored independently while every prior claim and controller assignment remains cleared.
+7. **Given** a broadcast is active and the game-master end-broadcast control is visible, **when** the game master activates and confirms it, **then** exactly one end-broadcast command completes and every connected player leaves the active terminal from the resulting authoritative no-broadcast state.
 
 ## Edge Cases
 
@@ -186,6 +206,9 @@ As the game master, I can end one live broadcast and start another with clean ch
 - A session with an invalidated assignment returns to selection even if another tab still displays the terminal.
 - Moving the active character without an explicit control reassignment clears control rather than transferring it implicitly.
 - Switching terminals while the unfinished-puzzle decision is pending leaves the current terminal authoritative and actionable only according to the existing game-master flow.
+- A failed-puzzle retry racing with a player action follows one coordinator order: an action ordered before retry observes the failed puzzle, while an old-generation action ordered after retry cannot mutate the fresh puzzle.
+- Rapid duplicate activation of the game-master retry control creates no more than one fresh puzzle generation.
+- A retry request arriving after the active terminal, broadcast, or puzzle outcome changes is rejected without mutating either the former or current runtime.
 - Rapid duplicate one-use actions from one or several tabs can produce no more than one accepted mutation.
 - If an authoritative result rejects an action, pending input still resolves without requiring an animation timeout.
 - The private game-master application remains operational when no player is connected, assigned, or active.
@@ -221,7 +244,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 #### Character roster and claims
 
 - **FR-019**: The game master MUST be able to define a roster of player characters before or during a live broadcast.
-- **FR-020**: Each roster entry MUST have a stable identity for the current server process, a player-facing name, and an available-or-claimed state.
+- **FR-020**: Each roster entry MUST have a ~~stable identity for the current server process~~ stable identity stored in the active player config, a player-facing name, and a runtime available-or-claimed state. The process-only identity lifetime is superseded by BUG-001 because authored entries must survive restart.
 - **FR-021**: The game master MUST be able to add and rename roster entries without mutating logical sessions, controller status, or terminal state.
 - **FR-022**: Renaming a roster entry MUST update every affected game-master and player view without creating a new assignment.
 - **FR-023**: The system MUST refuse to delete a claimed roster entry until its claim is released or transferred.
@@ -269,7 +292,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-056**: Observer, unassigned, unknown, expired, invalid, and stale-controller actions MUST leave all canonical state unchanged.
 - **FR-057**: Rejected player actions MUST NOT consume attempts, activate patterns, advance randomness, navigate content, alter logs, trigger outcomes, or otherwise mutate puzzle or terminal state.
 - **FR-058**: An unassigned session MUST NOT submit or cause terminal actions before character selection completes.
-- **FR-059**: The system MUST accept existing player-side navigation, menu, password-candidate, filler-character, special-pattern, and other terminal actions for canonical processing only from the active controller.
+- **FR-059**: The system MUST accept existing player-side navigation, menu, password-candidate, filler-character, special-pattern, and other terminal actions for canonical processing only from the active controller. BUG-003 clarifies that this eligibility MUST remain actionable through the fully composed rendered-target, browser-gating, WebSocket, coordinator, runtime-mutation, projection, and correlated-result path rather than being proven only at isolated boundaries.
 - **FR-060**: Observer hover and focus feedback MUST remain local without submitting a shared action or changing canonical state.
 - **FR-061**: Any control available to an observer MUST be limited to client-local behavior that does not affect shared state.
 - **FR-062**: The player surface MUST present observer controls as visibly read-only within the existing terminal aesthetic.
@@ -311,7 +334,7 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-089**: The private game-master application MUST keep a disconnected active session visibly identified until it reconnects or control is reassigned.
 - **FR-090**: The game-master session view MUST show both fallback session name and character name when needed to resolve device or assignment problems.
 - **FR-091**: Character name MUST remain the primary player-facing identity after assignment, while fallback session name remains a separate technical label.
-- **FR-092**: Ending a broadcast MUST remove the active terminal from player control and return connected clients to an immersive waiting or selection state.
+- **FR-092**: Ending a broadcast MUST remove the active terminal from player control and return connected clients to an immersive waiting or selection state. BUG-004 clarifies that this transition MUST remain actionable through the fully composed visible game-master control, confirmation, desktop facade, coordinator, player publication, and authoritative client-rendering path.
 - **FR-093**: Ending a broadcast MUST NOT delete configured terminals or silently alter durable unlocked-terminal state.
 - **FR-094**: Server restart MUST discard logical sessions, fallback-name changes, presence, character claims, controller assignment, and any active runtime puzzle allowed to expire by the existing persistence boundary.
 - **FR-095**: The game-master application MUST retain its existing trusted operations regardless of player connection, assignment, or controller state.
@@ -320,11 +343,40 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **FR-098**: This feature MUST NOT import or manage character sheets, attributes, skills, perks, eligibility, rules tests, inventory, or campaign history.
 - **FR-099**: This feature MUST NOT change existing password-guessing, likeness, attempt, special-pattern, dud-removal, attempt-restoration, lockout, terminal-content, or game-master success rules.
 
+#### Durable roster configuration — BUG-001
+
+- **FR-100**: Authored roster configuration MUST be stored in a separate UTF-8 JSON player-config file containing `version`, `name`, and a `roster` array of stable `id` and `name` pairs.
+- **FR-101**: Player-config files created by the application MUST declare `version: 1`, derive their initial `name` from the chosen filename, and begin with an empty roster serialized as `"roster": []`; the create, association, and installation path MUST preserve that empty array rather than treating it as missing or `null`. BUG-002 clarifies the representation invariant after an empty Go slice was converted to nil between these boundaries.
+- **FR-102**: A version-1 session JSON MAY contain an optional `playerConfig` string referencing a player-config file; adding this optional reference MUST NOT make existing session files without it invalid.
+- **FR-103**: A stored `playerConfig` reference MUST be normalized relative to the session file's directory so a session and its player config remain portable when their directory tree is moved together.
+- **FR-104**: After successful session creation or opening, the application MUST automatically load a valid referenced player config or, when no usable reference exists, offer the game master explicit native-dialog actions to select an existing player config or create a new one.
+- **FR-105**: Canceling player-config selection or creation MUST keep the selected session open without an error, MUST NOT invent an in-memory roster, and MUST leave roster mutation and broadcast-start controls unavailable until a player config is active.
+- **FR-106**: Opening a player config MUST validate supported version, nonblank config name, a roster array, unique nonblank character IDs, and character names under the existing 80-code-point limit before replacing the current roster.
+- **FR-107**: Selecting or creating a player config MUST be allowed only when no broadcast is active and MUST replace the authored roster as one operation without deleting recognized logical sessions.
+- **FR-108**: Establishing a player-config association MUST save the relative `playerConfig` reference to the active session file; if that session save fails, the previous active association and roster MUST remain unchanged and a newly created standalone player-config file MAY remain available for a later retry.
+- **FR-109**: Adding, renaming, or deleting a roster entry MUST require an active player config and MUST atomically save the complete candidate roster before publishing the corresponding coordination revision.
+- **FR-110**: A failed player-config write MUST leave the active roster, claims, controller, terminal, puzzle, and saved player-config contents unchanged and MUST return a visible error.
+- **FR-111**: Loading a player config after restart MUST restore only authored roster IDs and names; availability MUST be recalculated from a fresh broadcast with no restored claims.
+- **FR-112**: Player-config JSON and the session's `playerConfig` reference MUST exclude browser tokens, logical-session IDs and labels, connection IDs, presence, claims, assignments, controller state, broadcast IDs, revisions, request results, active or suspended terminal state, navigation, and puzzles.
+- **FR-113**: The same valid player-config file MAY be referenced by more than one session file, and roster changes made through any one of them MUST be visible when another referencing session later loads that config.
+- **FR-114**: A missing, unreadable, unsupported, or invalid referenced player config MUST NOT prevent the terminal session from opening and MUST NOT partially load roster entries.
+- **FR-115**: Durable roster configuration MUST remain distinct from the excluded account, authentication, persistent character-profile, character-sheet, and campaign-history capabilities.
+
+#### Failed-puzzle retry — BUG-005
+
+- **FR-116**: When the current active hacking puzzle is failed, the private game-master application MUST expose an actionable `ПОВТОРИТЬ ВЗЛОМ` control that invokes exactly one trusted `ResetFailedHack` command and awaits its authoritative result.
+- **FR-117**: `ResetFailedHack` MUST be accepted only while a broadcast has the same active hacking-enabled terminal and its current puzzle is failed; no broadcast, no active terminal, a non-hacking terminal, an unfinished puzzle, a solved puzzle, or a stale terminal identity MUST be rejected without canonical mutation.
+- **FR-118**: An accepted `ResetFailedHack` MUST discard the failed puzzle's complete private runtime and create a fresh server-owned puzzle from the active terminal's latest validated authored content and hacking level, with a new generation identity, the configured maximum attempts, a fresh board and log, and navigation gated until success under the unchanged hacking rules.
+- **FR-119**: An accepted `ResetFailedHack` MUST preserve the current broadcast ID, active terminal ID, logical sessions, presence, character assignments, active controller, roster, other suspended terminal runtimes, configured durable terminals, and durable unlocked-terminal state.
+- **FR-120**: Failed-puzzle retry MUST commit under the coordinator order and publish exactly one revisioned fresh terminal/hacking projection to every connected assigned session; player requests carrying targets from the discarded generation MUST NOT mutate the replacement puzzle.
+- **FR-121**: `ResetFailedHack` MUST remain a trusted Wails-only game-master operation with no player WebSocket message, browser global, DOM control, keyboard shortcut, query parameter, or public endpoint, and it MUST NOT broaden or rename `ForceHackSuccess`.
+
 ## Key Entities
 
 - **Logical Connection Session**: A temporary identity for one recognized device and browser profile during one server process. It has an opaque identity, unique fallback name, aggregate connected presence, optional current-broadcast character assignment, and controller-or-observer status. It is not an account or campaign profile.
 - **Browser Connection**: One currently open player connection belonging to a logical session. Several connections may belong to the same session, and aggregate presence remains connected until the final one closes.
-- **Character Roster Entry**: A game-master-defined, player-facing character identity available within the current server process. It has a stable process-local identity, a mutable display name, and current available-or-claimed state, but no character-sheet data.
+- **Character Roster Entry**: A game-master-defined, player-facing character identity. ~~It is available only within the current server process and has a stable process-local identity.~~ Under BUG-001 it is loaded from the active player config and has a stable durable roster identity, a mutable display name, and a runtime available-or-claimed state, but no character-sheet data.
+- **Player Config**: A separately selected versioned JSON file containing the reusable authored roster. A session may hold a relative reference to it; it contains no browser recognition, presence, assignment, controller, terminal-runtime, puzzle, account, or character-sheet data.
 - **Character Assignment**: The exclusive relationship between one logical session and one roster entry for the current live broadcast. It is independent from controller status.
 - **Live Terminal Broadcast**: The runtime period in which the game master may present one configured terminal at a time to connected players. It owns the current character-assignment lifetime and controller assignment.
 - **Active Controller Assignment**: The exclusive designation of at most one character-assigned logical session as authorized to submit player terminal actions for the current broadcast.
@@ -356,15 +408,25 @@ As the game master, I can end one live broadcast and start another with clean ch
 - **SC-017**: Preserve, discard, and cancel tests show no silent puzzle solve, failure, restart, or loss during terminal-switch decisions.
 - **SC-018**: Ending a broadcast clears all character and controller assignments while retaining all recognized logical sessions until restart.
 - **SC-019**: Starting a second broadcast requires new character selection from every recognized session, and restarting the server restores no prior logical session or claim.
-- **SC-020**: Persistence comparison before and after the feature shows no logical-session, fallback-name, presence, character-claim, or controller data in the version-1 saved schema.
+- **SC-020**: Persistence comparison before and after the feature shows no logical-session, fallback-name, presence, ~~authored roster,~~ character-claim, or controller data in the version-1 session body. BUG-001 permits only the relative `playerConfig` reference there and stores the authored roster in its separate file.
 - **SC-021**: Player-surface and crafted-player-action checks find zero path to `ForceHackSuccess`, while the existing game-master operation remains available.
 - **SC-022**: Existing regression suites for password guesses, likeness, attempts, special patterns, dud removal, attempt restoration, lockout, terminal content, and game-master forced success pass unchanged.
+- **SC-023**: Creating a player config, adding at least three roster entries, restarting the application, and reopening the referencing session restores exactly the same roster IDs, order, and names without manual re-entry.
+- **SC-024**: Session files without `playerConfig` continue to open successfully and present the select-or-create workflow in every compatibility test.
+- **SC-025**: Create, select, cancel, missing-file, malformed-file, unsupported-version, duplicate-ID, and failed-write tests produce no partial roster, association, claim, controller, terminal, or puzzle mutation; the create test MUST distinguish a valid empty `[]` roster from a missing or `null` roster through the complete create-to-install path.
+- **SC-026**: Every successful add, rename, and unclaimed delete is present after the active player-config file is reopened, while every simulated failed write leaves both disk and coordination snapshots unchanged.
+- **SC-027**: Inspection of session and player-config JSON after complete runtime activity finds zero browser token, logical-session, connection, presence, claim, assignment, controller, broadcast, revision, request, navigation, or puzzle field.
+- **SC-028**: A production-composed browser journey using the real player WebSocket server and coordinator lets the current active controller select a password candidate, filler cell, and unused special pattern; each selection produces exactly one accepted canonical mutation, all assigned clients converge, pending input resolves authoritatively, and equivalent observer selections produce zero outbound shared actions and zero canonical mutation.
+- **SC-029**: A production-shaped game-master journey starts with a visible and enabled `ЗАВЕРШИТЬ ТРАНСЛЯЦИЮ` control, accepts its confirmation, observes exactly one `EndBroadcast` invocation, and verifies that all connected players receive the authoritative no-broadcast context and terminal clear while logical sessions, fallback names, authored roster, and configured durable terminals remain unchanged.
+- **SC-030**: A production-shaped game-master journey exhausts the active puzzle, observes the blocked state, activates `ПОВТОРИТЬ ВЗЛОМ`, observes exactly one `ResetFailedHack` invocation, and verifies that active and observer players converge on one fresh generation with full attempts while broadcast ID, active terminal, assignments, controller, sessions, roster, configured terminals, and durable unlocked state remain unchanged.
+- **SC-031**: Concurrent duplicate retry and stale-generation action tests create exactly one fresh puzzle and produce zero post-reset mutation from discarded-generation targets, while inspection of every player asset and protocol path finds zero way to invoke `ResetFailedHack`.
 
 ## Assumptions
 
 - The existing shared terminal, server-authoritative navigation, hacking puzzle, special-pattern behavior, player presentation, loading animation, and private game-master operation are stable dependencies of this feature.
+- BUG-005 clarifies that the migrated hacking feature's “restart live terminal” recovery means replacing only the failed active terminal runtime inside the current broadcast; it does not mean ending and recreating the broadcast epoch.
 - A browser identity can be recognized across ordinary reopen and reconnect behavior within a server process; the mechanism is deliberately deferred to planning.
-- The roster definition is process-local, remains available across broadcast endings within that process, and is cleared on server restart; claims are still cleared at every broadcast end.
+- ~~The roster definition is process-local, remains available across broadcast endings within that process, and is cleared on server restart; claims are still cleared at every broadcast end.~~ Superseded by BUG-001: authored roster IDs and names come from the active player config and survive restart, while availability, claims, controller state, and every other coordination value retain their existing runtime lifetimes.
 - When control has been cleared, the next newly completed eligible character assignment may establish control, but already assigned observers are never promoted automatically.
 - Moving a character away from the active session without an explicit simultaneous controller reassignment clears control and does not transfer control with the character.
 - Duplicate character display names are permitted because stable roster identity, not the visible name, determines claims; the game master is responsible for choosing distinguishable names.
@@ -374,8 +436,9 @@ As the game master, I can end one live broadcast and start another with clean ch
 
 ## Scope Boundaries
 
-This feature excludes user accounts and passwords, persistent player or campaign profiles, character-sheet and rules automation, hacking eligibility, individual invitation links, additional internet-access controls, unassigned spectators, simultaneous multi-session control, automatic controller election after disconnect, persistence of sessions or claims beyond their stated lifetimes, historical action attribution, per-terminal controller assignments, mobile-phone-specific presentation, localization, audio-system work, and any visual redesign.
+This feature excludes user accounts and passwords, ~~persistent player or campaign profiles,~~ persistent player or campaign profiles beyond the BUG-001 roster-only player config, character-sheet and rules automation, hacking eligibility, individual invitation links, additional internet-access controls, unassigned spectators, simultaneous multi-session control, automatic controller election after disconnect, persistence of logical sessions or claims beyond their stated lifetimes, historical action attribution, per-terminal controller assignments, mobile-phone-specific presentation, localization, audio-system work, and any visual redesign.
 
 ## Verbatim Constraints
 
 - The trusted game-master operation name MUST remain exactly `ForceHackSuccess`.
+- The trusted failed-puzzle retry operation name MUST remain exactly `ResetFailedHack`.

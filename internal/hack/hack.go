@@ -3,6 +3,7 @@ package hack
 
 import (
 	cryptorand "crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
@@ -92,8 +93,9 @@ func generateBoardAttempt(generationID string, level, wordLength int, secretWord
 		Log:          []string{},
 	}
 
-	columnA := newColumnBuilder("A", random)
-	columnB := newColumnBuilder("B", random)
+	wordScope := sha256.Sum256([]byte(generationID))
+	columnA := newColumnBuilder(fmt.Sprintf("%x-A", wordScope[:8]), random)
+	columnB := newColumnBuilder(fmt.Sprintf("%x-B", wordScope[:8]), random)
 	for index, text := range candidates {
 		builder := columnA
 		if index%2 != 0 {
@@ -241,7 +243,7 @@ func PublicState(state *domain.HackState) *domain.PublicHackState {
 		AttemptsLeft: state.AttemptsLeft,
 		Solved:       state.Solved,
 		Failed:       state.Failed,
-		Log:          append([]string(nil), state.Log...),
+		Log:          cloneStrings(state.Log),
 		Columns:      make([]domain.HackColumn, len(state.Columns)),
 		Patterns:     discoverPatterns(state),
 	}
@@ -251,6 +253,13 @@ func PublicState(state *domain.HackState) *domain.PublicHackState {
 		public.Columns[index].Words = append([]domain.HackWord(nil), column.Words...)
 	}
 	return public
+}
+
+func cloneStrings(values []string) []string {
+	if values == nil {
+		return nil
+	}
+	return append([]string{}, values...)
 }
 
 type columnBuilder struct {

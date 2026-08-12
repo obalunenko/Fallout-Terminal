@@ -3,7 +3,7 @@
   "specName": "player sessions control",
   "branch": "develop",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -114,15 +114,1363 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-11T22:55:56.937Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T22:57:55.311Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:02:35.948Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:02:40.069Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:06:28.171Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:08:12.307Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:08:41.881Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:09:26.776Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:10:03.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:10:44.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:10:46.984Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:11:37.655Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:11:59.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:12:03.549Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:12:28.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:14:00.640Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:15:09.997Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:15:55.220Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:17:12.594Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:17:22.958Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:18:34.787Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:21:51.573Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:23:46.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:25:19.144Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:27:16.979Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:27:28.727Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:29:05.926Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:29:35.584Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:31:57.318Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:33:25.214Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:34:57.689Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:36:12.470Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:37:19.909Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:39:07.607Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:41:32.486Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:41:32.586Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:42:41.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:48:32.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:51:07.422Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:53:45.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:54:15.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:55:02.833Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:55:49.995Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:58:42.615Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T23:59:02.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:00:56.424Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:01:26.389Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:01:42.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:02:26.092Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:02:46.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:04:08.454Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:04:40.652Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:05:11.565Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:06:18.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T00:07:18.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:19:54.779Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:19:54.824Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:20:27.021Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:20:41.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:20:55.647Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:21:45.846Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:29:16.800Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:29:16.842Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:30:16.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:30:29.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:30:53.976Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:31:18.908Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:31:44.264Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:32:38.523Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:36:51.450Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:36:51.497Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:38:35.104Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:39:48.213Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:39:57.663Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:42:09.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:45:00.164Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:45:18.408Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T086",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:48:22.289Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:49:00.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T084",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:51:57.446Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T085",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:52:04.877Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:57:10.454Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T087",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T07:58:39.143Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T088",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:00:15.598Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:00:52.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:01:45.663Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:02:29.031Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:03:26.706Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:04:05.714Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:04:42.003Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:06:09.273Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:06:59.445Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:07:10.955Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:07:26.817Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:08:21.341Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:17:48.692Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:18:55.130Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:19:27.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T106",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:20:17.269Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:21:07.443Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:21:16.996Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:22:34.381Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T108",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:23:08.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T110",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:24:37.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:33:17.266Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T109",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:49:54.582Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:51:01.672Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T112",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:52:39.345Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T113",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:53:41.752Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T08:59:00.128Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T115",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T09:01:06.315Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T09:01:06.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T10:34:07.063Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:38:06.245Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T117",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:38:06.354Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:38:06.450Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:38:06.551Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:39:00.277Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:39:45.454Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:40:00.593Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:41:17.608Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:42:42.357Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:45:19.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T126",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:45:19.736Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T127",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:46:35.499Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T128",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:48:14.053Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T10:54:05.061Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T11:23:50.695Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:25:28.766Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:25:34.506Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:25:46.877Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:26:12.889Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:26:50.750Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:27:09.914Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T11:44:04.240Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T12:09:38.996Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:16:07.993Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:16:08.091Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:16:08.204Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:17:36.581Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:17:36.691Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:17:36.807Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:17:36.909Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T130",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:20:51.877Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T131",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:26:24.289Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T132",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:32:31.843Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T133",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T12:32:31.950Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T13:01:24.992Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T134",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T13:02:40.252Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T13:33:30.368Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T135",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T13:35:38.216Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T136",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T13:36:38.483Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T13:40:22.392Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T137",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T13:40:22.494Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T138",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:00:41.434Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:00:50.748Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T14:29:20.690Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T139",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:33:27.959Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T140",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:36:20.093Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T141",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:38:18.480Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T142",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:40:35.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T143",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T14:43:01.626Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T144",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T15:20:24.982Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T15:35:14.771Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T145",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T15:49:16.172Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T146",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T15:49:22.688Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T147",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T15:49:32.390Z"
     }
   ],
-  "last_action": "living specs evaluated — skipped (not configured)",
+  "last_action": "all 147 tasks complete — Go, race, frontend, 30 browser journeys, and Wails package pass",
   "coverage": {
     "FR-001": {
       "title": "The system MUST resolve every player connection to exactly one server-recognized logical session.",
       "tasks": [
         "T043",
         "T044"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "internal/player/server_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
       ]
     },
     "FR-002": {
@@ -158,6 +1506,10 @@
         "T043",
         "T044",
         "T045"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestCoordinatedServerResumesCanonicalRuntimeForNewTabAndReconnect",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-003 composed server lets the active controller mutate every hacking target category while observers stay silent"
       ]
     },
     "FR-006": {
@@ -235,6 +1587,10 @@
         "T106",
         "T107",
         "T109"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestCoordinatedServerBroadcastEndClearsActiveAndObserverPlayersAtOneRevision",
+        "internal/control/service_test.go::TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity"
       ]
     },
     "FR-015": {
@@ -243,6 +1599,10 @@
         "T101",
         "T106",
         "T111"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestCoordinatedServerBroadcastEndClearsActiveAndObserverPlayersAtOneRevision",
+        "internal/control/service_test.go::TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity"
       ]
     },
     "FR-016": {
@@ -578,6 +1938,10 @@
         "T027",
         "T033",
         "T035"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-003 composed server lets the active controller mutate every hacking target category while observers stay silent",
+        "internal/control/service_test.go::TestControllerActionIsAuthorizedAndObserverStateRemainsCanonical"
       ]
     },
     "FR-055": {
@@ -587,6 +1951,10 @@
         "T030",
         "T033",
         "T035"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestCoordinatedServerTargetsResultToInitiatingTabAndRejectsCraftedObserverAction",
+        "internal/control/service_test.go::TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness"
       ]
     },
     "FR-056": {
@@ -622,6 +1990,10 @@
         "T034",
         "T035",
         "T037"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-003 composed server lets the active controller mutate every hacking target category while observers stay silent",
+        "internal/player/server_test.go::TestCoordinatedServerDispatchesActiveControllerHackingThroughControlService"
       ]
     },
     "FR-060": {
@@ -657,6 +2029,11 @@
         "T030",
         "T036",
         "T113"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "internal/player/protocol_test.go",
+        "app_test.go"
       ]
     },
     "FR-064": {
@@ -674,6 +2051,10 @@
         "T031",
         "T037",
         "T114"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes",
+        "tests/browser/hacking-camouflage.spec.mjs"
       ]
     },
     "FR-066": {
@@ -719,6 +2100,9 @@
       "tasks": [
         "T029",
         "T034"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::active controller can select password filler and pattern targets with authoritative pending completion"
       ]
     },
     "FR-071": {
@@ -727,6 +2111,9 @@
         "T029",
         "T034",
         "T037"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::controller action stays pending and canonical navigation waits for accepted state at its revision"
       ]
     },
     "FR-072": {
@@ -737,6 +2124,9 @@
         "T029",
         "T034",
         "T035"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::rejected controller action clears pending immediately and leaves the canonical view unchanged"
       ]
     },
     "FR-073": {
@@ -755,6 +2145,11 @@
         "T035",
         "T079",
         "T085"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestCurrentLiveForSessionResumesCoordinatorOwnedRuntimeWithoutRegeneration",
+        "internal/player/server_test.go::TestCoordinatedServerResumesCanonicalRuntimeForNewTabAndReconnect",
+        "internal/player/server_test.go::TestCoordinatedForceHackSuccessPublishesOneSolvedCanonicalProjection"
       ]
     },
     "FR-075": {
@@ -832,6 +2227,12 @@
         "T095",
         "T096",
         "T100"
+      ],
+      "tests": [
+        "internal/live/service_test.go",
+        "internal/control/service_test.go",
+        "internal/player/server_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
       ]
     },
     "FR-083": {
@@ -930,6 +2331,10 @@
         "T109",
         "T110",
         "T111"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-004 master end-broadcast control confirms in-app and invokes the authoritative command once",
+        "internal/player/server_test.go::TestCoordinatedServerBroadcastEndClearsActiveAndObserverPlayersAtOneRevision"
       ]
     },
     "FR-093": {
@@ -950,6 +2355,12 @@
         "T103",
         "T106",
         "T109"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "internal/player/server_test.go",
+        "internal/domain/model_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
       ]
     },
     "FR-095": {
@@ -960,6 +2371,10 @@
         "T090",
         "T096",
         "T113"
+      ],
+      "tests": [
+        "app_test.go::TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime",
+        "internal/player/server_test.go::TestCoordinatedForceHackSuccessPublishesOneSolvedCanonicalProjection"
       ]
     },
     "FR-096": {
@@ -993,6 +2408,143 @@
         "T031",
         "T037",
         "T114"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime",
+        "app_test.go::TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime"
+      ]
+    },
+    "FR-100": {
+      "tests": [
+        "internal/domain/model_test.go::TestPlayerConfigV1StrictValidationAndStableEncoding",
+        "internal/playerconfig/service_test.go::TestCreateLoadSaveAndReusePlayerConfig"
+      ]
+    },
+    "FR-101": {
+      "tests": [
+        "internal/playerconfig/service_test.go::TestCreateLoadSaveAndReusePlayerConfig",
+        "internal/domain/model_test.go::TestPlayerConfigV1StrictValidationAndStableEncoding",
+        "app_test.go::TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter"
+      ]
+    },
+    "FR-102": {
+      "tests": [
+        "internal/domain/model_test.go::TestSessionPlayerConfigReferenceIsOptionalAndRoundTrips"
+      ]
+    },
+    "FR-103": {
+      "tests": [
+        "internal/playerconfig/service_test.go::TestCreateLoadSaveAndReusePlayerConfig",
+        "internal/session/service_test.go::TestAssociatePlayerConfigPersistsRelativeReferenceAndKeepsActiveSession"
+      ]
+    },
+    "FR-104": {
+      "tests": [
+        "app_test.go::TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001/BUG-002 master workflow accepts an active player config with an empty roster"
+      ]
+    },
+    "FR-105": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::US4 player-config cancellation stays informational while editing remains available"
+      ]
+    },
+    "FR-106": {
+      "tests": [
+        "internal/domain/model_test.go::TestPlayerConfigV1StrictValidationAndStableEncoding",
+        "internal/playerconfig/service_test.go::TestPlayerConfigCancellationAndFailuresAreNonMutating"
+      ]
+    },
+    "FR-107": {
+      "tests": [
+        "internal/control/service_test.go::TestPlayerConfigRosterInstallAndSaveBeforePublication",
+        "app_test.go::TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter"
+      ]
+    },
+    "FR-108": {
+      "tests": [
+        "app_test.go::TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter",
+        "internal/session/service_test.go"
+      ]
+    },
+    "FR-109": {
+      "tests": [
+        "internal/control/service_test.go::TestPlayerConfigRosterInstallAndSaveBeforePublication"
+      ]
+    },
+    "FR-110": {
+      "tests": [
+        "internal/control/service_test.go::TestPlayerConfigRosterInstallAndSaveBeforePublication"
+      ]
+    },
+    "FR-111": {
+      "tests": [
+        "internal/playerconfig/service_test.go::TestCreateLoadSaveAndReusePlayerConfig",
+        "internal/control/service_test.go::TestPlayerConfigRosterInstallAndSaveBeforePublication"
+      ]
+    },
+    "FR-112": {
+      "tests": [
+        "internal/domain/model_test.go::TestPlayerConfigV1StrictValidationAndStableEncoding",
+        "internal/domain/model_test.go::TestVersionOneSessionJSONContainsOnlyDurableAuthoredFields"
+      ]
+    },
+    "FR-113": {
+      "tests": [
+        "internal/playerconfig/service_test.go::TestCreateLoadSaveAndReusePlayerConfig"
+      ]
+    },
+    "FR-114": {
+      "tests": [
+        "internal/playerconfig/service_test.go::TestPlayerConfigCancellationAndFailuresAreNonMutating",
+        "app_test.go::TestPlayerConfigCommandsAssociateBeforeInstallingRoster"
+      ]
+    },
+    "FR-115": {
+      "tests": [
+        "internal/domain/model_test.go::TestPlayerConfigV1StrictValidationAndStableEncoding",
+        "internal/platform/assets_test.go::TestPlayerSessionsControlCrossCuttingAssetContract"
+      ]
+    },
+    "SC-025": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::US4 player-config cancellation stays informational while editing remains available"
+      ]
+    },
+    "FR-116": {
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-005 master retries one failed puzzle and active and observer converge without identity drift",
+        "internal/platform/assets_test.go::TestGameMasterRetainsExclusiveFailedHackResetControl"
+      ]
+    },
+    "FR-117": {
+      "tests": [
+        "internal/live/service_test.go::TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget",
+        "internal/control/service_test.go::TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates"
+      ]
+    },
+    "FR-118": {
+      "tests": [
+        "internal/control/service_test.go::TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates",
+        "internal/player/server_test.go::TestCoordinatedServerPublishesFreshFailedHackResetToActiveAndObserver"
+      ]
+    },
+    "FR-119": {
+      "tests": [
+        "internal/control/service_test.go::TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates",
+        "internal/live/service_test.go::TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget"
+      ]
+    },
+    "FR-120": {
+      "tests": [
+        "app_test.go::TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState",
+        "internal/platform/assets_test.go::TestGameMasterRetainsExclusiveFailedHackResetControl"
+      ]
+    },
+    "FR-121": {
+      "tests": [
+        "internal/control/service_test.go::TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates",
+        "internal/player/server_test.go::TestCoordinatedServerPublishesFreshFailedHackResetToActiveAndObserver"
       ]
     }
   },
@@ -1069,6 +2621,81 @@
       "decision": "Add no runtime dependency",
       "why": "The standard library and existing deterministic Go and Playwright infrastructure cover identifiers, ordering, protocol, and browser behavior",
       "rejected": "A database, frontend framework, or second browser-test tool"
+    },
+    {
+      "decision": "One coordinator serializes identities, claims, controller authority, terminal runtimes, actions, publications, and broadcast lifetime",
+      "why": "authorization and mutation must share one order to prevent reassignment, switch, and stale-action races",
+      "rejected": "independent session and live locks with publication after unlock"
+    },
+    {
+      "decision": "Opaque same-origin localStorage recognition tokens identify one process-local logical session across tabs",
+      "why": "tabs and reopen share identity while server restart intentionally restores nothing",
+      "rejected": "connection IDs, URL tokens, and durable account persistence"
+    },
+    {
+      "decision": "Exact private terminal checkpoints remain coordinator-owned and never pass through public projections",
+      "why": "preserve must retain secrets, candidates, generation, patterns, attempts, log, outcome, and navigation exactly",
+      "rejected": "reconstructing suspended puzzles from player-safe state"
+    },
+    {
+      "decision": "Store authored roster IDs and names in a standalone strict version-1 player-config file and only a normalized relative reference in Session",
+      "why": "preserves legacy sessions and portability while excluding all runtime coordination and puzzle state",
+      "rejected": "persist roster or runtime ownership directly in version-1 session JSON"
+    },
+    {
+      "decision": "Persist complete candidate rosters under the coordinator transition lock before committing or publishing",
+      "why": "guarantees write failures leave disk, canonical state, revisions, and effects unchanged",
+      "rejected": "mutate runtime first and roll back after a failed asynchronous save"
+    },
+    {
+      "decision": "Serialize player-config selection and broadcast start at the Wails boundary",
+      "why": "prevents an association save from racing a broadcast start between precondition validation and coordinator installation",
+      "rejected": "rely only on disabled frontend controls"
+    },
+    {
+      "decision": "Preserve allocated empty rosters across both clone boundaries while leaving nil invalid",
+      "why": "FR-101 requires JSON [] for a new config and strict decoding must continue rejecting missing/null roster data",
+      "rejected": "Loosening ValidatePlayerConfig to accept nil, which would erase the format distinction"
+    },
+    {
+      "decision": "Preserve non-nil empty hacking logs through every clone boundary and keep the browser renderer defensive against null logs.",
+      "why": "The real composed fixture proved null log serialization caused renderHackLog to throw after pending was set but before the request send.",
+      "rejected": "Relaxing controller gates or bypassing authoritative pending/render flow."
+    },
+    {
+      "decision": "Use the polite coordination status for player-config cancellation and clear the assertive playerConfigError region.",
+      "why": "FR-105 and US4/AC10 require cancellation to keep editing available without presenting an error.",
+      "rejected": "Leaving an explanatory cancellation message in the role=alert error surface."
+    },
+    {
+      "decision": "Replace native window.confirm with an accessible in-app dialog for ending a broadcast",
+      "why": "The regression isolated confirmation as the first unavailable boundary; the dialog is controllable, keyboard-focusable, and can synchronously prevent duplicate commands",
+      "rejected": "Changing coordinator, App, facade, or player fanout layers that already passed focused tests"
+    },
+    {
+      "decision": "ResetFailedHack accepts the latest validated authored terminal payload at the trusted App boundary and atomically replaces only the current failed coordinator runtime slot",
+      "why": "This applies edited name, tree, intro, and hack level at the explicit retry boundary without misrepresenting the generation level of the failed puzzle",
+      "rejected": "Changing UpdateRuntime to overwrite HackLevel while preserving an existing puzzle"
+    },
+    {
+      "decision": "Candidate word IDs are scoped by a digest of the private generation ID",
+      "why": "Word IDs previously restarted at A1/B1, so delayed guesses could accidentally target the replacement generation; generation scoping makes stale guesses unaddressable like existing pattern IDs",
+      "rejected": "Relying only on board placement differences or request IDs"
+    },
+    {
+      "decision": "Resolve assigned reconnect snapshots through an additive coordinator read seam only after the socket is bound",
+      "why": "The coordinator owns canonical terminal slots, while effect callbacks must remain non-reentrant under the coordinator lock",
+      "rejected": "Reading the legacy live slot or querying the coordinator from a synchronous player-state effect callback"
+    },
+    {
+      "decision": "Publish private forced success as one complete revisioned live projection",
+      "why": "All assigned clients must converge on the coordinator-owned solved runtime and its unchanged attempts",
+      "rejected": "Mutating and publishing the legacy live service hack snapshot"
+    },
+    {
+      "decision": "Run production reconnect continuity inside the composed active-controller browser journey",
+      "why": "The suite intentionally retains disconnected claims in one fixture process, so a separate later test cannot claim another character deterministically",
+      "rejected": "Resetting canonical fixture state between tests or weakening the production composition"
     }
   ],
   "step_summaries": {
@@ -1078,9 +2705,12 @@
     },
     "tasks": {
       "summary": "115 tasks across Setup, Foundational, nine user-story phases, and Polish; every phase uses explicit test-first dependency waves and all FR-001 through FR-099 are mapped."
+    },
+    "implement": {
+      "summary": "Idempotent Companion implementation validation confirmed all 147 tasks and all current automated/package gates."
     }
   },
-  "currentTask": "T008",
+  "currentTask": "T147",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1116,6 +2746,1432 @@
       "files": [
         "internal/testutil/fakes.go"
       ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added process-local coordination IDs, canonical runtime models, roles, phases, action results, detached master/player projections, and deep clone helpers without changing durable session JSON",
+      "files": [
+        "internal/domain/model.go",
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Extended the strict player protocol with handshake, selection, correlated action preconditions, personalized state/results, and typed revisioned terminal envelopes; updated legacy server call sites to the new constructors.",
+      "files": [
+        "internal/player/protocol.go",
+        "internal/player/protocol_test.go",
+        "internal/player/server.go",
+        "internal/player/server_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added sender-aware PlayerConnection callbacks while retaining the compatibility Start path, one reader, one writer, bounded queue behavior, and per-connection slow-client isolation.",
+      "files": [
+        "internal/player/client.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Implemented the single-lock coordinator transaction skeleton with opaque IDs, accepted-only revisions, detached ordered effects and projections, and bounded replay records",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Added failing-first desktop bridge tests for validated character creation, broadcast start, detached coordination status/event replay, and rejection without partial state.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Added US1 coordinator contract tests for roster/start flow, fresh selection, 100-trial concurrent claim races, exclusive assignments, and exactly one initial controller",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Added exact US1 handshake, selection, personalized state, action-result, stale-broadcast, roster-privacy, and strict-field protocol tests",
+      "files": [
+        "internal/player/protocol_test.go"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Added failing-first browser coverage for welcome-gated token continuity, terminal-styled escaped roster selection, one pending selection, conflict recovery, and authoritative assignment progression.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added failing-first real-WebSocket US1 integration coverage for session welcome identity, token and fallback uniqueness, character claim success/conflict, personalized roster refresh, and assigned waiting/live-terminal delivery.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Added failing-first source contracts for bounded hidden selection/waiting regions, available-versus-claimed styling, safe text rendering, token URL/markup privacy, and continued absence of player ForceHackSuccess paths.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added the minimal game-master roster creation, roster display, broadcast summary/start, and authoritative status regions with semantic labels and no privileged player surface.",
+      "files": [
+        "frontend/src/index.html"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Added accessible hidden player identity, role, character selection, assigned-waiting, and notice regions with no privileged controls",
+      "files": [
+        "client/index.html"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Styled the master roster and broadcast controls as a bounded terminal panel with responsive flex sizing, claim/status treatments, and existing desktop visual language.",
+      "files": [
+        "frontend/src/master.css"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Added responsive no-scroll terminal styling for player identity and role, character selection availability and claimed states, pending selection, notices, and assigned waiting while preserving authoritative hidden layout.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Implemented fresh logical sessions, unique fallback names, roster creation, broadcast start, exclusive cached character selection, conflict outcomes, and atomic initial-controller election",
+      "files": [
+        "internal/control/service.go",
+        "internal/domain/model.go"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Added the exact AddCharacter and StartBroadcast facade commands plus coordination-state subscription with runtime-status replay",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Added the coordination service boundary, validated roster/start commands, detached coordination runtime status and DOM-ready replay, and coordination-state event publication to the Wails facade.",
+      "files": [
+        "app.go",
+        "app_test.go"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Integrated handshake-gated sender-aware player connections with coordinator token/session binding, character selection dispatch, personalized multi-tab effect routing, assigned-only live delivery, and disconnect cleanup while retaining legacy lifecycle and bounded queues.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Implemented welcome-gated browser recognition, authoritative player-state rendering, safe roster selection, correlated pending results, conflict recovery, and assigned identity/waiting UI",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Rendered authoritative roster/broadcast snapshots, safely escaped names through textContent, awaited add/start results, surfaced failures, and avoided optimistic master coordination state.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Composed one shared control.Service with a deferred effect router, injected it into App and player.Config through the server coordinator adapter, routed ordered player/master effects without callback lock re-entry, and preserved existing shutdown ownership.",
+      "files": [
+        "main.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Hardened asset contracts so role and pending presentation cannot disable focusable hacking hit targets.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Covered active password, filler, and pattern target requests plus accepted and rejected authoritative pending completion in Playwright.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Added US2 coordinator tests for sender authorization, exact rejection immutability and zero RNG, duplicate fingerprints, reassignment ordering, and unchanged nav/hack outcomes",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Added a real control.Service-backed WebSocket regression proving active-controller hacking dispatch and revisioned completion.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Added bounded observer read-only and shared-action pending presentation while preserving local highlights, focus, paging, and hacking previews",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Added a coordinator-callable live runtime Apply boundary over domain.TerminalRuntime and RuntimeCommand, routed legacy navigation, guess, and one-use pattern operations through the same rules, retained puzzle/navigation/forced-success semantics, returned detached public snapshots, and moved pattern publication outside the live mutex to prevent callback re-entry.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Revalidated client request preconditions, role and pending gates, revision application, and authoritative completion across all hacking target categories.",
+      "files": [
+        "client/client.js",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Implemented sender-resolved player authorization, deterministic action fingerprints, replay-safe cached outcomes, ordered live effects/results, and accepted-only canonical revisions",
+      "files": [
+        "internal/control/service.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Proved sender-bound active-controller hacking dispatch through the real coordinator while retaining targeted results and observer rejection.",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/server_test.go"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Re-ran password, filler, and pattern browser regressions with exact preconditions, pending state, and authoritative results.",
+      "files": [
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Routed exact private ForceHackSuccess through the coordinator revision/effect order, preserved hack status publication, and retained legacy-only compatibility without adding player authority",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "main.go",
+        "internal/control/service.go",
+        "internal/player/server.go"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Revalidated production effect-router composition and private hack-state delivery with the active-controller server path.",
+      "files": [
+        "main.go",
+        "internal/player/server_test.go"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Proved recognition has no HTTP/query endpoint or URL-construction path, tokens are never reflected, and same-host Origin, exact CSP, and nosniff behavior remain unchanged.",
+      "files": [
+        "internal/player/http_test.go"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Added US3 coordinator tests for absent/known/unknown recognition tokens, unique replacements, first/last presence effects, stable reconnect identity/claim/role, and claim retention for unrecognized newcomers",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Added failing-first browser coverage for recognized reload and reopen continuity, three-tab profile reuse, context and cleared-storage isolation, stale-token replacement, and Web Locks/storage-fallback first-use serialization",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Added real-socket three-tab membership, one/final-close presence, assigned reconnect snapshot, different-profile and unknown-token isolation, and prior-process stale-token replacement coverage.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Implemented token-based logical-session reuse, unique replacement identities, idempotent connection membership, and first/last aggregate presence effects without releasing claims or request caches",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Added failing coordinator contracts for roster and session renames, duplicate-name support, GM assignment/release/move, inverse-claim invariants, controller clearing, rejection immutability, and exact terminal/puzzle preservation.",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Completed connection-to-session close tracking and reconnect replay, and wired production token recognition/detach through the canonical coordinator",
+      "files": [
+        "internal/player/server.go",
+        "main.go"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Added failing Wails boundary contracts for validated roster/session/assignment payloads, accepted detached events and status replay, conflict snapshots, and proof that corrections never call durable session persistence.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Serialized first-use browser token issuance across tabs with Web Locks and deterministic storage-event contender/lease fallback, preserving stale-token replacement and welcome-gated connection UI",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Added real-socket US4 contracts for same-session/all-session roster fanout, character and session rename propagation, atomic transfer, claimed-delete refusal, release-to-selection, and privacy-safe player JSON",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Added browser contracts for stable-ID roster renames and availability, character-primary/fallback-secondary identity updates, release-to-selection, transfer, canonical terminal mirror retention, and zero optimistic shared actions.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Added accessible authoritative roster CRUD and logical-session assignment correction templates, claim/presence/role semantics, and separate status/error live regions to the master coordination panel",
+      "files": [
+        "frontend/src/index.html"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Implemented validated roster and logical-session renames, unclaimed deletion, exclusive GM assignment/release/move transactions, inverse indexes, controller clearing, and detached full-state effects without touching terminal runtime",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Styled roster and logical-session management rows, claim/presence/role states, rename/delete/assign/release/move/controller controls, accessible feedback, compact responsive wrapping, and bounded coordination-panel overflow.",
+      "files": [
+        "frontend/src/master.css"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Added exact lower-camel frozen desktop facade commands for character rename/delete, logical-session rename, and assignment release/move corrections mapped to their Wails App methods",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Hardened personalized coordinator fanout to require matching session IDs, ignore stale projections, update every bound tab, and resend canonical terminal state only for a new assignment or active-terminal change so roster/name corrections do not replay gameplay.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Applied authoritative roster and assignment projections by stable IDs, cleared obsolete selection state, and retained broadcast-scoped terminal mirrors across release and reassignment without optimistic mutation",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Added validated trusted Wails roster/session correction payloads and commands with detached authoritative results, success-only coordination publication, and no durable-session persistence calls",
+      "files": [
+        "app.go",
+        "app_test.go"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Rendered authoritative roster, logical sessions, presence, claims and roles from inert templates; wired awaited rename/delete/assign/release/move corrections; showed validation/conflict/claimed-delete refusals in accessible feedback; and kept terminal/puzzle UI independent of coordination commands.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "Added failing Wails contracts for validated SetActiveController, connected-assigned eligibility refusal snapshots, detached result/event/status state, success-only publication, and coordinator-before-master-event ordering.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Added failing-first controller reassignment contracts for eligibility, exact state preservation, 100 forced action-order interleavings, former-controller rejection, and the single-controller invariant",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "Added real-socket contracts for all-tab controller-role fanout plus action-before and action-after reassignment ordering; corrected the contract to avoid expecting redundant terminal replay for a role-only change.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Added browser contracts for four-tab live role swap, immediate former-controller gating, new-controller send eligibility, stale revision rejection, and unchanged character, terminal, puzzle, focus, and local feedback.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Added exact setActiveController to the frozen narrow desktop facade, forwarding only the logical-session ID through the existing Wails command boundary.",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Implemented atomic connected-assigned controller replacement in the coordinator action order with one full detached state revision and exact claim/terminal/private-puzzle preservation",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Added validated SetActiveController Wails command with blank-ID rejection, additive coordinator boundary, detached authoritative success/error snapshots, success-only coordination publication, and replayable status updates.",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Applied authoritative controller and observer revisions immediately while preserving canonical terminal DOM and local hacking focus, hover, and input preview across role-only transitions; stale player revisions remain ignored",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Confirmed and hardened one-revision personalized role fanout to every bound tab, with stale-state rejection, no redundant terminal replay for role-only changes, and preserved coordinator-before-later-action ordering.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Enabled controller controls only for connected assigned observers, rendered authoritative active/observer state, awaited reassignment through shared command handling, and surfaced refusal snapshots without optimistic role changes.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Covered detached master status/event replay for a disconnected active logical session, retaining its character claim and controller identity across presence-only snapshots.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Kept disconnected sessions and claims visible, labeled a disconnected active controller distinctly, and left connected assigned observers eligible for explicit reassignment without optimistic claim changes.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Added US6 coordinator contracts for observer/controller final-close retention, zero promotion, reconnect before/after reassignment roles, presence-only effects, and byte-equivalent terminal/private-puzzle state",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Added reconnect browser contracts for unchanged and reassigned former controllers, covering welcome-gated overlay, recognized-token handshake, authoritative role restoration, no selection, immediate send eligibility, and exact terminal/puzzle plus local-input continuity",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Made final-detach detection explicit and routed attach/detach transitions through dedicated ordered master/player-only presence effects while retaining claims, controller identity, caches, and all terminal runtime state",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "Restored the authoritative welcomed controller or observer role on reconnect without inferring promotion, retained same-broadcast terminal revision and puzzle DOM, and preserved local hacking focus/input while keeping the connection overlay gated until welcome",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Added real-socket US6 tests for controller multi-tab close order, final disconnect without observer promotion, stable claim/controller, unchanged puzzle, active reconnect, and former-controller observer reconnect after reassignment.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "Verified the server detaches only the closing connection, forwards last-close presence effects without clearing terminal delivery state, and welcomes reconnects with the coordinator-authoritative retained assignment and role.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Added failing live-runtime lifecycle contracts for fresh checkpoint/puzzle creation, navigation revalidation, authored metadata updates without puzzle reset, detached projection, and independent fresh generations.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Added failing-first US7 coordinator contracts for direct completed-puzzle activation/clear, broadcast identity preservation, runtime-slot ownership/restoration, late assignment into the active terminal, and stale/inactive action rejection",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Added coordinator-owned terminal runtime create/update/project boundaries with fresh navigation and puzzle generation, authored-content navigation revalidation, private puzzle retention, and detached secret-free projection.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "Implemented direct coordinator-owned terminal activation, same/restored-slot updates, completed/no-puzzle switches and clear, late-assignee live snapshots, stale-terminal guards, and identity/claim/controller-preserving ordered effects",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Added a bounded real-WebSocket US7 integration contract covering ten monotonic terminal live/clear switches, complete assigned-client convergence, late assignment into the current terminal, recognized reconnect snapshots, and stale inactive-terminal rejection at the latest revision.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Added browser coverage for assigned waiting with no active terminal, progressive reveal across ten authoritative automatic switches, late character selection into the current terminal, and stable character identity, fallback identity, and role throughout",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T086": {
+      "status": "DONE",
+      "did": "Applied revisioned live, update, navigation, hacking, and clear envelopes only when they match the latest authoritative personalized active-terminal target; retained existing waiting and progressive reveal flows, identity and role stability, and late-assignee current-terminal delivery while rejecting stale snapshots",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Added failing-first US7 Wails contracts for validated terminal activation/clear, coordinator-ordered live updates, activated/cleared authoritative results, detached refusal snapshots, and zero optimistic legacy live/player publication",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T084": {
+      "status": "DONE",
+      "did": "Added narrow requestTerminalActivation and requestTerminalClear facade commands mapped to the exact Wails method names while retaining updateLiveTerminal and the private forceHackSuccess mapping",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T085": {
+      "status": "DONE",
+      "did": "Hardened revisioned terminal routing so coordinated live and clear effects reject stale revisions, retained TERMINAL_UPDATE through the existing bridge, made all coordinated live/update/clear/hack bridge fanout selective to assigned sessions, preserved waiting sessions, and kept inactive-terminal results on the initiating socket.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "Added validated coordinator-owned terminal activation, clear, and ordered update Wails methods with detached authoritative results and production lifecycle wiring.",
+      "files": [
+        "app.go",
+        "main.go",
+        "internal/control/service.go"
+      ]
+    },
+    "T087": {
+      "status": "DONE",
+      "did": "Drove make-active, update, and clear-active controls from awaited coordinator results and distinguished broadcast waiting from broadcast end.",
+      "files": [
+        "frontend/src/master.js",
+        "frontend/src/index.html"
+      ]
+    },
+    "T088": {
+      "status": "DONE",
+      "did": "Added deep private checkpoint tests for exact puzzle/navigation preservation, latest authored refresh, navigation revalidation, and fresh discard generation.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "Added browser coverage proving decision-required and cancel leave the source puzzle authoritative, preserve restores the exact visible board/attempts/log, discard creates a distinct fresh puzzle, and player identity, character assignment, and controller role remain stable throughout",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "Added app bridge contracts for decision-required switch shapes, validated preserve/discard/cancel resolution, stale refusal, detached state, and trusted forced-success eligibility.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "Added a bounded real-WebSocket US8 contract covering no premature terminal clear/switch while pending, cancel with unchanged source, preserve and wire-exact public puzzle restoration, discard with one fresh converged puzzle, assigned-client fanout, and initiating-socket stale inactive-terminal rejection.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "Added failing-first US8 coordinator contracts for opaque pending switch decisions, source actions while pending, exact preserve/reactivation, discard regeneration, cancel, stale refusal, deletion guards, and inactive action rejection",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "Added failing-first master asset contracts for an accessible hidden preserve/discard/cancel terminal-switch dialog, destructive discard styling, status/error regions, and exclusion from all player assets and protocol.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "Implemented exact private checkpoint suspension/reactivation and fresh discard generation with authored metadata refresh and navigation revalidation.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "Implemented opaque pending switch transactions, preserve/discard/cancel resolution, stale source/broadcast guards, continued source actions, deletion guards, and ordered terminal effects.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "Added the hidden native game-master terminal-switch dialog with accessible title/description, preserve/discard/cancel controls, destructive discard hook, and polite/assertive status regions for pending and stale decisions.",
+      "files": [
+        "frontend/src/index.html"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "Added the exact resolveTerminalSwitch desktop mapping and normalized activation, clear, and resolution results while retaining ForceHackSuccess as its distinct private binding",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "Added validated ResolveTerminalSwitch Wails payloads and normalized detached switch results while preserving exact private ForceHackSuccess routing.",
+      "files": [
+        "app.go",
+        "app_test.go"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "Styled the unfinished-puzzle switch dialog with bounded terminal presentation, destructive discard emphasis, keyboard-visible focus, responsive action stacking, and authoritative hidden states.",
+      "files": [
+        "frontend/src/master.css"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "Integrated blocking preserve/discard/cancel master flow, awaited decision outcomes, retained source authority while pending, surfaced stale errors, and guarded owned-terminal deletion.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "Proved complete runtime coordination and puzzle activity leaves version-1 durable encoding byte-identical and authored terminal behavior unchanged.",
+      "files": [
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "Added failing-first US9 coordinator contracts for atomic broadcast disposal, retained process sessions/tokens/fallbacks/roster, cleared claims/controller/terminal slots/pending decisions/request caches, and a fresh broadcast/controller epoch",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T106": {
+      "status": "DONE",
+      "did": "Implemented atomic broadcast end/start cleanup and full process shutdown disposal while retaining only process-scoped recognition, fallback names, presence, and roster between broadcasts.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "Added app contracts for validated broadcast end, same-process restart, replay status, shutdown disposal, and unchanged durable-session command separation.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "Added the US9 browser lifecycle contract covering immediate end-of-broadcast waiting cleanup, second-broadcast character reselection and assigned waiting, ignored stale pending action completion/snapshots, and replacement-token fresh welcome after simulated process restart.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "Added authoritative EndBroadcast Wails command, same-process restart support, and coordinator shutdown disposal without touching durable session commands.",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T108": {
+      "status": "DONE",
+      "did": "Added the exact EndBroadcast desktop binding and lower-camel facade command while retaining the existing StartBroadcast mapping",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T110": {
+      "status": "DONE",
+      "did": "Made authoritative broadcast lifetime changes clear pending selection/shared actions plus all terminal, navigation, puzzle, revision, timer, audio, and rendered mirrors; same-broadcast reconnect/role changes still preserve state while every new broadcast renders server-confirmed unassigned selection.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "Added a bounded real-socket US9 lifetime contract covering ordered end-broadcast player context and terminal clear, retained same-process identity with mandatory reselection, stale prior-broadcast selection/action rejection, and fresh-process replacement of unknown prior tokens without restored assignment.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T109": {
+      "status": "DONE",
+      "did": "Published ordered terminal clear and fresh personalized contexts across broadcast epochs, retained stale-ID rejection, and verified unknown prior-process tokens receive fresh identity.",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/server_test.go"
+      ]
+    },
+    "T111": {
+      "status": "DONE",
+      "did": "Completed authoritative master broadcast-end integration with accessible confirmation, exactly-once invocation, and retained-state rendering",
+      "files": [
+        "frontend/src/master.js",
+        "frontend/src/index.html",
+        "frontend/src/master.css"
+      ]
+    },
+    "T112": {
+      "status": "DONE",
+      "did": "Documented the game-master roster, assignment correction and controller workflow; unfinished-puzzle preserve/discard/cancel switching; browser-origin/profile recognition limits; broadcast-versus-process cleanup; version-1 persistence boundary; and unchanged private-only ForceHackSuccess capability.",
+      "files": [
+        "README.md"
+      ]
+    },
+    "T113": {
+      "status": "DONE",
+      "did": "Consolidated cross-cutting platform asset assertions for restrictive CSP, safe name rendering, resume-token secrecy, observer/pending authority gates, switch resolution, responsive layouts, and player forced-success exclusion.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T114": {
+      "status": "DONE",
+      "did": "Recorded passing formatting, vet, full and race Go suites, frontend build, 29/29 browser journeys, production Wails package build, SC-001–SC-029 evidence, and the native BUG-004 click-through.",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T115": {
+      "status": "DONE",
+      "did": "Ran Wails development launch/render/shutdown and clean macOS package build; recorded self-signing, private-API warning, and unavailable distribution notarization credentials.",
+      "files": [
+        "specs/004-player-sessions-control/validation.md",
+        "build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T116": {
+      "status": "DONE",
+      "did": "Added non-nil empty-roster and JSON array regressions for player-config create and domain round trips",
+      "files": [
+        "internal/playerconfig/service_test.go",
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T117": {
+      "status": "DONE",
+      "did": "Added coordinator tests for active-store requirements, no-broadcast replacement, and save-before-publication rollback",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T118": {
+      "status": "DONE",
+      "did": "Added real App player-config create, association, coordinator install, and first durable roster-add regression",
+      "files": [
+        "app_test.go",
+        "internal/session/service_test.go"
+      ]
+    },
+    "T119": {
+      "status": "DONE",
+      "did": "Extended master workflow contract to accept an active player config independently of empty roster length",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T120": {
+      "status": "DONE",
+      "did": "Added strict durable PlayerConfig models, optional relative session association, active metadata, and validation limits",
+      "files": [
+        "internal/domain/model.go",
+        "internal/domain/json.go",
+        "internal/domain/validate.go"
+      ]
+    },
+    "T121": {
+      "status": "DONE",
+      "did": "Added accessible player-config select/create status and recoverable-error controls with disabled roster presentation",
+      "files": [
+        "frontend/src/index.html",
+        "frontend/src/master.css",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T122": {
+      "status": "DONE",
+      "did": "Added exact player-config load/create/open bindings with normalized command results",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T123": {
+      "status": "DONE",
+      "did": "Preserved non-nil empty roster slices across player-config result and save cloning while retaining nil validation",
+      "files": [
+        "internal/playerconfig/service.go"
+      ]
+    },
+    "T124": {
+      "status": "DONE",
+      "did": "Preserved allocated empty rosters during coordinator installation and retained strict nil rejection without mutation",
+      "files": [
+        "internal/control/service.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T125": {
+      "status": "DONE",
+      "did": "Verified the real App create-associate-install-first-add path with durable empty-roster semantics",
+      "files": [
+        "app_test.go",
+        "internal/playerconfig/service.go",
+        "internal/control/service.go"
+      ]
+    },
+    "T126": {
+      "status": "DONE",
+      "did": "Made personalized coordination fanout explicitly carry newly installed rosters without restoring runtime ownership",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T127": {
+      "status": "DONE",
+      "did": "Implemented referenced auto-load, explicit retries, active-config status, durable session refresh, and authoritative roster/broadcast gating",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T128": {
+      "status": "DONE",
+      "did": "Documented player-config format, relative association, reuse/recovery, runtime exclusions, and revised master workflow",
+      "files": [
+        "README.md",
+        "specs/004-player-sessions-control/contracts/desktop-coordination.md"
+      ]
+    },
+    "T129": {
+      "status": "DONE",
+      "did": "Passed format, vet, full/race Go, frontend, 25 browser, native Wails empty-config journey, and macOS package gates for BUG-002",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T130": {
+      "status": "DONE",
+      "did": "Added a real coordinator/player-server Playwright fixture and reproduced active-controller hacking selection failing before any outbound HACK request.",
+      "files": [
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/playwright.config.mjs"
+      ]
+    },
+    "T131": {
+      "status": "DONE",
+      "did": "Fixed the confirmed null empty-log projection that threw during pending render before send, preserving non-nil empty logs and adding defensive client rendering.",
+      "files": [
+        "internal/hack/hack.go",
+        "internal/control/service.go",
+        "app.go",
+        "client/client.js",
+        "internal/player/server_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T132": {
+      "status": "DONE",
+      "did": "Completed focused coordinator, server, asset, and browser regressions for active, observer, stale, duplicate, and pending-result behavior.",
+      "files": [
+        "internal/control/service_test.go",
+        "internal/player/server_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T133": {
+      "status": "DONE",
+      "did": "Passed formatting, vet, full and race Go suites, frontend build, 27 browser journeys, Wails development launch, and Darwin package build; recorded SC-028 evidence.",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T134": {
+      "status": "DONE",
+      "did": "Kept player-config cancellation informational, hid the assertive error alert, preserved editor/control gating, and added a DOM-level Playwright regression for both create and open cancellation.",
+      "files": [
+        "frontend/src/master.js",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T135": {
+      "status": "DONE",
+      "did": "Added a production-shaped master regression that exposes the native confirmation boundary before EndBroadcast can run",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T136": {
+      "status": "DONE",
+      "did": "Replaced the unreliable native confirm gate with an accessible in-app dialog and authoritative exactly-once end-broadcast handling",
+      "files": [
+        "frontend/src/index.html",
+        "frontend/src/master.css",
+        "frontend/src/master.js",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T137": {
+      "status": "DONE",
+      "did": "Added cross-boundary regressions proving master-to-coordinator invocation and active/observer no-broadcast fanout with terminal clear",
+      "files": [
+        "app_test.go",
+        "internal/player/server_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T138": {
+      "status": "DONE",
+      "did": "Completed full BUG-004 automated, package, and native end-broadcast verification; a real connected player cleared its active terminal and retained master-side roster/session state.",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T139": {
+      "status": "DONE",
+      "did": "Added failing live and coordinator coverage for eligible failed-puzzle replacement, latest settings, preserved identity/runtime state, fanout revision, and duplicate/stale rejection",
+      "files": [
+        "internal/live/service_test.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T140": {
+      "status": "DONE",
+      "did": "Added failing App validation, assigned player fanout, authoritative error/state, and master-only asset exposure coverage for ResetFailedHack",
+      "files": [
+        "app_test.go",
+        "internal/player/server_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T141": {
+      "status": "DONE",
+      "did": "Added failing production-shaped BUG-005 browser journey covering four-attempt lockout, one master retry, and active/observer convergence with stable roles",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T142": {
+      "status": "DONE",
+      "did": "Implemented atomic coordinator ResetFailedHack with eligible failed-source validation, latest-target regeneration, generation-scoped word identities, ordered fresh projection, and duplicate/stale no-mutation rejection",
+      "files": [
+        "internal/live/service.go",
+        "internal/control/service.go",
+        "internal/hack/hack.go"
+      ]
+    },
+    "T143": {
+      "status": "DONE",
+      "did": "Implemented the exact trusted ResetFailedHack desktop/App contract, generated Wails binding, awaited facade/UI control with pending/error states, and existing ordered player effect composition",
+      "files": [
+        "specs/004-player-sessions-control/contracts/desktop-coordination.md",
+        "app.go",
+        "frontend/src/desktop-api.js",
+        "frontend/src/index.html",
+        "frontend/src/master.css",
+        "frontend/src/master.js",
+        "frontend/wailsjs/go/main/App.js",
+        "frontend/wailsjs/go/main/App.d.ts"
+      ]
+    },
+    "T144": {
+      "status": "DONE",
+      "did": "Completed BUG-005 regression matrix: format, vet, full and race Go suites, frontend build, 30-case Playwright suite, Wails package, and native active/observer failed-retry journey; documented SC-030/SC-031 evidence",
+      "files": [
+        "specs/004-player-sessions-control/validation.md"
+      ]
+    },
+    "T145": {
+      "status": "DONE",
+      "did": "Delivered detached coordinator-owned active runtime snapshots to recognized assigned new tabs and reconnects without regeneration, with Go and Chromium regressions",
+      "files": [
+        "internal/control/service.go",
+        "internal/player/server.go",
+        "main.go",
+        "internal/player/server_test.go",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T146": {
+      "status": "DONE",
+      "did": "Routed private ForceHackSuccess through the coordinator-owned active terminal and published one sanitized solved live projection with ineligibility regressions",
+      "files": [
+        "internal/control/service.go",
+        "internal/live/service.go",
+        "app.go",
+        "main.go",
+        "internal/control/service_test.go",
+        "internal/player/server_test.go",
+        "app_test.go"
+      ]
+    },
+    "T147": {
+      "status": "DONE",
+      "did": "Normalized master JavaScript to two-space indentation and added a cross-surface no-tabs source contract for browser scripts",
+      "files": [
+        "frontend/src/desktop-api.js",
+        "frontend/src/master.js",
+        "internal/platform/assets_test.go"
+      ]
     }
-  }
+  },
+  "verified": [
+    {
+      "what": "complete Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./...",
+      "result": "pass",
+      "warnings": []
+    },
+    {
+      "what": "race-enabled Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./...",
+      "result": "pass after stabilizing the slow-observer test fixture payload",
+      "warnings": [
+        "initial fixture mixed large JSON serialization cost into its queue-isolation timing assertion"
+      ]
+    },
+    {
+      "what": "player browser journeys",
+      "command": "npm --prefix tests/browser test",
+      "result": "24/24 pass",
+      "warnings": [
+        "static fixture intentionally returns 404 for optional sound endpoints"
+      ]
+    },
+    {
+      "what": "frontend and macOS package",
+      "command": "npm --prefix frontend run build; wails build -clean",
+      "result": "pass; darwin/arm64 app packaged and self-signed",
+      "warnings": [
+        "distribution notarization credentials unavailable",
+        "development build private-API warning"
+      ]
+    },
+    {
+      "what": "formatting and static analysis",
+      "command": "gofmt -l . && GOCACHE=/private/tmp/fallout-go-cache go vet ./...",
+      "result": "pass; no formatting output and vet clean",
+      "warnings": []
+    },
+    {
+      "what": "full Go regression suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "pass; all packages including playerconfig",
+      "warnings": []
+    },
+    {
+      "what": "Go race suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "pass; all packages",
+      "warnings": []
+    },
+    {
+      "what": "frontend production build",
+      "command": "npm --prefix frontend run build",
+      "result": "pass; Vite production bundle generated",
+      "warnings": []
+    },
+    {
+      "what": "browser journeys",
+      "command": "npm --prefix tests/browser test",
+      "result": "pass; 25 of 25 Playwright tests",
+      "warnings": [
+        "static fixture returned expected 404 responses for optional sound endpoints",
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "macOS package",
+      "command": "/Users/olegbalunenko/go/bin/wails build",
+      "result": "pass; darwin arm64 app compiled, packaged, and self-signed",
+      "warnings": [
+        "release notarization and Developer ID signing were not attempted"
+      ]
+    },
+    {
+      "what": "live Wails master/player smoke",
+      "command": "wails dev plus read-only local browser inspection",
+      "result": "development build passed; live master controls and player waiting surface rendered",
+      "warnings": [
+        "second Wails bridge could not bind because an existing development instance owned port 34115; existing process was left untouched",
+        "direct Chrome bridge inspection emitted harness-only Wails IPC and extension channel errors"
+      ]
+    },
+    {
+      "what": "BUG-002 formatting and static analysis",
+      "command": "gofmt -l . && go vet ./...",
+      "result": "PASS; no formatting paths and vet succeeded",
+      "warnings": []
+    },
+    {
+      "what": "BUG-002 full Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "PASS for all packages with loopback bind access",
+      "warnings": [
+        "restricted sandbox initially denied local listener binds"
+      ]
+    },
+    {
+      "what": "BUG-002 Go race suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS for all packages",
+      "warnings": []
+    },
+    {
+      "what": "BUG-002 frontend and browser suites",
+      "command": "npm --prefix frontend run build && npm --prefix tests/browser test",
+      "result": "PASS; Vite build and 25/25 Playwright journeys",
+      "warnings": [
+        "optional sound fixture routes returned expected 404s",
+        "FORCE_COLOR overrode NO_COLOR"
+      ]
+    },
+    {
+      "what": "BUG-002 real Wails create workflow",
+      "command": "wails dev plus native save dialogs and live master inspection",
+      "result": "PASS; empty roster activated, controls enabled, first character persisted, relative association saved",
+      "warnings": [
+        "direct Chrome Wails dev bridge logged known IPC/browser-extension console noise"
+      ]
+    },
+    {
+      "what": "BUG-002 macOS package",
+      "command": "/Users/olegbalunenko/go/bin/wails build",
+      "result": "PASS; darwin arm64 app packaged and self-signed",
+      "warnings": []
+    },
+    {
+      "what": "Go formatting and vet",
+      "command": "gofmt -l . && GOCACHE=/private/tmp/fallout-go-cache go vet ./...",
+      "result": "PASS; no formatting output and vet clean",
+      "warnings": []
+    },
+    {
+      "what": "Full Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "PASS across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Full race-enabled Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Frontend production build",
+      "command": "npm --prefix frontend run build",
+      "result": "PASS; Vite bundle generated",
+      "warnings": []
+    },
+    {
+      "what": "Browser regression suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "PASS; 27/27 Playwright journeys",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Native development and package smoke",
+      "command": "/Users/olegbalunenko/go/bin/wails dev; /Users/olegbalunenko/go/bin/wails build",
+      "result": "PASS; native development app launched and shut down cleanly; darwin/arm64 app packaged and self-signed",
+      "warnings": [
+        "Known browser-development bridge ipc.js noise",
+        "macOS assistive access unavailable for native file-dialog automation"
+      ]
+    },
+    {
+      "what": "Master frontend syntax",
+      "command": "node --check frontend/src/master.js",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Focused player-config cancellation browser regression",
+      "command": "npm --prefix tests/browser test -- --grep US4 player-config cancellation",
+      "result": "PASS — 1/1",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Complete browser regression suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "PASS — 28/28",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Complete Go suite",
+      "command": "go test ./... -count=1",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Go formatting and static analysis",
+      "command": "gofmt -l . && go vet ./...",
+      "result": "PASS: no unformatted files and vet succeeded",
+      "warnings": []
+    },
+    {
+      "what": "Complete Go and race suites",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1 && go test -race ./... -count=1",
+      "result": "PASS: all packages",
+      "warnings": [
+        "Loopback integration tests required execution outside the restricted sandbox"
+      ]
+    },
+    {
+      "what": "Frontend and browser regression gates",
+      "command": "npm --prefix frontend run build && npm --prefix tests/browser test",
+      "result": "PASS: Vite build and 29/29 Playwright journeys",
+      "warnings": [
+        "NO_COLOR is ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Darwin production package",
+      "command": "/Users/olegbalunenko/go/bin/wails build",
+      "result": "PASS: packaged and self-signed build/bin/Fallout Terminal.app",
+      "warnings": []
+    },
+    {
+      "what": "Production Wails end-broadcast click-through with a real connected player",
+      "command": "Finder-opened build/bin/Fallout Terminal.app; native master controls; Chrome player at http://127.0.0.1:3690/",
+      "result": "PASS: confirmation ended the broadcast, restored master no-broadcast state, retained Mara and PLAYER 1, and immediately cleared the player terminal to the unassigned waiting state",
+      "warnings": []
+    },
+    {
+      "what": "format and static analysis",
+      "command": "gofmt -l . && GOCACHE=/private/tmp/fallout-go-cache go vet ./...",
+      "result": "PASS; no formatting output and vet exited 0",
+      "warnings": []
+    },
+    {
+      "what": "full Go race suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS; all Go packages",
+      "warnings": []
+    },
+    {
+      "what": "complete browser regression suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "PASS; 30/30 Playwright journeys",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Wails production package",
+      "command": "wails build",
+      "result": "PASS; darwin/arm64 app packaged and self-signed",
+      "warnings": []
+    },
+    {
+      "what": "native failed-hack retry journey",
+      "command": "packaged app plus two real Chromium player contexts",
+      "result": "PASS; active and observer blocked after four attempts, one master retry produced fresh board and 4/4 attempts with roles and broadcast retained",
+      "warnings": []
+    },
+    {
+      "what": "focused duplicate reset race",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./internal/control ./internal/live -run TestResetFailedHack -count=1",
+      "result": "PASS; 32 concurrent duplicate resets accept exactly one transition and one revision",
+      "warnings": []
+    },
+    {
+      "what": "focused convergence tests and source contracts",
+      "command": "go test ./internal/control ./internal/platform . -count=1 plus focused internal/player tests and node --check",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "full Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "passed all packages",
+      "warnings": []
+    },
+    {
+      "what": "full race-enabled Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "passed all packages",
+      "warnings": []
+    },
+    {
+      "what": "complete browser suite",
+      "command": "npx playwright test --config playwright.config.mjs",
+      "result": "30 passed",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR was set"
+      ]
+    },
+    {
+      "what": "native package build",
+      "command": "wails build",
+      "result": "darwin/arm64 application compiled, packaged, and self-signed",
+      "warnings": []
+    },
+    {
+      "what": "idempotent formatting and static analysis",
+      "command": "gofmt -l .; GOCACHE=/private/tmp/fallout-go-cache go vet ./...",
+      "result": "PASS; no formatting output and vet exited 0",
+      "warnings": []
+    },
+    {
+      "what": "idempotent full Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1",
+      "result": "PASS; all packages",
+      "warnings": []
+    },
+    {
+      "what": "idempotent race-enabled Go suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS; all packages",
+      "warnings": []
+    },
+    {
+      "what": "idempotent frontend production build",
+      "command": "npm --prefix frontend run build",
+      "result": "PASS; Vite production bundle generated",
+      "warnings": []
+    },
+    {
+      "what": "idempotent complete browser suite",
+      "command": "npm --prefix tests/browser test",
+      "result": "PASS; 30/30 Playwright journeys",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "idempotent Wails production package",
+      "command": "wails build",
+      "result": "PASS; darwin/arm64 app packaged and self-signed",
+      "warnings": []
+    }
+  ],
+  "concerns": [
+    {
+      "note": "A pre-existing Wails development instance owned bridge port 34115, so the new dev launcher was stopped after successful compilation and the existing live surface was inspected non-destructively.",
+      "step": "implement"
+    },
+    {
+      "note": "Direct Chrome inspection of the Wails browser-development bridge emitted known ipc.js and extension channel errors although native dialogs, bound commands, UI state, and persistence completed successfully.",
+      "step": "implement"
+    },
+    {
+      "note": "Native Wails launch/package passed, but macOS denied assistive access for automating the native save dialog; the active-controller journey therefore uses the real Go coordinator/player server and bundled browser, while the native UI gate is launch/render only.",
+      "step": "implement"
+    },
+    {
+      "note": "Native production app launch passed, but macOS denied assistive click automation with error -25211; T138 and reopened T114 remain open until Accessibility access is granted",
+      "step": "implement"
+    }
+  ]
 }

@@ -1,5 +1,7 @@
 # Desktop Coordination Contract: Roster, Sessions, Broadcast, and Terminal Switching
 
+**Bugfix**: 2026-08-12 — BUG-001 adds the durable player-config selection, association, and roster-save boundary.
+
 ## Boundary
 
 The Wails `App` remains the only privileged browser-to-Go boundary. Every command validates untrusted IDs, display names, authored terminal payloads, and switch decisions before entering `internal/control`. Generated Go method names are PascalCase; `frontend/src/desktop-api.js` maps them to camelCase facade methods and returns structured results. No coordinator, filesystem, process, environment, or player-server object is exposed directly.
@@ -13,6 +15,12 @@ The trusted hacking operation name remains exactly `ForceHackSuccess`. This cont
 ```json
 {
   "revision": 31,
+  "playerConfig": {
+    "status": "loaded",
+    "name": "Commonwealth Party",
+    "filePath": "/campaign/commonwealth.players.json",
+    "version": 1
+  },
   "roster": [
     {"id": "character-1", "name": "Mara", "claimedBySessionId": "session-1"},
     {"id": "character-2", "name": "Boone", "claimedBySessionId": null}
@@ -35,7 +43,7 @@ The trusted hacking operation name remains exactly `ForceHackSuccess`. This cont
 }
 ```
 
-`broadcast` is null when ended. `character`, `controllerSessionId`, and `activeTerminalId` are nullable. Session role is `unassigned`, `active`, or `observer`. The projection includes every recognized process-local logical session so disconnected claims remain manageable; disconnected active sessions remain visibly `active` until reassigned or released. It excludes browser tokens, raw connection IDs, private hacking state, and mutable canonical references.
+`playerConfig` is null until a referenced, selected, or newly created config and its session association succeed. Its `status` is `loaded`; recoverable load errors are returned by the player-config operation and rendered separately rather than installing a partial handle. `broadcast` is null when ended. `character`, `controllerSessionId`, and `activeTerminalId` are nullable. Session role is `unassigned`, `active`, or `observer`. The projection includes every recognized process-local logical session so disconnected claims remain manageable; disconnected active sessions remain visibly `active` until reassigned or released. It excludes browser tokens, raw connection IDs, private hacking state, and mutable canonical references.
 
 ## Common result shapes
 
@@ -65,11 +73,27 @@ Terminal-switch requests additionally return:
 
 `status` is `activated`, `cleared`, `decision-required`, or `cancelled`. `switchId` is present only for `decision-required`.
 
+## Player-config operations — BUG-001
+
+Player-config operations return `{ok:false,canceled:true}` on native-dialog cancellation, `{ok:false,error,state}` on failure, or `{ok:true,playerConfig,session,state}` on success. The successful `session` is the detached active document containing the saved relative association so later terminal autosaves cannot erase it. Operations require an active session file and no active broadcast.
+
+### `LoadReferencedPlayerConfig()` / `desktopAPI.loadReferencedPlayerConfig()`
+
+Resolves the active session's optional relative `playerConfig` reference. An absent reference returns `{ok:false}` without an error so the master can offer select/create. A missing, unreadable, unsupported, or invalid referenced file returns a visible error and leaves the previous active player config and roster unchanged. A valid file installs its roster as one coordinator transition.
+
+### `NewPlayerConfig()` / `desktopAPI.newPlayerConfig()`
+
+Uses a native JSON save dialog and creates a version-1 player config whose name is derived from the filename and whose roster is empty. It then saves the normalized relative reference into the active session. If association saving fails, the new standalone player-config file remains reusable, but the prior active association, roster, and coordination snapshot remain unchanged.
+
+### `OpenPlayerConfig()` / `desktopAPI.openPlayerConfig()`
+
+Uses a native single-file JSON open dialog, validates the complete player config, saves its normalized relative reference into the active session, and replaces the authored roster as one operation. Cancellation is not an error. Validation or association failure installs no partial roster.
+
 ## Roster commands
 
 ### `AddCharacter(name string)` / `desktopAPI.addCharacter(name)`
 
-Creates a process-local roster entry with a new opaque stable ID. The trimmed name must be nonblank and at most 80 Unicode code points. Duplicate names are allowed. The entry is immediately available in the current broadcast, if any.
+~~Creates a process-local roster entry with a new opaque stable ID.~~ Under BUG-001, creates a roster entry with a new opaque ID stable in the active player config. The trimmed name must be nonblank and at most 80 Unicode code points. Duplicate names are allowed. An active player config is required. The complete candidate config is atomically saved before the entry and revision are published; failure leaves the prior config and coordination state unchanged. The entry is immediately available in the current broadcast, if any.
 
 ### `RenameCharacter(payload CharacterRenamePayload)` / `desktopAPI.renameCharacter(payload)`
 
@@ -77,11 +101,11 @@ Creates a process-local roster entry with a new opaque stable ID. The trimmed na
 {"characterId": "character-1", "name": "Mara Voss"}
 ```
 
-Retains character identity and claim and updates every master/player projection. It does not change session identity, assignment, role, terminal, navigation, puzzle, attempts, randomness, log, or outcome.
+Retains durable character identity and any runtime claim, atomically saves the complete active player config, and then updates every master/player projection. A save failure publishes nothing. It does not change session identity, assignment, role, terminal, navigation, puzzle, attempts, randomness, log, or outcome.
 
 ### `DeleteCharacter(characterID string)` / `desktopAPI.deleteCharacter(characterId)`
 
-Deletes only an existing unclaimed roster entry. A claimed entry is refused until release or transfer. No terminal or puzzle state changes.
+Deletes only an existing unclaimed roster entry from the active player config. A claimed entry is refused until release or transfer. The complete candidate config is atomically saved before publication; a failure changes nothing. No terminal or puzzle state changes.
 
 ## Logical-session and assignment commands
 
@@ -162,6 +186,18 @@ Retains its existing tree/intro update purpose for the active terminal. It valid
 
 ## Trusted hacking command
 
+### `ResetFailedHack(payload LiveTerminalPayload)` / `desktopAPI.resetFailedHack(payload)`
+
+```json
+{"terminalId":"terminal-1","terminalName":"Overseer","tree":{"id":"root","type":"folder","name":"ROOT","children":[]},"hackLevel":2,"introText":"LATEST"}
+```
+
+This exact private game-master command is eligible only while the named terminal is still the active terminal and its current puzzle is failed, unsolved, and active. The trusted App boundary validates and normalizes the latest authored terminal payload before the coordinator atomically replaces that terminal's private runtime slot with one fresh puzzle. The replacement uses a new generation, full attempts, an empty log, default navigation, and the supplied latest authored name, tree, hacking level, and intro text.
+
+The accepted transition keeps the broadcast ID, active terminal ID, logical sessions, connections, fallback names, roster, assignments, controller, other terminal runtime slots, pending durable terminal/session data, and unlock state unchanged. It publishes one revision containing the complete fresh terminal projection to every assigned active and observer session. A duplicate call, a non-failed/solved/absent puzzle, a stale terminal identity, or an unavailable lifecycle is rejected without mutation or revision advance. Old-generation word and pattern identities cannot act on the replacement.
+
+`ResetFailedHack` is absent from player WebSocket messages, player DOM and JavaScript globals, keyboard shortcuts, query parameters, and public HTTP endpoints. It does not broaden `ForceHackSuccess`.
+
 ### `ForceHackSuccess()` / `desktopAPI.forceHackSuccess()`
 
 The exact existing private operation remains eligible only for an active unsolved and unfailed puzzle. It spends no attempt, uses no player identity or controller privilege, and publishes the resulting canonical success through the same ordered revision stream. It is unavailable from all player assets and protocol messages.
@@ -172,11 +208,15 @@ The exact existing private operation remains eligible only for an active unsolve
 - Keep the existing raw `client-count` status labeled as browser connections, while coordination presence is logical-session status.
 - Show character name as primary and fallback name as secondary when assigned.
 - Keep a disconnected controller visibly active until reassignment or claim release.
+- After session create/open, automatically load its valid referenced player config; otherwise present explicit select-existing and create-new actions before enabling roster or broadcast controls.
+- Keep terminal authoring available when player-config selection is cancelled or its reference is missing/invalid, show recoverable errors, and never render a partial roster.
+- Display the active player-config name/path separately from transient roster availability and session assignments.
 - Await every command result before changing visible broadcast, terminal, claim, role, or pending-switch state.
 - Present preserve, discard, and cancel in a blocking game-master dialog whenever `decision-required` is returned.
+- While the active puzzle is failed, replace the obsolete broadcast-restart instruction with a visible enabled `ПОВТОРИТЬ ВЗЛОМ` control; await `ResetFailedHack`, disable it while pending, and surface any authoritative refusal without changing local puzzle state optimistically.
 - Refusal to delete a claimed character or resolve a stale switch must be visible and must not close over stale local state.
 - Roster/session controls and switch dialogs follow the existing plain-DOM render functions, restrictive CSP, terminal aesthetic, and escaped-text rules.
 
 ## Persistence and compatibility
 
-No method in this contract changes the version-1 session schema. Authored terminal edits continue through existing explicit save behavior; roster, sessions, recognition, presence, assignments, controller, broadcast, revisions, switches, and runtime puzzles are never passed to `SaveSession` or encoded into session JSON.
+~~No method in this contract changes the version-1 session schema.~~ BUG-001 adds only the optional normalized relative `playerConfig` reference and saves it through the existing privileged session boundary. Authored terminal edits continue through existing explicit save behavior. Reusable roster IDs/names are encoded only in the separate player-config JSON. Logical sessions, fallback labels, recognition, connections, presence, claims, assignments, controller, broadcast, revisions, switches, terminal runtime, and puzzles are never encoded into either durable file. The same player config may be referenced by multiple sessions and is re-read when each session is opened; background watching and concurrent multi-process merge are outside this contract.

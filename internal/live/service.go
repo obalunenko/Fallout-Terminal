@@ -102,6 +102,121 @@ func (service *Service) Snapshot() *domain.PublicLiveState {
 	return publicLiveState(service.live)
 }
 
+// Apply executes one already-authorized shared command against the
+// coordinator-owned terminal checkpoint. The caller retains ownership of the
+// canonical state; the returned player projection is deeply detached. This
+// boundary deliberately performs no authorization and invokes no callbacks,
+// allowing the coordinator to reject ineligible commands before live rules or
+// their randomness are reached.
+func (service *Service) Apply(state *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.PublicLiveState, bool) {
+	if service == nil || state == nil {
+		return nil, false
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return service.applyRuntimeLocked(state, command)
+}
+
+// CreateRuntime builds a fresh coordinator-owned terminal checkpoint. It does
+// not install the checkpoint into the legacy process-global live slot.
+func (service *Service) CreateRuntime(target domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState) {
+	if service == nil {
+		return nil, nil
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return service.createRuntimeLocked(target)
+}
+
+func (service *Service) createRuntimeLocked(target domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState) {
+	state := &domain.TerminalRuntime{
+		TerminalID: target.TerminalID, TerminalName: target.TerminalName,
+		Tree: cloneNode(target.Tree), HackLevel: target.HackLevel, IntroText: target.IntroText,
+		Nav: nav.Default(), Lifecycle: domain.TerminalLifecycleActive,
+	}
+	if target.HackLevel > 0 {
+		state.Hack = hack.GenerateBoard(service.generationIDs.Next(), target.HackLevel, service.random, service.words)
+	}
+	return state, publicTerminalRuntime(state)
+}
+
+// ResetFailedHack creates a fresh checkpoint only when the supplied source is
+// the still-current failed puzzle for the same terminal. The caller owns the
+// atomic slot replacement; this helper owns generation and projection rules.
+func (service *Service) ResetFailedHack(source *domain.TerminalRuntime, target domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState) {
+	if service == nil || source == nil || target.TerminalID == "" || source.TerminalID != target.TerminalID || source.Hack == nil || !source.Hack.Failed || source.Hack.Solved {
+		return nil, nil
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return service.createRuntimeLocked(target)
+}
+
+// UpdateRuntime applies the latest authored content to an existing checkpoint
+// while retaining its private puzzle and repairing navigation.
+func (service *Service) UpdateRuntime(state *domain.TerminalRuntime, target domain.TerminalTarget) *domain.PublicLiveState {
+	if service == nil || state == nil || target.TerminalID == "" || state.TerminalID != target.TerminalID {
+		return nil
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	state.TerminalName = target.TerminalName
+	state.Tree = cloneNode(target.Tree)
+	state.IntroText = target.IntroText
+	if state.Hack == nil {
+		state.HackLevel = target.HackLevel
+	}
+	state.Nav = nav.Revalidate(state.Nav, state.Tree)
+	return publicTerminalRuntime(state)
+}
+
+// ProjectRuntime returns a detached, secret-free checkpoint projection.
+func (service *Service) ProjectRuntime(state *domain.TerminalRuntime) *domain.PublicLiveState {
+	if service == nil || state == nil {
+		return nil
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	return publicTerminalRuntime(state)
+}
+
+// SuspendRuntime changes only checkpoint eligibility. The private navigation
+// and hacking aggregates remain in place without passing through a projection.
+func (service *Service) SuspendRuntime(state *domain.TerminalRuntime) {
+	if service == nil || state == nil {
+		return
+	}
+	service.mu.Lock()
+	state.Lifecycle = domain.TerminalLifecycleSuspended
+	service.mu.Unlock()
+}
+
+// ReactivateRuntime reapplies current authored metadata and content while
+// preserving the exact private puzzle and revalidating navigation against the
+// refreshed tree.
+func (service *Service) ReactivateRuntime(state *domain.TerminalRuntime, target domain.TerminalTarget) *domain.PublicLiveState {
+	if service == nil || state == nil || target.TerminalID == "" || state.TerminalID != target.TerminalID {
+		return nil
+	}
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	state.TerminalName = target.TerminalName
+	state.Tree = cloneNode(target.Tree)
+	state.IntroText = target.IntroText
+	if state.Hack == nil {
+		state.HackLevel = target.HackLevel
+	}
+	state.Nav = nav.Revalidate(state.Nav, state.Tree)
+	state.Lifecycle = domain.TerminalLifecycleActive
+	return publicTerminalRuntime(state)
+}
+
+// DiscardRuntime creates a wholly fresh checkpoint from the latest authored
+// payload. The caller replaces the prior slot atomically in coordinator state.
+func (service *Service) DiscardRuntime(target domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState) {
+	return service.CreateRuntime(target)
+}
+
 // ApplyNav applies a player navigation request. The boolean reports whether a
 // live terminal existed; valid no-op requests remain observable for protocol
 // compatibility.
@@ -112,9 +227,15 @@ func (service *Service) ApplyNav(action, nodeID string) (*domain.NavState, bool)
 		return nil, false
 	}
 
-	service.live.Nav = nav.ApplyAction(service.live.Nav, service.live.Tree, action, nodeID)
-	projection := cloneNav(service.live.Nav)
-	return &projection, true
+	runtime := terminalRuntime(service.live)
+	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandNavAction, Action: action, NodeID: nodeID,
+	})
+	if !ok {
+		return nil, false
+	}
+	service.live.Nav = runtime.Nav
+	return &projection.Nav, true
 }
 
 // ApplyHackGuess applies a candidate or filler guess to an active puzzle.
@@ -125,24 +246,39 @@ func (service *Service) ApplyHackGuess(targetID string) (*domain.PublicHackState
 		return nil, false
 	}
 
-	hack.ApplyGuess(service.live.Hack, targetID)
-	return hack.PublicState(service.live.Hack), true
+	runtime := terminalRuntime(service.live)
+	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandHackGuess, TargetID: targetID,
+	})
+	if !ok {
+		return nil, false
+	}
+	service.live.Hack = runtime.Hack
+	return projection.Hack, true
 }
 
 // ApplyHackPattern atomically validates and consumes one current pattern.
 func (service *Service) ApplyHackPattern(patternID string, publish func(*domain.PublicHackState)) bool {
 	service.mu.Lock()
-	defer service.mu.Unlock()
 	if !activePuzzle(service.live) {
+		service.mu.Unlock()
 		return false
 	}
 
-	if !hack.ApplyPattern(service.live.Hack, patternID, service.random) {
+	runtime := terminalRuntime(service.live)
+	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandHackPattern, PatternID: patternID,
+	})
+	if !ok {
+		service.mu.Unlock()
 		return false
 	}
-	projection := hack.PublicState(service.live.Hack)
+	service.live.Hack = runtime.Hack
+	publicHack := projection.Hack
+	service.mu.Unlock()
+
 	if publish != nil {
-		publish(projection)
+		publish(publicHack)
 	}
 	return true
 }
@@ -159,7 +295,76 @@ func (service *Service) ForceHackSuccess() (*domain.PublicHackState, bool) {
 	return hack.PublicState(service.live.Hack), true
 }
 
+// ForceRuntimeHackSuccess completes one coordinator-owned active runtime
+// without touching the legacy live slot or spending an attempt.
+func (service *Service) ForceRuntimeHackSuccess(state *domain.TerminalRuntime) (*domain.PublicLiveState, bool) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if state == nil || state.Lifecycle != domain.TerminalLifecycleActive || !activeRuntimePuzzle(state) {
+		return nil, false
+	}
+
+	hack.ForceSuccess(state.Hack)
+	return publicTerminalRuntime(state), true
+}
+
+func (service *Service) applyRuntimeLocked(state *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.PublicLiveState, bool) {
+	if state == nil {
+		return nil, false
+	}
+
+	switch command.Kind {
+	case domain.RuntimeCommandNavAction:
+		state.Nav = nav.ApplyAction(state.Nav, state.Tree, command.Action, command.NodeID)
+	case domain.RuntimeCommandHackGuess:
+		if !activeRuntimePuzzle(state) {
+			return nil, false
+		}
+		attemptsBefore := state.Hack.AttemptsLeft
+		solvedBefore := state.Hack.Solved
+		failedBefore := state.Hack.Failed
+		logLengthBefore := len(state.Hack.Log)
+		hack.ApplyGuess(state.Hack, command.TargetID)
+		if state.Hack.AttemptsLeft == attemptsBefore && state.Hack.Solved == solvedBefore && state.Hack.Failed == failedBefore && len(state.Hack.Log) == logLengthBefore {
+			return nil, false
+		}
+	case domain.RuntimeCommandHackPattern:
+		if !activeRuntimePuzzle(state) || !hack.ApplyPattern(state.Hack, command.PatternID, service.random) {
+			return nil, false
+		}
+	default:
+		return nil, false
+	}
+	return publicTerminalRuntime(state), true
+}
+
+func terminalRuntime(state *domain.LiveState) *domain.TerminalRuntime {
+	if state == nil {
+		return nil
+	}
+	return &domain.TerminalRuntime{
+		TerminalID: state.TerminalID, TerminalName: state.TerminalName,
+		Tree: state.Tree, HackLevel: state.HackLevel, IntroText: state.IntroText,
+		Nav: state.Nav, Hack: state.Hack, Lifecycle: domain.TerminalLifecycleActive,
+	}
+}
+
+func publicTerminalRuntime(state *domain.TerminalRuntime) *domain.PublicLiveState {
+	if state == nil {
+		return nil
+	}
+	return &domain.PublicLiveState{
+		TerminalID: state.TerminalID, TerminalName: state.TerminalName,
+		Tree: cloneNode(state.Tree), HackLevel: state.HackLevel, IntroText: state.IntroText,
+		Nav: cloneNav(state.Nav), Hack: hack.PublicState(state.Hack),
+	}
+}
+
 func activePuzzle(state *domain.LiveState) bool {
+	return state != nil && state.Hack != nil && !state.Hack.Solved && !state.Hack.Failed
+}
+
+func activeRuntimePuzzle(state *domain.TerminalRuntime) bool {
 	return state != nil && state.Hack != nil && !state.Hack.Solved && !state.Hack.Failed
 }
 
