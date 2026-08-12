@@ -8,7 +8,7 @@ description: "Task list template for Fallout Terminal feature implementation"
 
 **Prerequisites**: `plan.md` and `spec.md`; include `research.md`, `data-model.md`, `contracts/`, and `quickstart.md` when the plan requires them
 
-**Testing**: No automated runner is currently configured. Include automated test tasks when the specification or plan requires them; if introducing a runner, first add the chosen dependency, test location, and npm script. Always include concrete manual verification tasks for affected Electron and browser journeys.
+**Testing**: Colocated Go tests and Playwright browser journeys are configured. Include focused automated tests for changed behavior, race testing for affected concurrent services, and concrete `wails dev` journeys for native/browser interaction. Packaging and credential-dependent checks apply only when their surfaces change and the required environment is available.
 
 **Organization**: Group tasks by prioritized user story so each story remains independently implementable and verifiable.
 
@@ -18,48 +18,54 @@ description: "Task list template for Fallout Terminal feature implementation"
 - **[Story]**: User-story traceability label such as `[US1]`
 - Every task MUST name exact repository paths
 - Contract changes MUST identify both producer and consumer tasks
+- Verification tasks MUST name the command or observable manual journey
 
 ## Repository Paths
 
-- Electron orchestration and persistence: `main.js`
-- Privileged renderer bridge: `preload.js`
-- Game-master interface: `master/index.html`, `master/master.js`, `master/master.css`
-- Server and domain logic: `server/server.js`, `server/hack.js`, `server/nav.js`, `server/wordbank.js`
-- Optional public tunnel: `server/ngrok.js`
+- Composition, lifecycle, and Wails bridge: `main.go`, `app.go`
+- Models and pure rules: `internal/domain/`, `internal/nav/`, `internal/hack/`
+- Canonical live and coordination state: `internal/live/`, `internal/control/`
+- Persistent JSON: `internal/session/`, `internal/playerconfig/`, `sessions/*.json`
+- Player HTTP/WebSocket boundary: `internal/player/`
+- Platform and optional public access: `internal/platform/`, `internal/tunnel/`
+- Shared Go test support: `internal/testutil/`
+- Game-master interface: `frontend/src/index.html`, `frontend/src/desktop-api.js`, `frontend/src/master.js`, `frontend/src/master.css`
 - Player interface: `client/index.html`, `client/client.js`, `client/sound.js`, `client/client.css`
-- Persistent examples: `sessions/*.json`
-- Package/build configuration: `package.json`, `package-lock.json`
+- Browser journeys: `tests/browser/*.spec.mjs`, `tests/browser/fixture-server/main.go`
+- Build configuration: `go.mod`, `go.sum`, `frontend/package.json`, `frontend/package-lock.json`, `wails.json`
+- macOS packaging/release: `build/`, `scripts/build-macos.sh`, `.github/workflows/wails-macos.yml`
 
 <!--
 The task generator MUST replace all examples below with feature-specific tasks.
-Do not add database, authentication, API-framework, or generic src/ setup tasks
-unless the feature actually introduces those changes.
+Do not add database, generic authentication, API-framework, or imaginary src/
+setup tasks unless the approved feature actually introduces those changes.
 -->
 
 ## Phase 1: Setup and Contract Baseline
 
-**Purpose**: Confirm affected boundaries and establish contracts before implementation.
+**Purpose**: Confirm affected boundaries, compatibility requirements, and verification before implementation.
 
 - [ ] T001 Review the feature's affected paths and current behavior in [exact paths]
-- [ ] T002 Record changed session, IPC, HTTP, or WebSocket contracts in `specs/[###-feature]/contracts/[contract].md`
-- [ ] T003 Define verification steps in `specs/[###-feature]/quickstart.md`
-- [ ] T004 [P] Update dependency/build configuration in `package.json` and `package-lock.json` only if required by the approved plan
+- [ ] T002 Record changed persistent JSON, Wails, HTTP, or WebSocket contracts in `specs/[###-feature]/contracts/[contract].md`
+- [ ] T003 Define automated commands and interactive journeys in `specs/[###-feature]/quickstart.md`
+- [ ] T004 [P] Update `go.mod`/`go.sum` or the relevant npm manifest/lockfile only if required by the approved plan
 
-**Checkpoint**: Contracts, compatibility behavior, and verification approach are explicit.
+**Checkpoint**: Producers, consumers, compatibility behavior, and verification are explicit.
 
 ---
 
-## Phase 2: Foundational Runtime Work
+## Phase 2: Foundational Domain, Persistence, and Transport Work
 
 **Purpose**: Implement shared behavior that blocks all user stories.
 
-- [ ] T005 Implement pure domain/state behavior in `server/[module].js`
-- [ ] T006 Implement transport validation and canonical-state changes in `server/server.js`
-- [ ] T007 Implement native/session orchestration in `main.js` if required
-- [ ] T008 Expose the smallest required privileged API in `preload.js` if required
-- [ ] T009 Add or update focused automated tests in [planned test path] if the plan introduces or uses test tooling
+- [ ] T005 Implement model, validation, navigation, or hacking behavior in `internal/domain/`, `internal/nav/`, or `internal/hack/`
+- [ ] T006 Implement canonical state and ordered coordination in `internal/live/` or `internal/control/`
+- [ ] T007 Implement compatible persistence in `internal/session/` or `internal/playerconfig/` if required
+- [ ] T008 Implement HTTP/WebSocket validation, protocol, and publication in `internal/player/` if required
+- [ ] T009 Wire lifecycle, dependencies, or the smallest required Wails API/event in `main.go` and `app.go`
+- [ ] T010 Add focused colocated Go tests and deterministic fixtures in [exact `*_test.go` or `internal/testutil/` path]
 
-**Checkpoint**: Shared runtime behavior and cross-boundary contracts are ready for user-story integration.
+**Checkpoint**: Shared rules, state ownership, persistence, and cross-boundary contracts are ready for user-story integration.
 
 ---
 
@@ -71,18 +77,19 @@ unless the feature actually introduces those changes.
 
 ### Verification for User Story 1
 
-- [ ] T010 [P] [US1] Add focused domain/contract tests in [planned test path], if configured
-- [ ] T011 [US1] Document the manual Electron/browser scenario in `specs/[###-feature]/quickstart.md`
+- [ ] T011 [P] [US1] Add focused Go tests in [exact package/test path]
+- [ ] T012 [P] [US1] Add or update a Playwright journey in `tests/browser/[exact].spec.mjs` when player behavior changes
+- [ ] T013 [US1] Document the `wails dev` master/player journey in `specs/[###-feature]/quickstart.md`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Implement GM-facing changes in `master/[exact file]`
-- [ ] T013 [P] [US1] Implement player-facing changes in `client/[exact file]`
-- [ ] T014 [US1] Integrate IPC/WebSocket producers and consumers in [exact paths]
-- [ ] T015 [US1] Update session defaults, validation, versioning, or `sessions/demo.json` if the persistent contract changes
-- [ ] T016 [US1] Verify the independent journey with one master and [client count] player browsers
+- [ ] T014 [P] [US1] Implement game-master changes in `frontend/src/[exact file]`
+- [ ] T015 [P] [US1] Implement player changes in `client/[exact file]`
+- [ ] T016 [US1] Integrate Wails/WebSocket producers and consumers in [exact Go and JavaScript paths]
+- [ ] T017 [US1] Update JSON defaults, validation, versioning, references, or `sessions/demo.json` if the persistent contract changes
+- [ ] T018 [US1] Verify the independent journey with one master and [client count] player browsers
 
-**Checkpoint**: User Story 1 works independently and all connected clients converge on expected state.
+**Checkpoint**: User Story 1 works independently and all connected clients converge on authoritative state.
 
 ---
 
@@ -94,15 +101,15 @@ unless the feature actually introduces those changes.
 
 ### Verification for User Story 2
 
-- [ ] T017 [P] [US2] Add focused automated verification in [planned test path], if configured
-- [ ] T018 [US2] Add the manual journey to `specs/[###-feature]/quickstart.md`
+- [ ] T019 [P] [US2] Add focused automated verification in [exact Go or Playwright path]
+- [ ] T020 [US2] Add the interactive journey to `specs/[###-feature]/quickstart.md`
 
 ### Implementation for User Story 2
 
-- [ ] T019 [P] [US2] Implement runtime/domain changes in `server/[exact file]`
-- [ ] T020 [P] [US2] Implement presentation changes in `master/[exact file]` or `client/[exact file]`
-- [ ] T021 [US2] Integrate and validate changed contracts in [producer path] and [consumer path]
-- [ ] T022 [US2] Verify initial connection, multi-client behavior, and reconnection as applicable
+- [ ] T021 [P] [US2] Implement domain/runtime changes in `internal/[exact package]/[exact file]`
+- [ ] T022 [P] [US2] Implement presentation changes in `frontend/src/[exact file]` or `client/[exact file]`
+- [ ] T023 [US2] Integrate and validate changed contracts in [producer path] and [consumer path]
+- [ ] T024 [US2] Verify initial connection, multiple tabs/clients, controller authority, and reconnection as applicable
 
 **Checkpoint**: User Stories 1 and 2 remain independently functional.
 
@@ -116,10 +123,10 @@ unless the feature actually introduces those changes.
 
 ### Implementation and Verification for User Story 3
 
-- [ ] T023 [P] [US3] Implement isolated changes in [exact path]
-- [ ] T024 [US3] Integrate cross-boundary behavior in [exact paths]
-- [ ] T025 [US3] Add automated verification in [planned test path], if configured
-- [ ] T026 [US3] Verify the documented independent journey
+- [ ] T025 [P] [US3] Implement isolated changes in [exact path]
+- [ ] T026 [US3] Integrate cross-boundary behavior in [exact paths]
+- [ ] T027 [US3] Add automated verification in [exact Go or Playwright path]
+- [ ] T028 [US3] Verify the documented independent journey
 
 **Checkpoint**: All selected user stories are independently functional.
 
@@ -127,42 +134,46 @@ unless the feature actually introduces those changes.
 
 ## Final Phase: Cross-Cutting Verification and Polish
 
-- [ ] T027 [P] Review Electron sandbox, context isolation, CSP, and external URL handling in `main.js`, `preload.js`, and `master/index.html`
-- [ ] T028 [P] Review WebSocket input validation, secret-state filtering, and reconnect synchronization in `server/` and `client/`
-- [ ] T029 [P] Open and save existing compatible files from `sessions/` without data loss
-- [ ] T030 Run all automated commands defined in `specs/[###-feature]/quickstart.md`
-- [ ] T031 Run `npm start` and complete the documented master/player smoke journeys
-- [ ] T032 Run `npm run build:dir` for packaging-sensitive changes when the required environment is available
-- [ ] T033 Update `README.md` when setup, operation, environment variables, or user-visible workflows changed
+- [ ] T029 [P] Review Wails method exposure, CSP, external URL handling, and privileged input validation in `app.go` and `frontend/src/`
+- [ ] T030 [P] Review WebSocket origin/input validation, public projections, revisions, and reconnect synchronization in `internal/player/` and `client/`
+- [ ] T031 [P] Open and save existing compatible files from `sessions/` without data loss when persistence changes
+- [ ] T032 Run `gofmt -l .`, `go vet ./...`, and `go test ./...`
+- [ ] T033 Run `go test -race ./...` when concurrent runtime behavior changes
+- [ ] T034 Run `npm ci --prefix frontend` and `npm run build --prefix frontend` when the master UI, bridge, embedding, or package changes
+- [ ] T035 Run `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected browser journeys are available
+- [ ] T036 Run `wails dev` and complete the documented master/player smoke journeys
+- [ ] T037 Run `wails build -clean -platform darwin/arm64` for packaging-sensitive changes when the required macOS environment is available
+- [ ] T038 Run the approved ngrok or signing/notarization/DMG gates when affected and credentials are available; otherwise record them as unavailable
+- [ ] T039 Update `README.md`, contracts, fixtures, and CI configuration when setup, operation, protocol, or user-visible workflows changed
 
 ---
 
 ## Dependencies and Execution Order
 
 - Contract/setup tasks precede changes to contract producers and consumers.
-- Foundational server, `main.js`, or `preload.js` work blocks dependent UI stories.
-- Within a story, pure domain behavior precedes transport integration; producer and consumer changes precede end-to-end verification.
-- Session migration/default logic precedes validation with older session files.
+- Foundational domain, persistence, control, player-server, or composition work blocks dependent UI stories.
+- Within a story, pure rules precede canonical-state and transport integration; producer and consumer changes precede end-to-end verification.
+- Persistent JSON migration/default logic precedes validation with older user files.
 - User stories may proceed in parallel only after shared foundations are stable and their exact files do not overlap.
 - Cross-cutting verification follows all selected user stories.
 
 ## Parallel Opportunities
 
-- Independent `master/` and `client/` presentation work may run in parallel after their shared contract is fixed.
-- Pure domain tests may run in parallel with isolated CSS/HTML work.
-- Security, documentation, and session-fixture review may run in parallel when they touch different files.
-- Tasks changing `server/server.js`, `main.js`, shared renderer state, or the same contract are not parallel merely because they have different story labels.
+- Independent `frontend/src/` and `client/` presentation work may run in parallel after their shared contract is fixed.
+- Pure Go tests may run in parallel with isolated CSS/HTML work when their files and prerequisites do not overlap.
+- Security, documentation, fixtures, and packaging review may run in parallel when they touch different files.
+- Tasks changing `main.go`, `app.go`, `internal/control/`, `internal/player/`, shared frontend state, or the same contract are not parallel merely because they have different story labels.
 
 ## Implementation Strategy
 
-1. Deliver the smallest P1 vertical slice across every required boundary.
-2. Verify it with the documented master/player journey.
+1. Deliver the smallest P1 vertical slice across every required Go and browser boundary.
+2. Verify it with focused automated checks and the documented master/player journey.
 3. Add P2 and P3 stories incrementally without breaking earlier journeys.
-4. Finish with multi-client, reconnection, session compatibility, security, and packaging checks proportional to the change.
+4. Finish with race, multi-client, reconnection, persistent-data, security, shutdown, and packaging checks proportional to the change.
 
 ## Notes
 
-- Do not claim test, lint, coverage, or CI success unless such tooling exists and ran.
-- Record unavailable build environments or manual checks explicitly.
-- Keep runtime-only live state out of session JSON unless persistence is an approved requirement.
-- Avoid vague tasks, imaginary `src/` paths, generic database/authentication work, and producer-only contract changes.
+- Do not claim formatting, vet, test, race, browser, CI, packaging, or release success unless the relevant command or journey actually ran.
+- Record unavailable macOS build environments, credentials, browsers, or manual checks explicitly.
+- Keep runtime-only live and coordination state out of persistent JSON unless persistence is an approved requirement.
+- Avoid vague tasks, generic database/authentication work, and producer-only contract changes.
