@@ -120,6 +120,184 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 	}
 }
 
+func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	soundScript := read("client/sound.js")
+	for _, required := range []string{
+		"let webAudioEligible = false;",
+		"const folderLoads = new Map();",
+		"const rawLoads    = new Map();",
+		"const oneShotFolders = ['single', 'multiple', 'enter', 'hack-good', 'hack-bad', 'menu-focus', 'charscroll'];",
+		"function enableWebAudio()",
+		"function reportPlayback(url)",
+		"if (!webAudioReady || !await webAudioReady || !webAudioEligible) {",
+		"await Promise.all(oneShotFolders.map(loadFolder));",
+		"const buffer = await context.decodeAudioData(raw.slice(0));",
+		"if (!rawBufs.has(url)) await prefetch(url);",
+		"await Promise.all(supported.map(file =>",
+		"enableWebAudio();",
+		"reportPlayback(url);",
+		"playFromFolder('single', 0.55)",
+		"playFromFolder('multiple', 0.55)",
+		"playFromFolder('enter', 0.65)",
+		"playFirst('menu-focus', 0.5)",
+		"playFirst('hack-good', 0.8)",
+		"playFirst('hack-bad', 0.7)",
+		"playFromFolder('charscroll', 0.4)",
+	} {
+		if !strings.Contains(soundScript, required) {
+			t.Errorf("player sound adapter is missing outcome-audio contract %q", required)
+		}
+	}
+
+	playerScript := read("client/client.js")
+	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack) {")
+	if outcomeStart < 0 {
+		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
+	}
+	outcomeEnd := strings.Index(playerScript[outcomeStart:], "function scheduleHackSolvedNavigation() {")
+	if outcomeEnd < 0 {
+		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
+	}
+	outcomeBoundary := playerScript[outcomeStart : outcomeStart+outcomeEnd]
+	for _, required := range []string{
+		"nextHack.attemptsLeft < previousHack.attemptsLeft",
+		"playHackBad();",
+		"nextHack.solved && !previousHack.solved",
+		"playHackGood();",
+	} {
+		if !strings.Contains(outcomeBoundary, required) {
+			t.Errorf("common authoritative outcome handler is missing transition guard %q", required)
+		}
+	}
+	for _, required := range []string{
+		"let terminalLiveBaselinePending = true;",
+		"const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive",
+		"if (isContinuousTerminalUpdate) playHackOutcomeTransition(previousHack, hack);",
+		"terminalLiveBaselinePending = false;",
+		"playHackOutcomeTransition(previousHack, hack);",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("player script is missing revisioned live/hack outcome guard %q", required)
+		}
+	}
+
+	actionResultStart := strings.Index(playerScript, "} else if (msg.type === 'ACTION_RESULT') {")
+	if actionResultStart < 0 {
+		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+	}
+	actionResultEnd := strings.Index(playerScript[actionResultStart:], "} else if (msg.type === 'TERMINAL_LIVE') {")
+	if actionResultEnd < 0 {
+		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+	}
+	if strings.Contains(playerScript[actionResultStart:actionResultStart+actionResultEnd], "playHack") {
+		t.Error("ACTION_RESULT must not optimistically play hacking outcome audio")
+	}
+
+	beginActionStart := strings.Index(playerScript, "function beginSharedAction(type, fields) {")
+	if beginActionStart < 0 {
+		t.Fatal("player script is missing the shared-action presentation boundary")
+	}
+	beginActionEnd := strings.Index(playerScript[beginActionStart:], "function selectCharacter(characterID) {")
+	if beginActionEnd < 0 {
+		t.Fatal("player script is missing the shared-action presentation boundary")
+	}
+	beginAction := playerScript[beginActionStart : beginActionStart+beginActionEnd]
+	if !strings.Contains(beginAction, "renderPlayerContext();") || strings.Contains(beginAction, "render();") {
+		t.Error("beginSharedAction must update pending presentation without rebuilding the hacking board")
+	}
+	for _, required := range []string{
+		"pattern.id !== hackHoverKey",
+		"setHackHover(hoveredCells.length ? hackHoverKey : null, true);",
+	} {
+		if !strings.Contains(playerScript, required) {
+			t.Errorf("player script is missing preview-audio replay guard %q", required)
+		}
+	}
+}
+
+func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	paths := []string{
+		"client/client.js",
+		"client/sound.js",
+		"frontend/src/desktop-api.js",
+		"frontend/src/master.js",
+	}
+	for _, relative := range paths {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.ContainsRune(string(raw), '\t') {
+			t.Errorf("%s contains a tab; browser JavaScript uses two-space indentation", relative)
+		}
+	}
+}
+
+func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	facade := read("frontend/src/desktop-api.js")
+	app := read("app.go")
+	for _, required := range []string{
+		"requestTerminalActivation: 'RequestTerminalActivation'",
+		"requestTerminalClear: 'RequestTerminalClear'",
+		"updateLiveTerminal: 'UpdateLiveTerminal'",
+		"forceHackSuccess: 'ForceHackSuccess'",
+	} {
+		if !strings.Contains(facade, required) {
+			t.Errorf("master desktop facade is missing coordinator-owned command %q", required)
+		}
+	}
+	for _, forbidden := range []string{"SetLiveTerminal", "ClearLiveTerminal", "setLiveTerminal", "clearLiveTerminal"} {
+		if strings.Contains(facade, forbidden) {
+			t.Errorf("master desktop facade exposes legacy terminal command %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		"func (app *App) RequestTerminalActivation(",
+		"func (app *App) RequestTerminalClear(",
+		"func (app *App) UpdateLiveTerminal(",
+		"func (app *App) ForceHackSuccess(",
+	} {
+		if !strings.Contains(app, required) {
+			t.Errorf("Wails App is missing required terminal command %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"func (app *App) SetLiveTerminal(",
+		"func (app *App) ClearLiveTerminal(",
+	} {
+		if strings.Contains(app, forbidden) {
+			t.Errorf("Wails App still binds legacy terminal command %q", forbidden)
+		}
+	}
+}
+
 func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 	t.Parallel()
 
@@ -160,6 +338,83 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 	}
 	if !strings.Contains(compactCSS, "[hidden]{display:none!important;}") {
 		t.Error("player stylesheet must make the hidden attribute authoritative so inactive state containers occupy no layout space")
+	}
+}
+
+func TestPlayerSessionSelectionAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	html := read("client/index.html")
+	for _, fragment := range []string{
+		`class="player-identity" id="playerIdentity" hidden`,
+		`class="role-badge" id="roleBadge"`,
+		`class="character-select" id="characterSelect" hidden`,
+		`class="assigned-waiting" id="assignedWaiting" hidden`,
+		`class="player-notice" id="playerNotice"`,
+	} {
+		if !strings.Contains(html, fragment) {
+			t.Errorf("player markup is missing session-selection region %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{"browserToken", "ForceHackSuccess", "forceHackSuccess", "HACK_ADMIN"} {
+		if strings.Contains(html, forbidden) {
+			t.Errorf("player markup exposes private/session capability %q", forbidden)
+		}
+	}
+
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+	for _, fragment := range []string{
+		".character-select{height:100%;min-height:0;display:flex;",
+		`.character-option[data-status="claimed"]{`,
+		".character-select.pending{",
+		".assigned-waiting{height:100%;display:flex;",
+		"[hidden]{display:none!important;}",
+	} {
+		if !strings.Contains(compactCSS, fragment) {
+			t.Errorf("player stylesheet is missing bounded selection contract %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
+		if strings.Contains(compactCSS, forbidden) {
+			t.Errorf("session selection must remain within the no-scroll player layout; found %q", forbidden)
+		}
+	}
+
+	js := read("client/client.js")
+	for _, fragment := range []string{
+		"const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token'",
+		"localStorage.getItem(PLAYER_TOKEN_KEY)",
+		"localStorage.setItem(PLAYER_TOKEN_KEY",
+		"option.textContent = entry.name",
+		"type: 'SESSION_HELLO'",
+		"type: 'CHARACTER_SELECT'",
+	} {
+		if !strings.Contains(js, fragment) {
+			t.Errorf("player script is missing safe selection/identity contract %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"searchParams.set('browserToken'",
+		`searchParams.set("browserToken"`,
+		"innerHTML = entry.name",
+		"ForceHackSuccess",
+		"forceHackSuccess",
+		"HACK_ADMIN",
+	} {
+		if strings.Contains(js, forbidden) {
+			t.Errorf("player script exposes unsafe session/privileged path %q", forbidden)
+		}
 	}
 }
 
@@ -354,8 +609,87 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
 		}
 	}
-	if !strings.Contains(string(playerScript), "send({ type: 'HACK_GUESS', targetId: cell.dataset.target });") {
+	if !strings.Contains(string(playerScript), "beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })") {
 		t.Error("ordinary candidate and filler cells must continue through HACK_GUESS")
+	}
+}
+
+func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := string(playerScript)
+
+	for _, required := range []string{
+		"let pendingSharedAction = null",
+		"function canControlSharedTerminal()",
+		"playerState.role === 'active'",
+		"playerState.phase === 'controlling'",
+		"pendingSharedAction === null",
+		"function beginSharedAction(type, fields)",
+		"beginSharedAction('NAV_ACTION', { action: 'enter', nodeId: node.id })",
+		"beginSharedAction('NAV_ACTION', { action: 'command', nodeId: node.id })",
+		"beginSharedAction('NAV_ACTION', { action: 'entry', nodeId: node.id })",
+		"beginSharedAction('NAV_ACTION', { action: 'back' })",
+		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id })",
+		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })",
+		"activateRow(kids[selIndex])",
+		"goBack()",
+	} {
+		if !strings.Contains(js, required) {
+			t.Errorf("player script is missing shared-action gate %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"send({ type: 'NAV_ACTION'",
+		"send({ type: 'HACK_GUESS'",
+		"send({ type: 'HACK_PATTERN'",
+		"ForceHackSuccess",
+		"forceHackSuccess",
+		"HACK_ADMIN",
+	} {
+		if strings.Contains(js, forbidden) {
+			t.Errorf("player script bypasses authority or exposes a privileged path %q", forbidden)
+		}
+	}
+
+	stylesheet, err := os.ReadFile(filepath.Join(root, "client", "client.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(string(stylesheet))
+	for _, forbidden := range []string{
+		"#screen.observer-read-only:is(.term-row,.back-btn,.hcell){pointer-events:none",
+		"#screen.shared-input-pending:is(.term-row,.back-btn,.hcell){pointer-events:none",
+		"#screen.observer-read-only.hcell{pointer-events:none",
+		"#screen.shared-input-pending.hcell{pointer-events:none",
+	} {
+		if strings.Contains(compactCSS, forbidden) {
+			t.Errorf("read-only/pending presentation disables target hit-testing through %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		`class="hcell word" data-target="${esc(wid)}" tabindex="0"`,
+		`class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0"`,
+		"const lines = Array.isArray(hack.log) ? hack.log : []",
+	} {
+		if !strings.Contains(js, required) {
+			t.Errorf("active hacking target is not rendered as a focusable hit target %q", required)
+		}
+	}
+
+	protocol, err := os.ReadFile(filepath.Join(root, "internal", "player", "protocol.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"ForceHackSuccess", "forceHackSuccess", "HACK_ADMIN"} {
+		if strings.Contains(string(protocol), forbidden) {
+			t.Errorf("player protocol exposes trusted hacking capability %q", forbidden)
+		}
 	}
 }
 
@@ -373,12 +707,12 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 		"(hack.patterns || [])",
 		"pattern.row === row && pattern.start === offset",
 		"const pattern = patternAtCell(cell)",
-		"if (patternAtCell(cell))",
+		"const relatedPattern = patternAtCell(related)",
 		"offset >= pattern.start && offset <= pattern.end",
 		"`[data-row=\"${pattern.row}\"][data-offset]`",
 		"if (pattern.used) setHackPatternHover(null)",
-		"send({ type: 'HACK_PATTERN', patternId: pattern.id })",
-		"send({ type: 'HACK_GUESS', targetId: cell.dataset.target })",
+		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id })",
+		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })",
 	} {
 		if !strings.Contains(playerScript, required) {
 			t.Errorf("bundled player is missing pattern interaction contract %q", required)
@@ -417,9 +751,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"const pattern = patternAtCell(cell)",
 		"pattern.row === row && pattern.start === offset",
 		"if (pattern && !pattern.used)",
-		"send({ type: 'HACK_PATTERN', patternId: pattern.id });",
+		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id });",
 		"if (pattern) return;",
-		"send({ type: 'HACK_GUESS', targetId: cell.dataset.target });",
+		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target });",
 		"class=\"hcell word\"",
 		"class=\"hcell filler\"",
 	} {
@@ -503,6 +837,233 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		if strings.Contains(playerSurface, forbidden) {
 			t.Errorf("player surface gained game-master solve authority %q", forbidden)
 		}
+	}
+}
+
+func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	masterHTML := read("frontend/src/index.html")
+	masterCSS := read("frontend/src/master.css")
+	masterJS := read("frontend/src/master.js")
+	desktopAPI := read("frontend/src/desktop-api.js")
+	appBoundary := read("app.go")
+	contract := read("specs/004-player-sessions-control/contracts/desktop-coordination.md")
+	for _, required := range []string{
+		`id="btnResetFailedHack"`,
+		`ПОВТОРИТЬ ВЗЛОМ`,
+		`desktopAPI.resetFailedHack(`,
+		`resetFailedHack: 'ResetFailedHack'`,
+		`func (app *App) ResetFailedHack(`,
+		`ResetFailedHack`,
+	} {
+		if !strings.Contains(masterHTML+masterCSS+masterJS+desktopAPI+appBoundary+contract, required) {
+			t.Errorf("game-master bundle is missing failed-hack reset contract %q", required)
+		}
+	}
+	playerSurface := strings.Join([]string{
+		read("client/index.html"), read("client/client.css"), read("client/client.js"),
+		read("internal/player/protocol.go"), read("internal/player/server.go"),
+	}, "\n")
+	for _, forbidden := range []string{"ResetFailedHack", "resetFailedHack", "btnResetFailedHack", "HACK_RESET", "URLSearchParams", "location.search"} {
+		if strings.Contains(playerSurface, forbidden) {
+			t.Errorf("player surface gained failed-hack reset authority %q", forbidden)
+		}
+	}
+}
+
+func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	openingTag := func(document, id string) string {
+		t.Helper()
+		marker := `id="` + id + `"`
+		markerAt := strings.Index(document, marker)
+		if markerAt < 0 {
+			return ""
+		}
+		start := strings.LastIndex(document[:markerAt], "<")
+		endOffset := strings.Index(document[markerAt:], ">")
+		if start < 0 || endOffset < 0 {
+			return ""
+		}
+		return document[start : markerAt+endOffset+1]
+	}
+
+	masterHTML := read("frontend/src/index.html")
+	dialogTag := openingTag(masterHTML, "terminalSwitchDialog")
+	for _, fragment := range []string{
+		"<dialog",
+		`id="terminalSwitchDialog"`,
+		`aria-modal="true"`,
+		`aria-labelledby="terminalSwitchDialogTitle"`,
+		`aria-describedby="terminalSwitchDialogDescription terminalSwitchStatus terminalSwitchError"`,
+		"hidden",
+	} {
+		if !strings.Contains(dialogTag, fragment) {
+			t.Errorf("terminal-switch dialog opening tag is missing %q; got %q", fragment, dialogTag)
+		}
+	}
+	for _, fragment := range []string{
+		`id="terminalSwitchDialogTitle"`,
+		`id="terminalSwitchDialogDescription"`,
+		`id="terminalSwitchStatus" role="status" aria-live="polite"`,
+		`id="terminalSwitchError" role="alert" aria-live="assertive"`,
+	} {
+		if !strings.Contains(masterHTML, fragment) {
+			t.Errorf("terminal-switch dialog is missing accessible feedback contract %q", fragment)
+		}
+	}
+	if errorTag := openingTag(masterHTML, "terminalSwitchError"); !strings.Contains(errorTag, "hidden") {
+		t.Errorf("terminal-switch error must be hidden until populated; got %q", errorTag)
+	}
+
+	for id, decision := range map[string]string{
+		"btnPreserveTerminalSwitch": "preserve",
+		"btnDiscardTerminalSwitch":  "discard",
+		"btnCancelTerminalSwitch":   "cancel",
+	} {
+		tag := openingTag(masterHTML, id)
+		for _, fragment := range []string{
+			"<button",
+			`type="button"`,
+			`data-switch-decision="` + decision + `"`,
+		} {
+			if !strings.Contains(tag, fragment) {
+				t.Errorf("terminal-switch %s control is missing %q; got %q", decision, fragment, tag)
+			}
+		}
+	}
+	discardTag := openingTag(masterHTML, "btnDiscardTerminalSwitch")
+	for _, className := range []string{"btn-danger", "terminal-switch-discard"} {
+		if !strings.Contains(discardTag, className) {
+			t.Errorf("discard must carry destructive emphasis class %q; got %q", className, discardTag)
+		}
+	}
+
+	masterCSS := read("frontend/src/master.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	for _, fragment := range []string{
+		".terminal-switch-dialog{",
+		".terminal-switch-dialog[hidden]{display:none;}",
+		".terminal-switch-discard{",
+	} {
+		if !strings.Contains(compactCSS, fragment) {
+			t.Errorf("master stylesheet is missing terminal-switch visibility/destructive contract %q", fragment)
+		}
+	}
+
+	playerSurface := strings.Join([]string{
+		read("client/index.html"),
+		read("client/client.css"),
+		read("client/client.js"),
+		read("internal/player/protocol.go"),
+	}, "\n")
+	for _, forbidden := range []string{
+		"terminalSwitchDialog",
+		"btnPreserveTerminalSwitch",
+		"btnDiscardTerminalSwitch",
+		"btnCancelTerminalSwitch",
+		"data-switch-decision",
+		"resolveTerminalSwitch",
+		"ResolveTerminalSwitch",
+		"switchId",
+		"ForceHackSuccess",
+		"forceHackSuccess",
+	} {
+		if strings.Contains(playerSurface, forbidden) {
+			t.Errorf("player surface exposes game-master switch/private-puzzle capability %q", forbidden)
+		}
+	}
+}
+
+func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	openingTag := func(document, id string) string {
+		t.Helper()
+		marker := `id="` + id + `"`
+		markerAt := strings.Index(document, marker)
+		if markerAt < 0 {
+			return ""
+		}
+		start := strings.LastIndex(document[:markerAt], "<")
+		endOffset := strings.Index(document[markerAt:], ">")
+		if start < 0 || endOffset < 0 {
+			return ""
+		}
+		return document[start : markerAt+endOffset+1]
+	}
+
+	masterHTML := read("frontend/src/index.html")
+	masterJS := read("frontend/src/master.js")
+	masterCSS := read("frontend/src/master.css")
+	dialogTag := openingTag(masterHTML, "endBroadcastDialog")
+	for _, fragment := range []string{
+		"<dialog",
+		`id="endBroadcastDialog"`,
+		`aria-modal="true"`,
+		`aria-labelledby="endBroadcastDialogTitle"`,
+		`aria-describedby="endBroadcastDialogDescription"`,
+		"hidden",
+	} {
+		if !strings.Contains(dialogTag, fragment) {
+			t.Errorf("end-broadcast dialog opening tag is missing %q; got %q", fragment, dialogTag)
+		}
+	}
+	for _, id := range []string{"endBroadcastDialogTitle", "endBroadcastDialogDescription", "btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
+		if !strings.Contains(masterHTML, `id="`+id+`"`) {
+			t.Errorf("end-broadcast dialog is missing %q", id)
+		}
+	}
+	for _, id := range []string{"btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
+		if tag := openingTag(masterHTML, id); !strings.Contains(tag, `type="button"`) {
+			t.Errorf("end-broadcast control %q must be an explicit button; got %q", id, tag)
+		}
+	}
+	for _, fragment := range []string{
+		"showEndBroadcastConfirmation()",
+		"desktopAPI.endBroadcast()",
+		"!result.state || result.state.broadcast",
+		"btnConfirmEndBroadcast.disabled = true",
+	} {
+		if !strings.Contains(masterJS, fragment) {
+			t.Errorf("master script is missing end-broadcast contract %q", fragment)
+		}
+	}
+	if strings.Contains(masterJS, "window.confirm('Завершить текущую трансляцию") {
+		t.Error("end-broadcast action still depends on the native window.confirm gate")
+	}
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	if !strings.Contains(compactCSS, ".end-broadcast-actions{") {
+		t.Error("master stylesheet is missing end-broadcast confirmation layout")
 	}
 }
 
@@ -649,6 +1210,205 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	}
 	if !strings.Contains(string(viteConfig), `./dist/.keep`) {
 		t.Error("Vite build does not restore frontend/dist/.keep after emptyOutDir")
+	}
+}
+
+func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+
+	masterHTML := read("frontend/src/index.html")
+	masterJS := read("frontend/src/master.js")
+	masterCSS := read("frontend/src/master.css")
+	playerHTML := read("client/index.html")
+	playerJS := read("client/client.js")
+	playerCSS := read("client/client.css")
+	playerHTTP := read("internal/player/http.go")
+	playerProtocol := read("internal/player/protocol.go")
+
+	for _, directive := range []string{
+		`default-src 'self'`,
+		`script-src 'self'`,
+		`object-src 'none'`,
+		`base-uri 'none'`,
+		`form-action 'none'`,
+	} {
+		if !strings.Contains(masterHTML, directive) {
+			t.Errorf("master CSP is missing restrictive directive %q", directive)
+		}
+	}
+	for _, fragment := range []string{
+		`response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)`,
+		`default-src 'self'`,
+		`script-src 'self'`,
+		`object-src 'none'`,
+		`base-uri 'none'`,
+		`frame-ancestors 'none'`,
+	} {
+		if !strings.Contains(playerHTTP, fragment) {
+			t.Errorf("player HTTP boundary is missing CSP contract %q", fragment)
+		}
+	}
+
+	for _, fragment := range []string{
+		`row.querySelector('.roster-name').textContent = character.name || '—'`,
+		`row.querySelector('.session-primary-name').textContent = assigned`,
+		`row.querySelector('.session-character-name').textContent = assigned`,
+		`row.querySelector('.session-fallback-label').textContent = `,
+	} {
+		if !strings.Contains(masterJS, fragment) {
+			t.Errorf("master asset is missing text-only name rendering %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		`option.textContent = entry.name`,
+		`playerCharacterName.textContent = playerState.character.name`,
+		`playerFallbackName.textContent = playerState.fallbackName`,
+	} {
+		if !strings.Contains(playerJS, fragment) {
+			t.Errorf("player asset is missing text-only name rendering %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{
+		"innerHTML = character.name",
+		"innerHTML = session.fallbackName",
+		"innerHTML = entry.name",
+		"innerHTML = playerState.fallbackName",
+	} {
+		if strings.Contains(masterJS, forbidden) || strings.Contains(playerJS, forbidden) {
+			t.Errorf("coordination assets interpolate an unescaped name through %q", forbidden)
+		}
+	}
+
+	masterSurface := masterHTML + "\n" + masterJS + "\n" + masterCSS
+	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "fallout-terminal.player-token"} {
+		if strings.Contains(masterSurface, forbidden) {
+			t.Errorf("master assets expose player resume-token detail %q", forbidden)
+		}
+	}
+	for _, fragment := range []string{
+		"const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token'",
+		"localStorage.getItem(PLAYER_TOKEN_KEY)",
+		"localStorage.setItem(PLAYER_TOKEN_KEY",
+		"sendSessionHello(socket, browserToken)",
+	} {
+		if !strings.Contains(playerJS, fragment) {
+			t.Errorf("player token is not confined to the private handshake/storage path %q", fragment)
+		}
+	}
+	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "?token", "?session"} {
+		if strings.Contains(playerHTML+"\n"+playerCSS, forbidden) {
+			t.Errorf("player document/style surface leaks token detail %q", forbidden)
+		}
+	}
+	for _, forbidden := range []string{"URLSearchParams", "location.search", "searchParams.set('browserToken'", `searchParams.set("browserToken"`} {
+		if strings.Contains(playerJS, forbidden) {
+			t.Errorf("player script exposes resume tokens through the URL via %q", forbidden)
+		}
+	}
+
+	for _, fragment := range []string{
+		"const observerReadOnly = hasState && playerState.role === 'observer'",
+		"screen.classList.toggle('observer-read-only', observerReadOnly)",
+		"screen.setAttribute('aria-readonly', String(observerReadOnly))",
+		"function canControlSharedTerminal()",
+		"playerState.role === 'active'",
+		"pendingSharedAction === null",
+	} {
+		if !strings.Contains(playerJS, fragment) {
+			t.Errorf("player asset is missing observer/local-only action gate %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		"#screen.observer-read-only :is(.term-row, .back-btn, .hcell)",
+		"#screen.shared-input-pending :is(.term-row, .back-btn, .hcell)",
+	} {
+		if !strings.Contains(playerCSS, fragment) {
+			t.Errorf("player stylesheet is missing read-only/pending presentation %q", fragment)
+		}
+	}
+
+	for _, fragment := range []string{
+		"pendingSharedAction.acceptedRevision = Number(result.revision) || 0",
+		"if (appliedSharedRevision < pendingSharedAction.acceptedRevision) return",
+		"playerState.revision >= pendingSelection.acceptedRevision",
+	} {
+		if !strings.Contains(playerJS, fragment) {
+			t.Errorf("player asset clears pending input without authoritative revision evidence %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		"pendingTerminalSwitch = result?.switchId || null",
+		"desktopAPI.resolveTerminalSwitch({ switchId: pendingTerminalSwitch, decision })",
+		"if (!pendingTerminalSwitch || coordinationCommandPending) return",
+	} {
+		if !strings.Contains(masterJS, fragment) {
+			t.Errorf("master asset is missing terminal-switch resolution contract %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		`id="playerConfigStatus"`,
+		`id="btnOpenPlayerConfig"`,
+		`id="btnNewPlayerConfig"`,
+		`id="playerConfigError"`,
+	} {
+		if !strings.Contains(masterHTML, fragment) {
+			t.Errorf("master asset is missing player-config recovery control %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		`.coord-panel[data-player-config-active="false"] .roster-management`,
+		`.player-config-error[hidden]`,
+	} {
+		if !strings.Contains(masterCSS, fragment) {
+			t.Errorf("master stylesheet is missing player-config gating contract %q", fragment)
+		}
+	}
+
+	compactPlayerCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(playerCSS)
+	compactMasterCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	for _, fragment := range []string{
+		"--terminal-scale:clamp(",
+		".screen{position:relative;width:100%;max-width:1500px;height:100%;",
+		"@media(max-width:760px){",
+		"@media(max-height:720px){",
+	} {
+		if !strings.Contains(compactPlayerCSS, fragment) {
+			t.Errorf("player stylesheet is missing responsive layout boundary %q", fragment)
+		}
+	}
+	for _, fragment := range []string{
+		"@media(max-width:1050px){",
+		"@media(max-width:820px){",
+		"@media(max-width:620px),(max-height:560px){",
+		".terminal-switch-dialog{width:calc(100vw-20px);max-height:calc(100dvh-20px);",
+	} {
+		if !strings.Contains(compactMasterCSS, fragment) {
+			t.Errorf("master stylesheet is missing responsive layout boundary %q", fragment)
+		}
+	}
+
+	playerSurface := strings.Join([]string{playerHTML, playerCSS, playerJS, playerProtocol}, "\n")
+	for _, forbidden := range []string{
+		"ForceHackSuccess",
+		"forceHackSuccess",
+		"HACK_ADMIN",
+		"btnHackSuccess",
+		"resolveTerminalSwitch",
+		"ResolveTerminalSwitch",
+	} {
+		if strings.Contains(playerSurface, forbidden) {
+			t.Errorf("player surface exposes private game-master capability %q", forbidden)
+		}
 	}
 }
 

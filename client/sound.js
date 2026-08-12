@@ -10,35 +10,87 @@
 const folderFiles = {};   // folder -> [filenames]
 const rawBufs     = new Map(); // url -> ArrayBuffer
 const decodedBufs = new Map(); // url -> AudioBuffer
+const folderLoads = new Map(); // folder -> Promise<[filenames]>
+const rawLoads    = new Map(); // url -> Promise<void>
+const oneShotFolders = ['single', 'multiple', 'enter', 'hack-good', 'hack-bad', 'menu-focus', 'charscroll'];
 let audioCtx = null;
+let webAudioEligible = false;
+let webAudioReady = null;
+
+function reportPlayback(url) {
+  try {
+    if (typeof window.__falloutTerminalSoundObserver === 'function') {
+      window.__falloutTerminalSoundObserver(url);
+    }
+  } catch {
+    // Test/diagnostic observation is optional and cannot affect playback.
+  }
+}
 
 function getCtx() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass) return null;
   try {
     if (!audioCtx) audioCtx = new AudioContextClass();
-    if (audioCtx.state === 'suspended') {
-      const resumed = audioCtx.resume();
-      if (resumed && typeof resumed.catch === 'function') resumed.catch(() => {});
-    }
   } catch {
     return null;
   }
   return audioCtx;
 }
 
+function enableWebAudio() {
+  if (webAudioReady) return webAudioReady;
+  const context = getCtx();
+  if (!context) return null;
+
+  webAudioReady = (async () => {
+    try {
+      if (context.state === 'suspended') await context.resume();
+      if (context.state !== 'running') return false;
+
+      await Promise.all(oneShotFolders.map(loadFolder));
+      await Promise.all(Array.from(rawBufs.entries()).map(async ([url, raw]) => {
+        if (decodedBufs.has(url)) return;
+        const buffer = await context.decodeAudioData(raw.slice(0));
+        decodedBufs.set(url, buffer);
+      }));
+      if (context.state === 'running') {
+        webAudioEligible = true;
+        return true;
+      }
+    } catch {
+      // A document without an eligible Web Audio context remains silent.
+    }
+    return false;
+  })();
+  return webAudioReady;
+}
+
 async function prefetch(url) {
   if (rawBufs.has(url) || decodedBufs.has(url)) return;
+  if (rawLoads.has(url)) return rawLoads.get(url);
+  const loading = (async () => {
+    try {
+      const res = await fetch(url);
+      if (res.ok) rawBufs.set(url, await res.arrayBuffer());
+    } catch { /* sound file missing — silently skip */ }
+  })();
+  rawLoads.set(url, loading);
   try {
-    const res = await fetch(url);
-    if (res.ok) rawBufs.set(url, await res.arrayBuffer());
-  } catch { /* sound file missing — silently skip */ }
+    await loading;
+  } finally {
+    rawLoads.delete(url);
+  }
 }
 
 async function playBuf(url, volume) {
   try {
+    if (!webAudioReady || !await webAudioReady || !webAudioEligible) {
+      return;
+    }
     let buffer = decodedBufs.get(url);
     if (!buffer) {
+      if (!rawBufs.has(url)) await prefetch(url);
       const raw = rawBufs.get(url);
       if (!raw) return;
       const c = getCtx();
@@ -55,33 +107,50 @@ async function playBuf(url, volume) {
     src.connect(gain);
     gain.connect(c.destination);
     src.start();
+    reportPlayback(url);
   } catch {
     // Audio is optional: decode, autoplay, and device failures are non-fatal.
   }
 }
 
 async function loadFolder(name) {
+  if (Object.prototype.hasOwnProperty.call(folderFiles, name)) return folderFiles[name];
+  if (folderLoads.has(name)) return folderLoads.get(name);
+  const loading = (async () => {
+    try {
+      const res = await fetch(`/api/sounds/${name}`);
+      if (!res.ok) return [];
+      const files = await res.json();
+      if (!Array.isArray(files)) return [];
+      const supported = files.filter(file => typeof file === 'string');
+      folderFiles[name] = supported;
+      await Promise.all(supported.map(file =>
+        prefetch(`/sounds/${name}/${encodeURIComponent(file)}`)
+      ));
+      return supported;
+    } catch {
+      return [];
+    }
+  })();
+  folderLoads.set(name, loading);
   try {
-    const res = await fetch(`/api/sounds/${name}`);
-    if (!res.ok) return;
-    const files = await res.json();
-    if (!Array.isArray(files)) return;
-    folderFiles[name] = files.filter(file => typeof file === 'string');
-    folderFiles[name].forEach(file => prefetch(`/sounds/${name}/${encodeURIComponent(file)}`));
-  } catch { /* sound folder missing — silently skip */ }
+    return await loading;
+  } finally {
+    folderLoads.delete(name);
+  }
 }
 
-function playFromFolder(name, volume) {
-  const files = folderFiles[name];
+async function playFromFolder(name, volume) {
+  const files = folderFiles[name] || await loadFolder(name);
   if (!files || !files.length) return;
   const f = files[Math.floor(Math.random() * files.length)];
-  playBuf(`/sounds/${name}/${encodeURIComponent(f)}`, volume);
+  await playBuf(`/sounds/${name}/${encodeURIComponent(f)}`, volume);
 }
 
-function playFirst(name, volume) {
-  const files = folderFiles[name];
+async function playFirst(name, volume) {
+  const files = folderFiles[name] || await loadFolder(name);
   if (!files || !files.length) return;
-  playBuf(`/sounds/${name}/${encodeURIComponent(files[0])}`, volume);
+  await playBuf(`/sounds/${name}/${encodeURIComponent(files[0])}`, volume);
 }
 
 // ── Public one-shot sounds ─────────────────────────────
@@ -132,10 +201,11 @@ function stopAmbient() {
 document.addEventListener('click', () => {
   if (!userGestured) {
     userGestured = true;
+    enableWebAudio();
     tryStartAmbient();
   }
 });
 
 // ── Boot: prefetch everything up front ─────────────────
-['single', 'multiple', 'enter', 'hack-good', 'hack-bad', 'menu-focus', 'charscroll'].forEach(loadFolder);
+oneShotFolders.forEach(loadFolder);
 setupAmbient().catch(() => {});

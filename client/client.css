@@ -136,6 +136,189 @@ html, body {
   opacity: .85;
 }
 
+/* ── Player identity / character assignment ───────────── */
+.player-identity {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: min(16vh, 5.5rem);
+  margin-bottom: clamp(4px, 1vh, 10px);
+  padding: clamp(4px, .8vh, 8px) clamp(6px, 1vw, 12px);
+  border: 1px solid rgba(87, 255, 110, .32);
+  background: rgba(20, 77, 24, .12);
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.2vw, 14px);
+  font-size: var(--font-chrome);
+  line-height: 1.2;
+  overflow: hidden;
+}
+.player-identity-name {
+  min-width: 0;
+  color: #d8ffb8;
+  font-size: var(--font-menu);
+  overflow-wrap: anywhere;
+}
+.player-identity-fallback {
+  min-width: 0;
+  margin-left: auto;
+  opacity: .62;
+  overflow-wrap: anywhere;
+}
+.role-badge {
+  flex: 0 0 auto;
+  padding: 2px clamp(5px, .8vw, 9px);
+  border: 1px solid currentColor;
+  color: #d8ffb8;
+  letter-spacing: .7px;
+  white-space: nowrap;
+}
+.role-badge[data-role="active"] { color: #ffe08a; }
+.role-badge[data-role="observer"],
+#roleBadge[data-role="observer"] {
+  color: #7fc0ff;
+  border-style: dashed;
+  background: rgba(127, 192, 255, .08);
+  text-shadow: 0 0 5px rgba(127, 192, 255, .45);
+}
+.role-badge[data-role="unassigned"] { opacity: .65; }
+
+.character-select {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(6px, 1.4vh, 14px);
+  padding: clamp(4px, 1.2vh, 12px) clamp(2px, .8vw, 8px);
+  overflow: hidden;
+}
+.character-select-title,
+.assigned-waiting-title {
+  flex: 0 0 auto;
+  color: #d8ffb8;
+  font-size: var(--font-title);
+  line-height: 1.2;
+  letter-spacing: 1px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.character-select-copy,
+.assigned-waiting-copy {
+  flex: 0 0 auto;
+  max-height: min(16vh, 5rem);
+  font-size: var(--font-chrome);
+  line-height: 1.25;
+  text-align: center;
+  opacity: .76;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.character-options {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  align-content: center;
+  gap: clamp(4px, 1vh, 10px) clamp(6px, 1vw, 14px);
+  overflow: hidden;
+}
+.character-option {
+  min-width: 0;
+  min-height: calc(var(--terminal-scale) * 2.35);
+  max-height: calc(var(--terminal-scale) * 4.5);
+  padding: clamp(5px, 1vh, 10px) clamp(8px, 1.4vw, 16px);
+  border: 1px solid #2a6b30;
+  background: rgba(20, 77, 24, .1);
+  color: #57ff6e;
+  font: inherit;
+  font-size: var(--font-menu);
+  line-height: 1.15;
+  text-align: left;
+  text-shadow: inherit;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.character-option:hover,
+.character-option:focus-visible {
+  border-color: #d8ffb8;
+  background: rgba(87, 255, 110, .16);
+  outline: none;
+}
+.character-option:active {
+  background: #57ff6e;
+  color: #021002;
+  text-shadow: none;
+}
+.character-option[data-status="claimed"] {
+  border-style: dashed;
+  color: #6f9a5f;
+  background: rgba(4, 18, 5, .5);
+  opacity: .58;
+  cursor: not-allowed;
+  text-shadow: none;
+}
+.character-option[data-status="claimed"]:hover,
+.character-option[data-status="claimed"]:focus-visible {
+  border-color: #2a6b30;
+  background: rgba(4, 18, 5, .5);
+}
+.character-option-status {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-chrome);
+  letter-spacing: .5px;
+  opacity: .7;
+}
+.character-select.pending {
+  pointer-events: none;
+}
+.character-select.pending .character-option {
+  opacity: .38;
+}
+.character-select.pending .character-option[data-status="available"] {
+  border-style: dashed;
+  animation: selection-pending 1s steps(2) infinite;
+}
+@keyframes selection-pending {
+  0%, 49% { border-color: #57ff6e; }
+  50%, 100% { border-color: #144d18; }
+}
+
+.player-notice {
+  flex: 0 0 auto;
+  min-height: 1.25em;
+  max-height: 2.5em;
+  color: #ffe08a;
+  font-size: var(--font-chrome);
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.player-notice:empty { visibility: hidden; }
+.player-notice[data-kind="error"] { color: #ff9a7a; }
+
+.assigned-waiting {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.4vh, 14px);
+  min-height: 0;
+  padding: clamp(8px, 2vh, 22px);
+  text-align: center;
+  overflow: hidden;
+}
+.assigned-waiting::after {
+  content: '_';
+  font-size: var(--font-title);
+  animation: blink 1s steps(1) infinite;
+}
+
 .blink { animation: blink 1s steps(1) infinite; }
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 
@@ -296,6 +479,40 @@ html, body {
   text-shadow: none;
 }
 
+/* ── Shared-action authority / pending presentation ─────
+   These states alter only controls that can mutate the shared terminal.
+   Paging, hover selection, focus, and hacking preview remain local and keep
+   their ordinary highlight behavior. */
+#screen.observer-read-only .player-identity {
+  border-color: rgba(127, 192, 255, .48);
+  background: rgba(36, 70, 92, .14);
+}
+
+#screen.observer-read-only :is(.term-row, .back-btn, .hcell),
+#screen.shared-input-pending :is(.term-row, .back-btn, .hcell) {
+  cursor: not-allowed;
+  opacity: .72;
+}
+
+#screen.observer-read-only .term-row.sel,
+#screen.observer-read-only .hcell.hi,
+#screen.shared-input-pending .term-row.sel,
+#screen.shared-input-pending .hcell.hi {
+  opacity: 1;
+}
+
+#screen.observer-read-only .back-btn:hover,
+#screen.observer-read-only .back-btn:focus-visible,
+#screen.shared-input-pending .back-btn:hover,
+#screen.shared-input-pending .back-btn:focus-visible {
+  color: #7fc0ff;
+  background: rgba(127, 192, 255, .08);
+}
+
+#screen.shared-input-pending :is(.term-row, .back-btn, .hcell) {
+  filter: saturate(.55);
+}
+
 .hack-log-panel {
   flex: 0 1 32%;
   display: grid;
@@ -417,4 +634,24 @@ html, body {
   .term-divider { margin-top: 3px; }
   .term-output { max-height: 25%; }
   .term-footer { min-height: 24px; }
+  .player-identity {
+    max-height: min(13vh, 4rem);
+    margin-bottom: 3px;
+    padding-block: 2px;
+  }
+  .character-select { gap: 4px; padding-block: 2px; }
+  .character-select-copy, .assigned-waiting-copy { max-height: 2.5em; line-height: 1.1; }
+  .character-options { gap: 3px 6px; }
+  .character-option {
+    min-height: calc(var(--terminal-scale) * 1.9);
+    max-height: calc(var(--terminal-scale) * 3.2);
+    padding-block: 3px;
+  }
+  .assigned-waiting { gap: 4px; padding-block: 4px; }
+}
+
+@media (max-width: 760px) {
+  .player-identity { flex-wrap: wrap; gap: 3px 8px; }
+  .player-identity-fallback { width: 100%; margin-left: 0; }
+  .character-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

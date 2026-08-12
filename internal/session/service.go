@@ -319,6 +319,59 @@ func (service *Service) Save(ctx context.Context, session domain.Session, revisi
 	return <-reply
 }
 
+// AssociatePlayerConfig atomically saves a normalized relative reference and
+// updates the active session only after the durable replacement succeeds.
+func (service *Service) AssociatePlayerConfig(ctx context.Context, playerConfigPath string) SessionResult {
+	service.commandMu.Lock()
+	defer service.commandMu.Unlock()
+
+	if err := contextError(ctx); err != nil {
+		return sessionFailure("player config association was canceled")
+	}
+	service.mu.Lock()
+	if service.closed || service.active.Path == "" || service.active.Session == nil {
+		service.mu.Unlock()
+		return sessionFailure("there is no active session")
+	}
+	active := cloneActive(service.active)
+	epoch := service.epoch
+	service.mu.Unlock()
+
+	playerConfigPath = filepath.Clean(strings.TrimSpace(playerConfigPath))
+	if !filepath.IsAbs(playerConfigPath) || playerConfigPath == string(filepath.Separator) {
+		return sessionFailure("player config path must be absolute")
+	}
+	reference, err := filepath.Rel(filepath.Dir(active.Path), playerConfigPath)
+	if err != nil || filepath.IsAbs(reference) || filepath.Clean(reference) == "." {
+		return sessionFailure("could not create a relative player config reference")
+	}
+	candidate := cloneSession(*active.Session)
+	candidate.PlayerConfig = filepath.Clean(reference)
+	data, err := domain.EncodeSession(candidate)
+	if err != nil {
+		return sessionFailure("could not prepare the player config association")
+	}
+	if service.store == nil || service.store.WriteAtomic(active.Path, data) != nil {
+		return sessionFailure("could not save the player config association")
+	}
+
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if service.closed || service.epoch != epoch || service.active.Path != active.Path {
+		return sessionFailure("active session changed while saving the player config association")
+	}
+	revision := service.active.RequestedRevision + 1
+	if revision <= service.active.SavedRevision {
+		revision = service.active.SavedRevision + 1
+	}
+	service.active.Session = sessionPointer(candidate)
+	service.active.RequestedRevision = revision
+	service.active.SavedRevision = revision
+	service.active.SaveState = SaveStateSaved
+	service.durable[epoch] = revision
+	return SessionResult{OK: true, FilePath: active.Path, Session: sessionPointer(candidate)}
+}
+
 // Snapshot returns detached state safe for concurrent callers to inspect.
 func (service *Service) Snapshot() ActiveSession {
 	if service == nil {

@@ -48,9 +48,24 @@ func (connection *PlayerConnection) ID() string {
 	return connection.id
 }
 
-// Start launches one reader and one writer. Syntactically invalid messages are
-// ignored; oversized input closes the offending connection.
+// Start launches one reader and one writer. It is retained for callers that do
+// not need sender identity; new protocol dispatch should use StartWithSender.
 func (connection *PlayerConnection) Start(ctx context.Context, onMessage func(ClientMessage)) {
+	var senderHandler func(*PlayerConnection, ClientMessage)
+	if onMessage != nil {
+		senderHandler = func(_ *PlayerConnection, message ClientMessage) {
+			onMessage(message)
+		}
+	}
+	connection.StartWithSender(ctx, senderHandler)
+}
+
+// StartWithSender launches one reader and one writer and includes the
+// originating connection in every accepted message callback. This identity is
+// required to resolve the connection's logical session before authorization.
+// Syntactically invalid messages are ignored; oversized input closes only the
+// offending connection.
+func (connection *PlayerConnection) StartWithSender(ctx context.Context, onMessage func(*PlayerConnection, ClientMessage)) {
 	if connection == nil {
 		return
 	}
@@ -129,7 +144,7 @@ func (connection *PlayerConnection) Done() <-chan struct{} {
 	return connection.done
 }
 
-func (connection *PlayerConnection) readLoop(ctx context.Context, onMessage func(ClientMessage)) {
+func (connection *PlayerConnection) readLoop(ctx context.Context, onMessage func(*PlayerConnection, ClientMessage)) {
 	defer connection.workers.Done()
 	defer connection.Close()
 	for {
@@ -148,7 +163,7 @@ func (connection *PlayerConnection) readLoop(ctx context.Context, onMessage func
 			continue
 		}
 		if onMessage != nil {
-			onMessage(message)
+			onMessage(connection, message)
 		}
 	}
 }

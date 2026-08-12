@@ -17,14 +17,19 @@ const (
 	// reaches JSON decoding or canonical live-state services.
 	MaxClientMessageBytes = 4 << 10
 
-	MessageNavAction      = "NAV_ACTION"
-	MessageHackGuess      = "HACK_GUESS"
-	MessageHackPattern    = "HACK_PATTERN"
-	MessageTerminalLive   = "TERMINAL_LIVE"
-	MessageTerminalUpdate = "TERMINAL_UPDATE"
-	MessageTerminalClear  = "TERMINAL_CLEAR"
-	MessageNavState       = "NAV_STATE"
-	MessageHackState      = "HACK_STATE"
+	MessageSessionHello    = "SESSION_HELLO"
+	MessageCharacterSelect = "CHARACTER_SELECT"
+	MessageNavAction       = "NAV_ACTION"
+	MessageHackGuess       = "HACK_GUESS"
+	MessageHackPattern     = "HACK_PATTERN"
+	MessageTerminalLive    = "TERMINAL_LIVE"
+	MessageTerminalUpdate  = "TERMINAL_UPDATE"
+	MessageTerminalClear   = "TERMINAL_CLEAR"
+	MessageNavState        = "NAV_STATE"
+	MessageHackState       = "HACK_STATE"
+	MessageSessionWelcome  = "SESSION_WELCOME"
+	MessagePlayerState     = "PLAYER_STATE"
+	MessageActionResult    = "ACTION_RESULT"
 )
 
 // ErrMessageTooLarge identifies an inbound player message that exceeded the
@@ -35,11 +40,16 @@ var ErrMessageTooLarge = errors.New("player message exceeds read limit")
 // ClientMessage is the complete typed player-to-server protocol. Only fields
 // applicable to Type are populated.
 type ClientMessage struct {
-	Type      string
-	Action    string
-	NodeID    string
-	TargetID  string
-	PatternID string
+	Type         string
+	BrowserToken string
+	RequestID    string
+	BroadcastID  string
+	TerminalID   string
+	CharacterID  string
+	Action       string
+	NodeID       string
+	TargetID     string
+	PatternID    string
 }
 
 // DecodeClientMessage reads exactly one bounded JSON object and validates its
@@ -68,6 +78,10 @@ func DecodeClientMessage(reader io.Reader) (ClientMessage, error) {
 	}
 
 	switch typeName {
+	case MessageSessionHello:
+		return decodeSessionHello(fields)
+	case MessageCharacterSelect:
+		return decodeCharacterSelect(fields)
 	case MessageNavAction:
 		return decodeNavAction(fields)
 	case MessageHackGuess:
@@ -77,6 +91,36 @@ func DecodeClientMessage(reader io.Reader) (ClientMessage, error) {
 	default:
 		return ClientMessage{}, fmt.Errorf("unsupported player message type %q", typeName)
 	}
+}
+
+func decodeSessionHello(fields map[string]json.RawMessage) (ClientMessage, error) {
+	if err := allowFields(fields, "type", "browserToken"); err != nil {
+		return ClientMessage{}, err
+	}
+	message := ClientMessage{Type: MessageSessionHello}
+	if raw, exists := fields["browserToken"]; exists {
+		token, err := nonBlankString(raw, "browserToken")
+		if err != nil {
+			return ClientMessage{}, err
+		}
+		message.BrowserToken = token
+	}
+	return message, nil
+}
+
+func decodeCharacterSelect(fields map[string]json.RawMessage) (ClientMessage, error) {
+	if err := allowFields(fields, "type", "requestId", "broadcastId", "characterId"); err != nil {
+		return ClientMessage{}, err
+	}
+	requestID, broadcastID, err := requiredRequest(fields)
+	if err != nil {
+		return ClientMessage{}, err
+	}
+	characterID, err := requiredString(fields, "characterId")
+	if err != nil {
+		return ClientMessage{}, err
+	}
+	return ClientMessage{Type: MessageCharacterSelect, RequestID: requestID, BroadcastID: broadcastID, CharacterID: characterID}, nil
 }
 
 func decodeStrictObject(data []byte) (map[string]json.RawMessage, error) {
@@ -127,14 +171,18 @@ func decodeStrictObject(data []byte) (map[string]json.RawMessage, error) {
 }
 
 func decodeNavAction(fields map[string]json.RawMessage) (ClientMessage, error) {
-	if err := allowFields(fields, "type", "action", "nodeId"); err != nil {
+	if err := allowFields(fields, "type", "requestId", "broadcastId", "terminalId", "action", "nodeId"); err != nil {
+		return ClientMessage{}, err
+	}
+	requestID, broadcastID, terminalID, err := requiredTerminalRequest(fields)
+	if err != nil {
 		return ClientMessage{}, err
 	}
 	action, err := requiredString(fields, "action")
 	if err != nil {
 		return ClientMessage{}, err
 	}
-	message := ClientMessage{Type: MessageNavAction, Action: action}
+	message := ClientMessage{Type: MessageNavAction, RequestID: requestID, BroadcastID: broadcastID, TerminalID: terminalID, Action: action}
 
 	switch action {
 	case "back":
@@ -153,18 +201,26 @@ func decodeNavAction(fields map[string]json.RawMessage) (ClientMessage, error) {
 }
 
 func decodeHackGuess(fields map[string]json.RawMessage) (ClientMessage, error) {
-	if err := allowFields(fields, "type", "targetId"); err != nil {
+	if err := allowFields(fields, "type", "requestId", "broadcastId", "terminalId", "targetId"); err != nil {
+		return ClientMessage{}, err
+	}
+	requestID, broadcastID, terminalID, err := requiredTerminalRequest(fields)
+	if err != nil {
 		return ClientMessage{}, err
 	}
 	targetID, err := requiredString(fields, "targetId")
 	if err != nil {
 		return ClientMessage{}, err
 	}
-	return ClientMessage{Type: MessageHackGuess, TargetID: targetID}, nil
+	return ClientMessage{Type: MessageHackGuess, RequestID: requestID, BroadcastID: broadcastID, TerminalID: terminalID, TargetID: targetID}, nil
 }
 
 func decodeHackPattern(fields map[string]json.RawMessage) (ClientMessage, error) {
-	if err := allowFields(fields, "type", "patternId"); err != nil {
+	if err := allowFields(fields, "type", "requestId", "broadcastId", "terminalId", "patternId"); err != nil {
+		return ClientMessage{}, err
+	}
+	requestID, broadcastID, terminalID, err := requiredTerminalRequest(fields)
+	if err != nil {
 		return ClientMessage{}, err
 	}
 	// patternId is an opaque server-issued identity that binds the active
@@ -174,7 +230,31 @@ func decodeHackPattern(fields map[string]json.RawMessage) (ClientMessage, error)
 	if err != nil {
 		return ClientMessage{}, err
 	}
-	return ClientMessage{Type: MessageHackPattern, PatternID: patternID}, nil
+	return ClientMessage{Type: MessageHackPattern, RequestID: requestID, BroadcastID: broadcastID, TerminalID: terminalID, PatternID: patternID}, nil
+}
+
+func requiredRequest(fields map[string]json.RawMessage) (string, string, error) {
+	requestID, err := requiredString(fields, "requestId")
+	if err != nil {
+		return "", "", err
+	}
+	broadcastID, err := requiredString(fields, "broadcastId")
+	if err != nil {
+		return "", "", err
+	}
+	return requestID, broadcastID, nil
+}
+
+func requiredTerminalRequest(fields map[string]json.RawMessage) (string, string, string, error) {
+	requestID, broadcastID, err := requiredRequest(fields)
+	if err != nil {
+		return "", "", "", err
+	}
+	terminalID, err := requiredString(fields, "terminalId")
+	if err != nil {
+		return "", "", "", err
+	}
+	return requestID, broadcastID, terminalID, nil
 }
 
 func allowFields(fields map[string]json.RawMessage, names ...string) error {
@@ -212,6 +292,7 @@ func nonBlankString(raw json.RawMessage, name string) (string, error) {
 // TerminalLiveEnvelope is the complete reconnect/set-live projection.
 type TerminalLiveEnvelope struct {
 	Type         string                  `json:"type"`
+	Revision     uint64                  `json:"revision"`
 	TerminalID   string                  `json:"terminalId"`
 	TerminalName string                  `json:"terminalName"`
 	Tree         domain.ContentNode      `json:"tree"`
@@ -224,32 +305,61 @@ type TerminalLiveEnvelope struct {
 // TerminalUpdateEnvelope replaces public content without resetting identity
 // or the current hacking puzzle.
 type TerminalUpdateEnvelope struct {
-	Type      string             `json:"type"`
-	Tree      domain.ContentNode `json:"tree"`
-	IntroText string             `json:"introText"`
-	Nav       domain.NavState    `json:"nav"`
+	Type       string             `json:"type"`
+	Revision   uint64             `json:"revision"`
+	TerminalID string             `json:"terminalId"`
+	Tree       domain.ContentNode `json:"tree"`
+	IntroText  string             `json:"introText"`
+	Nav        domain.NavState    `json:"nav"`
 }
 
 // TerminalClearEnvelope announces that no terminal is currently live.
 type TerminalClearEnvelope struct {
-	Type string `json:"type"`
+	Type     string `json:"type"`
+	Revision uint64 `json:"revision"`
 }
 
 // NavStateEnvelope broadcasts the authoritative shared navigation position.
 type NavStateEnvelope struct {
-	Type string          `json:"type"`
-	Nav  domain.NavState `json:"nav"`
+	Type       string          `json:"type"`
+	Revision   uint64          `json:"revision"`
+	TerminalID string          `json:"terminalId"`
+	Nav        domain.NavState `json:"nav"`
 }
 
 // HackStateEnvelope broadcasts only the public hacking projection.
 type HackStateEnvelope struct {
-	Type string                  `json:"type"`
-	Hack *domain.PublicHackState `json:"hack"`
+	Type       string                  `json:"type"`
+	Revision   uint64                  `json:"revision"`
+	TerminalID string                  `json:"terminalId"`
+	Hack       *domain.PublicHackState `json:"hack"`
+}
+
+// SessionWelcomeEnvelope completes the mandatory connection handshake.
+type SessionWelcomeEnvelope struct {
+	Type         string              `json:"type"`
+	BrowserToken string              `json:"browserToken"`
+	State        *domain.PlayerState `json:"state"`
+}
+
+// PlayerStateEnvelope carries one complete personalized coordination snapshot.
+type PlayerStateEnvelope struct {
+	Type  string              `json:"type"`
+	State *domain.PlayerState `json:"state"`
+}
+
+// ActionResultEnvelope completes one correlated player request.
+type ActionResultEnvelope struct {
+	Type      string              `json:"type"`
+	RequestID string              `json:"requestId"`
+	Accepted  bool                `json:"accepted"`
+	Reason    domain.ActionReason `json:"reason"`
+	Revision  uint64              `json:"revision"`
 }
 
 // NewTerminalLiveEnvelope constructs the exact TERMINAL_LIVE wire object.
-func NewTerminalLiveEnvelope(state *domain.PublicLiveState) TerminalLiveEnvelope {
-	envelope := TerminalLiveEnvelope{Type: MessageTerminalLive}
+func NewTerminalLiveEnvelope(revision uint64, state *domain.PublicLiveState) TerminalLiveEnvelope {
+	envelope := TerminalLiveEnvelope{Type: MessageTerminalLive, Revision: revision}
 	if state == nil {
 		return envelope
 	}
@@ -264,25 +374,26 @@ func NewTerminalLiveEnvelope(state *domain.PublicLiveState) TerminalLiveEnvelope
 }
 
 // NewTerminalUpdateEnvelope constructs the exact TERMINAL_UPDATE wire object.
-func NewTerminalUpdateEnvelope(state *domain.PublicLiveState) TerminalUpdateEnvelope {
-	envelope := TerminalUpdateEnvelope{Type: MessageTerminalUpdate}
+func NewTerminalUpdateEnvelope(revision uint64, state *domain.PublicLiveState) TerminalUpdateEnvelope {
+	envelope := TerminalUpdateEnvelope{Type: MessageTerminalUpdate, Revision: revision}
 	if state == nil {
 		return envelope
 	}
 	envelope.Tree = state.Tree
+	envelope.TerminalID = state.TerminalID
 	envelope.IntroText = state.IntroText
 	envelope.Nav = state.Nav
 	return envelope
 }
 
 // NewTerminalClearEnvelope constructs the exact TERMINAL_CLEAR wire object.
-func NewTerminalClearEnvelope() TerminalClearEnvelope {
-	return TerminalClearEnvelope{Type: MessageTerminalClear}
+func NewTerminalClearEnvelope(revision uint64) TerminalClearEnvelope {
+	return TerminalClearEnvelope{Type: MessageTerminalClear, Revision: revision}
 }
 
 // NewNavStateEnvelope constructs the exact NAV_STATE wire object.
-func NewNavStateEnvelope(state *domain.NavState) NavStateEnvelope {
-	envelope := NavStateEnvelope{Type: MessageNavState}
+func NewNavStateEnvelope(revision uint64, terminalID string, state *domain.NavState) NavStateEnvelope {
+	envelope := NavStateEnvelope{Type: MessageNavState, Revision: revision, TerminalID: terminalID}
 	if state != nil {
 		envelope.Nav = *state
 	}
@@ -290,6 +401,21 @@ func NewNavStateEnvelope(state *domain.NavState) NavStateEnvelope {
 }
 
 // NewHackStateEnvelope constructs the exact HACK_STATE wire object.
-func NewHackStateEnvelope(state *domain.PublicHackState) HackStateEnvelope {
-	return HackStateEnvelope{Type: MessageHackState, Hack: state}
+func NewHackStateEnvelope(revision uint64, terminalID string, state *domain.PublicHackState) HackStateEnvelope {
+	return HackStateEnvelope{Type: MessageHackState, Revision: revision, TerminalID: terminalID, Hack: state}
+}
+
+// NewSessionWelcomeEnvelope constructs the exact SESSION_WELCOME object.
+func NewSessionWelcomeEnvelope(browserToken string, state *domain.PlayerState) SessionWelcomeEnvelope {
+	return SessionWelcomeEnvelope{Type: MessageSessionWelcome, BrowserToken: browserToken, State: domain.ClonePlayerState(state)}
+}
+
+// NewPlayerStateEnvelope constructs the exact PLAYER_STATE object.
+func NewPlayerStateEnvelope(state *domain.PlayerState) PlayerStateEnvelope {
+	return PlayerStateEnvelope{Type: MessagePlayerState, State: domain.ClonePlayerState(state)}
+}
+
+// NewActionResultEnvelope constructs the exact ACTION_RESULT object.
+func NewActionResultEnvelope(result domain.ActionResult) ActionResultEnvelope {
+	return ActionResultEnvelope{Type: MessageActionResult, RequestID: result.RequestID, Accepted: result.Accepted, Reason: result.Reason, Revision: result.Revision}
 }

@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: '.',
-  testMatch: 'hacking-camouflage.spec.mjs',
+  testMatch: '*.spec.mjs',
   fullyParallel: false,
   workers: 1,
   use: {
@@ -10,7 +10,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'python3 -m http.server 34119 --bind 127.0.0.1 --directory ../../client',
+    command: 'GOCACHE=/private/tmp/fallout-browser-fixture-cache go run ./fixture-server',
     url: 'http://127.0.0.1:34119',
     reuseExistingServer: false,
   },

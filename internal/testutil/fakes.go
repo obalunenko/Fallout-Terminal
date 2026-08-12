@@ -524,6 +524,141 @@ func (t *FakeTunnel[Request, Info]) StopCalls() int {
 	return t.stopCalls
 }
 
+// FakeOpaqueIDSource returns a caller-supplied sequence of opaque identifiers.
+// It is safe for concurrent use and panics on exhaustion so an unexpected ID
+// allocation cannot silently make a concurrency test nondeterministic.
+type FakeOpaqueIDSource struct {
+	mu sync.Mutex
+
+	values []string
+	next   int
+}
+
+// NewFakeOpaqueIDSource returns an ID source that yields values in order.
+func NewFakeOpaqueIDSource(values ...string) *FakeOpaqueIDSource {
+	return &FakeOpaqueIDSource{values: append([]string(nil), values...)}
+}
+
+// Next returns the next configured opaque identifier.
+func (s *FakeOpaqueIDSource) Next() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.next >= len(s.values) {
+		panic("testutil: fake opaque ID source exhausted")
+	}
+	value := s.values[s.next]
+	s.next++
+	return value
+}
+
+// Calls returns the number of identifiers issued so far.
+func (s *FakeOpaqueIDSource) Calls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.next
+}
+
+// Remaining returns the number of configured identifiers not yet issued.
+func (s *FakeOpaqueIDSource) Remaining() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.values) - s.next
+}
+
+// OrderedEffect records one effect and its one-based enqueue sequence.
+type OrderedEffect[Effect any] struct {
+	Sequence int
+	Value    Effect
+}
+
+// FakeOrderedEffectSink serializes and records transport-neutral effects in
+// enqueue order. The fake deliberately retains each value exactly as received:
+// tests can mutate a producer or recorded projection afterward to expose an
+// aliasing bug in the production boundary.
+type FakeOrderedEffectSink[Effect any] struct {
+	mu sync.Mutex
+
+	effects []OrderedEffect[Effect]
+	notify  chan struct{}
+}
+
+// NewFakeOrderedEffectSink returns an empty ordered effect recorder.
+func NewFakeOrderedEffectSink[Effect any]() *FakeOrderedEffectSink[Effect] {
+	return &FakeOrderedEffectSink[Effect]{notify: make(chan struct{}, 1)}
+}
+
+// Enqueue records effect synchronously in total call order.
+func (s *FakeOrderedEffectSink[Effect]) Enqueue(effect Effect) {
+	s.mu.Lock()
+	s.ensureNotify()
+	s.effects = append(s.effects, OrderedEffect[Effect]{
+		Sequence: len(s.effects) + 1,
+		Value:    effect,
+	})
+	notify := s.notify
+	s.mu.Unlock()
+
+	select {
+	case notify <- struct{}{}:
+	default:
+	}
+}
+
+// Effects returns a copy of all recorded effects in enqueue order.
+func (s *FakeOrderedEffectSink[Effect]) Effects() []OrderedEffect[Effect] {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]OrderedEffect[Effect](nil), s.effects...)
+}
+
+// Values returns recorded effect values in enqueue order.
+func (s *FakeOrderedEffectSink[Effect]) Values() []Effect {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	values := make([]Effect, len(s.effects))
+	for index, effect := range s.effects {
+		values[index] = effect.Value
+	}
+	return values
+}
+
+// Calls returns the number of enqueued effects.
+func (s *FakeOrderedEffectSink[Effect]) Calls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.effects)
+}
+
+// WaitForCount waits until at least count effects have been enqueued or ctx is
+// cancelled. It avoids polling and wall-clock sleeps in concurrent tests.
+func (s *FakeOrderedEffectSink[Effect]) WaitForCount(ctx context.Context, count int) bool {
+	if count <= 0 {
+		return true
+	}
+	for {
+		s.mu.Lock()
+		s.ensureNotify()
+		if len(s.effects) >= count {
+			s.mu.Unlock()
+			return true
+		}
+		notify := s.notify
+		s.mu.Unlock()
+
+		select {
+		case <-ctx.Done():
+			return false
+		case <-notify:
+		}
+	}
+}
+
+func (s *FakeOrderedEffectSink[Effect]) ensureNotify() {
+	if s.notify == nil {
+		s.notify = make(chan struct{}, 1)
+	}
+}
+
 // Event records one emitted event.
 type Event struct {
 	Name    string
