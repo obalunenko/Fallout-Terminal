@@ -12,35 +12,36 @@
 
 ## Technical Context
 
-**Language/Version**: JavaScript on Node.js/Electron 28
+**Language/Version**: Go 1.26; browser JavaScript modules with Node.js 20.19+ build/test tooling
 
-**Primary Dependencies**: Electron, Express 4, `ws` 8; electron-builder for packaging
+**Primary Dependencies**: Wails v2.13.0, `github.com/coder/websocket` v1.8.15, Vite 8.1.5; Playwright 1.62.1 for browser journeys
 
-**Storage**: Versioned local JSON session files; ephemeral live state in server memory
+**Storage**: Versioned local JSON session and player-configuration files; ephemeral live, navigation, hacking, connection, and coordination state in process memory
 
-**Testing**: No automated framework or coverage threshold currently configured; define feature-specific automated and manual verification
+**Testing**: Colocated Go `*_test.go` tests with deterministic fakes; Playwright specs under `tests/browser/*.spec.mjs`; no numeric coverage threshold or repository-wide linter detected
 
-**Target Platform**: Electron desktop application packaged for Windows x64, with modern browser clients on the local network or authenticated ngrok endpoint
+**Target Platform**: Wails desktop application on macOS 13+ / Apple Silicon (`arm64`), with modern browser clients on the local network or an authenticated ngrok endpoint
 
-**Project Type**: Modular desktop monolith with embedded HTTP/WebSocket server
+**Project Type**: Go modular desktop monolith with a Wails master frontend and embedded HTTP/WebSocket player frontend
 
-**Performance Goals**: [Feature-specific responsiveness, synchronization, startup, or client-count goal]
+**Performance Goals**: [Feature-specific responsiveness, synchronization, startup, persistence, or client-count goal]
 
-**Constraints**: Preserve renderer sandbox/context isolation, server-authoritative shared state, session compatibility, and single-package npm structure
+**Constraints**: Preserve narrow Wails bindings, server-authoritative shared state, persistent JSON compatibility, same-host WebSocket policy, owned-resource cleanup, and the single-process runtime
 
-**Scale/Scope**: One GM desktop process, one active broadcast state, and [expected connected player-client count or NEEDS CLARIFICATION]
+**Scale/Scope**: One game-master desktop process, one active broadcast, and [expected connected player-client count or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research and be re-checked after Phase 1 design.*
 
-- [ ] Runtime ownership remains within `main.js`/`preload.js`, `master/`, `server/`, `client/`, and `sessions/` boundaries.
-- [ ] Cross-boundary IPC, HTTP, and WebSocket contracts are documented with validation and failure behavior.
-- [ ] Shared navigation/hacking behavior remains server-authoritative and reconnect-safe.
-- [ ] Electron isolation, CSP, external URL handling, and ngrok credential protections are preserved where applicable.
-- [ ] Session schema changes define versioning, defaults, migration, and backward compatibility.
-- [ ] New dependencies or structural changes have a concrete, documented need.
-- [ ] Verification is proportionate and does not claim absent lint, coverage, test, or CI gates.
+- [ ] Runtime ownership remains within `main.go`/`app.go`, the relevant `internal/` packages, `frontend/src/`, `client/`, and `sessions/` boundaries.
+- [ ] Cross-boundary Wails, HTTP, and WebSocket contracts document producer, consumer, payload, validation, failure, ordering, and reconnect behavior.
+- [ ] Shared navigation, hacking, roster, and controller behavior remains server-authoritative and reconnect-safe.
+- [ ] Wails method exposure, CSP, external URL handling, WebSocket origin/input checks, and ngrok credential protections are preserved where applicable.
+- [ ] Session or player-configuration changes define versioning, defaults, references, migration, and backward compatibility.
+- [ ] Runtime-only state remains outside persistent JSON unless persistence is explicitly approved.
+- [ ] New dependencies or structural changes have a concrete, documented need and reproducible pinning.
+- [ ] Verification uses the configured Go, Playwright, Vite, Wails, and CI gates that apply; unavailable checks are reported rather than claimed.
 - [ ] Naming and code style match the conventions of the affected files.
 
 ## Project Structure
@@ -52,92 +53,132 @@ specs/[###-feature]/
 ├── spec.md
 ├── plan.md
 ├── research.md          # Include only when research decisions are needed
-├── data-model.md        # Include for session/state model changes
+├── data-model.md        # Include for persistent or runtime model changes
 ├── quickstart.md        # Feature verification instructions
-├── contracts/           # Include for IPC/HTTP/WebSocket/session contracts
+├── contracts/           # Include for Wails/HTTP/WebSocket/JSON contracts
 └── tasks.md
 ```
 
 ### Source Code (repository root)
 
 ```text
-main.js                  # Electron lifecycle, native APIs, persistence, orchestration
-preload.js               # Narrow contextBridge API for the master renderer
-master/
-├── index.html
-├── master.js            # GM session editor and broadcast controls
-└── master.css
-server/
-├── server.js            # Express, WebSocket transport, canonical live state
-├── hack.js              # Hacking domain logic
-├── nav.js               # Navigation domain logic
-├── wordbank.js          # Hacking word data/selection
-└── ngrok.js             # Optional authenticated tunnel integration
+main.go                         # Wails entry point, embedding, service composition
+app.go                          # Privileged Wails bridge and application lifecycle
+internal/
+├── domain/                     # Models, JSON codecs, cloning, validation
+├── nav/                        # Transport-independent navigation rules
+├── hack/                       # Transport-independent hacking rules and wordbank
+├── live/                       # Canonical live terminal/navigation/hack state
+├── control/                    # Sessions, roster, controller, broadcast coordination
+├── session/                    # Session persistence and native file workflow
+├── playerconfig/               # Player configuration persistence and references
+├── player/                     # HTTP assets, WebSocket server, public protocol
+├── platform/                   # Wails desktop adapter and macOS paths
+├── tunnel/                     # Optional ngrok process and policy lifecycle
+└── testutil/                   # Shared deterministic test fakes and fixtures
+frontend/
+├── src/
+│   ├── index.html
+│   ├── desktop-api.js          # Narrow Wails binding/event adapter
+│   ├── master.js               # Game-master state and interactions
+│   └── master.css
+├── package.json
+└── vite.config.js
 client/
 ├── index.html
-├── client.js            # Player state/rendering and WebSocket client
-├── sound.js             # Browser audio behavior
+├── client.js                   # Player state/rendering and WebSocket client
+├── sound.js                    # Browser audio behavior
 ├── client.css
 └── sounds/
+tests/browser/
+├── *.spec.mjs                  # Playwright player journeys
+├── fixture-server/main.go      # In-process browser-test fixture
+└── playwright.config.mjs
 sessions/
-└── demo.json            # Versioned example session
-package.json             # npm scripts, dependencies, electron-builder configuration
+└── demo.json                   # Versioned example session
+wails.json                      # Wails development/build orchestration
+build/                          # macOS metadata, icon, hooks, and output location
+scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 ```
 
-**Structure Decision**: [List affected paths and explain why the feature belongs in each]
+**Structure Decision**: [List affected paths, their ownership, and why the feature belongs in each]
 
 ## Contract and State Design
 
-### Session JSON
+### Persistent JSON
 
-[Document changed fields, versioning, validation, defaults, migration, and sample updates, or N/A]
+[Document changed session/player-configuration fields, versioning, references, validation, defaults, migration, atomic-save behavior, and fixture updates, or N/A]
 
-### IPC
+### Wails Bridge and Runtime Events
 
-[Document preload API and main/renderer channels, directions, payloads, validation, and errors, or N/A]
+[Document bound method/event names, directions, payloads, public projections, validation, errors, readiness, and shutdown behavior, or N/A]
 
 ### HTTP and WebSocket
 
-[Document routes/message types, directions, payloads, server validation, broadcasts, and reconnect state, or N/A]
+[Document routes/message types, directions, payloads, origin and size checks, server validation, authorization, revisions, broadcasts, action results, and reconnect state, or N/A]
 
-### Live-State Lifecycle
+### Runtime-State Lifecycle
 
-[Describe creation, mutation, clearing, client synchronization, and persistence boundary, or N/A]
+[Describe creation, mutation, publication, clearing, reconnection, and the persistence boundary for live and coordination state, or N/A]
+
+### Platform, Tunnel, and Packaging
+
+[Describe macOS paths/dialogs, owned processes, credentials, temporary material, embedding, build, or release implications, or N/A]
 
 ## Implementation Phases
 
 ### Phase 0: Research and Decisions
 
 - [Resolve actual unknowns; omit generic research]
-- [Choose test tooling only if the feature introduces automated tests]
-- [Confirm platform, protocol, or compatibility decisions]
+- [Confirm platform, protocol, persistence, concurrency, or compatibility decisions]
+- [Choose a new dependency only when existing tools cannot satisfy a documented need]
 
 ### Phase 1: Contracts and Data Design
 
-- [Define session/IPC/WebSocket/HTTP contracts as applicable]
-- [Define compatibility and reconnection behavior]
-- [Update Constitution Check after design]
+- [Define persistent JSON, Wails, HTTP, and WebSocket contracts as applicable]
+- [Define validation, public projection, ordering, compatibility, and reconnection behavior]
+- [Map producer and consumer changes to exact paths]
+- [Re-run the Constitution Check after design]
 
-### Phase 2: Server and Desktop Foundations
+### Phase 2: Domain, Persistence, and Transport Foundations
 
-- [Changes to `server/`, `main.js`, or `preload.js` required before UI work]
+- [Implement pure models/rules in `internal/domain/`, `internal/nav/`, or `internal/hack/`]
+- [Implement canonical state and coordination in `internal/live/` or `internal/control/`]
+- [Implement persistence in `internal/session/` or `internal/playerconfig/`]
+- [Implement HTTP/WebSocket behavior in `internal/player/`]
 
-### Phase 3: Master and Player Experiences
+### Phase 3: Desktop and Presentation Integration
 
-- [Vertical user-story slices across `master/` and `client/`]
+- [Wire services or privileged commands/events in `main.go` and `app.go`]
+- [Implement game-master behavior in `frontend/src/`]
+- [Implement player behavior in `client/`]
+- [Deliver independently verifiable vertical user-story slices]
 
 ### Phase 4: Integration and Packaging
 
-- [End-to-end synchronization, session, security, ngrok, and packaging checks]
+- [Verify multi-client synchronization, reconnection, persistence, security, and shutdown]
+- [Verify Vite embedding and Wails startup/build behavior]
+- [Verify ngrok or signed-release behavior only when affected and the environment is available]
 
 ## Verification Plan
 
-| Surface | Automated check | Manual check | Expected result |
+| Surface | Automated check | Interactive/manual check | Expected result |
 |---|---|---|---|
-| Domain/session logic | [Command or not configured] | [Scenario] | [Result] |
-| Electron master | [Command or not configured] | `npm start` + [journey] | [Result] |
-| Player browser(s) | [Command or not configured] | [multi-client/reconnect journey] | [Result] |
-| Packaging | `npm run build:dir` when applicable/available | [packaged smoke test] | [Result] |
+| Go domain/services | `go test ./...` | [Focused scenario if needed] | [Result] |
+| Concurrent runtime | `go test -race ./...` when affected | [Stress/reconnect scenario] | [Result] |
+| Go quality | `gofmt -l .` and `go vet ./...` | N/A | No formatting paths; vet succeeds |
+| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `wails dev` + [game-master journey] | [Result] |
+| Player browser(s) | `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected | [Multi-client/audio/reconnect journey] | [Result] |
+| Unsigned package | `wails build -clean -platform darwin/arm64` when affected | [Packaged `.app` smoke] | [Result] |
+| Signed release/ngrok | [Configured preflight or N/A] | [Credential-dependent journey] | [Result or explicitly unavailable] |
+
+## Project-Specific Complexity Factors
+
+- Concurrent lifecycle and shutdown across Wails, persistence workers, HTTP/WebSocket clients, and optional tunnel processes
+- Server-authoritative state projections shared across master and player presentation surfaces
+- Backward-compatible user-owned JSON files and cross-file player-configuration references
+- Browser identity, multi-tab recognition, controller authority, revisions, and reconnect convergence
+- macOS application embedding, arm64 packaging, signing/notarization, and Gatekeeper requirements
 
 ## Complexity Tracking
 

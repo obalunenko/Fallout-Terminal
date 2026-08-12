@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Session Persistence",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T18:36:47.069Z"
+    }
+  ],
+  "telemetryInstanceId": "b09291c0-54b4-4682-8f13-4a3bc36c8b67"
+}

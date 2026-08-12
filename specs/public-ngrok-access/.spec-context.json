@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Public Ngrok Access",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T18:36:44.903Z"
+    }
+  ],
+  "telemetryInstanceId": "1f889c57-603b-414d-bdad-e39734741ba6"
+}

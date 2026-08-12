@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Player Terminal Presentation",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T18:36:42.781Z"
+    }
+  ],
+  "telemetryInstanceId": "b2db97d4-774e-4710-8c4b-9db717dcbe2a"
+}

@@ -1,0 +1,2454 @@
+{
+  "workflow": "companion",
+  "specName": "Hacking Game Evolution",
+  "branch": "feature/003-hacking-game-evolution",
+  "selectedAt": "2026-08-11T08:50:20.328Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T08:50:20.328Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T08:54:35.272Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T09:13:00.910Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:17:00.480Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:18:28.843Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T09:19:21.193Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T09:32:50.459Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:34:14.292Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T09:34:58.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T09:35:13.104Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:35:47.536Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:36:31.871Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:36:48.669Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:37:02.586Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:37:37.929Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:37:49.192Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:38:02.574Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:38:53.951Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:39:40.111Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:40:01.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:40:19.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:41:48.448Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:42:04.271Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:42:25.809Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:42:39.610Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:43:13.721Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:44:01.208Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:44:16.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:44:45.095Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:45:04.099Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:45:14.952Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:45:41.090Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:46:32.326Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:46:43.071Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:47:02.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T09:48:05.716Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-11T09:48:05.850Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T12:03:03.153Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:03:37.262Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:06:30.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:06:30.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:08:11.600Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:08:11.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:09:48.476Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:10:18.932Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:10:59.345Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:10:59.594Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:13:00.407Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:13:00.641Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:13:00.871Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:13:01.115Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:13:32.950Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:14:04.139Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:14:04.376Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:21:22.853Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:22:19.220Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:22:19.466Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:23:00.207Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:23:45.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T12:42:48.449Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T12:43:33.302Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T13:58:56.340Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:01:42.666Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:02:21.502Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:32:07.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:34:25.860Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:35:23.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T14:39:36.523Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T15:12:03.222Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:12:49.572Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:13:23.217Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:14:26.874Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:15:41.188Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:16:18.225Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:16:36.036Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:17:09.771Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:17:53.662Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T15:39:41.793Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T15:40:55.984Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-11T16:34:25.187Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:18.182Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:27.223Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:38.554Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:35:51.379Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:09.049Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:15.571Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:24.895Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:36:37.143Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:37:22.816Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:38:06.634Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-11T16:38:44.356Z",
+      "reopened": true
+    }
+  ],
+  "last_action": "all tasks done — Go, race, syntax, Playwright 3/3, frontend build, and diff checks pass; Electron smoke recorded unavailable",
+  "coverage": {
+    "FR-001": {
+      "title": "Phase 1 MUST replace player-accessible hacking cheats with server-authoritative Fallout-style special patterns.",
+      "tasks": [
+        "T028",
+        "T029"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingCheatPathsAreRemoved"
+      ]
+    },
+    "FR-002": {
+      "title": "The player experience MUST expose no command, board entry, protocol operation, browser global, DOM control, keyboard shortcut, or query parameter that directly forces puzzle success.",
+      "tasks": [
+        "T028",
+        "T029"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardHasNoPlayerAdministratorEntry",
+        "internal/player/protocol_test.go::TestDecodeClientMessageRejectsMalformedOrUnsupportedObjects",
+        "internal/platform/assets_test.go::TestPlayerHackingCheatPathsAreRemoved"
+      ]
+    },
+    "FR-003": {
+      "title": "The player experience MUST remove the former administrator shortcut that bulk-removes incorrect passwords.",
+      "tasks": [
+        "T028",
+        "T029"
+      ],
+      "tests": [
+        "app_test.go::TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt",
+        "internal/platform/assets_test.go::TestGameMasterRetainsExclusiveHackSolveControl"
+      ]
+    },
+    "FR-004": {
+      "title": "Ordinary candidate-word guesses and filler clicks MUST retain their existing password-match, likeness, attempt-spending, logging, success, and failure rules.",
+      "tasks": [
+        "T028",
+        "T029"
+      ],
+      "tests": [
+        "app_test.go::TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt"
+      ]
+    },
+    "FR-005": {
+      "title": "The existing game-master `ForceHackSuccess` control MUST remain available only through the private desktop/Wails boundary.",
+      "tasks": [
+        "T044",
+        "T045"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns",
+        "internal/hack/hack_test.go::TestPatternDiscoveryHandlesStackedAndInvalidSpans"
+      ]
+    },
+    "FR-006": {
+      "title": "`ForceHackSuccess` MUST NOT be exposed through the player WebSocket protocol, browser globals, DOM controls, keyboard shortcuts, or query parameters.",
+      "tasks": [
+        "T044",
+        "T045"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns",
+        "internal/hack/hack_test.go::TestPatternDiscoveryHandlesStackedAndInvalidSpans"
+      ]
+    },
+    "FR-007": {
+      "title": "A successful trusted `ForceHackSuccess` action MUST use the existing shared success flow without consuming an attempt.",
+      "tasks": [
+        "T044",
+        "T045"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns",
+        "internal/hack/hack_test.go::TestPatternDiscoveryHandlesStackedAndInvalidSpans"
+      ]
+    },
+    "FR-008": {
+      "title": "A valid special pattern MUST use exactly one matching delimiter type from `()`, `[]`, `{}`, or `<>`.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract"
+      ]
+    },
+    "FR-009": {
+      "title": "A valid special pattern MUST start and end on the same rendered row.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestApplyPatternUsesExactOutcomeBuckets",
+        "internal/live/service_test.go::TestApplyHackPatternReturnsDetachedAcceptedState",
+        "internal/player/server_test.go::TestPlayerPatternActionPublishesPublicCallback"
+      ]
+    },
+    "FR-010": {
+      "title": "A valid special pattern MUST contain no alphabetic character between its endpoints.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestApplyPatternUsesExactOutcomeBuckets"
+      ]
+    },
+    "FR-011": {
+      "title": "Pattern discovery MUST pair each opening delimiter with the first compatible closing delimiter to its right on the same rendered row.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestApplyPatternUsesExactOutcomeBuckets",
+        "internal/hack/hack_test.go::TestDudRemovalRevealsDynamicPatternImmediately"
+      ]
+    },
+    "FR-012": {
+      "title": "A discovered pattern MUST be represented by an inclusive opening-through-closing coordinate range.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract"
+      ]
+    },
+    "FR-013": {
+      "title": "Multiple opening delimiters that share the same first compatible closing delimiter MUST be discovered as distinct patterns.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-014": {
+      "title": "Using one pattern MUST NOT consume another pattern with a different complete coordinate pair.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-015": {
+      "title": "Before publication, a newly generated puzzle board MUST contain between three and six distinct selectable special patterns inclusive.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestApplyPatternIsOneUseAndRestoresWhenNoDudRemains"
+      ]
+    },
+    "FR-016": {
+      "title": "The initial pattern count MUST be computed from the final rendered board using the same discovery algorithm used during gameplay.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryHandlesStackedAndInvalidSpans",
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract"
+      ]
+    },
+    "FR-017": {
+      "title": "A final rendered board with fewer than three or more than six discovered patterns MUST be regenerated before publication.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryHandlesStackedAndInvalidSpans",
+        "internal/hack/hack_test.go::TestApplyPatternIsOneUseAndRestoresWhenNoDudRemains"
+      ]
+    },
+    "FR-018": {
+      "title": "The initial three-to-six limit MUST apply only until the first player action.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDudRemovalRevealsDynamicPatternImmediately",
+        "internal/player/server_test.go::TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState"
+      ]
+    },
+    "FR-019": {
+      "title": "Gameplay discovery after board mutation MUST publish all current valid patterns even when their count exceeds six.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestApplyPatternIsOneUseAndRestoresWhenNoDudRemains"
+      ]
+    },
+    "FR-020": {
+      "title": "The initial three-to-six limit MUST NOT vary by hacking difficulty.",
+      "tasks": [
+        "T030",
+        "T031",
+        "T032",
+        "T033"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsAtEveryDifficultyContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-021": {
+      "title": "A special-pattern identity MUST contain the puzzle generation identifier, rendered row, opening-character index, and closing-character index.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/live/service_test.go::TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage"
+      ]
+    },
+    "FR-022": {
+      "title": "Pattern used state MUST belong to the complete generation-and-coordinate identity.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState"
+      ]
+    },
+    "FR-023": {
+      "title": "A complete pattern identity MUST be accepted at most once during its puzzle generation.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/player/protocol_test.go::TestDecodeClientMessageValidatesActionAndTargetFields",
+        "internal/live/service_test.go::TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage",
+        "internal/player/server_test.go::TestRejectedPatternDoesNotBroadcastAndReconnectReceivesCurrentState"
+      ]
+    },
+    "FR-024": {
+      "title": "When board mutation causes the same opening character to pair with a different first compatible closing character, the resulting coordinate pair MUST be treated as a new pattern identity.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/live/service_test.go::TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage"
+      ]
+    },
+    "FR-025": {
+      "title": "A coordinate pair already used in the active puzzle generation MUST remain unavailable if that pair is later rediscovered.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ]
+    },
+    "FR-026": {
+      "title": "Replacing a removed incorrect password with periods MUST trigger discovery against the resulting canonical rendered board.",
+      "tasks": [
+        "T027",
+        "T034",
+        "T035"
+      ]
+    },
+    "FR-027": {
+      "title": "Each accepted pattern activation MUST independently select one outcome using server-side weighted randomness.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-028": {
+      "title": "Eighty percent of the random-source value space MUST map to dud removal.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-029": {
+      "title": "Twenty percent of the random-source value space MUST map to attempt restoration.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-030": {
+      "title": "A dud-removal outcome MUST remove exactly one currently available incorrect password candidate.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-031": {
+      "title": "Dud removal MUST replace the selected incorrect password with periods without altering the correct password.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-032": {
+      "title": "An attempt-restoration outcome MUST set remaining attempts to the configured maximum without exceeding it.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-033": {
+      "title": "A selected dud-removal outcome MUST apply attempt restoration instead when no removable incorrect password remains.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-034": {
+      "title": "Invalid, stale, already-used, or otherwise rejected pattern requests MUST NOT consume a random-source value.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-035": {
+      "title": "Verification MUST use an injected deterministic random source for outcome mapping and activation-order tests.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-036": {
+      "title": "A controlled source spanning 100 equiprobable values MUST map exactly 80 values to dud removal and 20 values to attempt restoration.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-037": {
+      "title": "Production behavior MUST be judged by the configured probability mapping rather than by requiring every sample of 100 accepted activations to contain exactly 80 dud removals and 20 restorations.",
+      "tasks": [
+        "T030",
+        "T032",
+        "T036",
+        "T040"
+      ]
+    },
+    "FR-038": {
+      "title": "Every `HACK_PATTERN` request MUST identify both the target pattern and the puzzle generation from which the client received it.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-039": {
+      "title": "A pattern target MUST be represented either by an opaque server-issued `patternId` that resolves to generation and coordinates or by an explicit equivalent containing only `generationId`, `row`, `start`, and `end`.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-040": {
+      "title": "The server MUST reject a `HACK_PATTERN` payload containing missing, unknown, or invalid fields.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-041": {
+      "title": "The server MUST reject a `HACK_PATTERN` request whose generation does not match the active puzzle generation.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-042": {
+      "title": "The server MUST reject coordinates that do not identify a currently valid pattern in canonical board state.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-043": {
+      "title": "The server MUST reject a pattern identity already marked used.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-044": {
+      "title": "The server MUST reject a pattern request when the puzzle is not in an actionable state.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-045": {
+      "title": "A request from an older generation MUST NOT activate a pattern at matching coordinates in a newer generation.",
+      "tasks": [
+        "T037",
+        "T038",
+        "T040",
+        "T041",
+        "T043"
+      ]
+    },
+    "FR-046": {
+      "title": "Accepted pattern activation MUST execute under the canonical live-service mutex.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-047": {
+      "title": "Under that mutex, activation MUST perform these steps in order: validate the active generation; validate or rediscover the requested coordinate pair against canonical board state; verify unused state; mark the pair used; select the weighted outcome; apply the outcome or fallback; recompute patterns affected by mutation; produce a detached public projection; broadcast resulting canonical state.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-048": {
+      "title": "Concurrent requests for the same pattern MUST result in exactly one accepted activation.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-049": {
+      "title": "Rejected duplicate requests MUST NOT mutate canonical state.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-050": {
+      "title": "Rejected duplicate requests MUST NOT advance the random source.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-051": {
+      "title": "Player authorization MUST remain behind a distinct player/live-service boundary so a future active-session check can be added without changing hacking domain logic.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-052": {
+      "title": "Phase 1 MUST NOT implement an active controlling-player or observer authorization model.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-053": {
+      "title": "The public pattern projection MUST contain only a stable public pattern identity, rendered row, inclusive start and end coordinates, and current available-or-used status.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-054": {
+      "title": "The public pattern projection MUST contain the rendered row and inclusive start and end coordinates.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-055": {
+      "title": "The public pattern projection MUST state whether each pattern is currently available or used.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-056": {
+      "title": "The public pattern projection MUST NOT reveal the password, dud identities, future effects of unused patterns, or private candidate metadata.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-057": {
+      "title": "Every public projection MUST be detached from canonical slices, maps, and objects.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-058": {
+      "title": "Mutating a returned projection MUST NOT alter canonical state.",
+      "tasks": [
+        "T027",
+        "T030",
+        "T036",
+        "T037",
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-059": {
+      "title": "Pattern availability, used identities, removed duds, remaining attempts, and pattern outcomes MUST remain runtime-only state.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T046"
+      ]
+    },
+    "FR-060": {
+      "title": "A reconnecting client MUST receive the current canonical puzzle state while the originating server process retains that puzzle.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T046"
+      ]
+    },
+    "FR-061": {
+      "title": "Phase 1 MUST NOT preserve an active puzzle across server application restarts.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T046"
+      ]
+    },
+    "FR-062": {
+      "title": "Phase 1 MUST NOT modify the version-1 persisted session schema.",
+      "tasks": [
+        "T036",
+        "T038",
+        "T046"
+      ]
+    },
+    "FR-063": {
+      "title": "Every initially published board MUST interleave candidate password words, ordinary punctuation and filler symbols, delimiters belonging to valid special patterns, and standalone delimiter-decoy characters outside every currently valid pattern's inclusive interaction range.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-064": {
+      "title": "The generator MUST NOT reserve or group board rows or contiguous board regions by content type for candidate words, ordinary filler, valid patterns, or delimiter decoys.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-065": {
+      "title": "Production discovery MUST accept a matching same-row pattern with one or more ordinary non-alphabetic filler characters between its opening and first compatible closing delimiter.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-066": {
+      "title": "Every initially published board MUST contain at least one valid special pattern with one or more non-alphabetic filler characters between its endpoints.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-067": {
+      "title": "Production discovery MUST continue to accept an adjacent empty matching delimiter pair that satisfies all normal special-pattern rules.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-068": {
+      "title": "The generator MUST NOT construct every initial valid pattern as an adjacent empty pair.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-069": {
+      "title": "Matching delimiters surrounding a candidate word or other alphabetic content MUST NOT form a valid special pattern while that alphabetic content remains rendered.",
+      "tasks": [
+        "T049"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestPatternDiscoveryRetainsEmptyNonEmptyAndFirstCloserRules"
+      ]
+    },
+    "FR-070": {
+      "title": "A candidate word inside an alphabetic-interrupted delimiter span MUST remain selectable under the existing candidate-word guess rules.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable",
+        "tests/browser/hacking-camouflage.spec.mjs::word-interrupted spans stay ordinary until a server snapshot publishes a new pattern"
+      ]
+    },
+    "FR-071": {
+      "title": "When dud removal replaces an incorrect word inside a delimiter span with periods, production discovery MUST publish the resulting span if it satisfies every normal special-pattern rule on the mutated board.",
+      "tasks": [
+        "T049",
+        "T051",
+        "T052",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDudRemovalRevealsDynamicPatternImmediately",
+        "tests/browser/hacking-camouflage.spec.mjs::word-interrupted spans stay ordinary until a server snapshot publishes a new pattern"
+      ]
+    },
+    "FR-072": {
+      "title": "Every initially published board MUST contain standalone delimiter-decoy characters that are not part of any currently valid pattern interaction range.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-073": {
+      "title": "The number of standalone delimiter-decoy characters on every initially published board MUST be at least the number of initially valid special patterns.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-074": {
+      "title": "Every initially published board MUST contain at least one potential matching-delimiter span that is invalid because alphabetic content appears between its endpoints.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-075": {
+      "title": "A standalone delimiter decoy MUST NOT highlight, produce a HACK_PATTERN request, consume an attempt, or change puzzle state.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterDecoyGuessIsInertWhileInterruptedCandidateRemainsSelectable",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-076": {
+      "title": "A delimiter decoy MUST use the same color, brightness, font, CRT effect, and static styling as the same delimiter character when it belongs to a valid pattern.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingCamouflageAndDelimiterContract",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-077": {
+      "title": "Pattern validity MUST be revealed only through normal hover, focus, or selection behavior for currently valid patterns.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingCamouflageAndDelimiterContract",
+        "tests/browser/hacking-camouflage.spec.mjs::valid patterns interact while standalone delimiters remain inert and visually identical"
+      ]
+    },
+    "FR-078": {
+      "title": "Candidate words and all camouflage characters MUST be added before initial-board validation begins.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-079": {
+      "title": "Initial-board validation MUST run the production discovery algorithm against the complete final rendered board and count every accidentally formed valid pattern toward the initial 3–6 limit.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestFinalBoardClassificationCountsAccidentalPatternsAndOnlyStandaloneDecoys",
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-080": {
+      "title": "Initial-board validation MUST regenerate a board that fails the 3–6 valid-pattern limit, standalone delimiter-decoy minimum, non-empty valid-interior requirement, alphabetic-interrupted-span requirement, or mixed-distribution requirement.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestGeneratedBoardsContainThreeThroughSixValidPatterns"
+      ]
+    },
+    "FR-081": {
+      "title": "The public pattern projection MUST include only spans that are currently valid under production discovery.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "FR-082": {
+      "title": "Standalone, mismatched, word-interrupted, later-compatible-but-unselected, and otherwise invalid delimiters MUST receive no public pattern identity.",
+      "tasks": [
+        "T049",
+        "T052"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "FR-083": {
+      "title": "Camouflage construction and final-board validation MUST preserve the discovery rules in FR-008 through FR-013 unchanged.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-003": {
+      "title": "Across 1,000 generated and publishable initial boards, every complete board satisfies all pattern, camouflage, exact occupied-row distribution, and valid-only projection gates.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-004": {
+      "title": "Every generated board that fails any initial pattern-count or camouflage condition is rejected and regenerated after complete-board analysis.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-014": {
+      "title": "Controlled generator tests preserve adjacent empty pairs while preventing all-empty initial pattern sets.",
+      "tasks": [
+        "T049",
+        "T052",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "SC-015": {
+      "title": "Executable browser interaction tests prove delimiter decoys are inert while valid patterns retain inclusive interaction behavior.",
+      "tasks": [
+        "T049",
+        "T050",
+        "T051",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "SC-016": {
+      "title": "Dynamic-board tests prove word-interrupted spans gain identity only after dud removal makes them valid.",
+      "tasks": [
+        "T049",
+        "T051",
+        "T052",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "SC-017": {
+      "title": "Static and computed-style checks find no persistent validity-dependent delimiter treatment.",
+      "tasks": [
+        "T050",
+        "T051",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-084": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-085": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-086": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerHackingPatternInteractionContract",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-087": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "FR-088": {
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ],
+      "title": "Non-opening delimiter symbols use HACK_GUESS logging and attempt behavior and never send HACK_PATTERN.",
+      "tasks": [
+        "T055"
+      ]
+    },
+    "SC-018": {
+      "title": "Browser and domain tests prove invalid delimiter targets use ordinary individual interaction and send zero HACK_PATTERN requests.",
+      "tasks": [
+        "T055"
+      ],
+      "tests": [
+        "internal/hack/hack_test.go::TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules",
+        "tests/browser/hacking-camouflage.spec.mjs::invalid delimiter categories remain ordinary individual targets"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 10,
+    "projectedTasks": 18,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: existing hacking-game behavior and prior migrated specification",
+    "area: puzzle model, board generation, player protocol, player interface, and game-master control",
+    "constraint: remove every player cheat while preserving the trusted game-master solve control",
+    "constraint: exact bracket pairs and 80/20 special-pattern outcomes",
+    "area: board generation, production discovery, public projection, and browser interaction",
+    "constraint: preserve same-row, matching-pair, first-compatible-closer, no-alphabetic-interior discovery semantics",
+    "verification: 1,000 complete final boards must pass pattern-count and camouflage gates",
+    "surface: client/client.css static delimiter styling",
+    "verification: executable browser interactions in tests/browser complement Go asset contracts"
+  ],
+  "intent": "Camouflage valid hacking patterns among ordinary board content and inert delimiter decoys while preserving the established discovery and activation rules.",
+  "approach": "Correct the existing pattern implementation in place: use generation-bound opaque identities over rendered-row coordinates, validate final boards with the gameplay discovery function, and apply weighted outcomes plus ordered detached publication under the live mutex. Keep runtime persistence and the private game-master boundary unchanged.",
+  "decisions": [
+    {
+      "decision": "Replace HACK_ADMIN and the SUCCESS entry with HACK_PATTERN while retaining ForceHackSuccess",
+      "why": "Separates the untrusted player mechanic from the trusted game-master override",
+      "rejected": "Reusing the administrator message or removing the GM override"
+    },
+    {
+      "decision": "Identify patterns by column, opening index, and closing index and rediscover them from current board text",
+      "why": "Coordinates distinguish stacked patterns and support dynamic discovery without exposing secrets",
+      "rejected": "Text identities, client-trusted coordinates, or generation-only random IDs"
+    },
+    {
+      "decision": "Construct and verify exactly 3-6 isolated initial patterns using bracket-free ordinary filler",
+      "why": "Guarantees the required count at every difficulty without incidental bracket interactions",
+      "rejected": "Retrying uncontrolled random boards or publishing only a subset"
+    },
+    {
+      "decision": "Validate, consume, resolve, and project each pattern activation under the existing live-service mutex",
+      "why": "Makes simultaneous use produce at most one effect and one complete shared snapshot",
+      "rejected": "Transport-layer deduplication or client-local disabling"
+    },
+    {
+      "decision": "Use Intn(100) buckets 0-79 for dud removal and 80-99 for attempt restoration",
+      "why": "Implements the exact 80/20 split through the existing deterministic random seam",
+      "rejected": "Floating-point probability or a no-op dud fallback"
+    },
+    {
+      "decision": "Drive range highlighting and activation from the public patterns projection",
+      "why": "Supports overlapping spans while keeping canonical availability on the server",
+      "rejected": "Independent JavaScript discovery or overlapping DOM wrappers"
+    },
+    {
+      "decision": "Extend HACK_STATE and TERMINAL_LIVE additively with patterns and reject removed HACK_ADMIN input",
+      "why": "Reuses existing convergence and reconnect envelopes while ensuring stale clients cannot retain the cheat",
+      "rejected": "A new protocol version or a separate pattern snapshot message"
+    },
+    {
+      "decision": "Seed each generated special pattern as an isolated adjacent bracket pair",
+      "why": "A two-cell span is valid under the contract and guarantees the exact count without cross-pair interactions while the scanner still supports longer dynamic and stacked spans",
+      "rejected": "Variable-length generated spans that can accidentally create extra compatible pairs"
+    },
+    {
+      "decision": "Supersede coordinate-only pattern IDs with an opaque ID over generationId + row + inclusive start + inclusive end",
+      "why": "Prevents stale cross-generation activation while preserving the existing HACK_PATTERN shape",
+      "rejected": "Column/opening/closing-only IDs or a wider explicit request payload"
+    },
+    {
+      "decision": "Use a flattened canonical rendered-row ordinal with row-local inclusive offsets",
+      "why": "Meets the minimal public projection without exposing column or pair",
+      "rejected": "Public column metadata or cross-column 24-character rows"
+    },
+    {
+      "decision": "Issue puzzle generation IDs from a source independent of gameplay Random",
+      "why": "Stale-request safety must not consume or perturb the deterministic outcome sequence",
+      "rejected": "Restarting counters or drawing IDs from outcome randomness"
+    },
+    {
+      "decision": "Regenerate until production discovery on the final rendered board reports 3-6 patterns",
+      "why": "Final discovery is authoritative; intended insertion count is only a construction aid",
+      "rejected": "Trusting inserted pairs, exact random target equality, or publishing a subset"
+    },
+    {
+      "decision": "Consume one Intn(100) outcome value for every accepted activation before applying the no-dud fallback",
+      "why": "Implements the mandated 80/20 mapping and activation order",
+      "rejected": "Checking dud availability before the weighted selection"
+    },
+    {
+      "decision": "Commit one detached publication callback as step nine while the live mutex is held",
+      "why": "Preserves canonical mutation and broadcast ordering without moving WebSocket ownership into live state",
+      "rejected": "Post-unlock broadcast races or direct network writes from the live package"
+    },
+    {
+      "decision": "Project only id, row, inclusive start/end, and used for current spans while retaining complete used history privately",
+      "why": "Provides rendering data without leaks and keeps rediscovered pairs unavailable",
+      "rejected": "Public column/pair metadata or forgetting hidden used identities"
+    },
+    {
+      "decision": "Use opaque server-issued pattern IDs derived from generation and inclusive rendered-row coordinates.",
+      "why": "Prevents delayed old-puzzle requests from activating coincident coordinates while keeping private metadata off the wire.",
+      "rejected": "Client-reconstructed or coordinate-only IDs."
+    },
+    {
+      "decision": "Issue generation IDs from an independent cryptographic runtime source and reserve gameplay RNG for board and outcome choices.",
+      "why": "Stale identity safety must not perturb deterministic gameplay RNG tests or persisted schema.",
+      "rejected": "Deriving generation identity from gameplay RNG or persisted puzzle seeds."
+    },
+    {
+      "decision": "Publish accepted pattern state through a non-reentrant callback while the live-service mutex still owns the transition.",
+      "why": "Preserves the mandated validate-mark-draw-mutate-project-broadcast order and guarantees one publication for one acceptance.",
+      "rejected": "Returning state and broadcasting after releasing the live mutex."
+    },
+    {
+      "decision": "Resolve exact pattern openings first, then choose the containing pattern with the nearest opening for other in-range cells",
+      "why": "This enables inclusive interaction without making stacked patterns with shared closers unreachable from their distinct openings",
+      "rejected": "Selecting the first containing range, which would mask nested pattern openings"
+    },
+    {
+      "decision": "Amend the completed full-pipeline feature in place and preserve its oversized classification; implement the amendment through unchecked T049-T053."
+    },
+    {
+      "decision": "Define mixed distribution by per-category occupied-row counts and pairwise-overlapping inclusive row intervals."
+    },
+    {
+      "decision": "Use an isolated, exactly pinned and locked executable browser-test dependency because Go asset checks cannot execute DOM interaction or message dispatch."
+    },
+    {
+      "decision": "Derive all camouflage categories only after unchanged production discovery analyzes the complete rendered board",
+      "why": "Accidental spans and decoy membership are final-board properties and must share the gameplay validity authority",
+      "rejected": "Trust construction-time intended pattern and decoy metadata"
+    },
+    {
+      "decision": "Reject non-ASCII-alphabetic injected candidate placeholders and supplement from the built-in word bank",
+      "why": "Published word-interrupted spans must contain alphabetic candidate content and scanner semantics are ASCII alphabetic",
+      "rejected": "Count numeric placeholder content as alphabetic interruption"
+    },
+    {
+      "decision": "Resolve whole-pattern interaction only when a cell exactly matches a current pattern start, while keeping start-to-end solely as the highlight span",
+      "why": "This preserves stacked-pattern identity and makes every non-opening cell follow ordinary filler behavior as required by BUG-001",
+      "rejected": "Inclusive span hit-testing, which incorrectly captured interior and closing cells"
+    },
+    {
+      "decision": "Reserve current pattern openings in canonical ApplyGuess by consulting production discovery, but allow every other delimiter coordinate through the existing filler path",
+      "why": "The server remains authoritative even for crafted HACK_GUESS messages without maintaining a second validity model",
+      "rejected": "Blanket delimiter rejection or browser-only enforcement"
+    },
+    {
+      "decision": "Use controlled 12-character board rows and table-driven targets to mirror production delimiter discovery categories; no production change was needed because ordinary fallback behavior is already generic.",
+      "why": "This isolates unmatched, mismatched, and first-compatible-closer semantics while proving the existing implementation satisfies SC-018."
+    },
+    {
+      "decision": "Make the existing 1,000-board gate explicitly enumerate all five configured hacking difficulties",
+      "why": "FR-020 requires the same initial 3-6 pattern invariant at every supported level",
+      "rejected": "A separate duplicate generator test with weaker camouflage coverage"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Rebuilt corrective plan, research, data model, and HACK_PATTERN contract for generation-bound atomic Phase 1 behavior",
+      "key_finding": "The current implementation lacks generation binding, skips the no-dud outcome draw, overprojects pattern metadata, and publishes after unlocking"
+    },
+    "tasks": {
+      "summary": "21 corrective tasks across foundational work, five user-story phases, and one success-criteria validation phase"
+    },
+    "implement": {
+      "summary": "Revalidated BUG-001 opening-only pattern activation, completed SC-018 fixtures and all-difficulties generation coverage, and passed the full automated gate",
+      "key_finding": "The existing production implementation already routes every non-selected delimiter coordinate through ordinary HACK_GUESS behavior, so only explicit regression fixtures were required.",
+      "risks": "No remaining implementation risks identified."
+    }
+  },
+  "currentTask": "T054",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added private used-pattern and detached public pattern model types while removing administrator-only fields.",
+      "files": [
+        "internal/domain/model.go"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Replaced administrator-domain expectations with failing no-cheat board and normal-guess coverage.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added strict-decoder coverage rejecting the removed HACK_ADMIN request and administrator metadata.",
+      "files": [
+        "internal/player/protocol_test.go"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added bundled-player assertions that removed administrator commands and entries are absent.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Removed administrator board generation, lookup, activation, logging, and metadata while preserving guesses.",
+      "files": [
+        "internal/hack/hack.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Removed HACK_ADMIN from accepted player message constants and strict decoding.",
+      "files": [
+        "internal/player/protocol.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Removed the typed administrator command dispatch from the bundled player.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added failing exact-count, allowed-pair, 80/20 outcome, dud-preservation, restore-fallback, and one-use domain tests.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added failing HACK_PATTERN decode, validation, privacy, and golden public-pattern envelope coverage.",
+      "files": [
+        "internal/player/protocol_test.go",
+        "internal/testutil/testdata/protocol/hack-state.json"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Added failing accepted-pattern and detached live snapshot coverage.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Replaced administrator server-action coverage with a failing pattern broadcast and master-callback test.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Implemented exact-count pattern construction, coordinate discovery, one-use 80/20 effects, dud removal, restore fallback, and public projection.",
+      "files": [
+        "internal/hack/hack.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Added strict HACK_PATTERN decoding with a required nonblank patternId.",
+      "files": [
+        "internal/player/protocol.go"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Added the mutex-protected live-service pattern transition with accepted-state projection.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Dispatched accepted HACK_PATTERN requests and published the resulting player/master state.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Added public-pattern opening lookup, inclusive range highlighting, used-state handling, and HACK_PATTERN dispatch without optimistic mutation.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Added stacked-opening, invalid-span, first-close, and post-dud dynamic-discovery tests.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Completed and verified row-local stacked scanning and immediate post-dud pattern rediscovery.",
+      "files": [
+        "internal/hack/hack.go"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Extended bridge tests for GM solve publication, unchanged attempts, and detached pattern metadata.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Asserted the master retains the eligible solve control while the player bundle lacks equivalent authority.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Deep-cloned public patterns across runtime status and hack-state events while retaining ForceHackSuccess.",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added concurrent single-use, rejected-action immutability, detached snapshot, and fresh-puzzle reset tests.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Added multi-client pattern convergence, reconnect snapshot, terminal-state no-broadcast, and current-state tests.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified the live mutex returns accepted only for first valid use and fresh Set resets used-pattern state.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified rejected pattern actions suppress player broadcasts and master callbacks while accepted actions converge.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Passed gofmt, go vet, full Go tests, race tests, browser syntax check, frontend build, and SC-001 through SC-009 coverage.",
+      "files": [
+        "."
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Added generation-bound private identity and minimal row-based public pattern models",
+      "files": [
+        "internal/domain/model.go"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Updated ordinary candidate, filler-click, removed administrator candidate, and terminal-state regressions for generation-bound state.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Strengthened player bundle regressions against administrator, query, global, and private force-success paths while preserving ordinary HACK_GUESS dispatch.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Added generation-aware final-board, exact weighted bucket, RNG-consumption, fallback, secret-preservation, rejection, and detached-projection tests.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Validated opening-only pattern lookup, inclusive highlighting, individual non-opening dispatch, and opaque pattern IDs",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Implemented generation-aware row discovery, final-board regeneration through the production scanner, exact weighted outcome draw ordering, fallback, dud removal, and detached minimal projection.",
+      "files": [
+        "internal/hack/hack.go",
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Validated row/start-only browser pattern resolution, inclusive highlight spans, ordinary non-opening guesses, opaque IDs, and no optimistic mutation",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added stacked shared-closer, first-close, invalid-span, changed-closer, disappeared/reappeared used-pair, and dynamic post-dud tests.",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Completed row-local first-compatible scanning and permanent complete-identity used history for changed and rediscovered pattern pairs.",
+      "files": [
+        "internal/hack/hack.go"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Added deterministic generation-ID, stale-generation, duplicate zero-RNG, exact publication, callback-order, fresh-set, terminal, and detached live-service tests.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Updated strict HACK_PATTERN protocol tests for opaque IDs, missing/blank/unknown/duplicate fields, and generation-bound private fixtures.",
+      "files": [
+        "internal/player/protocol_test.go"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added multi-client stale and concurrent duplicate rejection, single accepted fanout, no-broadcast, and reconnect convergence coverage.",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Updated public pattern fixtures and extended runtime/event projection mutation tests across all minimal pattern fields.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Issued independent collision-resistant runtime generation IDs and completed accepted pattern activation plus one detached publication callback under the live mutex.",
+      "files": [
+        "internal/live/service.go",
+        "internal/live/service_test.go"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Retained strict HACK_PATTERN decoding and documented patternId as an opaque generation-bound server identity with no client coordinate assumptions.",
+      "files": [
+        "internal/player/protocol.go"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Replaced the golden public pattern wire objects with minimal id, row, inclusive start/end, and used fields.",
+      "files": [
+        "internal/testutil/testdata/protocol/hack-state.json"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Connected the live-service mutex callback to exactly one accepted HACK_STATE fanout and game-master notification while suppressing rejected publications.",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/server_test.go"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Updated minimal generation-bound public fixtures and verified eligible/ineligible private force success, unchanged attempts, detached events, and shared publication.",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Verified the master Wails control remains intact while player protocol, assets, DOM, globals, keyboard/query surfaces expose no equivalent authority.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Added a version-1 encode/decode regression proving complete runtime hacking state and puzzle seeds never enter persisted session JSON.",
+      "files": [
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Passed formatting, vet, full tests, race tests, frontend production build, and verified SC-001 through SC-013.",
+      "files": [
+        "."
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Validated convergence of start-only browser hit resolution, inclusive highlighting, and individual non-opening filler selection",
+      "files": [
+        "client/client.js",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Validated 1,000-board camouflage, decoy classification, ordinary delimiter guesses, candidate selection, and post-dud rediscovery",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Validated opening-only pattern dispatch, ordinary delimiter and non-opening dispatch, and static player styling parity",
+      "files": [
+        "internal/platform/assets_test.go",
+        "client/client.css"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Validated pinned Playwright fixtures for opening-only activation, individual delimiters, styling parity, no optimistic mutation, and dud-created patterns",
+      "files": [
+        "tests/browser/package.json",
+        "tests/browser/package-lock.json",
+        "tests/browser/playwright.config.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Implemented normal-row camouflage placement and complete-board discovery, decoy, interruption, distribution, overlap, and projection publication gates",
+      "files": [
+        "internal/hack/hack.go",
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Validated canonical HACK_GUESS handling for standalone and non-opening symbols, reserved pattern starts, and matching browser dispatch; CSS required no change",
+      "files": [
+        "internal/hack/hack.go",
+        "client/client.js"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Passed formatting, vet, full Go and race suites, JS syntax, Playwright 3/3, frontend build, difficulty-invariant generation, and diff hygiene; Electron smoke accurately recorded unavailable",
+      "files": [
+        "."
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Validated domain and executable-browser fixtures for unmatched, mismatched, word-interrupted, and later-closer delimiter targets under SC-018",
+      "files": [
+        "internal/hack/hack_test.go",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Made the 1,000-board generator gate explicitly iterate all five configured difficulties and assert the invariant 3-6 pattern count",
+      "files": [
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Ran npm start and recorded UNAVAILABLE: the post-cutover repository has no root package.json or Electron baseline, so no smoke pass was claimed",
+      "files": [
+        "."
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Go formatting",
+      "command": "gofmt -l .",
+      "result": "PASS: no Go source paths reported",
+      "warnings": []
+    },
+    {
+      "what": "Go static analysis",
+      "command": "go vet ./...",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Go test suite",
+      "command": "go test ./...",
+      "result": "PASS across all packages, including 1,000 generated-board checks and WebSocket integration",
+      "warnings": [
+        "Initial sandboxed player-package run could not bind localhost; the approved localhost-enabled rerun passed."
+      ]
+    },
+    {
+      "what": "Go race suite",
+      "command": "go test -race ./...",
+      "result": "PASS across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Bundled player JavaScript syntax",
+      "command": "node --check client/client.js",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Frontend production build",
+      "command": "npm run build (frontend/)",
+      "result": "PASS with Vite 8.1.5",
+      "warnings": []
+    },
+    {
+      "what": "Patch whitespace",
+      "command": "git diff --check",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Full Go test suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./...",
+      "result": "passed all packages",
+      "warnings": [
+        "localhost integration tests required managed permission approval"
+      ]
+    },
+    {
+      "what": "Race-enabled Go test suite",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test -race ./...",
+      "result": "passed all packages",
+      "warnings": [
+        "localhost integration tests required managed permission approval"
+      ]
+    },
+    {
+      "what": "Client JavaScript syntax",
+      "command": "node --check client/client.js",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Inclusive browser pattern asset contract",
+      "command": "go test ./internal/platform",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Full Go race suite",
+      "command": "go test -race ./...",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Master frontend production build",
+      "command": "npm --prefix frontend run build",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Browser JavaScript syntax",
+      "command": "node --check client/client.js && node --check tests/browser/playwright.config.mjs && node --check tests/browser/hacking-camouflage.spec.mjs",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Executable browser interactions",
+      "command": "npm --prefix tests/browser test -- --reporter=line",
+      "result": "2 tests passed",
+      "warnings": [
+        "Static fixture server returns expected 404 responses for optional sound APIs"
+      ]
+    },
+    {
+      "what": "Go formatting and static analysis",
+      "result": "passed",
+      "command": "gofmt -l .; go vet ./..."
+    },
+    {
+      "what": "Go unit and race suites",
+      "result": "passed",
+      "command": "go test ./...; go test -race ./..."
+    },
+    {
+      "what": "Player JavaScript syntax and frontend build",
+      "result": "passed",
+      "command": "node --check client/client.js client/sound.js frontend/src/*.js frontend/vite.config.js tests/browser/*.mjs; npm --prefix frontend run build"
+    },
+    {
+      "what": "Controlled browser interaction suite",
+      "result": "3 passed",
+      "command": "npm --prefix tests/browser test",
+      "warnings": "The static fixture server returns expected 404 responses for sound API routes; media playback is stubbed and all assertions pass."
+    },
+    {
+      "what": "Electron behavioral smoke",
+      "command": "npm start",
+      "result": "UNAVAILABLE: no root package.json exists in the post-cutover repository; no pass claimed",
+      "warnings": [
+        "Electron baseline is absent"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Socket integration tests could not bind inside the filesystem sandbox; they were rerun successfully with approved localhost access",
+      "step": "implement"
+    },
+    {
+      "note": "Full player-server tests require loopback listeners, which the default sandbox denied; rerunning the unchanged suites with approved local-listener permission passed",
+      "step": "implement"
+    },
+    {
+      "note": "The constitution-requested npm start smoke is unavailable because the post-cutover repository has no root package.json or Electron runtime; the result is recorded without claiming success",
+      "step": "implement"
+    }
+  ]
+}

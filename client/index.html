@@ -32,6 +32,24 @@
     </div>
 
     <div class="term-body" id="termBody">
+      <section class="player-identity" id="playerIdentity" hidden aria-label="Идентификация игрока">
+        <div class="player-character-name" id="playerCharacterName"></div>
+        <div class="player-fallback-name" id="playerFallbackName"></div>
+        <output class="role-badge" id="roleBadge" aria-live="polite"></output>
+      </section>
+
+      <section class="character-select" id="characterSelect" hidden aria-labelledby="characterSelectTitle" aria-describedby="playerNotice">
+        <h1 class="character-select-title" id="characterSelectTitle">ВЫБЕРИТЕ ПЕРСОНАЖА</h1>
+        <div class="character-options" id="characterOptions" role="list"></div>
+      </section>
+
+      <section class="assigned-waiting" id="assignedWaiting" hidden aria-labelledby="assignedWaitingTitle">
+        <h1 class="assigned-waiting-title" id="assignedWaitingTitle">ОЖИДАНИЕ ТЕРМИНАЛА</h1>
+        <p>ПЕРСОНАЖ НАЗНАЧЕН. ОЖИДАЙТЕ ТРАНСЛЯЦИИ<span class="blink">_</span></p>
+      </section>
+
+      <div class="player-notice" id="playerNotice" role="status" aria-live="polite" hidden></div>
+
       <div class="term-idle" id="termIdle">
         <div>ОЖИДАНИЕ ТРАНСЛЯЦИИ<span class="blink">_</span></div>
       </div>

@@ -12,8 +12,8 @@
 
 <!--
 Prioritize stories as P1, P2, P3, and keep each story independently usable and
-verifiable. Include both the game-master experience and player experience when
-the feature crosses the Electron/WebSocket boundary.
+verifiable. Include both the game-master and player experience when the feature
+crosses the Wails/Go, HTTP, or WebSocket boundary.
 -->
 
 ### User Story 1 - [Brief Title] (Priority: P1)
@@ -61,13 +61,13 @@ the feature crosses the Electron/WebSocket boundary.
 
 ### Edge Cases
 
-- What happens when no session or live terminal exists?
-- What happens when a browser connects, disconnects, or reconnects mid-action?
-- How do multiple connected players remain synchronized?
-- How are malformed, stale, or unexpected IPC/WebSocket inputs handled?
-- What happens when session data is missing a new field or uses an older version?
-- What happens when filesystem, server startup, packaging, or ngrok operations fail?
-- [Feature-specific boundary or error case]
+- What happens when no session, player configuration, broadcast, or live terminal exists?
+- What happens when a browser connects, opens another tab, disconnects, or reconnects mid-action?
+- How do multiple connected players remain synchronized and respect controller authority?
+- How are malformed, stale, duplicate, oversized, or unexpected Wails/WebSocket inputs handled?
+- What happens when persistent JSON is missing a new field, references another file, or uses an older version?
+- What happens when filesystem, player-server startup, packaging, or ngrok operations fail?
+- [Feature-specific boundary, concurrency, or error case]
 
 ## Requirements *(mandatory)*
 
@@ -86,34 +86,49 @@ Mark material ambiguity inline, for example:
 
 <!-- Mark each as affected or not affected and explain why. -->
 
-- **Electron main (`main.js`)**: [Affected/not affected — native lifecycle, files, dialogs, server startup]
-- **Preload IPC (`preload.js`)**: [Affected/not affected — privileged bridge contract]
-- **Master UI (`master/`)**: [Affected/not affected — GM editing/control workflow]
-- **Server (`server/`)**: [Affected/not affected — HTTP, WebSocket, shared live state, domain logic]
-- **Player UI (`client/`)**: [Affected/not affected — browser behavior and audio/visual state]
-- **Session data (`sessions/`)**: [Affected/not affected — persistent JSON shape or examples]
-- **Packaging/public access**: [Affected/not affected — electron-builder or ngrok behavior]
+- **Composition and Wails bridge (`main.go`, `app.go`)**: [Affected/not affected — lifecycle, native operations, bound commands, or runtime events]
+- **Domain and canonical state (`internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, `internal/control/`)**: [Affected/not affected — models, validation, state transitions, coordination, or public projections]
+- **Persistence (`internal/session/`, `internal/playerconfig/`, `sessions/`)**: [Affected/not affected — JSON shape, validation, file references, storage behavior, or examples]
+- **Player transport (`internal/player/`)**: [Affected/not affected — HTTP routes, WebSocket protocol, validation, broadcast, or reconnect behavior]
+- **Platform and public access (`internal/platform/`, `internal/tunnel/`)**: [Affected/not affected — macOS paths, desktop operations, owned processes, or ngrok behavior]
+- **Master UI (`frontend/src/`)**: [Affected/not affected — game-master editing/control workflow or Wails bridge consumer]
+- **Player UI (`client/`)**: [Affected/not affected — browser behavior, presentation, audio, or WebSocket consumer]
+- **Tests and fixtures (`internal/**/*_test.go`, `tests/browser/`, `internal/testutil/`)**: [Affected/not affected — automated coverage or fixtures]
+- **Build and packaging (`go.mod`, `frontend/`, `wails.json`, `build/`, `scripts/`)**: [Affected/not affected — dependencies, embedding, macOS build, signing, or release behavior]
 
 ### State and Contract Requirements *(include when applicable)*
 
-- **Session compatibility**: [Version/default/migration behavior, or N/A]
-- **IPC contract**: [Channel, direction, payload, validation, error behavior, or N/A]
-- **WebSocket contract**: [Message type, direction, payload, server validation, broadcast behavior, or N/A]
-- **Reconnect behavior**: [State a newly connected/reconnected client receives, or N/A]
-- **HTTP/static contract**: [Route/request/response behavior, or N/A]
+- **Session/player-config compatibility**: [Version, default, reference, migration, and backward-compatibility behavior, or N/A]
+- **Wails bridge and event contract**: [Bound method/event, direction, payload, validation, error behavior, and public projection, or N/A]
+- **WebSocket contract**: [Message type, direction, payload, server validation, ordering/revision, broadcast behavior, and rejection result, or N/A]
+- **Reconnect and multi-tab behavior**: [Authoritative state a new/reconnected tab receives and identity rules, or N/A]
+- **HTTP/static contract**: [Route, method, request/response behavior, origin policy, or N/A]
+- **Runtime-state lifecycle**: [Creation, mutation, publication, clearing, shutdown, and persistence boundary, or N/A]
 
 ### Security and Privacy Requirements *(include when applicable)*
 
-- [Electron sandbox/context-isolation/CSP implications]
-- [External URL, filesystem path, or untrusted payload validation]
-- [ngrok authentication, credentials, and temporary-file handling]
-- [Data that MUST remain server-side or local]
+- [Wails method exposure, CSP, external URL, filesystem path, or untrusted payload validation]
+- [WebSocket origin, input-size, authorization, or public-projection implications]
+- [ngrok authentication, credentials, owned process, and temporary-file handling]
+- [Data that MUST remain server-side, process-local, or user-controlled]
+
+### Verification Requirements *(mandatory)*
+
+- **Go tests**: [Affected packages and observable behavior, or N/A]
+- **Race testing**: [Affected concurrent services and required command, or N/A]
+- **Browser tests**: [Playwright journey under `tests/browser/`, or N/A]
+- **Interactive verification**: [Affected `wails dev` master/player journey]
+- **Packaging/release verification**: [arm64 app, signing/notarization, or N/A]
+
+No numeric coverage threshold or repository-wide linter is currently defined.
+Specify concrete behavioral checks rather than inventing either gate.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Session**: [Version, name, terminals, and any changed semantics]
-- **Terminal**: [Identity, settings, content tree, and any changed semantics]
-- **Live state**: [Ephemeral server state and lifecycle, if affected]
+- **Session**: [Version, name, terminals, player-config reference, and changed semantics]
+- **Player configuration**: [Stable character identities, names, and changed semantics]
+- **Terminal**: [Identity, settings, content tree, and changed semantics]
+- **Live/coordination state**: [Ephemeral state, authority, revisions, and lifecycle, if affected]
 - **[Additional entity]**: [Meaning and relationships]
 
 ## Success Criteria *(mandatory)*
@@ -124,15 +139,15 @@ Mark material ambiguity inline, for example:
 
 - **SC-001**: [Primary journey completes with a concrete observable result]
 - **SC-002**: [All connected clients converge on the expected state under defined conditions]
-- **SC-003**: [Existing compatible sessions continue to open/save correctly, if applicable]
-- **SC-004**: [Failure/security/performance outcome relevant to the feature]
+- **SC-003**: [Existing compatible persistent files continue to open/save correctly, if applicable]
+- **SC-004**: [Failure, security, responsiveness, or packaging outcome relevant to the feature]
 
 ## Assumptions
 
-- [Assumption about GM/player environment or local network]
-- [Assumption about compatible session versions]
-- [Assumption about connected-client count or supported platform]
-- [Dependency on existing Electron, server, browser, or ngrok behavior]
+- [Assumption about the game-master/player environment or local network]
+- [Assumption about compatible session or player-configuration versions]
+- [Assumption about connected-player count or supported macOS profile]
+- [Dependency on existing Wails, Go service, browser, or ngrok behavior]
 
 ## Out of Scope
 

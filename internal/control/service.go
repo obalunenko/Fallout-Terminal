@@ -1,0 +1,2048 @@
+// Package control owns the process-local coordination aggregate shared by the
+// trusted desktop boundary and untrusted player connections.
+package control
+
+import (
+	cryptorand "crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+	"unicode/utf8"
+
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+)
+
+const defaultRequestResultLimit = 256
+
+// IDSource produces opaque process-local identifiers. Implementations must be
+// safe for concurrent use because IDs may be prepared outside a transaction.
+type IDSource interface {
+	Next() string
+}
+
+// RuntimeActions applies one already-authorized command to a coordinator-owned
+// terminal checkpoint. It performs gameplay rules only; authorization,
+// revisions, request replay, and publication remain Service responsibilities.
+type RuntimeActions interface {
+	Apply(*domain.TerminalRuntime, domain.RuntimeCommand) (*domain.PublicLiveState, bool)
+}
+
+// TerminalRuntimeLifecycle creates and refreshes coordinator-owned terminal
+// checkpoints without installing them into a second canonical live slot.
+type TerminalRuntimeLifecycle interface {
+	CreateRuntime(domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState)
+	UpdateRuntime(*domain.TerminalRuntime, domain.TerminalTarget) *domain.PublicLiveState
+	ProjectRuntime(*domain.TerminalRuntime) *domain.PublicLiveState
+}
+
+type terminalDecisionLifecycle interface {
+	TerminalRuntimeLifecycle
+	SuspendRuntime(*domain.TerminalRuntime)
+	ReactivateRuntime(*domain.TerminalRuntime, domain.TerminalTarget) *domain.PublicLiveState
+	DiscardRuntime(domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState)
+}
+
+type failedHackLifecycle interface {
+	ResetFailedHack(*domain.TerminalRuntime, domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState)
+}
+
+// TrustedHackRuntime is the private game-master-only hacking operation used
+// during the transition from the legacy live aggregate to coordinator-owned
+// terminal slots. It is never exposed through the player protocol.
+type TrustedHackRuntime interface {
+	ForceRuntimeHackSuccess(*domain.TerminalRuntime) (*domain.PublicLiveState, bool)
+}
+
+// RosterStore persists one complete candidate player config. The coordinator
+// calls it while holding the transition lock and commits only after success.
+type RosterStore interface {
+	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) error
+}
+
+// Config supplies deterministic seams for identifiers and ordered effects.
+// Enqueue must only place the detached effect onto another owner; it must not
+// call back into Service while the coordinator transaction is still locked.
+type Config struct {
+	IDs                IDSource
+	Enqueue            func(Effect)
+	Runtime            RuntimeActions
+	Terminals          TerminalRuntimeLifecycle
+	TrustedHack        TrustedHackRuntime
+	RosterStore        RosterStore
+	RequestResultLimit int
+}
+
+// SessionIdentity is the fresh process-local identity returned after an
+// unrecognized player connection establishes a logical session.
+type SessionIdentity struct {
+	SessionID    domain.LogicalSessionID
+	BrowserToken domain.BrowserToken
+	State        *domain.PlayerState
+}
+
+// CharacterSelection is one transport-independent player claim request.
+type CharacterSelection struct {
+	ConnectionID domain.ConnectionID
+	SessionID    domain.LogicalSessionID
+	RequestID    domain.RequestID
+	BroadcastID  domain.BroadcastID
+	CharacterID  domain.CharacterID
+}
+
+// Effect is one transport-neutral publication produced by a transaction.
+// Target IDs identify the intended logical session or concrete connection;
+// nil payloads simply mean that projection family is absent from this effect.
+type Effect struct {
+	Revision          uint64
+	SessionID         domain.LogicalSessionID
+	ConnectionID      domain.ConnectionID
+	Master            *domain.MasterCoordinationState
+	Player            *domain.PlayerState
+	Live              *domain.PublicLiveState
+	Hack              *domain.PublicHackState
+	TerminalID        string
+	Result            *domain.ActionResult
+	ClearLiveTerminal bool
+}
+
+// Service serializes every process-runtime transition under one mutex.
+type Service struct {
+	mu sync.RWMutex
+
+	runtime             domain.ProcessRuntime
+	ids                 IDSource
+	enqueue             func(Effect)
+	actions             RuntimeActions
+	terminals           TerminalRuntimeLifecycle
+	trustedHack         TrustedHackRuntime
+	rosterStore         RosterStore
+	requirePlayerConfig bool
+	requestResultLimit  int
+}
+
+type transition struct {
+	accepted bool
+	persist  bool
+	effects  []Effect
+}
+
+type transitionResult struct {
+	accepted bool
+	revision uint64
+}
+
+type cryptoIDSource struct {
+	fallback atomic.Uint64
+}
+
+func (source *cryptoIDSource) Next() string {
+	var value [16]byte
+	if _, err := cryptorand.Read(value[:]); err == nil {
+		return hex.EncodeToString(value[:])
+	}
+	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), source.fallback.Add(1))
+}
+
+// New returns an empty coordinator with process-local runtime state.
+func New(config Config) *Service {
+	ids := config.IDs
+	if ids == nil {
+		ids = &cryptoIDSource{}
+	}
+	enqueue := config.Enqueue
+	if enqueue == nil {
+		enqueue = func(Effect) {}
+	}
+	requestResultLimit := config.RequestResultLimit
+	if requestResultLimit <= 0 {
+		requestResultLimit = defaultRequestResultLimit
+	}
+	return &Service{
+		runtime:             newProcessRuntime(),
+		ids:                 ids,
+		enqueue:             enqueue,
+		actions:             config.Runtime,
+		terminals:           config.Terminals,
+		trustedHack:         config.TrustedHack,
+		rosterStore:         config.RosterStore,
+		requirePlayerConfig: config.RosterStore != nil,
+		requestResultLimit:  requestResultLimit,
+	}
+}
+
+// InstallPlayerConfig replaces the authored roster only while no broadcast is
+// active. Logical sessions remain recognized; claims cannot exist here.
+func (service *Service) InstallPlayerConfig(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) (*domain.MasterCoordinationState, error) {
+	var clonedRoster []domain.CharacterRosterEntry
+	if roster != nil {
+		clonedRoster = make([]domain.CharacterRosterEntry, len(roster))
+		copy(clonedRoster, roster)
+	}
+	config := domain.PlayerConfig{Version: handle.Version, Name: handle.Name, Roster: clonedRoster}
+	if strings.TrimSpace(handle.Path) == "" {
+		return service.Snapshot(), fmt.Errorf("player config path must not be blank")
+	}
+	if err := domain.ValidatePlayerConfig(config); err != nil {
+		return service.Snapshot(), err
+	}
+
+	var state *domain.MasterCoordinationState
+	var installErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			installErr = fmt.Errorf("player config cannot change during a broadcast")
+			return transition{}
+		}
+		runtime.RosterByID = make(map[domain.CharacterID]*domain.CharacterRosterEntry, len(roster))
+		runtime.RosterOrder = make([]domain.CharacterID, 0, len(roster))
+		for _, entry := range roster {
+			value := entry
+			runtime.RosterByID[entry.ID] = &value
+			runtime.RosterOrder = append(runtime.RosterOrder, entry.ID)
+		}
+		value := handle
+		runtime.ActivePlayerConfig = &value
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), installErr
+}
+
+// ClearPlayerConfig removes only the active authored roster/config binding.
+// It is used when another durable session is opened without an association.
+func (service *Service) ClearPlayerConfig() (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var clearErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			clearErr = fmt.Errorf("player config cannot change during a broadcast")
+			return transition{}
+		}
+		runtime.ActivePlayerConfig = nil
+		runtime.RosterByID = make(map[domain.CharacterID]*domain.CharacterRosterEntry)
+		runtime.RosterOrder = nil
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), clearErr
+}
+
+// Revision returns the latest accepted canonical revision.
+func (service *Service) Revision() uint64 {
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	return service.runtime.Revision
+}
+
+// Snapshot returns a deeply detached game-master coordination projection.
+func (service *Service) Snapshot() *domain.MasterCoordinationState {
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	return domain.CloneMasterCoordinationState(masterSnapshot(&service.runtime))
+}
+
+// PlayerSnapshot returns a deeply detached personalized projection for a
+// recognized logical session.
+func (service *Service) PlayerSnapshot(sessionID domain.LogicalSessionID) (*domain.PlayerState, bool) {
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	state, ok := playerSnapshot(&service.runtime, sessionID)
+	if !ok {
+		return nil, false
+	}
+	return domain.ClonePlayerState(state), true
+}
+
+// CurrentLiveForSession returns the coordinator-owned active terminal only to
+// a recognized session with a current-broadcast assignment. The projection
+// and revision are captured under the same coordinator read lock so reconnects
+// and newly opened tabs resume the canonical runtime without regenerating it.
+func (service *Service) CurrentLiveForSession(sessionID domain.LogicalSessionID) (*domain.PublicLiveState, uint64, bool) {
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+
+	broadcast := service.runtime.Broadcast
+	if service.terminals == nil || broadcast == nil || !sessionAssigned(broadcast, sessionID) {
+		return nil, service.runtime.Revision, false
+	}
+	terminal := activeTerminalRuntime(broadcast)
+	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+		return nil, service.runtime.Revision, false
+	}
+	projection := service.terminals.ProjectRuntime(terminal)
+	if projection == nil {
+		return nil, service.runtime.Revision, false
+	}
+	return clonePublicLiveState(projection), service.runtime.Revision, true
+}
+
+// AddCharacter appends one stable process-local roster entry.
+func (service *Service) AddCharacter(name string) (*domain.MasterCoordinationState, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return service.Snapshot(), fmt.Errorf("character name must not be blank")
+	}
+	if utf8.RuneCountInString(name) > 80 {
+		return service.Snapshot(), fmt.Errorf("character name must not exceed 80 characters")
+	}
+
+	var state *domain.MasterCoordinationState
+	var addErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf("select or create a player config first")
+			return transition{}
+		}
+		characterID := domain.CharacterID(service.nextID())
+		candidateByID, candidateOrder := cloneRosterState(runtime)
+		candidateByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		candidateOrder = append(candidateOrder, characterID)
+		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf("could not save player config: %w", err)
+			return transition{}
+		}
+		runtime.RosterByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		runtime.RosterOrder = append(runtime.RosterOrder, characterID)
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), addErr
+}
+
+// RenameCharacter updates the player-facing name while retaining the stable
+// roster identity and any current claim.
+func (service *Service) RenameCharacter(characterID domain.CharacterID, name string) (*domain.MasterCoordinationState, error) {
+	name, err := validatedCoordinationName(name, "character name")
+	if err != nil {
+		return service.Snapshot(), err
+	}
+
+	var state *domain.MasterCoordinationState
+	var renameErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
+			state = masterSnapshot(runtime)
+			renameErr = fmt.Errorf("select or create a player config first")
+			return transition{}
+		}
+		character := runtime.RosterByID[characterID]
+		if character == nil {
+			state = masterSnapshot(runtime)
+			renameErr = fmt.Errorf("character %q does not exist", characterID)
+			return transition{}
+		}
+		if character.Name == name {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		candidateByID, candidateOrder := cloneRosterState(runtime)
+		candidateByID[characterID].Name = name
+		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+			state = masterSnapshot(runtime)
+			renameErr = fmt.Errorf("could not save player config: %w", err)
+			return transition{}
+		}
+		character.Name = name
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), renameErr
+}
+
+// DeleteCharacter removes an unclaimed roster entry while preserving the
+// stable order of every survivor.
+func (service *Service) DeleteCharacter(characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var deleteErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf("select or create a player config first")
+			return transition{}
+		}
+		if runtime.RosterByID[characterID] == nil {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf("character %q does not exist", characterID)
+			return transition{}
+		}
+		if characterClaimed(runtime.Broadcast, characterID) {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf("character %q is currently claimed", characterID)
+			return transition{}
+		}
+		candidateByID, candidateOrder := cloneRosterState(runtime)
+		delete(candidateByID, characterID)
+		filtered := candidateOrder[:0]
+		for _, candidate := range candidateOrder {
+			if candidate != characterID {
+				filtered = append(filtered, candidate)
+			}
+		}
+		candidateOrder = filtered
+		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf("could not save player config: %w", err)
+			return transition{}
+		}
+		delete(runtime.RosterByID, characterID)
+		order := runtime.RosterOrder[:0]
+		for _, candidate := range runtime.RosterOrder {
+			if candidate != characterID {
+				order = append(order, candidate)
+			}
+		}
+		runtime.RosterOrder = order
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), deleteErr
+}
+
+// RenameLogicalSession changes only the process-local technical label. The
+// trimmed label remains unique across all recognized sessions.
+func (service *Service) RenameLogicalSession(sessionID domain.LogicalSessionID, fallbackName string) (*domain.MasterCoordinationState, error) {
+	fallbackName, err := validatedCoordinationName(fallbackName, "session fallback name")
+	if err != nil {
+		return service.Snapshot(), err
+	}
+
+	var state *domain.MasterCoordinationState
+	var renameErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		session := runtime.SessionsByID[sessionID]
+		if session == nil {
+			state = masterSnapshot(runtime)
+			renameErr = fmt.Errorf("logical session %q does not exist", sessionID)
+			return transition{}
+		}
+		if session.FallbackName == fallbackName {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		for candidateID, candidate := range runtime.SessionsByID {
+			if candidateID != sessionID && candidate != nil && candidate.FallbackName == fallbackName {
+				state = masterSnapshot(runtime)
+				renameErr = fmt.Errorf("session fallback name %q is already in use", fallbackName)
+				return transition{}
+			}
+		}
+		session.FallbackName = fallbackName
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), renameErr
+}
+
+// AssignCharacter installs one available claim for an unassigned session. A
+// connected first assignee establishes initial control when none exists.
+func (service *Service) AssignCharacter(sessionID domain.LogicalSessionID, characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var assignErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		session := runtime.SessionsByID[sessionID]
+		switch {
+		case broadcast == nil:
+			assignErr = fmt.Errorf("no broadcast is active")
+		case session == nil:
+			assignErr = fmt.Errorf("logical session %q does not exist", sessionID)
+		case runtime.RosterByID[characterID] == nil:
+			assignErr = fmt.Errorf("character %q does not exist", characterID)
+		case sessionAssigned(broadcast, sessionID):
+			assignErr = fmt.Errorf("logical session %q already has a character", sessionID)
+		case characterClaimed(broadcast, characterID):
+			assignErr = fmt.Errorf("character %q is currently claimed", characterID)
+		}
+		if assignErr != nil {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		ensureAssignmentIndexes(broadcast)
+		broadcast.AssignmentsBySession[sessionID] = characterID
+		broadcast.SessionByCharacter[characterID] = sessionID
+		if broadcast.ControllerSessionID == nil && len(session.ConnectionIDs) > 0 {
+			controller := sessionID
+			broadcast.ControllerSessionID = &controller
+		}
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = service.appendCurrentTerminalEffect(runtime, effects, sessionID)
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), assignErr
+}
+
+// ReleaseCharacter removes one current claim. Releasing the controller clears
+// control without electing any observer.
+func (service *Service) ReleaseCharacter(sessionID domain.LogicalSessionID) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var releaseErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		if broadcast == nil {
+			releaseErr = fmt.Errorf("no broadcast is active")
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		if runtime.SessionsByID[sessionID] == nil {
+			releaseErr = fmt.Errorf("logical session %q does not exist", sessionID)
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		characterID, assigned := broadcast.AssignmentsBySession[sessionID]
+		if !assigned {
+			releaseErr = fmt.Errorf("logical session %q has no character", sessionID)
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		delete(broadcast.AssignmentsBySession, sessionID)
+		delete(broadcast.SessionByCharacter, characterID)
+		clearControllerIfSession(broadcast, sessionID)
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), releaseErr
+}
+
+// MoveCharacter transfers one roster identity from its current owner, when
+// any, to an unassigned destination. Control is cleared when the old owner was
+// active and is never transferred implicitly.
+func (service *Service) MoveCharacter(characterID domain.CharacterID, toSessionID domain.LogicalSessionID) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var moveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		switch {
+		case broadcast == nil:
+			moveErr = fmt.Errorf("no broadcast is active")
+		case runtime.RosterByID[characterID] == nil:
+			moveErr = fmt.Errorf("character %q does not exist", characterID)
+		case runtime.SessionsByID[toSessionID] == nil:
+			moveErr = fmt.Errorf("logical session %q does not exist", toSessionID)
+		case sessionAssigned(broadcast, toSessionID):
+			moveErr = fmt.Errorf("logical session %q already has a character", toSessionID)
+		}
+		if moveErr != nil {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+
+		ensureAssignmentIndexes(broadcast)
+		if fromSessionID, claimed := characterOwner(broadcast, characterID); claimed {
+			delete(broadcast.AssignmentsBySession, fromSessionID)
+			clearControllerIfSession(broadcast, fromSessionID)
+		}
+		broadcast.AssignmentsBySession[toSessionID] = characterID
+		broadcast.SessionByCharacter[characterID] = toSessionID
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), moveErr
+}
+
+// SetActiveController atomically replaces controller identity with one
+// connected, character-assigned logical session. It shares commit ordering
+// with player actions and changes no claim or terminal runtime field.
+func (service *Service) SetActiveController(sessionID domain.LogicalSessionID) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var controllerErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		session := runtime.SessionsByID[sessionID]
+		switch {
+		case broadcast == nil:
+			controllerErr = fmt.Errorf("no broadcast is active")
+		case session == nil:
+			controllerErr = fmt.Errorf("logical session %q does not exist", sessionID)
+		case !sessionAssigned(broadcast, sessionID):
+			controllerErr = fmt.Errorf("logical session %q has no character", sessionID)
+		case len(session.ConnectionIDs) == 0:
+			controllerErr = fmt.Errorf("logical session %q is disconnected", sessionID)
+		}
+		if controllerErr != nil {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		if broadcast.ControllerSessionID != nil && *broadcast.ControllerSessionID == sessionID {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		controller := sessionID
+		broadcast.ControllerSessionID = &controller
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), controllerErr
+}
+
+// RequestTerminalActivation directly activates a new or retained checkpoint
+// when the current source has no unfinished puzzle. Unfinished-puzzle switch
+// decisions are introduced by the later terminal-decision slice.
+func (service *Service) RequestTerminalActivation(target domain.TerminalTarget) (*domain.MasterCoordinationState, error) {
+	if strings.TrimSpace(target.TerminalID) == "" {
+		return service.Snapshot(), fmt.Errorf("terminal ID must not be blank")
+	}
+
+	var state *domain.MasterCoordinationState
+	var activationErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		if broadcast == nil {
+			state = masterSnapshot(runtime)
+			activationErr = fmt.Errorf("no broadcast is active")
+			return transition{}
+		}
+		if service.terminals == nil {
+			state = masterSnapshot(runtime)
+			activationErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
+			return transition{}
+		}
+		if source := activeTerminalRuntime(broadcast); unfinishedTerminalRuntime(source) && source.TerminalID != target.TerminalID {
+			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
+				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
+				SourceTerminalID: source.TerminalID, Target: cloneTerminalTarget(&target),
+			}
+			state = masterSnapshot(runtime)
+			return transition{accepted: true, effects: stateEffects(runtime)}
+		}
+
+		ensureTerminalRuntimeSlots(broadcast)
+		targetRuntime := broadcast.TerminalRuntimes[target.TerminalID]
+		var projection *domain.PublicLiveState
+		if targetRuntime == nil {
+			targetRuntime, projection = service.terminals.CreateRuntime(target)
+			if targetRuntime == nil || projection == nil || targetRuntime.TerminalID != target.TerminalID {
+				state = masterSnapshot(runtime)
+				activationErr = fmt.Errorf("terminal runtime could not be created")
+				return transition{}
+			}
+			broadcast.TerminalRuntimes[target.TerminalID] = targetRuntime
+		} else if targetRuntime.Lifecycle == domain.TerminalLifecycleSuspended {
+			if lifecycle, ok := service.terminals.(terminalDecisionLifecycle); ok {
+				projection = lifecycle.ReactivateRuntime(targetRuntime, target)
+			} else {
+				projection = service.terminals.UpdateRuntime(targetRuntime, target)
+				targetRuntime.Lifecycle = domain.TerminalLifecycleActive
+			}
+		} else {
+			projection = service.terminals.UpdateRuntime(targetRuntime, target)
+			if projection == nil {
+				state = masterSnapshot(runtime)
+				activationErr = fmt.Errorf("terminal runtime could not be updated")
+				return transition{}
+			}
+		}
+
+		if source := activeTerminalRuntime(broadcast); source != nil && source != targetRuntime {
+			source.Lifecycle = domain.TerminalLifecycleSuspended
+		}
+		targetRuntime.Lifecycle = domain.TerminalLifecycleActive
+		activeTerminalID := target.TerminalID
+		broadcast.ActiveTerminalID = &activeTerminalID
+		runtime.PendingSwitch = nil
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{Live: projection})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), activationErr
+}
+
+// RequestTerminalClear keeps the broadcast, identities, claims, and controller
+// while suspending a directly clearable active checkpoint and publishing a
+// canonical terminal clear at the same revision.
+func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var clearErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		if broadcast == nil {
+			state = masterSnapshot(runtime)
+			clearErr = fmt.Errorf("no broadcast is active")
+			return transition{}
+		}
+		source := activeTerminalRuntime(broadcast)
+		if unfinishedTerminalRuntime(source) {
+			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
+				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
+				SourceTerminalID: source.TerminalID,
+			}
+			state = masterSnapshot(runtime)
+			return transition{accepted: true, effects: stateEffects(runtime)}
+		}
+		if source == nil && broadcast.ActiveTerminalID == nil {
+			state = masterSnapshot(runtime)
+			return transition{}
+		}
+		if source != nil {
+			source.Lifecycle = domain.TerminalLifecycleSuspended
+		}
+		broadcast.ActiveTerminalID = nil
+		runtime.PendingSwitch = nil
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{ClearLiveTerminal: true})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), clearErr
+}
+
+// ResolveTerminalSwitch applies one explicit unfinished-puzzle decision
+// against the still-current source and broadcast. The opaque switch ID is the
+// only authority to resolve a pending request.
+func (service *Service) ResolveTerminalSwitch(switchID domain.SwitchID, choice domain.TerminalSwitchChoice) (*domain.MasterCoordinationState, error) {
+	if switchID == "" {
+		return service.Snapshot(), fmt.Errorf("switch ID must not be blank")
+	}
+	if choice != domain.TerminalSwitchPreserve && choice != domain.TerminalSwitchDiscard && choice != domain.TerminalSwitchCancel {
+		return service.Snapshot(), fmt.Errorf("terminal switch decision must be preserve, discard, or cancel")
+	}
+
+	var state *domain.MasterCoordinationState
+	var resolveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		pending := runtime.PendingSwitch
+		broadcast := runtime.Broadcast
+		if pending == nil || pending.ID != switchID || broadcast == nil || pending.BroadcastID != broadcast.ID || broadcast.ActiveTerminalID == nil || *broadcast.ActiveTerminalID != pending.SourceTerminalID {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal switch decision is stale")
+			return transition{}
+		}
+		if choice == domain.TerminalSwitchCancel {
+			runtime.PendingSwitch = nil
+			state = masterSnapshot(runtime)
+			return transition{accepted: true, effects: stateEffects(runtime)}
+		}
+		lifecycle, ok := service.terminals.(terminalDecisionLifecycle)
+		if !ok {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal decision lifecycle is unavailable")
+			return transition{}
+		}
+		source := activeTerminalRuntime(broadcast)
+		if source == nil || source.TerminalID != pending.SourceTerminalID {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal switch decision is stale")
+			return transition{}
+		}
+
+		if choice == domain.TerminalSwitchPreserve {
+			lifecycle.SuspendRuntime(source)
+		} else {
+			delete(broadcast.TerminalRuntimes, source.TerminalID)
+		}
+
+		var projection *domain.PublicLiveState
+		clear := pending.Target == nil
+		if clear {
+			broadcast.ActiveTerminalID = nil
+		} else {
+			target := *cloneTerminalTarget(pending.Target)
+			targetRuntime := broadcast.TerminalRuntimes[target.TerminalID]
+			if targetRuntime == nil {
+				targetRuntime, projection = service.terminals.CreateRuntime(target)
+			} else {
+				projection = lifecycle.ReactivateRuntime(targetRuntime, target)
+			}
+			if targetRuntime == nil || projection == nil {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal runtime could not be activated")
+				return transition{}
+			}
+			targetRuntime.Lifecycle = domain.TerminalLifecycleActive
+			broadcast.TerminalRuntimes[target.TerminalID] = targetRuntime
+			targetID := target.TerminalID
+			broadcast.ActiveTerminalID = &targetID
+		}
+		runtime.PendingSwitch = nil
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		if clear {
+			effects = append(effects, Effect{ClearLiveTerminal: true})
+		} else {
+			effects = append(effects, Effect{Live: projection})
+		}
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), resolveErr
+}
+
+// CanDeleteTerminal prevents durable deletion while a process-local runtime
+// still owns active or preserved state for that authored terminal.
+func (service *Service) CanDeleteTerminal(terminalID string) error {
+	terminalID = strings.TrimSpace(terminalID)
+	if terminalID == "" {
+		return fmt.Errorf("terminal ID must not be blank")
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	if service.runtime.Broadcast != nil && service.runtime.Broadcast.TerminalRuntimes[terminalID] != nil {
+		return fmt.Errorf("terminal %q has active or preserved runtime state", terminalID)
+	}
+	return nil
+}
+
+// UpdateLiveTerminal refreshes the active checkpoint's authored tree and
+// optional introduction while preserving navigation validity and puzzle state.
+func (service *Service) UpdateLiveTerminal(tree domain.ContentNode, introText *string) (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var updateErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		active := activeTerminalRuntime(broadcast)
+		if broadcast == nil || active == nil || broadcast.ActiveTerminalID == nil {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("no terminal is active")
+			return transition{}
+		}
+		if service.terminals == nil {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
+			return transition{}
+		}
+		intro := active.IntroText
+		if introText != nil {
+			intro = *introText
+		}
+		projection := service.terminals.UpdateRuntime(active, domain.TerminalTarget{
+			TerminalID: active.TerminalID, TerminalName: active.TerminalName,
+			Tree: tree, HackLevel: active.HackLevel, IntroText: intro,
+		})
+		if projection == nil {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("active terminal could not be updated")
+			return transition{}
+		}
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{Live: projection})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), updateErr
+}
+
+// ResetFailedHack atomically replaces only the failed puzzle checkpoint of
+// the current active terminal. The latest validated authored target comes
+// from the trusted desktop boundary; every unrelated coordinator field and
+// runtime slot remains on the transaction's private clone unchanged.
+func (service *Service) ResetFailedHack(target domain.TerminalTarget) (*domain.MasterCoordinationState, error) {
+	target.TerminalID = strings.TrimSpace(target.TerminalID)
+	if target.TerminalID == "" {
+		return service.Snapshot(), fmt.Errorf("terminal ID must not be blank")
+	}
+
+	var state *domain.MasterCoordinationState
+	var resetErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		active := activeTerminalRuntime(broadcast)
+		if broadcast == nil || broadcast.ActiveTerminalID == nil || active == nil {
+			state = masterSnapshot(runtime)
+			resetErr = fmt.Errorf("no terminal is active")
+			return transition{}
+		}
+		if *broadcast.ActiveTerminalID != target.TerminalID || active.TerminalID != target.TerminalID {
+			state = masterSnapshot(runtime)
+			resetErr = fmt.Errorf("failed hacking puzzle reset is stale")
+			return transition{}
+		}
+		if active.Lifecycle != domain.TerminalLifecycleActive || active.Hack == nil || !active.Hack.Failed || active.Hack.Solved {
+			state = masterSnapshot(runtime)
+			resetErr = fmt.Errorf("active hacking puzzle is not failed")
+			return transition{}
+		}
+		lifecycle, ok := service.terminals.(failedHackLifecycle)
+		if !ok {
+			state = masterSnapshot(runtime)
+			resetErr = fmt.Errorf("failed hacking puzzle lifecycle is unavailable")
+			return transition{}
+		}
+
+		replacement, projection := lifecycle.ResetFailedHack(active, target)
+		if replacement == nil || projection == nil || replacement.TerminalID != target.TerminalID || replacement.Hack == nil || replacement.Hack.Failed || replacement.Hack.Solved {
+			state = masterSnapshot(runtime)
+			resetErr = fmt.Errorf("failed hacking puzzle could not be reset")
+			return transition{}
+		}
+		replacement.Lifecycle = domain.TerminalLifecycleActive
+		broadcast.TerminalRuntimes[target.TerminalID] = replacement
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{Live: projection})
+		return transition{accepted: true, effects: effects}
+	})
+	if state == nil {
+		state = service.Snapshot()
+	}
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), resetErr
+}
+
+// StartBroadcast creates a fresh assignment epoch while retaining recognized
+// sessions, fallback names, and the process-local roster.
+func (service *Service) StartBroadcast() (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var startErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
+			state = masterSnapshot(runtime)
+			startErr = fmt.Errorf("select or create a player config first")
+			return transition{}
+		}
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			startErr = fmt.Errorf("a broadcast is already active")
+			return transition{}
+		}
+		runtime.Broadcast = &domain.LiveBroadcast{
+			ID:                   domain.BroadcastID(service.nextID()),
+			AssignmentsBySession: make(map[domain.LogicalSessionID]domain.CharacterID),
+			SessionByCharacter:   make(map[domain.CharacterID]domain.LogicalSessionID),
+			TerminalRuntimes:     make(map[string]*domain.TerminalRuntime),
+		}
+		runtime.PendingSwitch = nil
+		clearRequestResults(runtime)
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: stateEffects(runtime)}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), startErr
+}
+
+// EndBroadcast atomically drops the entire broadcast-scoped epoch while
+// retaining process-local browser recognition, fallback names, presence, and
+// roster identities. Every request cache is cleared for the next epoch.
+func (service *Service) EndBroadcast() (*domain.MasterCoordinationState, error) {
+	var state *domain.MasterCoordinationState
+	var endErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if runtime.Broadcast == nil {
+			state = masterSnapshot(runtime)
+			endErr = fmt.Errorf("no broadcast is active")
+			return transition{}
+		}
+		runtime.Broadcast = nil
+		runtime.PendingSwitch = nil
+		clearRequestResults(runtime)
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{ClearLiveTerminal: true})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), endErr
+}
+
+// Shutdown discards the complete process-local aggregate. It intentionally
+// persists nothing and publishes nothing because transports are already being
+// torn down by the application lifecycle.
+func (service *Service) Shutdown() {
+	if service == nil {
+		return
+	}
+	service.mu.Lock()
+	service.runtime = newProcessRuntime()
+	service.mu.Unlock()
+}
+
+// CreateSession establishes one new logical session and attaches the supplied
+// concrete connection. It is the compatibility form of AttachConnection for
+// callers that do not yet hold a browser token.
+func (service *Service) CreateSession(connectionID domain.ConnectionID) SessionIdentity {
+	browserToken, state := service.AttachConnection(connectionID, "")
+	return SessionIdentity{SessionID: state.SessionID, BrowserToken: browserToken, State: state}
+}
+
+// AttachConnection resolves a known browser token or creates a fresh logical
+// session and replacement token. Additional tabs mutate only private
+// membership; aggregate presence effects are emitted on the first connection.
+func (service *Service) AttachConnection(connectionID domain.ConnectionID, browserToken domain.BrowserToken) (domain.BrowserToken, *domain.PlayerState) {
+	var returnedToken domain.BrowserToken
+	var state *domain.PlayerState
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		sessionID, known := runtime.SessionIDByBrowserToken[browserToken]
+		session := runtime.SessionsByID[sessionID]
+		if browserToken == "" || !known || session == nil {
+			sessionID = service.nextUniqueSessionID(runtime)
+			returnedToken = service.nextUniqueBrowserToken(runtime)
+			connections := make(map[domain.ConnectionID]struct{})
+			if connectionID != "" {
+				removeConnectionFromOtherSessions(runtime, connectionID, sessionID)
+				connections[connectionID] = struct{}{}
+			}
+			session = &domain.LogicalSession{
+				ID:             sessionID,
+				FallbackName:   nextFallbackName(runtime),
+				ConnectionIDs:  connections,
+				RequestResults: make(map[domain.RequestID]domain.RequestResultRecord),
+			}
+			runtime.SessionsByID[sessionID] = session
+			runtime.SessionIDByBrowserToken[returnedToken] = sessionID
+			state, _ = playerSnapshot(runtime, sessionID)
+			return transition{accepted: true, effects: presenceEffects(runtime)}
+		}
+
+		returnedToken = browserToken
+		if connectionID == "" {
+			state, _ = playerSnapshot(runtime, sessionID)
+			return transition{}
+		}
+		if session.ConnectionIDs == nil {
+			session.ConnectionIDs = make(map[domain.ConnectionID]struct{})
+		}
+		if _, alreadyAttached := session.ConnectionIDs[connectionID]; alreadyAttached {
+			state, _ = playerSnapshot(runtime, sessionID)
+			return transition{}
+		}
+		wasConnected := len(session.ConnectionIDs) > 0
+		otherPresenceChanged := removeConnectionFromOtherSessions(runtime, connectionID, sessionID)
+		session.ConnectionIDs[connectionID] = struct{}{}
+		state, _ = playerSnapshot(runtime, sessionID)
+		effects := []Effect(nil)
+		if !wasConnected || otherPresenceChanged {
+			effects = presenceEffects(runtime)
+		}
+		return transition{accepted: true, effects: effects}
+	})
+	if state == nil {
+		return "", nil
+	}
+	state.Revision = result.revision
+	return returnedToken, domain.ClonePlayerState(state)
+}
+
+// DetachConnection removes one concrete membership idempotently. Claims,
+// controller identity, fallback names, recognition, and request caches remain;
+// an effect is emitted only when the final connection closes.
+func (service *Service) DetachConnection(connectionID domain.ConnectionID) {
+	if connectionID == "" {
+		return
+	}
+	service.commit(func(runtime *domain.ProcessRuntime) transition {
+		_, session := sessionForConnection(runtime, connectionID)
+		if session == nil {
+			return transition{}
+		}
+		finalConnection := len(session.ConnectionIDs) == 1
+		delete(session.ConnectionIDs, connectionID)
+		effects := []Effect(nil)
+		if finalConnection {
+			effects = presenceEffects(runtime)
+		}
+		return transition{accepted: true, effects: effects}
+	})
+}
+
+// SelectCharacter atomically installs both sides of one exclusive claim. The
+// first accepted assignment becomes controller in the same transaction.
+func (service *Service) SelectCharacter(selection CharacterSelection) domain.ActionResult {
+	var outcome domain.ActionResult
+	commitResult := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		session := runtime.SessionsByID[selection.SessionID]
+		if session == nil {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonInvalidSession, runtime.Revision)
+			return transition{effects: []Effect{resultEffect(selection, outcome)}}
+		}
+		if selection.RequestID == "" {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return transition{effects: selectionResultEffects(runtime, selection, outcome)}
+		}
+
+		fingerprint := selectionFingerprint(selection)
+		if cached, exists := service.requestResult(runtime, selection.SessionID, selection.RequestID); exists {
+			if cached.Fingerprint == fingerprint {
+				outcome = cached.Result
+				return transition{effects: selectionResultEffects(runtime, selection, outcome)}
+			}
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonDuplicate, runtime.Revision)
+			return transition{effects: selectionResultEffects(runtime, selection, outcome)}
+		}
+		if selection.CharacterID == "" {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return cacheSelectionRejection(service, runtime, selection, outcome)
+		}
+		if runtime.Broadcast == nil || runtime.Broadcast.ID != selection.BroadcastID {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonStaleBroadcast, runtime.Revision)
+			return transition{effects: selectionResultEffects(runtime, selection, outcome)}
+		}
+		if _, assigned := runtime.Broadcast.AssignmentsBySession[selection.SessionID]; assigned {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonConflict, runtime.Revision)
+			return cacheSelectionRejection(service, runtime, selection, outcome)
+		}
+		if runtime.RosterByID[selection.CharacterID] == nil {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonConflict, runtime.Revision)
+			return cacheSelectionRejection(service, runtime, selection, outcome)
+		}
+		if _, claimed := runtime.Broadcast.SessionByCharacter[selection.CharacterID]; claimed {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonConflict, runtime.Revision)
+			return cacheSelectionRejection(service, runtime, selection, outcome)
+		}
+
+		runtime.Broadcast.AssignmentsBySession[selection.SessionID] = selection.CharacterID
+		runtime.Broadcast.SessionByCharacter[selection.CharacterID] = selection.SessionID
+		if runtime.Broadcast.ControllerSessionID == nil {
+			controller := selection.SessionID
+			runtime.Broadcast.ControllerSessionID = &controller
+		}
+		outcome = domain.ActionResult{
+			RequestID: selection.RequestID,
+			Accepted:  true,
+			Reason:    domain.ActionReasonAccepted,
+			Revision:  runtime.Revision + 1,
+		}
+		service.storeRequestResult(runtime, selection.SessionID, selection.RequestID, domain.RequestResultRecord{
+			Fingerprint: fingerprint,
+			Result:      outcome,
+		})
+		effects := stateEffects(runtime)
+		effects = service.appendCurrentTerminalEffect(runtime, effects, selection.SessionID)
+		effects = append(effects, resultEffect(selection, outcome))
+		return transition{accepted: true, effects: effects}
+	})
+	if outcome.Accepted {
+		outcome.Revision = commitResult.revision
+	}
+	return outcome
+}
+
+// DispatchPlayerAction resolves the sending connection and processes one
+// shared navigation or hacking command. Every failed precondition returns
+// before the gameplay boundary is invoked. Accepted canonical effects are
+// enqueued before the initiating connection's correlated result.
+func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, command domain.RuntimeCommand) {
+	service.commit(func(runtime *domain.ProcessRuntime) transition {
+		sessionID, session := sessionForConnection(runtime, connectionID)
+		if session == nil {
+			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidSession, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, "", result)}}
+		}
+		if command.RequestID == "" {
+			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, result)}}
+		}
+
+		fingerprint := playerActionFingerprint(command)
+		if cached, exists := service.requestResult(runtime, sessionID, command.RequestID); exists {
+			if cached.Fingerprint == fingerprint {
+				return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, cached.Result)}}
+			}
+			result := rejectedAction(command.RequestID, domain.ActionReasonDuplicate, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, result)}}
+		}
+		if !validRuntimeCommand(command) {
+			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if runtime.Broadcast == nil || runtime.Broadcast.ID != command.BroadcastID {
+			result := rejectedAction(command.RequestID, domain.ActionReasonStaleBroadcast, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if _, assigned := runtime.Broadcast.AssignmentsBySession[sessionID]; !assigned {
+			result := rejectedAction(command.RequestID, domain.ActionReasonUnassigned, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if runtime.Broadcast.ControllerSessionID == nil || *runtime.Broadcast.ControllerSessionID != sessionID {
+			result := rejectedAction(command.RequestID, domain.ActionReasonNotController, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if len(session.ConnectionIDs) == 0 {
+			result := rejectedAction(command.RequestID, domain.ActionReasonControllerDisconnected, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if runtime.Broadcast.ActiveTerminalID == nil || *runtime.Broadcast.ActiveTerminalID != command.TerminalID {
+			result := rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		terminal := runtime.Broadcast.TerminalRuntimes[command.TerminalID]
+		if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+			result := rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		if service.actions == nil {
+			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+
+		before := cloneTerminalRuntime(terminal)
+		projection, ok := service.actions.Apply(terminal, command)
+		if !ok || projection == nil {
+			runtime.Broadcast.TerminalRuntimes[command.TerminalID] = before
+			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+		}
+		result := domain.ActionResult{
+			RequestID: command.RequestID,
+			Accepted:  true,
+			Reason:    domain.ActionReasonAccepted,
+			Revision:  runtime.Revision + 1,
+		}
+		service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{
+			Fingerprint: fingerprint,
+			Result:      result,
+		})
+		return transition{
+			accepted: true,
+			effects: []Effect{
+				{Live: projection},
+				playerActionResultEffect(connectionID, sessionID, result),
+			},
+		}
+	})
+}
+
+// ForceHackSuccess executes the exact private game-master operation inside the
+// coordinator order. It spends no attempt and grants no player authority.
+func (service *Service) ForceHackSuccess() (*domain.PublicHackState, bool) {
+	var state *domain.PublicHackState
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if service.trustedHack == nil || runtime.Broadcast == nil {
+			return transition{}
+		}
+		terminal := activeTerminalRuntime(runtime.Broadcast)
+		if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+			return transition{}
+		}
+		projection, ok := service.trustedHack.ForceRuntimeHackSuccess(terminal)
+		if !ok || projection == nil || projection.Hack == nil || projection.TerminalID != terminal.TerminalID {
+			return transition{}
+		}
+		state = clonePublicHackState(projection.Hack)
+		return transition{
+			accepted: true,
+			effects: []Effect{{
+				Live:   projection,
+				Master: masterSnapshot(runtime),
+			}},
+		}
+	})
+	if !result.accepted {
+		return nil, false
+	}
+	return clonePublicHackState(state), true
+}
+
+func (service *Service) nextID() string {
+	return service.ids.Next()
+}
+
+// commit is the sole canonical transaction boundary. The mutation runs on a
+// private deep copy, so rejection cannot leak partial state. Accepted changes,
+// effect revision stamping, detachment, and synchronous enqueueing all occur
+// before the mutex is released, preventing later transitions from publishing
+// ahead of an earlier one.
+func (service *Service) commit(apply func(*domain.ProcessRuntime) transition) transitionResult {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+
+	working := cloneProcessRuntime(&service.runtime)
+	result := apply(working)
+	if result.accepted {
+		working.Revision = service.runtime.Revision + 1
+		service.runtime = *working
+	} else if result.persist {
+		working.Revision = service.runtime.Revision
+		service.runtime = *working
+	}
+	revision := service.runtime.Revision
+	for _, effect := range result.effects {
+		service.enqueue(detachEffect(effect, revision))
+	}
+	return transitionResult{accepted: result.accepted, revision: revision}
+}
+
+func (service *Service) requestResult(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, requestID domain.RequestID) (domain.RequestResultRecord, bool) {
+	session := runtime.SessionsByID[sessionID]
+	if session == nil {
+		return domain.RequestResultRecord{}, false
+	}
+	record, ok := session.RequestResults[requestID]
+	return record, ok
+}
+
+// storeRequestResult adds or replaces one replay record while keeping each
+// logical session's cache bounded. When full, the lexically smallest request
+// ID is evicted; the deterministic policy keeps race tests reproducible.
+func (service *Service) storeRequestResult(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, requestID domain.RequestID, record domain.RequestResultRecord) bool {
+	session := runtime.SessionsByID[sessionID]
+	if session == nil {
+		return false
+	}
+	if session.RequestResults == nil {
+		session.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord)
+	}
+	if _, exists := session.RequestResults[requestID]; !exists && len(session.RequestResults) >= service.requestResultLimit {
+		var evict domain.RequestID
+		for candidate := range session.RequestResults {
+			if evict == "" || candidate < evict {
+				evict = candidate
+			}
+		}
+		delete(session.RequestResults, evict)
+	}
+	session.RequestResults[requestID] = record
+	return true
+}
+
+func clearRequestResults(runtime *domain.ProcessRuntime) {
+	for _, session := range runtime.SessionsByID {
+		if session != nil {
+			session.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord)
+		}
+	}
+}
+
+func nextFallbackName(runtime *domain.ProcessRuntime) string {
+	used := make(map[string]struct{}, len(runtime.SessionsByID))
+	for _, session := range runtime.SessionsByID {
+		if session != nil {
+			used[session.FallbackName] = struct{}{}
+		}
+	}
+	for number := 1; ; number++ {
+		candidate := fmt.Sprintf("PLAYER %d", number)
+		if _, exists := used[candidate]; !exists {
+			return candidate
+		}
+	}
+}
+
+func validatedCoordinationName(value string, label string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", fmt.Errorf("%s must not be blank", label)
+	}
+	if utf8.RuneCountInString(value) > 80 {
+		return "", fmt.Errorf("%s must not exceed 80 characters", label)
+	}
+	return value, nil
+}
+
+func ensureAssignmentIndexes(broadcast *domain.LiveBroadcast) {
+	if broadcast.AssignmentsBySession == nil {
+		broadcast.AssignmentsBySession = make(map[domain.LogicalSessionID]domain.CharacterID)
+	}
+	if broadcast.SessionByCharacter == nil {
+		broadcast.SessionByCharacter = make(map[domain.CharacterID]domain.LogicalSessionID)
+	}
+}
+
+func ensureTerminalRuntimeSlots(broadcast *domain.LiveBroadcast) {
+	if broadcast.TerminalRuntimes == nil {
+		broadcast.TerminalRuntimes = make(map[string]*domain.TerminalRuntime)
+	}
+}
+
+func activeTerminalRuntime(broadcast *domain.LiveBroadcast) *domain.TerminalRuntime {
+	if broadcast == nil || broadcast.ActiveTerminalID == nil {
+		return nil
+	}
+	return broadcast.TerminalRuntimes[*broadcast.ActiveTerminalID]
+}
+
+func unfinishedTerminalRuntime(runtime *domain.TerminalRuntime) bool {
+	return runtime != nil && runtime.Hack != nil && !runtime.Hack.Solved && !runtime.Hack.Failed
+}
+
+func sessionAssigned(broadcast *domain.LiveBroadcast, sessionID domain.LogicalSessionID) bool {
+	if broadcast == nil {
+		return false
+	}
+	if _, assigned := broadcast.AssignmentsBySession[sessionID]; assigned {
+		return true
+	}
+	for _, ownerID := range broadcast.SessionByCharacter {
+		if ownerID == sessionID {
+			return true
+		}
+	}
+	return false
+}
+
+func characterOwner(broadcast *domain.LiveBroadcast, characterID domain.CharacterID) (domain.LogicalSessionID, bool) {
+	if broadcast == nil {
+		return "", false
+	}
+	if sessionID, claimed := broadcast.SessionByCharacter[characterID]; claimed {
+		return sessionID, true
+	}
+	for sessionID, assignedCharacterID := range broadcast.AssignmentsBySession {
+		if assignedCharacterID == characterID {
+			return sessionID, true
+		}
+	}
+	return "", false
+}
+
+func characterClaimed(broadcast *domain.LiveBroadcast, characterID domain.CharacterID) bool {
+	_, claimed := characterOwner(broadcast, characterID)
+	return claimed
+}
+
+func clearControllerIfSession(broadcast *domain.LiveBroadcast, sessionID domain.LogicalSessionID) {
+	if broadcast != nil && broadcast.ControllerSessionID != nil && *broadcast.ControllerSessionID == sessionID {
+		broadcast.ControllerSessionID = nil
+	}
+}
+
+func (service *Service) nextUniqueSessionID(runtime *domain.ProcessRuntime) domain.LogicalSessionID {
+	for {
+		sessionID := domain.LogicalSessionID(service.nextID())
+		if sessionID == "" {
+			continue
+		}
+		if _, exists := runtime.SessionsByID[sessionID]; !exists {
+			return sessionID
+		}
+	}
+}
+
+func (service *Service) nextUniqueBrowserToken(runtime *domain.ProcessRuntime) domain.BrowserToken {
+	for {
+		browserToken := domain.BrowserToken(service.nextID())
+		if browserToken == "" {
+			continue
+		}
+		if _, exists := runtime.SessionIDByBrowserToken[browserToken]; !exists {
+			return browserToken
+		}
+	}
+}
+
+func stateEffects(runtime *domain.ProcessRuntime) []Effect {
+	return presenceEffects(runtime)
+}
+
+// presenceEffects deliberately contains only complete master/player
+// projections. Connection membership never publishes terminal, hacking, or
+// request-result payloads and therefore cannot regenerate gameplay state.
+func presenceEffects(runtime *domain.ProcessRuntime) []Effect {
+	effects := []Effect{{Master: masterSnapshot(runtime)}}
+	sessionIDs := sortedSessionIDs(runtime)
+	for _, sessionID := range sessionIDs {
+		state, ok := playerSnapshot(runtime, sessionID)
+		if ok {
+			effects = append(effects, Effect{SessionID: sessionID, Player: state})
+		}
+	}
+	return effects
+}
+
+func (service *Service) appendCurrentTerminalEffect(runtime *domain.ProcessRuntime, effects []Effect, sessionID domain.LogicalSessionID) []Effect {
+	if service.terminals == nil || runtime == nil || runtime.Broadcast == nil {
+		return effects
+	}
+	terminal := activeTerminalRuntime(runtime.Broadcast)
+	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+		return effects
+	}
+	projection := service.terminals.ProjectRuntime(terminal)
+	if projection == nil {
+		return effects
+	}
+	return append(effects, Effect{SessionID: sessionID, Live: projection})
+}
+
+func selectionResultEffects(runtime *domain.ProcessRuntime, selection CharacterSelection, result domain.ActionResult) []Effect {
+	var effects []Effect
+	if state, ok := playerSnapshot(runtime, selection.SessionID); ok {
+		effects = append(effects, Effect{SessionID: selection.SessionID, Player: state})
+	}
+	return append(effects, resultEffect(selection, result))
+}
+
+func resultEffect(selection CharacterSelection, result domain.ActionResult) Effect {
+	return Effect{
+		ConnectionID: selection.ConnectionID,
+		SessionID:    selection.SessionID,
+		Result:       &result,
+	}
+}
+
+func cacheSelectionRejection(service *Service, runtime *domain.ProcessRuntime, selection CharacterSelection, result domain.ActionResult) transition {
+	service.storeRequestResult(runtime, selection.SessionID, selection.RequestID, domain.RequestResultRecord{
+		Fingerprint: selectionFingerprint(selection),
+		Result:      result,
+	})
+	return transition{
+		persist: true,
+		effects: selectionResultEffects(runtime, selection, result),
+	}
+}
+
+func rejectedSelection(requestID domain.RequestID, reason domain.ActionReason, revision uint64) domain.ActionResult {
+	return domain.ActionResult{RequestID: requestID, Reason: reason, Revision: revision}
+}
+
+func selectionFingerprint(selection CharacterSelection) string {
+	fields := []string{string(selection.BroadcastID), string(selection.CharacterID)}
+	return fingerprintFields(fields...)
+}
+
+func sessionForConnection(runtime *domain.ProcessRuntime, connectionID domain.ConnectionID) (domain.LogicalSessionID, *domain.LogicalSession) {
+	for _, sessionID := range sortedSessionIDs(runtime) {
+		session := runtime.SessionsByID[sessionID]
+		if session == nil {
+			continue
+		}
+		if _, connected := session.ConnectionIDs[connectionID]; connected {
+			return sessionID, session
+		}
+	}
+	return "", nil
+}
+
+// removeConnectionFromOtherSessions preserves the invariant that one concrete
+// connection belongs to at most one logical session. The return value reports
+// whether removing it changed any logical session from present to absent.
+func removeConnectionFromOtherSessions(runtime *domain.ProcessRuntime, connectionID domain.ConnectionID, targetSessionID domain.LogicalSessionID) bool {
+	presenceChanged := false
+	for _, sessionID := range sortedSessionIDs(runtime) {
+		if sessionID == targetSessionID {
+			continue
+		}
+		session := runtime.SessionsByID[sessionID]
+		if session == nil {
+			continue
+		}
+		if _, exists := session.ConnectionIDs[connectionID]; !exists {
+			continue
+		}
+		delete(session.ConnectionIDs, connectionID)
+		if len(session.ConnectionIDs) == 0 {
+			presenceChanged = true
+		}
+	}
+	return presenceChanged
+}
+
+func validRuntimeCommand(command domain.RuntimeCommand) bool {
+	if command.RequestID == "" || command.BroadcastID == "" || strings.TrimSpace(command.TerminalID) == "" {
+		return false
+	}
+	switch command.Kind {
+	case domain.RuntimeCommandNavAction:
+		if command.TargetID != "" || command.PatternID != "" {
+			return false
+		}
+		switch command.Action {
+		case "enter", "command", "entry":
+			return strings.TrimSpace(command.NodeID) != ""
+		case "back":
+			return command.NodeID == "" || strings.TrimSpace(command.NodeID) != ""
+		default:
+			return false
+		}
+	case domain.RuntimeCommandHackGuess:
+		return strings.TrimSpace(command.TargetID) != "" && command.Action == "" && command.NodeID == "" && command.PatternID == ""
+	case domain.RuntimeCommandHackPattern:
+		return strings.TrimSpace(command.PatternID) != "" && command.Action == "" && command.NodeID == "" && command.TargetID == ""
+	default:
+		return false
+	}
+}
+
+func playerActionFingerprint(command domain.RuntimeCommand) string {
+	return fingerprintFields(
+		string(command.Kind),
+		string(command.BroadcastID),
+		command.TerminalID,
+		command.Action,
+		command.NodeID,
+		command.TargetID,
+		command.PatternID,
+	)
+}
+
+func fingerprintFields(fields ...string) string {
+	var fingerprint strings.Builder
+	for _, field := range fields {
+		fmt.Fprintf(&fingerprint, "%d:%s;", len(field), field)
+	}
+	return fingerprint.String()
+}
+
+func rejectedAction(requestID domain.RequestID, reason domain.ActionReason, revision uint64) domain.ActionResult {
+	return domain.ActionResult{RequestID: requestID, Reason: reason, Revision: revision}
+}
+
+func playerActionResultEffect(connectionID domain.ConnectionID, sessionID domain.LogicalSessionID, result domain.ActionResult) Effect {
+	return Effect{ConnectionID: connectionID, SessionID: sessionID, Result: &result}
+}
+
+func (service *Service) cachePlayerActionRejection(runtime *domain.ProcessRuntime, connectionID domain.ConnectionID, sessionID domain.LogicalSessionID, command domain.RuntimeCommand, result domain.ActionResult) transition {
+	service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{
+		Fingerprint: playerActionFingerprint(command),
+		Result:      result,
+	})
+	return transition{
+		persist: true,
+		effects: []Effect{
+			playerActionResultEffect(connectionID, sessionID, result),
+		},
+	}
+}
+
+func newProcessRuntime() domain.ProcessRuntime {
+	return domain.ProcessRuntime{
+		SessionsByID:            make(map[domain.LogicalSessionID]*domain.LogicalSession),
+		SessionIDByBrowserToken: make(map[domain.BrowserToken]domain.LogicalSessionID),
+		RosterByID:              make(map[domain.CharacterID]*domain.CharacterRosterEntry),
+	}
+}
+
+func sortedSessionIDs(runtime *domain.ProcessRuntime) []domain.LogicalSessionID {
+	sessionIDs := make([]domain.LogicalSessionID, 0, len(runtime.SessionsByID))
+	for sessionID := range runtime.SessionsByID {
+		sessionIDs = append(sessionIDs, sessionID)
+	}
+	sort.Slice(sessionIDs, func(left, right int) bool { return sessionIDs[left] < sessionIDs[right] })
+	return sessionIDs
+}
+
+func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationState {
+	state := &domain.MasterCoordinationState{Revision: runtime.Revision}
+	if runtime.ActivePlayerConfig != nil {
+		state.PlayerConfig = &domain.PlayerConfigMetadata{
+			Status: "loaded", FilePath: runtime.ActivePlayerConfig.Path, Version: runtime.ActivePlayerConfig.Version, Name: runtime.ActivePlayerConfig.Name,
+		}
+	}
+
+	for _, characterID := range orderedRosterIDs(runtime) {
+		character := runtime.RosterByID[characterID]
+		if character == nil {
+			continue
+		}
+		entry := domain.MasterRosterEntry{ID: character.ID, Name: character.Name}
+		if runtime.Broadcast != nil {
+			if sessionID, claimed := runtime.Broadcast.SessionByCharacter[character.ID]; claimed {
+				claimedBy := sessionID
+				entry.ClaimedBySessionID = &claimedBy
+			}
+		}
+		state.Roster = append(state.Roster, entry)
+	}
+
+	for _, sessionID := range sortedSessionIDs(runtime) {
+		session := runtime.SessionsByID[sessionID]
+		if session == nil {
+			continue
+		}
+		entry := domain.MasterSessionEntry{
+			ID:           session.ID,
+			FallbackName: session.FallbackName,
+			Connected:    len(session.ConnectionIDs) > 0,
+			Role:         roleForSession(runtime.Broadcast, session.ID),
+		}
+		if character := assignedCharacter(runtime, session.ID); character != nil {
+			entry.Character = &domain.PlayerCharacter{ID: character.ID, Name: character.Name}
+		}
+		state.Sessions = append(state.Sessions, entry)
+	}
+
+	if broadcast := runtime.Broadcast; broadcast != nil {
+		state.Broadcast = &domain.MasterBroadcastState{
+			ID:                  broadcast.ID,
+			ControllerSessionID: cloneLogicalSessionID(broadcast.ControllerSessionID),
+			ActiveTerminalID:    cloneString(broadcast.ActiveTerminalID),
+		}
+	}
+	if pending := runtime.PendingSwitch; pending != nil {
+		state.PendingSwitch = &domain.MasterPendingSwitch{
+			SwitchID:         pending.ID,
+			BroadcastID:      pending.BroadcastID,
+			SourceTerminalID: pending.SourceTerminalID,
+		}
+		if pending.Target != nil {
+			targetID := pending.Target.TerminalID
+			state.PendingSwitch.TargetTerminalID = &targetID
+		}
+	}
+	return state
+}
+
+func playerSnapshot(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID) (*domain.PlayerState, bool) {
+	session := runtime.SessionsByID[sessionID]
+	if session == nil {
+		return nil, false
+	}
+	state := &domain.PlayerState{
+		Revision:     runtime.Revision,
+		SessionID:    session.ID,
+		FallbackName: session.FallbackName,
+		Role:         roleForSession(runtime.Broadcast, session.ID),
+	}
+	if runtime.Broadcast == nil {
+		state.Phase = domain.PlayerPhaseNoBroadcast
+	} else {
+		state.BroadcastID = runtime.Broadcast.ID
+		if runtime.Broadcast.ActiveTerminalID != nil {
+			state.ActiveTerminalID = *runtime.Broadcast.ActiveTerminalID
+		}
+		character := assignedCharacter(runtime, session.ID)
+		if character == nil {
+			state.Phase = domain.PlayerPhaseSelecting
+		} else {
+			state.Character = &domain.PlayerCharacter{ID: character.ID, Name: character.Name}
+			switch {
+			case runtime.Broadcast.ActiveTerminalID == nil:
+				state.Phase = domain.PlayerPhaseWaiting
+			case state.Role == domain.PlayerRoleActive:
+				state.Phase = domain.PlayerPhaseControlling
+			default:
+				state.Phase = domain.PlayerPhaseObserving
+			}
+		}
+	}
+	for _, characterID := range orderedRosterIDs(runtime) {
+		character := runtime.RosterByID[characterID]
+		if character == nil {
+			continue
+		}
+		status := domain.RosterStatusAvailable
+		if runtime.Broadcast != nil {
+			if _, claimed := runtime.Broadcast.SessionByCharacter[character.ID]; claimed {
+				status = domain.RosterStatusClaimed
+			}
+		}
+		state.Roster = append(state.Roster, domain.PlayerRosterEntry{
+			ID: character.ID, Name: character.Name, Status: status,
+		})
+	}
+	return state, true
+}
+
+func orderedRosterIDs(runtime *domain.ProcessRuntime) []domain.CharacterID {
+	ids := make([]domain.CharacterID, 0, len(runtime.RosterByID))
+	seen := make(map[domain.CharacterID]struct{}, len(runtime.RosterByID))
+	for _, characterID := range runtime.RosterOrder {
+		if _, exists := runtime.RosterByID[characterID]; !exists {
+			continue
+		}
+		if _, duplicate := seen[characterID]; duplicate {
+			continue
+		}
+		seen[characterID] = struct{}{}
+		ids = append(ids, characterID)
+	}
+	var remainder []domain.CharacterID
+	for characterID := range runtime.RosterByID {
+		if _, exists := seen[characterID]; !exists {
+			remainder = append(remainder, characterID)
+		}
+	}
+	sort.Slice(remainder, func(left, right int) bool { return remainder[left] < remainder[right] })
+	return append(ids, remainder...)
+}
+
+func cloneRosterState(runtime *domain.ProcessRuntime) (map[domain.CharacterID]*domain.CharacterRosterEntry, []domain.CharacterID) {
+	byID := make(map[domain.CharacterID]*domain.CharacterRosterEntry, len(runtime.RosterByID))
+	for characterID, character := range runtime.RosterByID {
+		if character == nil {
+			continue
+		}
+		value := *character
+		byID[characterID] = &value
+	}
+	return byID, append([]domain.CharacterID(nil), runtime.RosterOrder...)
+}
+
+func rosterEntries(byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) []domain.CharacterRosterEntry {
+	runtime := &domain.ProcessRuntime{RosterByID: byID, RosterOrder: order}
+	entries := make([]domain.CharacterRosterEntry, 0, len(byID))
+	for _, characterID := range orderedRosterIDs(runtime) {
+		if character := byID[characterID]; character != nil {
+			entries = append(entries, *character)
+		}
+	}
+	return entries
+}
+
+func (service *Service) persistRoster(runtime *domain.ProcessRuntime, byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) error {
+	if !service.requirePlayerConfig {
+		return nil
+	}
+	if runtime.ActivePlayerConfig == nil || service.rosterStore == nil {
+		return fmt.Errorf("no active player config")
+	}
+	return service.rosterStore.Save(*runtime.ActivePlayerConfig, rosterEntries(byID, order))
+}
+
+func roleForSession(broadcast *domain.LiveBroadcast, sessionID domain.LogicalSessionID) domain.PlayerRole {
+	if broadcast == nil {
+		return domain.PlayerRoleUnassigned
+	}
+	if _, assigned := broadcast.AssignmentsBySession[sessionID]; !assigned {
+		return domain.PlayerRoleUnassigned
+	}
+	if broadcast.ControllerSessionID != nil && *broadcast.ControllerSessionID == sessionID {
+		return domain.PlayerRoleActive
+	}
+	return domain.PlayerRoleObserver
+}
+
+func assignedCharacter(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID) *domain.CharacterRosterEntry {
+	if runtime.Broadcast == nil {
+		return nil
+	}
+	characterID, assigned := runtime.Broadcast.AssignmentsBySession[sessionID]
+	if !assigned {
+		return nil
+	}
+	return runtime.RosterByID[characterID]
+}
+
+func detachEffect(effect Effect, revision uint64) Effect {
+	detached := effect
+	detached.Revision = revision
+	detached.Master = domain.CloneMasterCoordinationState(effect.Master)
+	if detached.Master != nil {
+		detached.Master.Revision = revision
+	}
+	detached.Player = domain.ClonePlayerState(effect.Player)
+	if detached.Player != nil {
+		detached.Player.Revision = revision
+	}
+	detached.Live = clonePublicLiveState(effect.Live)
+	detached.Hack = clonePublicHackState(effect.Hack)
+	if effect.Result != nil {
+		result := *effect.Result
+		if result.Revision == 0 {
+			result.Revision = revision
+		}
+		detached.Result = &result
+	}
+	return detached
+}
+
+func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime {
+	if runtime == nil {
+		value := newProcessRuntime()
+		return &value
+	}
+	clone := *runtime
+	clone.SessionsByID = make(map[domain.LogicalSessionID]*domain.LogicalSession, len(runtime.SessionsByID))
+	for sessionID, session := range runtime.SessionsByID {
+		clone.SessionsByID[sessionID] = cloneLogicalSession(session)
+	}
+	clone.SessionIDByBrowserToken = make(map[domain.BrowserToken]domain.LogicalSessionID, len(runtime.SessionIDByBrowserToken))
+	for token, sessionID := range runtime.SessionIDByBrowserToken {
+		clone.SessionIDByBrowserToken[token] = sessionID
+	}
+	clone.RosterByID = make(map[domain.CharacterID]*domain.CharacterRosterEntry, len(runtime.RosterByID))
+	for characterID, character := range runtime.RosterByID {
+		if character == nil {
+			clone.RosterByID[characterID] = nil
+			continue
+		}
+		value := *character
+		clone.RosterByID[characterID] = &value
+	}
+	clone.RosterOrder = append([]domain.CharacterID(nil), runtime.RosterOrder...)
+	if runtime.ActivePlayerConfig != nil {
+		value := *runtime.ActivePlayerConfig
+		clone.ActivePlayerConfig = &value
+	}
+	clone.Broadcast = cloneBroadcast(runtime.Broadcast)
+	clone.PendingSwitch = clonePendingSwitch(runtime.PendingSwitch)
+	return &clone
+}
+
+func cloneLogicalSession(session *domain.LogicalSession) *domain.LogicalSession {
+	if session == nil {
+		return nil
+	}
+	clone := *session
+	clone.ConnectionIDs = make(map[domain.ConnectionID]struct{}, len(session.ConnectionIDs))
+	for connectionID := range session.ConnectionIDs {
+		clone.ConnectionIDs[connectionID] = struct{}{}
+	}
+	clone.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord, len(session.RequestResults))
+	for requestID, result := range session.RequestResults {
+		clone.RequestResults[requestID] = result
+	}
+	return &clone
+}
+
+func cloneBroadcast(broadcast *domain.LiveBroadcast) *domain.LiveBroadcast {
+	if broadcast == nil {
+		return nil
+	}
+	clone := *broadcast
+	clone.AssignmentsBySession = make(map[domain.LogicalSessionID]domain.CharacterID, len(broadcast.AssignmentsBySession))
+	for sessionID, characterID := range broadcast.AssignmentsBySession {
+		clone.AssignmentsBySession[sessionID] = characterID
+	}
+	clone.SessionByCharacter = make(map[domain.CharacterID]domain.LogicalSessionID, len(broadcast.SessionByCharacter))
+	for characterID, sessionID := range broadcast.SessionByCharacter {
+		clone.SessionByCharacter[characterID] = sessionID
+	}
+	clone.ControllerSessionID = cloneLogicalSessionID(broadcast.ControllerSessionID)
+	clone.ActiveTerminalID = cloneString(broadcast.ActiveTerminalID)
+	clone.TerminalRuntimes = make(map[string]*domain.TerminalRuntime, len(broadcast.TerminalRuntimes))
+	for terminalID, runtime := range broadcast.TerminalRuntimes {
+		clone.TerminalRuntimes[terminalID] = cloneTerminalRuntime(runtime)
+	}
+	return &clone
+}
+
+func clonePendingSwitch(pending *domain.TerminalSwitchDecision) *domain.TerminalSwitchDecision {
+	if pending == nil {
+		return nil
+	}
+	clone := *pending
+	if pending.Target != nil {
+		target := *pending.Target
+		target.Tree = cloneContentNode(pending.Target.Tree)
+		clone.Target = &target
+	}
+	return &clone
+}
+
+func cloneTerminalTarget(target *domain.TerminalTarget) *domain.TerminalTarget {
+	if target == nil {
+		return nil
+	}
+	clone := *target
+	clone.Tree = cloneContentNode(target.Tree)
+	return &clone
+}
+
+func cloneTerminalRuntime(runtime *domain.TerminalRuntime) *domain.TerminalRuntime {
+	if runtime == nil {
+		return nil
+	}
+	clone := *runtime
+	clone.Tree = cloneContentNode(runtime.Tree)
+	clone.Nav = cloneNavState(runtime.Nav)
+	clone.Hack = cloneHackState(runtime.Hack)
+	return &clone
+}
+
+func clonePublicLiveState(state *domain.PublicLiveState) *domain.PublicLiveState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	clone.Tree = cloneContentNode(state.Tree)
+	clone.Nav = cloneNavState(state.Nav)
+	clone.Hack = clonePublicHackState(state.Hack)
+	return &clone
+}
+
+func cloneContentNode(node domain.ContentNode) domain.ContentNode {
+	clone := node
+	if node.Children != nil {
+		clone.Children = make([]domain.ContentNode, len(node.Children))
+		for index := range node.Children {
+			clone.Children[index] = cloneContentNode(node.Children[index])
+		}
+	}
+	if node.Extra != nil {
+		clone.Extra = make(map[string]json.RawMessage, len(node.Extra))
+		for key, value := range node.Extra {
+			clone.Extra[key] = append([]byte(nil), value...)
+		}
+	}
+	return clone
+}
+
+func cloneNavState(state domain.NavState) domain.NavState {
+	clone := state
+	clone.Path = append([]string(nil), state.Path...)
+	clone.ViewEntryID = cloneString(state.ViewEntryID)
+	clone.CommandNodeID = cloneString(state.CommandNodeID)
+	return clone
+}
+
+func cloneHackState(state *domain.HackState) *domain.HackState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	if state.WordsByID != nil {
+		clone.WordsByID = make(map[string]domain.HackCandidate, len(state.WordsByID))
+		for id, candidate := range state.WordsByID {
+			clone.WordsByID[id] = candidate
+		}
+	}
+	if state.UsedPatterns != nil {
+		clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(state.UsedPatterns))
+		for identity := range state.UsedPatterns {
+			clone.UsedPatterns[identity] = struct{}{}
+		}
+	}
+	if state.Log != nil {
+		clone.Log = append([]string{}, state.Log...)
+	}
+	clone.Columns = cloneHackColumns(state.Columns)
+	return &clone
+}
+
+func clonePublicHackState(state *domain.PublicHackState) *domain.PublicHackState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	if state.Log != nil {
+		clone.Log = append([]string{}, state.Log...)
+	}
+	clone.Columns = cloneHackColumns(state.Columns)
+	clone.Patterns = append([]domain.PublicHackPattern(nil), state.Patterns...)
+	return &clone
+}
+
+func cloneHackColumns(columns []domain.HackColumn) []domain.HackColumn {
+	if columns == nil {
+		return nil
+	}
+	clone := make([]domain.HackColumn, len(columns))
+	for index, column := range columns {
+		clone[index] = column
+		if column.Addresses != nil {
+			clone[index].Addresses = append([]string(nil), column.Addresses...)
+		}
+		if column.Words != nil {
+			clone[index].Words = append([]domain.HackWord(nil), column.Words...)
+		}
+	}
+	return clone
+}
+
+func cloneLogicalSessionID(value *domain.LogicalSessionID) *domain.LogicalSessionID {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}

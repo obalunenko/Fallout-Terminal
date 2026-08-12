@@ -11,6 +11,7 @@ const state = {
   selectedNodeId: null,
   expanded:       new Set(['root']),
   liveHack:       null,   // last known hack-state of the live terminal, or null
+  coordination:   null,   // authoritative roster/session/broadcast projection
 };
 
 let idCounter = 0;
@@ -43,9 +44,33 @@ const btnStopBroadcast  = document.getElementById('btnStopBroadcast');
 const hackStatus        = document.getElementById('hackStatus');
 const hackStatusLine    = document.getElementById('hackStatusLine');
 const btnHackSuccess    = document.getElementById('btnHackSuccess');
+const btnResetFailedHack = document.getElementById('btnResetFailedHack');
 const hackLevelSelect   = document.getElementById('hackLevelSelect');
 const introTextArea     = document.getElementById('introTextArea');
 const btnApplySettings  = document.getElementById('btnApplySettings');
+const broadcastSummary = document.getElementById('broadcastSummary');
+const coordinationPanel = document.getElementById('coordinationPanel');
+const playerConfigStatus = document.getElementById('playerConfigStatus');
+const playerConfigError = document.getElementById('playerConfigError');
+const btnOpenPlayerConfig = document.getElementById('btnOpenPlayerConfig');
+const btnNewPlayerConfig = document.getElementById('btnNewPlayerConfig');
+const characterRoster = document.getElementById('characterRoster');
+const characterNameInput = document.getElementById('characterNameInput');
+const btnAddCharacter = document.getElementById('btnAddCharacter');
+const btnStartBroadcast = document.getElementById('btnStartBroadcast');
+const btnEndBroadcast = document.getElementById('btnEndBroadcast');
+const endBroadcastDialog = document.getElementById('endBroadcastDialog');
+const btnCancelEndBroadcast = document.getElementById('btnCancelEndBroadcast');
+const btnConfirmEndBroadcast = document.getElementById('btnConfirmEndBroadcast');
+const coordinationStatus = document.getElementById('coordinationStatus');
+const coordinationError = document.getElementById('coordinationError');
+const logicalSessionList = document.getElementById('logicalSessionList');
+const characterRosterRowTemplate = document.getElementById('characterRosterRowTemplate');
+const logicalSessionRowTemplate = document.getElementById('logicalSessionRowTemplate');
+const terminalSwitchDialog = document.getElementById('terminalSwitchDialog');
+const terminalSwitchStatus = document.getElementById('terminalSwitchStatus');
+const terminalSwitchError = document.getElementById('terminalSwitchError');
+const terminalSwitchButtons = Array.from(document.querySelectorAll('[data-switch-decision]'));
 
 let serverUrl = null;
 let serverUrlTitle = '';
@@ -53,6 +78,8 @@ let saveGeneration = 0;
 let saveInvocation = 0;
 let latestRenderedSave = 0;
 let newestDurableRevision = 0;
+let coordinationCommandPending = false;
+let pendingTerminalSwitch = null;
 
 // ── Server info / connection count ─────────────────────────
 desktopAPI.onServerInfo((info) => {
@@ -93,6 +120,15 @@ desktopAPI.onHackState((hack) => {
   state.liveHack = hack;
   renderHackStatus();
 });
+desktopAPI.onCoordinationState((coordination) => {
+  applyCoordinationState(coordination);
+  renderCoordination();
+  if (state.session) {
+    renderTermList();
+    renderTreeHeader();
+    renderHackStatus();
+  }
+});
 serverUrlEl.addEventListener('click', async () => {
   const requestedUrl = serverUrl;
   if (!requestedUrl) return;
@@ -113,7 +149,7 @@ document.getElementById('btnOpenSession').addEventListener('click', async () => 
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
     return;
   }
-  loadSession(res.session, res.filePath);
+  await loadSession(res.session, res.filePath);
 });
 
 document.getElementById('btnNewSession').addEventListener('click', async () => {
@@ -122,20 +158,20 @@ document.getElementById('btnNewSession').addEventListener('click', async () => {
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
     return;
   }
-  loadSession(res.session, res.filePath);
+  await loadSession(res.session, res.filePath);
 });
 
-function loadSession(session, filePath) {
-	saveGeneration++;
-	saveInvocation = 0;
-	latestRenderedSave = 0;
-	newestDurableRevision = 0;
-	delete saveStatus.dataset.savedRevision;
-	saveStatus.textContent = '';
-	saveStatus.classList.remove('err');
-	state.session        = session;
+async function loadSession(session, filePath) {
+  saveGeneration++;
+  saveInvocation = 0;
+  latestRenderedSave = 0;
+  newestDurableRevision = 0;
+  delete saveStatus.dataset.savedRevision;
+  saveStatus.textContent = '';
+  saveStatus.classList.remove('err');
+  state.session        = session;
   state.filePath        = filePath;
-  state.liveTerminalId  = null;
+  state.liveTerminalId  = state.coordination?.broadcast?.activeTerminalId || null;
   state.editTerminalId  = (session.terminals[0] && session.terminals[0].id) || null;
   state.selectedNodeId  = null;
   state.expanded         = new Set(['root']);
@@ -145,6 +181,15 @@ function loadSession(session, filePath) {
   startScreen.style.display = 'none';
   mainLayout.style.display  = 'flex';
   renderAll();
+
+  if (session.playerConfig) {
+    await runPlayerConfigCommand(
+      () => desktopAPI.loadReferencedPlayerConfig(),
+      'КОНФИГУРАЦИЯ ИГРОКОВ ЗАГРУЖЕНА'
+    );
+  } else {
+    setPlayerConfigError('ВЫБЕРИТЕ ИЛИ СОЗДАЙТЕ КОНФИГУРАЦИЮ ИГРОКОВ');
+  }
 }
 
 // ── Autosave (writes to the currently open session file) ──
@@ -226,6 +271,340 @@ function renderAll() {
   renderNodeForm();
   renderToolbarHint();
   renderHackStatus();
+  renderCoordination();
+}
+
+// ── Render: authoritative roster and broadcast state ────────
+function renderCoordination() {
+  const coordination = state.coordination;
+  const roster = Array.isArray(coordination?.roster) ? coordination.roster : [];
+  const sessions = Array.isArray(coordination?.sessions) ? coordination.sessions : [];
+  const broadcast = coordination?.broadcast || null;
+  const playerConfig = coordination?.playerConfig || null;
+  const availableCharacters = roster.filter(character => !character.claimedBySessionId);
+  const unassignedSessions = sessions.filter(session => !session.character);
+
+  broadcastSummary.textContent = broadcast
+    ? (broadcast.activeTerminalId
+      ? `ТРАНСЛЯЦИЯ АКТИВНА · ТЕРМИНАЛ ${broadcast.activeTerminalId}`
+      : `ТРАНСЛЯЦИЯ АКТИВНА · ОЖИДАНИЕ ТЕРМИНАЛА · ${broadcast.id}`)
+    : 'ТРАНСЛЯЦИЯ НЕ ЗАПУЩЕНА';
+  broadcastSummary.classList.toggle('is-live', Boolean(broadcast));
+  coordinationPanel.dataset.playerConfigActive = String(Boolean(playerConfig));
+  playerConfigStatus.dataset.active = String(Boolean(playerConfig));
+  playerConfigStatus.textContent = playerConfig
+    ? `${playerConfig.name} · ${playerConfig.filePath}`
+    : 'НЕ ВЫБРАНА · СОЗДАЙТЕ ИЛИ ВЫБЕРИТЕ ФАЙЛ';
+  btnOpenPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
+  btnNewPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
+  btnStartBroadcast.disabled = coordinationCommandPending || Boolean(broadcast) || !playerConfig;
+  btnEndBroadcast.hidden = !broadcast;
+  btnEndBroadcast.disabled = coordinationCommandPending || !broadcast;
+  btnAddCharacter.disabled = coordinationCommandPending || !playerConfig;
+  characterNameInput.disabled = coordinationCommandPending || !playerConfig;
+
+  characterRoster.replaceChildren();
+  if (!roster.length) {
+    const empty = document.createElement('div');
+    empty.className = 'roster-empty';
+    empty.textContent = 'ПЕРСОНАЖИ НЕ ЗАДАНЫ';
+    characterRoster.appendChild(empty);
+  } else {
+    for (const character of roster) {
+      const fragment = characterRosterRowTemplate.content.cloneNode(true);
+      const row = fragment.querySelector('.roster-row');
+      const claimed = Boolean(character.claimedBySessionId);
+      row.dataset.characterId = character.id;
+      row.dataset.claimed = String(claimed);
+      row.querySelector('.roster-name').textContent = character.name || '—';
+      const claimStatus = row.querySelector('.roster-claim-status');
+      claimStatus.dataset.claimState = claimed ? 'claimed' : 'available';
+      claimStatus.textContent = claimed ? 'ЗАНЯТ' : 'СВОБОДЕН';
+
+      const nameInput = row.querySelector('.roster-name-input');
+      nameInput.value = character.name || '';
+      const renameButton = row.querySelector('.roster-rename');
+      const deleteButton = row.querySelector('.roster-delete');
+      const moveControls = row.querySelector('.roster-move-controls');
+      const moveSelect = row.querySelector('.roster-move-session-select');
+      const moveButton = row.querySelector('.roster-move');
+      for (const control of row.querySelectorAll('input, select, button')) {
+        control.disabled = coordinationCommandPending || !playerConfig;
+      }
+      renameButton.addEventListener('click', () => {
+        const name = nameInput.value.trim();
+        if (!name) return setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
+        runCoordinationCommand(
+          () => desktopAPI.renameCharacter({ characterId: character.id, name }),
+          'ПЕРСОНАЖ ПЕРЕИМЕНОВАН',
+          'ПЕРЕИМЕНОВАНИЕ ПЕРСОНАЖА...'
+        );
+      });
+      deleteButton.addEventListener('click', () => runCoordinationCommand(
+        () => desktopAPI.deleteCharacter(character.id),
+        'ПЕРСОНАЖ УДАЛЁН',
+        claimed ? 'ПРОВЕРКА АКТИВНОГО НАЗНАЧЕНИЯ...' : 'УДАЛЕНИЕ ПЕРСОНАЖА...'
+      ));
+
+      moveControls.hidden = !claimed;
+      fillSelect(moveSelect, unassignedSessions, session => session.id, session => sessionLabel(session), 'НЕТ СВОБОДНЫХ СЕССИЙ');
+      moveButton.disabled = coordinationCommandPending || !claimed || !moveSelect.value;
+      moveButton.addEventListener('click', () => runCoordinationCommand(
+        () => desktopAPI.moveCharacter({ characterId: character.id, toSessionId: moveSelect.value }),
+        'НАЗНАЧЕНИЕ ПЕРЕМЕЩЕНО',
+        'ПЕРЕМЕЩЕНИЕ НАЗНАЧЕНИЯ...'
+      ));
+      characterRoster.appendChild(fragment);
+    }
+  }
+
+  logicalSessionList.replaceChildren();
+  if (!sessions.length) {
+    const empty = document.createElement('div');
+    empty.className = 'session-empty';
+    empty.setAttribute('role', 'listitem');
+    empty.textContent = 'СЕССИИ НЕ ПОДКЛЮЧЕНЫ';
+    logicalSessionList.appendChild(empty);
+    return;
+  }
+
+  for (const session of sessions) {
+    const fragment = logicalSessionRowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('.session-row');
+    const assigned = Boolean(session.character);
+    const role = session.role || 'unassigned';
+    row.dataset.sessionId = session.id;
+    row.dataset.connected = String(Boolean(session.connected));
+    row.dataset.role = role;
+    row.querySelector('.session-primary-name').textContent = assigned
+      ? session.character.name
+      : session.fallbackName;
+    const presence = row.querySelector('.session-presence');
+    presence.dataset.presence = session.connected ? 'connected' : 'disconnected';
+    presence.textContent = session.connected ? 'ПОДКЛЮЧЕН' : 'ОТКЛЮЧЕН';
+    const roleLabel = row.querySelector('.session-role');
+    roleLabel.dataset.sessionRole = role;
+    roleLabel.textContent = role === 'active'
+      ? (session.connected ? 'УПРАВЛЯЮЩИЙ' : 'УПРАВЛЯЮЩИЙ · НЕТ СВЯЗИ')
+      : role === 'observer' ? 'НАБЛЮДАТЕЛЬ' : 'БЕЗ РОЛИ';
+    row.querySelector('.session-character-name').textContent = assigned
+      ? `ПЕРСОНАЖ: ${session.character.name}`
+      : 'ПЕРСОНАЖ НЕ НАЗНАЧЕН';
+    row.querySelector('.session-fallback-label').textContent = `СЕССИЯ: ${session.fallbackName}`;
+
+    const nameInput = row.querySelector('.session-name-input');
+    nameInput.value = session.fallbackName || '';
+    const renameButton = row.querySelector('.session-rename');
+    const assignmentControls = row.querySelector('.session-assignment-controls');
+    const characterSelect = row.querySelector('.session-character-select');
+    const assignButton = row.querySelector('.session-assign');
+    const claimedControls = row.querySelector('.session-claimed-controls');
+    const releaseButton = row.querySelector('.session-release');
+    const controllerButton = row.querySelector('.session-controller');
+    for (const control of row.querySelectorAll('input, select, button')) {
+      control.disabled = coordinationCommandPending;
+    }
+    renameButton.addEventListener('click', () => {
+      const fallbackName = nameInput.value.trim();
+      if (!fallbackName) return setCoordinationStatus('УКАЖИТЕ МЕТКУ СЕССИИ', true);
+      runCoordinationCommand(
+        () => desktopAPI.renameLogicalSession({ sessionId: session.id, fallbackName }),
+        'МЕТКА СЕССИИ ОБНОВЛЕНА',
+        'ПЕРЕИМЕНОВАНИЕ СЕССИИ...'
+      );
+    });
+
+    assignmentControls.hidden = assigned || !broadcast;
+    fillSelect(characterSelect, availableCharacters, character => character.id, character => character.name, 'НЕТ ДОСТУПНЫХ ПЕРСОНАЖЕЙ');
+    assignButton.disabled = coordinationCommandPending || assigned || !broadcast || !characterSelect.value;
+    assignButton.addEventListener('click', () => runCoordinationCommand(
+      () => desktopAPI.assignCharacter({ sessionId: session.id, characterId: characterSelect.value }),
+      'ПЕРСОНАЖ НАЗНАЧЕН',
+      'НАЗНАЧЕНИЕ ПЕРСОНАЖА...'
+    ));
+
+    claimedControls.hidden = !assigned;
+    releaseButton.disabled = coordinationCommandPending || !assigned;
+    releaseButton.addEventListener('click', () => runCoordinationCommand(
+      () => desktopAPI.releaseCharacter(session.id),
+      'ПЕРСОНАЖ ОСВОБОЖДЁН',
+      'ОСВОБОЖДЕНИЕ ПЕРСОНАЖА...'
+    ));
+    controllerButton.disabled = true;
+    controllerButton.hidden = role === 'active';
+    if (assigned && session.connected && role !== 'active') {
+      controllerButton.disabled = coordinationCommandPending;
+      controllerButton.addEventListener('click', () => runCoordinationCommand(
+        () => desktopAPI.setActiveController(session.id),
+        'УПРАВЛЕНИЕ ПЕРЕДАНО',
+        'ПЕРЕДАЧА УПРАВЛЕНИЯ...'
+      ));
+    }
+    logicalSessionList.appendChild(fragment);
+  }
+}
+
+function setPlayerConfigError(message = '') {
+  playerConfigError.textContent = message;
+  playerConfigError.hidden = !message;
+}
+
+async function runPlayerConfigCommand(command, successMessage) {
+  if (coordinationCommandPending || state.coordination?.broadcast) return null;
+  coordinationCommandPending = true;
+  setPlayerConfigError('');
+  setCoordinationStatus('ЗАГРУЗКА КОНФИГУРАЦИИ ИГРОКОВ...');
+  renderCoordination();
+  let result;
+  try {
+    result = await command();
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  if (result?.canceled) {
+    setCoordinationStatus('ВЫБОР КОНФИГУРАЦИИ ОТМЕНЁН');
+    setPlayerConfigError('');
+    renderCoordination();
+    return result;
+  }
+  if (!result?.ok) {
+    const message = result?.error || 'НЕ УДАЛОСЬ ЗАГРУЗИТЬ КОНФИГУРАЦИЮ ИГРОКОВ';
+    setCoordinationStatus(message, true);
+    setPlayerConfigError(message);
+    renderCoordination();
+    return result;
+  }
+  if (result.session) state.session = result.session;
+  applyCoordinationState(result.state || state.coordination);
+  setCoordinationStatus(successMessage);
+  setPlayerConfigError('');
+  renderAll();
+  return result;
+}
+
+btnOpenPlayerConfig.addEventListener('click', () => runPlayerConfigCommand(
+  () => desktopAPI.openPlayerConfig(),
+  'КОНФИГУРАЦИЯ ИГРОКОВ ВЫБРАНА'
+));
+
+btnNewPlayerConfig.addEventListener('click', () => runPlayerConfigCommand(
+  () => desktopAPI.newPlayerConfig(),
+  'КОНФИГУРАЦИЯ ИГРОКОВ СОЗДАНА'
+));
+
+function applyCoordinationState(coordination) {
+  state.coordination = coordination || null;
+  state.liveTerminalId = coordination?.broadcast?.activeTerminalId || null;
+}
+
+function setCoordinationStatus(message, isError = false) {
+  coordinationStatus.textContent = isError ? '' : (message || '');
+  coordinationStatus.classList.remove('err');
+  coordinationError.textContent = isError ? (message || '') : '';
+  coordinationError.hidden = !isError || !message;
+}
+
+function fillSelect(select, values, valueOf, labelOf, emptyLabel) {
+  select.replaceChildren();
+  for (const value of values) {
+    const option = document.createElement('option');
+    option.value = valueOf(value);
+    option.textContent = labelOf(value);
+    select.appendChild(option);
+  }
+  if (!values.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = emptyLabel;
+    select.appendChild(option);
+  }
+}
+
+function sessionLabel(session) {
+  const character = session.character ? ` · ${session.character.name}` : '';
+  return `${session.fallbackName}${character}`;
+}
+
+async function runCoordinationCommand(command, successMessage, pendingMessage) {
+  if (coordinationCommandPending) return null;
+  coordinationCommandPending = true;
+  setCoordinationStatus(pendingMessage || 'ВЫПОЛНЕНИЕ ОПЕРАЦИИ...');
+  renderCoordination();
+  renderHackStatus();
+  let result;
+  try {
+    result = await command();
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  renderHackStatus();
+  if (!result?.ok) {
+    if (result?.state) applyCoordinationState(result.state);
+    setCoordinationStatus(result?.error || 'ОПЕРАЦИЯ ОТКЛОНЕНА', true);
+    renderCoordination();
+    return result;
+  }
+  if (result.state) applyCoordinationState(result.state);
+  setCoordinationStatus(successMessage || 'ОПЕРАЦИЯ ВЫПОЛНЕНА');
+  renderCoordination();
+  return result;
+}
+
+function showTerminalSwitchDecision(result) {
+  pendingTerminalSwitch = result?.switchId || null;
+  if (!pendingTerminalSwitch) return;
+  terminalSwitchStatus.textContent = 'ИСХОДНЫЙ ТЕРМИНАЛ ОСТАЁТСЯ АКТИВНЫМ ДО ВЫБОРА';
+  terminalSwitchError.textContent = '';
+  terminalSwitchError.hidden = true;
+  terminalSwitchDialog.hidden = false;
+  if (typeof terminalSwitchDialog.showModal === 'function' && !terminalSwitchDialog.open) {
+    terminalSwitchDialog.showModal();
+  } else {
+    terminalSwitchDialog.setAttribute('open', '');
+  }
+  terminalSwitchButtons[0]?.focus();
+}
+
+function hideTerminalSwitchDecision() {
+  pendingTerminalSwitch = null;
+  terminalSwitchDialog.hidden = true;
+  if (typeof terminalSwitchDialog.close === 'function' && terminalSwitchDialog.open) {
+    terminalSwitchDialog.close();
+  } else {
+    terminalSwitchDialog.removeAttribute('open');
+  }
+}
+
+function showEndBroadcastConfirmation() {
+  endBroadcastDialog.hidden = false;
+  if (typeof endBroadcastDialog.showModal === 'function' && !endBroadcastDialog.open) {
+    endBroadcastDialog.showModal();
+  } else {
+    endBroadcastDialog.setAttribute('open', '');
+  }
+  btnCancelEndBroadcast.focus();
+}
+
+function hideEndBroadcastConfirmation({ restoreFocus = true } = {}) {
+  endBroadcastDialog.hidden = true;
+  if (typeof endBroadcastDialog.close === 'function' && endBroadcastDialog.open) {
+    endBroadcastDialog.close();
+  } else {
+    endBroadcastDialog.removeAttribute('open');
+  }
+  btnCancelEndBroadcast.disabled = false;
+  btnConfirmEndBroadcast.disabled = false;
+  if (restoreFocus && !btnEndBroadcast.hidden) btnEndBroadcast.focus();
+}
+
+async function runTerminalSwitchRequest(command, completedMessage, pendingMessage) {
+  const result = await runCoordinationCommand(command, completedMessage, pendingMessage);
+  if (result?.ok && result.status === 'decision-required' && result.switchId) {
+    showTerminalSwitchDecision(result);
+  }
+  return result;
 }
 
 // ── Render: terminal list ────────────────────────────────────
@@ -271,13 +650,13 @@ function renderTermList() {
     delBtn.textContent = 'УДАЛИТЬ';
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (state.liveTerminalId === term.id || state.coordination?.pendingSwitch?.sourceTerminalId === term.id) {
+        setCoordinationStatus('АКТИВНЫЙ ИЛИ СОХРАНЁННЫЙ ТЕРМИНАЛ НЕЛЬЗЯ УДАЛИТЬ', true);
+        return;
+      }
       if (!window.confirm(`Удалить терминал "${term.name}" целиком?`)) return;
       const idx = state.session.terminals.findIndex(t => t.id === term.id);
       if (idx >= 0) state.session.terminals.splice(idx, 1);
-      if (state.liveTerminalId === term.id) {
-        desktopAPI.clearLiveTerminal();
-        state.liveTerminalId = null;
-      }
       if (state.editTerminalId === term.id) {
         state.editTerminalId = (state.session.terminals[0] && state.session.terminals[0].id) || null;
         state.selectedNodeId = null;
@@ -333,10 +712,13 @@ function renderTreeHeader() {
   const term = getEditTerminal();
   editingTermName.textContent = term ? term.name : '—';
   const isLive = !!term && term.id === state.liveTerminalId;
+  const broadcastActive = Boolean(state.coordination?.broadcast);
   liveFlag.style.display   = isLive ? '' : 'none';
-  btnMakeLive.textContent  = isLive ? 'ПЕРЕЗАПУСТИТЬ ТРАНСЛЯЦИЮ' : 'СДЕЛАТЬ АКТИВНЫМ';
-  btnMakeLive.disabled     = !term;
+  btnMakeLive.textContent  = isLive ? 'ОБНОВИТЬ АКТИВНЫЙ' : 'СДЕЛАТЬ АКТИВНЫМ';
+  btnMakeLive.disabled     = !term || !broadcastActive || coordinationCommandPending;
   btnPublish.style.display = isLive ? '' : 'none';
+  btnPublish.disabled = !isLive || coordinationCommandPending;
+  btnStopBroadcast.disabled = !broadcastActive || !state.liveTerminalId || coordinationCommandPending;
 }
 
 // ── Render: per-terminal settings (hack level / intro text) ──
@@ -357,6 +739,7 @@ function renderHackStatus() {
 
   if (!liveTerm || !liveTerm.hackLevel || !state.liveHack) {
     hackStatus.style.display = 'none';
+    btnResetFailedHack.hidden = true;
     return;
   }
 
@@ -365,11 +748,14 @@ function renderHackStatus() {
   if (h.solved) {
     hackStatusLine.textContent = 'ВЗЛОМ: ПРОЙДЕН';
   } else if (h.failed) {
-    hackStatusLine.textContent = 'ВЗЛОМ: ЗАБЛОКИРОВАН (нужен перезапуск трансляции)';
+    hackStatusLine.textContent = 'ВЗЛОМ: ЗАБЛОКИРОВАН';
   } else {
     hackStatusLine.textContent = `ВЗЛОМ: осталось попыток ${h.attemptsLeft}/${h.attemptsMax}`;
   }
   btnHackSuccess.disabled = h.solved || h.failed;
+  btnHackSuccess.hidden = h.failed;
+  btnResetFailedHack.hidden = !h.failed;
+  btnResetFailedHack.disabled = !h.failed || coordinationCommandPending;
 }
 
 function renderToolbarState() {
@@ -559,6 +945,94 @@ btnAddFolder.addEventListener('click', () => addNode('folder'));
 btnAddCommand.addEventListener('click', () => addNode('command'));
 btnAddEntry.addEventListener('click', () => addNode('entry'));
 
+// ── Player roster and broadcast management ──────────────────
+btnAddCharacter.addEventListener('click', async () => {
+  if (coordinationCommandPending || !state.coordination?.playerConfig) return;
+  const name = characterNameInput.value.trim();
+  if (!name) {
+    setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
+    return;
+  }
+
+  coordinationCommandPending = true;
+  setCoordinationStatus('ДОБАВЛЕНИЕ ПЕРСОНАЖА...');
+  renderCoordination();
+  const result = await desktopAPI.addCharacter(name);
+  coordinationCommandPending = false;
+  if (!result?.ok) {
+    setCoordinationStatus(result?.error || 'НЕ УДАЛОСЬ ДОБАВИТЬ ПЕРСОНАЖА', true);
+    renderCoordination();
+    return;
+  }
+
+  state.coordination = result.state || state.coordination;
+  characterNameInput.value = '';
+  setCoordinationStatus('ПЕРСОНАЖ ДОБАВЛЕН');
+  renderCoordination();
+});
+
+characterNameInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    btnAddCharacter.click();
+  }
+});
+
+btnStartBroadcast.addEventListener('click', async () => {
+  if (coordinationCommandPending || state.coordination?.broadcast || !state.coordination?.playerConfig) return;
+  coordinationCommandPending = true;
+  setCoordinationStatus('ЗАПУСК ТРАНСЛЯЦИИ...');
+  renderCoordination();
+  const result = await desktopAPI.startBroadcast();
+  coordinationCommandPending = false;
+  if (!result?.ok) {
+    setCoordinationStatus(result?.error || 'НЕ УДАЛОСЬ ЗАПУСТИТЬ ТРАНСЛЯЦИЮ', true);
+    renderCoordination();
+    return;
+  }
+
+  state.coordination = result.state || state.coordination;
+  setCoordinationStatus('ТРАНСЛЯЦИЯ ЗАПУЩЕНА');
+  renderCoordination();
+});
+
+btnEndBroadcast.addEventListener('click', () => {
+  if (coordinationCommandPending || !state.coordination?.broadcast) return;
+  showEndBroadcastConfirmation();
+});
+
+btnCancelEndBroadcast.addEventListener('click', () => hideEndBroadcastConfirmation());
+endBroadcastDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!coordinationCommandPending) hideEndBroadcastConfirmation();
+});
+
+btnConfirmEndBroadcast.addEventListener('click', async () => {
+  if (coordinationCommandPending || !state.coordination?.broadcast) return;
+  btnCancelEndBroadcast.disabled = true;
+  btnConfirmEndBroadcast.disabled = true;
+  const result = await runCoordinationCommand(
+    () => desktopAPI.endBroadcast(),
+    'ТРАНСЛЯЦИЯ ЗАВЕРШЕНА · СЕССИИ И ПЕРСОНАЖИ СОХРАНЕНЫ',
+    'ЗАВЕРШЕНИЕ ТРАНСЛЯЦИИ...'
+  );
+  if (!result?.ok) {
+    hideEndBroadcastConfirmation();
+    return;
+  }
+  if (!result.state || result.state.broadcast) {
+    setCoordinationStatus('ЗАВЕРШЕНИЕ НЕ ПОДТВЕРЖДЕНО АВТОРИТЕТНЫМ СОСТОЯНИЕМ', true);
+    renderCoordination();
+    hideEndBroadcastConfirmation();
+    return;
+  }
+  hideEndBroadcastConfirmation({ restoreFocus: false });
+  hideTerminalSwitchDecision();
+  state.liveHack = null;
+  renderAll();
+  btnStartBroadcast.focus();
+});
+
 // ── Terminal management ───────────────────────────────────────
 btnAddTerminal.addEventListener('click', () => {
   const term = {
@@ -576,7 +1050,7 @@ btnAddTerminal.addEventListener('click', () => {
   renderAll();
 });
 
-btnApplySettings.addEventListener('click', () => {
+btnApplySettings.addEventListener('click', async () => {
   const term = getEditTerminal();
   if (!term) return;
   term.hackLevel = Number(hackLevelSelect.value) || 0;
@@ -585,47 +1059,106 @@ btnApplySettings.addEventListener('click', () => {
   if (term.id === state.liveTerminalId) {
     // Intro text can refresh live immediately; hackLevel only takes effect
     // on the next (re)broadcast so it never disrupts an in-progress hack.
-    desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText });
+    await runCoordinationCommand(
+      () => desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText }),
+      'АКТИВНЫЙ ТЕРМИНАЛ ОБНОВЛЁН',
+      'ОБНОВЛЕНИЕ АКТИВНОГО ТЕРМИНАЛА...'
+    );
   }
 });
 
-btnMakeLive.addEventListener('click', () => {
+btnMakeLive.addEventListener('click', async () => {
   const term = getEditTerminal();
-  if (!term) return;
-  state.liveTerminalId = term.id;
-  state.liveHack = null;
-  desktopAPI.setLiveTerminal({
-    terminalId:   term.id,
-    terminalName: term.name,
-    tree:         term.root,
-    hackLevel:    term.hackLevel || 0,
-    introText:    term.introText || '',
-  });
+  if (!term || !state.coordination?.broadcast) return;
+  const result = await runTerminalSwitchRequest(
+    () => desktopAPI.requestTerminalActivation({
+      terminalId: term.id,
+      terminalName: term.name,
+      tree: term.root,
+      hackLevel: term.hackLevel || 0,
+      introText: term.introText || '',
+    }),
+    'АКТИВНЫЙ ТЕРМИНАЛ ВЫБРАН',
+    'ПЕРЕКЛЮЧЕНИЕ АКТИВНОГО ТЕРМИНАЛА...'
+  );
+  if (result?.ok && result.status === 'activated') state.liveHack = null;
   renderTermList();
   renderTreeHeader();
   renderHackStatus();
 });
 
-btnPublish.addEventListener('click', () => {
+btnPublish.addEventListener('click', async () => {
   const term = getEditTerminal();
   if (!term || term.id !== state.liveTerminalId) return;
-  desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText || '' });
+  const result = await runTerminalSwitchRequest(
+    () => desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText || '' }),
+    'АКТИВНЫЙ ТЕРМИНАЛ ОБНОВЛЁН',
+    'ПУБЛИКАЦИЯ ОБНОВЛЕНИЯ...'
+  );
+  if (!result?.ok) return;
   const original = btnPublish.textContent;
   btnPublish.textContent = 'ОБНОВЛЕНО ✓';
   setTimeout(() => { btnPublish.textContent = original; }, 1200);
 });
 
-btnStopBroadcast.addEventListener('click', () => {
-  if (!state.liveTerminalId) return;
-  desktopAPI.clearLiveTerminal();
-  state.liveTerminalId = null;
-  state.liveHack = null;
+btnStopBroadcast.addEventListener('click', async () => {
+  if (!state.coordination?.broadcast || !state.liveTerminalId) return;
+  const result = await runCoordinationCommand(
+    () => desktopAPI.requestTerminalClear(),
+    'АКТИВНЫЙ ТЕРМИНАЛ УБРАН · ТРАНСЛЯЦИЯ ПРОДОЛЖАЕТСЯ',
+    'ОЧИСТКА АКТИВНОГО ТЕРМИНАЛА...'
+  );
+  if (result?.ok && result.status === 'cleared') state.liveHack = null;
   renderTermList();
   renderTreeHeader();
   renderHackStatus();
 });
 
+for (const button of terminalSwitchButtons) {
+  button.addEventListener('click', async () => {
+    if (!pendingTerminalSwitch || coordinationCommandPending) return;
+    const decision = button.dataset.switchDecision;
+    terminalSwitchButtons.forEach(control => { control.disabled = true; });
+    terminalSwitchStatus.textContent = 'ПРИМЕНЕНИЕ РЕШЕНИЯ...';
+    terminalSwitchError.hidden = true;
+    const result = await runCoordinationCommand(
+      () => desktopAPI.resolveTerminalSwitch({ switchId: pendingTerminalSwitch, decision }),
+      decision === 'cancel' ? 'ПЕРЕКЛЮЧЕНИЕ ОТМЕНЕНО' : 'РЕШЕНИЕ ПРИМЕНЕНО',
+      'ПРИМЕНЕНИЕ РЕШЕНИЯ...'
+    );
+    terminalSwitchButtons.forEach(control => { control.disabled = false; });
+    if (!result?.ok) {
+      terminalSwitchError.textContent = result?.error || 'РЕШЕНИЕ ОТКЛОНЕНО';
+      terminalSwitchError.hidden = false;
+      terminalSwitchStatus.textContent = 'ИСХОДНЫЙ ТЕРМИНАЛ ОСТАЁТСЯ АКТИВНЫМ';
+      return;
+    }
+    if (result.status === 'activated' || result.status === 'cleared') state.liveHack = null;
+    hideTerminalSwitchDecision();
+    renderAll();
+  });
+}
+
 btnHackSuccess.addEventListener('click', () => {
   if (!state.liveHack || state.liveHack.solved || state.liveHack.failed) return;
   desktopAPI.forceHackSuccess();
+});
+
+btnResetFailedHack.addEventListener('click', async () => {
+  const term = state.session && state.liveTerminalId
+    ? state.session.terminals.find(candidate => candidate.id === state.liveTerminalId)
+    : null;
+  if (!term || !state.liveHack?.failed || coordinationCommandPending) return;
+  const result = await runCoordinationCommand(
+    () => desktopAPI.resetFailedHack({
+      terminalId: term.id,
+      terminalName: term.name,
+      tree: term.root,
+      hackLevel: term.hackLevel || 0,
+      introText: term.introText || '',
+    }),
+    'СОЗДАНА НОВАЯ ГОЛОВОЛОМКА',
+    'ПОДГОТОВКА НОВОЙ ГОЛОВОЛОМКИ...'
+  );
+  if (!result?.ok) renderHackStatus();
 });

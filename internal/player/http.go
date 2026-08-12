@@ -81,7 +81,8 @@ func (handler *playerHTTPHandler) serveSoundList(response http.ResponseWriter, r
 		entries, err := fs.ReadDir(handler.assets, "sounds/"+folder)
 		if err == nil {
 			for _, entry := range entries {
-				if entry.IsDir() {
+				info, err := entry.Info()
+				if err != nil || !info.Mode().IsRegular() {
 					continue
 				}
 				if _, allowed := allowedSoundExtensions[strings.ToLower(path.Ext(entry.Name()))]; allowed {

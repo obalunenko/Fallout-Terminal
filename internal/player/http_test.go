@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -125,6 +127,79 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 	}
 }
 
+func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(playerAssets())
+	const secretToken = "opaque-browser-token-that-must-not-be-reflected"
+
+	for _, requestPath := range []string{
+		"/api/session",
+		"/api/token",
+		"/api/browser-token",
+		"/api/identity",
+	} {
+		recorder := serveRequest(t, handler, requestPath)
+		if recorder.Code != http.StatusNotFound {
+			t.Errorf("GET %s status = %d, want no recognition endpoint", requestPath, recorder.Code)
+		}
+	}
+
+	for _, requestPath := range []string{
+		"/?browserToken=" + secretToken,
+		"/client.js?token=" + secretToken,
+		"/terminal/root?session=" + secretToken,
+	} {
+		recorder := serveRequest(t, handler, requestPath)
+		serialized := recorder.Body.String() + recorder.Header().Get("Location") + recorder.Header().Get("Set-Cookie")
+		if strings.Contains(serialized, secretToken) {
+			t.Errorf("GET %s reflected recognition material in an HTTP response", requestPath)
+		}
+		if recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("GET %s lost nosniff", requestPath)
+		}
+		if policy := recorder.Header().Get("Content-Security-Policy"); policy != playerContentSecurityPolicy {
+			t.Errorf("GET %s CSP changed: %q", requestPath, policy)
+		}
+	}
+
+	for _, test := range []struct {
+		origin string
+		want   bool
+	}{
+		{origin: "", want: true},
+		{origin: "https://player.test", want: true},
+		{origin: "http://player.test", want: true},
+		{origin: "https://evil.example", want: false},
+	} {
+		request := httptest.NewRequest(http.MethodGet, "http://player.test/", nil)
+		request.Host = "player.test"
+		if test.origin != "" {
+			request.Header.Set("Origin", test.origin)
+		}
+		if got := sameHostOrigin(request); got != test.want {
+			t.Errorf("sameHostOrigin(%q) = %t, want %t", test.origin, got, test.want)
+		}
+	}
+
+	clientScript, err := os.ReadFile(filepath.Join("..", "..", "client", "client.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := string(clientScript)
+	start := strings.Index(js, "function playerWebSocketURL()")
+	end := strings.Index(js, "function connect()")
+	if start < 0 || end <= start {
+		t.Fatal("player script is missing the WebSocket URL construction boundary")
+	}
+	urlBoundary := js[start:end]
+	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "searchParams", "?token", "?session"} {
+		if strings.Contains(urlBoundary, forbidden) {
+			t.Errorf("WebSocket URL construction exposes recognition material through %q", forbidden)
+		}
+	}
+}
+
 func TestHTTPHandlerListsOnlyAllowlistedSoundFiles(t *testing.T) {
 	t.Parallel()
 
@@ -152,14 +227,66 @@ func TestHTTPHandlerListsOnlyAllowlistedSoundFiles(t *testing.T) {
 	}
 }
 
+func TestHTTPHandlerSoundManifestExcludesNonRegularEntries(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(fstest.MapFS{
+		"sounds/ambient/hum.wav":    {Data: []byte("wav")},
+		"sounds/ambient/linked.wav": {Data: []byte("symlink"), Mode: fs.ModeSymlink},
+		"sounds/ambient/device.mp3": {Data: []byte("device"), Mode: fs.ModeDevice},
+	})
+	recorder := serveRequest(t, handler, "/api/sounds/ambient")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET ambient status = %d, want 200", recorder.Code)
+	}
+
+	var got []string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode sound response: %v; body = %q", err, recorder.Body.String())
+	}
+	want := []string{"hum.wav"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ambient sounds = %#v, want regular files only %#v", got, want)
+	}
+}
+
+func TestHTTPHandlerServesHackingSoundManifestsAndAssets(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(playerAssets())
+	for folder, want := range map[string][]string{
+		"charscroll": {"scroll.wav"},
+		"enter":      {"enter.wav"},
+		"hack-bad":   {"bad.wav"},
+		"hack-good":  {"good.mp3"},
+		"menu-focus": {"focus.wav"},
+		"multiple":   {"multiple.wav"},
+		"single":     {"single.wav"},
+	} {
+		manifest := serveRequest(t, handler, "/api/sounds/"+folder)
+		if manifest.Code != http.StatusOK {
+			t.Fatalf("GET %s manifest status = %d, want 200", folder, manifest.Code)
+		}
+		var files []string
+		if err := json.Unmarshal(manifest.Body.Bytes(), &files); err != nil {
+			t.Fatalf("decode %s manifest: %v", folder, err)
+		}
+		if !reflect.DeepEqual(files, want) {
+			t.Fatalf("%s manifest = %#v, want %#v", folder, files, want)
+		}
+		asset := serveRequest(t, handler, "/sounds/"+folder+"/"+want[0])
+		if asset.Code != http.StatusOK || asset.Body.Len() == 0 {
+			t.Fatalf("GET %s asset status = %d bytes = %d, want 200 and non-empty", folder, asset.Code, asset.Body.Len())
+		}
+	}
+}
+
 func TestHTTPHandlerSoundDiscoveryDegradesToAnEmptyJSONArray(t *testing.T) {
 	t.Parallel()
 
 	handler := NewHTTPHandler(playerAssets())
 	for _, requestPath := range []string{
 		"/api/sounds/not-allowed",
-		"/api/sounds/hack-bad",
-		"/api/sounds/menu-focus",
 	} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
@@ -189,16 +316,22 @@ func TestHTTPHandlerReturnsNotFoundWhenRequiredAssetsAreMissing(t *testing.T) {
 
 func playerAssets() fs.FS {
 	return fstest.MapFS{
-		"index.html":                  {Data: []byte("<!doctype html><title>player-shell</title>")},
-		"client.js":                   {Data: []byte("const client = 'player-client';")},
-		"fonts/Fixedsys.ttf":          {Data: []byte("fake-font")},
-		"outside.txt":                 {Data: []byte("outside-client-root")},
-		"sounds/ambient/HISS.OGG":     {Data: []byte("ogg")},
-		"sounds/ambient/hum.wav":      {Data: []byte("wav")},
-		"sounds/ambient/theme.m4a":    {Data: []byte("m4a")},
-		"sounds/ambient/README.txt":   {Data: []byte("not audio")},
-		"sounds/hack-good/good.mp3":   {Data: []byte("mp3")},
-		"sounds/menu-focus/empty.txt": {Data: []byte("not audio")},
+		"index.html":                   {Data: []byte("<!doctype html><title>player-shell</title>")},
+		"client.js":                    {Data: []byte("const client = 'player-client';")},
+		"fonts/Fixedsys.ttf":           {Data: []byte("fake-font")},
+		"outside.txt":                  {Data: []byte("outside-client-root")},
+		"sounds/ambient/HISS.OGG":      {Data: []byte("ogg")},
+		"sounds/ambient/hum.wav":       {Data: []byte("wav")},
+		"sounds/ambient/theme.m4a":     {Data: []byte("m4a")},
+		"sounds/ambient/README.txt":    {Data: []byte("not audio")},
+		"sounds/charscroll/scroll.wav": {Data: []byte("wav")},
+		"sounds/enter/enter.wav":       {Data: []byte("wav")},
+		"sounds/hack-bad/bad.wav":      {Data: []byte("wav")},
+		"sounds/hack-good/good.mp3":    {Data: []byte("mp3")},
+		"sounds/menu-focus/focus.wav":  {Data: []byte("wav")},
+		"sounds/menu-focus/empty.txt":  {Data: []byte("not audio")},
+		"sounds/multiple/multiple.wav": {Data: []byte("wav")},
+		"sounds/single/single.wav":     {Data: []byte("wav")},
 	}
 }
 

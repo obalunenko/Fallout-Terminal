@@ -12,6 +12,7 @@ frontend/dist/*
 !frontend/dist/.keep
 frontend/node_modules/
 frontend/wailsjs/
+tests/browser/test-results/
 
 # Go test/build artifacts
 *.exe

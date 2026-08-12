@@ -3,7 +3,9 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -12,10 +14,14 @@ const (
 	// MaxNodeDepth counts the root as depth one.
 	MaxNodeDepth = 64
 	// MaxNodes bounds recursive content nodes within one terminal.
-	MaxNodes      = 100000
-	maxNameBytes  = 256
-	maxIntroBytes = 64 * 1024
-	maxBodyBytes  = 1024 * 1024
+	MaxNodes = 100000
+	// MaxRosterEntries bounds authored characters in one player config.
+	MaxRosterEntries = 1000
+	// MaxCharacterNameRunes is the shared player-facing character-name limit.
+	MaxCharacterNameRunes = 80
+	maxNameBytes          = 256
+	maxIntroBytes         = 64 * 1024
+	maxBodyBytes          = 1024 * 1024
 )
 
 // ValidateSession validates every known version-1 field without mutating data.
@@ -28,6 +34,14 @@ func ValidateSession(session Session) error {
 	}
 	if session.Terminals == nil {
 		return fmt.Errorf("terminals must be an array")
+	}
+	if session.PlayerConfig != "" {
+		if filepath.IsAbs(session.PlayerConfig) || filepath.Clean(session.PlayerConfig) == "." {
+			return fmt.Errorf("playerConfig must be a relative file path")
+		}
+		if strings.ContainsRune(session.PlayerConfig, '\x00') {
+			return fmt.Errorf("playerConfig contains an invalid path character")
+		}
 	}
 	if len(session.Terminals) > MaxTerminals {
 		return fmt.Errorf("terminals exceeds limit %d", MaxTerminals)
@@ -64,6 +78,40 @@ func ValidateSession(session Session) error {
 		}
 		if err := validateTree(path+".root", terminal.Root); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// ValidatePlayerConfig validates a complete standalone authored roster.
+func ValidatePlayerConfig(config PlayerConfig) error {
+	if config.Version != 1 {
+		return fmt.Errorf("version must be 1")
+	}
+	if err := validateRequiredString("name", config.Name, maxNameBytes); err != nil {
+		return err
+	}
+	if config.Roster == nil {
+		return fmt.Errorf("roster must be an array")
+	}
+	if len(config.Roster) > MaxRosterEntries {
+		return fmt.Errorf("roster exceeds limit %d", MaxRosterEntries)
+	}
+	ids := make(map[CharacterID]struct{}, len(config.Roster))
+	for index, entry := range config.Roster {
+		path := fmt.Sprintf("roster[%d]", index)
+		if err := validateRequiredString(path+".id", string(entry.ID), maxNameBytes); err != nil {
+			return err
+		}
+		if _, exists := ids[entry.ID]; exists {
+			return fmt.Errorf("%s.id duplicates %q", path, entry.ID)
+		}
+		ids[entry.ID] = struct{}{}
+		if strings.TrimSpace(entry.Name) == "" {
+			return fmt.Errorf("%s.name must not be blank", path)
+		}
+		if utf8.RuneCountInString(entry.Name) > MaxCharacterNameRunes {
+			return fmt.Errorf("%s.name exceeds %d characters", path, MaxCharacterNameRunes)
 		}
 	}
 	return nil

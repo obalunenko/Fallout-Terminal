@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Hacking Game",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-10T18:36:36.548Z"
+    }
+  ],
+  "telemetryInstanceId": "85dca28c-bd3d-43a2-871f-d3cc7c38d9d9"
+}

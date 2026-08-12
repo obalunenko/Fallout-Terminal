@@ -47,12 +47,113 @@
     <aside class="term-panel">
       <div class="panel-hdr">ТЕРМИНАЛЫ СЕССИИ</div>
       <div class="term-list" id="termList"></div>
+
+      <section class="coord-panel" id="coordinationPanel" aria-labelledby="coordinationHeading">
+        <div class="panel-hdr coord-hdr" id="coordinationHeading">ИГРОКИ И ТРАНСЛЯЦИЯ</div>
+        <div class="broadcast-summary" id="broadcastSummary" role="status" aria-live="polite" aria-atomic="true">ТРАНСЛЯЦИЯ НЕ ЗАПУЩЕНА</div>
+
+        <section class="coord-group player-config-management" aria-labelledby="playerConfigHeading">
+          <h2 class="coord-group-title" id="playerConfigHeading">КОНФИГУРАЦИЯ ИГРОКОВ</h2>
+          <div class="player-config-status" id="playerConfigStatus" role="status" aria-live="polite" aria-atomic="true">НЕ ВЫБРАНА</div>
+          <div class="player-config-actions" role="group" aria-label="Выбор конфигурации игроков">
+            <button class="btn btn-mini" id="btnOpenPlayerConfig" type="button">ВЫБРАТЬ ФАЙЛ</button>
+            <button class="btn btn-mini btn-secondary" id="btnNewPlayerConfig" type="button">СОЗДАТЬ ФАЙЛ</button>
+          </div>
+          <div class="player-config-error" id="playerConfigError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+        </section>
+
+        <section class="coord-group roster-management" aria-labelledby="characterRosterHeading">
+          <h2 class="coord-group-title" id="characterRosterHeading">ПЕРСОНАЖИ</h2>
+          <div class="roster-list" id="characterRoster" role="list" aria-label="Персонажи игроков"></div>
+          <div class="roster-create">
+            <label class="field-label-inline" for="characterNameInput">НОВЫЙ ПЕРСОНАЖ</label>
+            <div class="roster-create-row">
+              <input class="field-input" id="characterNameInput" name="characterName" type="text" maxlength="80" autocomplete="off" aria-describedby="coordinationStatus coordinationError">
+              <button class="btn btn-mini" id="btnAddCharacter" type="button">ДОБАВИТЬ</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="coord-group session-management" aria-labelledby="logicalSessionsHeading">
+          <h2 class="coord-group-title" id="logicalSessionsHeading">ЛОГИЧЕСКИЕ СЕССИИ</h2>
+          <div class="session-list" id="logicalSessionList" role="list" aria-label="Распознанные логические сессии">
+            <div class="session-empty" role="listitem">СЕССИИ НЕ ПОДКЛЮЧЕНЫ</div>
+          </div>
+        </section>
+
+        <button class="btn btn-primary full-w" id="btnStartBroadcast" type="button">НАЧАТЬ ТРАНСЛЯЦИЮ</button>
+        <button class="btn btn-danger full-w" id="btnEndBroadcast" type="button" hidden>ЗАВЕРШИТЬ ТРАНСЛЯЦИЮ</button>
+        <div class="coord-feedback" aria-label="Состояние операций координации">
+          <div class="coord-status" id="coordinationStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+          <div class="coord-error" id="coordinationError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+        </div>
+
+        <template id="characterRosterRowTemplate">
+          <article class="roster-row roster-management-row" role="listitem" data-character-id="" data-claimed="false">
+            <div class="roster-summary">
+              <span class="roster-name">—</span>
+              <span class="roster-state roster-claim-status" data-claim-state="available">ДОСТУПЕН</span>
+            </div>
+            <div class="roster-controls" role="group" aria-label="Управление персонажем">
+              <label class="field-label-inline roster-name-field">
+                ИМЯ
+                <input class="field-input roster-name-input" name="characterRename" type="text" maxlength="80" autocomplete="off">
+              </label>
+              <div class="roster-action-row">
+                <button class="btn btn-mini roster-rename" type="button" data-action="rename-character">ПЕРЕИМЕНОВАТЬ</button>
+                <button class="btn btn-mini btn-danger roster-delete" type="button" data-action="delete-character">УДАЛИТЬ</button>
+              </div>
+              <div class="roster-move-controls" data-claimed-only hidden>
+                <label class="field-label-inline">
+                  ПЕРЕМЕСТИТЬ В СЕССИЮ
+                  <select class="field-input roster-move-session-select" name="moveToSession"></select>
+                </label>
+                <button class="btn btn-mini roster-move" type="button" data-action="move-character">ПЕРЕМЕСТИТЬ</button>
+              </div>
+            </div>
+          </article>
+        </template>
+
+        <template id="logicalSessionRowTemplate">
+          <article class="session-row logical-session-row" role="listitem" data-session-id="" data-connected="false" data-role="unassigned">
+            <header class="session-summary">
+              <span class="session-primary-name">—</span>
+              <span class="session-presence" data-presence="disconnected">ОТКЛЮЧЕН</span>
+              <span class="session-role" data-session-role="unassigned">БЕЗ РОЛИ</span>
+            </header>
+            <div class="session-identity">
+              <span class="session-character-name">ПЕРСОНАЖ НЕ НАЗНАЧЕН</span>
+              <span class="session-fallback-label">—</span>
+            </div>
+            <div class="session-controls" role="group" aria-label="Исправление логической сессии и назначения">
+              <label class="field-label-inline session-name-field">
+                МЕТКА СЕССИИ
+                <input class="field-input session-name-input" name="sessionFallbackName" type="text" maxlength="80" autocomplete="off">
+              </label>
+              <button class="btn btn-mini session-rename" type="button" data-action="rename-logical-session">ПЕРЕИМЕНОВАТЬ СЕССИЮ</button>
+              <div class="session-assignment-controls" data-unassigned-only>
+                <label class="field-label-inline">
+                  НАЗНАЧИТЬ ПЕРСОНАЖА
+                  <select class="field-input session-character-select" name="assignCharacter"></select>
+                </label>
+                <button class="btn btn-mini session-assign" type="button" data-action="assign-character">НАЗНАЧИТЬ</button>
+              </div>
+              <div class="session-claimed-controls" data-assigned-only hidden>
+                <button class="btn btn-mini session-release" type="button" data-action="release-character">ОСВОБОДИТЬ ПЕРСОНАЖА</button>
+                <button class="btn btn-mini session-controller" type="button" data-action="set-active-controller">СДЕЛАТЬ УПРАВЛЯЮЩИМ</button>
+              </div>
+            </div>
+          </article>
+        </template>
+      </section>
+
       <div class="term-footer">
         <button class="btn btn-secondary full-w" id="btnAddTerminal">+ НОВЫЙ ТЕРМИНАЛ</button>
-        <button class="btn btn-danger full-w" id="btnStopBroadcast">ОСТАНОВИТЬ ТРАНСЛЯЦИЮ</button>
+        <button class="btn btn-danger full-w" id="btnStopBroadcast">УБРАТЬ АКТИВНЫЙ ТЕРМИНАЛ</button>
         <div class="hack-status" id="hackStatus" style="display:none">
           <div class="hack-status-line" id="hackStatusLine">ВЗЛОМ: —</div>
           <button class="btn btn-accent full-w" id="btnHackSuccess">ВЗЛОМ УСПЕШЕН</button>
+		  <button class="btn btn-accent full-w hack-retry" id="btnResetFailedHack" type="button" hidden>ПОВТОРИТЬ ВЗЛОМ</button>
         </div>
       </div>
       <div class="save-status" id="saveStatus"></div>
@@ -105,6 +206,35 @@
 
   </div><!-- /main -->
 </div><!-- /layout -->
+
+<dialog class="terminal-switch-dialog end-broadcast-dialog" id="endBroadcastDialog" aria-modal="true" aria-labelledby="endBroadcastDialogTitle" aria-describedby="endBroadcastDialogDescription" hidden>
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="endBroadcastDialogTitle">ЗАВЕРШИТЬ ТРАНСЛЯЦИЮ?</h2>
+    <p class="terminal-switch-dialog-description" id="endBroadcastDialogDescription">
+      Активный терминал будет убран у всех игроков. Назначения персонажей и управление будут сброшены, а сессии и список персонажей сохранятся.
+    </p>
+    <div class="end-broadcast-actions" role="group" aria-label="Подтверждение завершения трансляции">
+      <button class="btn btn-secondary" id="btnCancelEndBroadcast" type="button">ОТМЕНА</button>
+      <button class="btn btn-danger" id="btnConfirmEndBroadcast" type="button">ЗАВЕРШИТЬ ТРАНСЛЯЦИЮ</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="terminal-switch-dialog" id="terminalSwitchDialog" aria-modal="true" aria-labelledby="terminalSwitchDialogTitle" aria-describedby="terminalSwitchDialogDescription terminalSwitchStatus terminalSwitchError" hidden>
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="terminalSwitchDialogTitle">НЕЗАВЕРШЁННЫЙ ВЗЛОМ</h2>
+    <p class="terminal-switch-dialog-description" id="terminalSwitchDialogDescription">
+      Перед переключением терминала выберите, что сделать с текущей головоломкой.
+    </p>
+    <div class="terminal-switch-actions" role="group" aria-label="Решение для незавершённой головоломки">
+      <button class="btn btn-primary" id="btnPreserveTerminalSwitch" type="button" data-switch-decision="preserve">СОХРАНИТЬ И ПЕРЕКЛЮЧИТЬ</button>
+      <button class="btn btn-danger terminal-switch-discard" id="btnDiscardTerminalSwitch" type="button" data-switch-decision="discard">СБРОСИТЬ И ПЕРЕКЛЮЧИТЬ</button>
+      <button class="btn btn-secondary" id="btnCancelTerminalSwitch" type="button" data-switch-decision="cancel">ОСТАТЬСЯ В ТЕРМИНАЛЕ</button>
+    </div>
+    <div class="terminal-switch-status" id="terminalSwitchStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="terminal-switch-error" id="terminalSwitchError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+  </div>
+</dialog>
 
 <script type="module" src="./desktop-api.js"></script>
 <script type="module" src="./master.js"></script>

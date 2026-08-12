@@ -198,6 +198,41 @@ func TestOpenAndSavePreserveUnknownFieldsAtExplicitPath(t *testing.T) {
 	assertNoApplicationSupportWrites(t, fileSystem)
 }
 
+func TestAssociatePlayerConfigPersistsRelativeReferenceAndKeepsActiveSession(t *testing.T) {
+	t.Parallel()
+
+	fs := testutil.NewFakeFileSystem()
+	sessionPath := "/Campaigns/Chapter One/session.json"
+	data, err := domain.EncodeSession(validSession("chapter one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs.SeedFile(sessionPath, data)
+	service := NewService(NewStorage(fs), &testutil.FakeDialog{OpenResult: sessionPath}, testLocations)
+	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	if opened := service.Open(context.Background()); !opened.OK {
+		t.Fatalf("Open() = %#v", opened)
+	}
+
+	configPath := "/Campaigns/Players/shared.json"
+	result := service.AssociatePlayerConfig(context.Background(), configPath)
+	if !result.OK || result.Session == nil {
+		t.Fatalf("AssociatePlayerConfig() = %#v", result)
+	}
+	want := filepath.Join("..", "Players", "shared.json")
+	if result.Session.PlayerConfig != want {
+		t.Fatalf("playerConfig = %q, want %q", result.Session.PlayerConfig, want)
+	}
+
+	written, err := domain.DecodeSession(fileSystemFileData(t, fs, sessionPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written.PlayerConfig != want || service.Snapshot().Session.PlayerConfig != want {
+		t.Fatalf("association was not durable and active: written=%q active=%q", written.PlayerConfig, service.Snapshot().Session.PlayerConfig)
+	}
+}
+
 func TestSaveWithoutActivePathFailsWithoutWriting(t *testing.T) {
 	t.Parallel()
 

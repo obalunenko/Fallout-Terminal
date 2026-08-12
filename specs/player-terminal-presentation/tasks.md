@@ -8,6 +8,8 @@ source: existing implementation
 
 All implementation tasks below are marked complete because they reconstruct work already present in the repository. The final section records gaps; it does not claim those follow-ups were implemented.
 
+**Runtime and sound reconciliation**: 2026-08-13 — Historical Express paths and click-only ambient wording are retained with explicit current Go and sound-system resolutions.
+
 ## Phase 1 — Static Shell and CRT Styling
 
 - [x] T001 Create separate connection, idle, normal terminal, record, command-output, hacking, blocked, footer, and prompt regions in `client/index.html`.
@@ -32,20 +34,20 @@ All implementation tasks below are marked complete because they reconstruct work
 
 ## Phase 4 — Atmospheric Audio
 
-- [x] T014 Add an allowlisted sound-folder discovery endpoint and supported media-extension filter in `server/server.js`.
+- [x] T014 ~~Add an allowlisted sound-folder discovery endpoint and supported media-extension filter in `server/server.js`.~~ **Runtime reconciliation**: The endpoint now lives in `internal/player/http.go`, filters regular supported files, and is covered by focused Go tests.
 - [x] T015 Prefetch sound assets, lazily decode and cache Web Audio buffers, and select category files in `client/sound.js`.
 - [x] T016 Map menu focus, character hover, entry, incorrect guess, correct guess, and reveal events to sound categories and configured volumes in `client/sound.js` and `client/client.js`.
-- [x] T017 Add a click-gated looping ambient track that starts with live presentation when permitted and pauses on terminal clear in `client/sound.js` and `client/client.js`.
+- [x] T017 ~~Add a click-gated looping ambient track that starts with live presentation when permitted and pauses on terminal clear in `client/sound.js` and `client/client.js`.~~ **Superseded by the focused sound-system implementation**: accepted live state triggers an immediate attempt, blocked playback retries on pointer or keyboard gestures, and every accepted non-live transition pauses the loop.
 - [x] T018 Treat missing folders, failed fetches, decode errors, and rejected playback as non-blocking optional-audio failures in `client/sound.js`.
 
 ## Gaps Identified During Migration
 
 These are observations for follow-up specification and planning, not completed tasks:
 
-1. No automated browser, DOM, accessibility, visual-regression, or sound-endpoint tests exist.
+1. ~~No automated browser, DOM, accessibility, visual-regression, or sound-endpoint tests exist.~~ **Partially resolved**: Playwright browser journeys and focused sound-endpoint tests now exist; accessibility and visual-regression coverage remain follow-ups.
 2. No explicit narrow-screen breakpoint adapts the two-column hacking board and proportional log panel for phones.
 3. Terminal rows and hacking cells lack semantic interactive roles, accessible names, and native focus behavior.
 4. Flicker, blink, and reveal animations do not honor `prefers-reduced-motion`.
-5. Keyboard-only interaction does not unlock the ambient audio loop because the gesture flag is click-only.
+5. ~~Keyboard-only interaction does not unlock the ambient audio loop because the gesture flag is click-only.~~ **Resolved by the focused sound-system implementation**: pointer and keyboard gestures can retry blocked playback.
 6. Optional-audio failures have no diagnostic or visible muted state.
 7. Player-facing strings are hardcoded and no localization mechanism exists.

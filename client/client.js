@@ -2,12 +2,21 @@
 
 const MODE = { LIST: 'list', ENTRY: 'entry', HACK: 'hack' };
 const ROW_WIDTH = 12; // must match server/hack.js
+const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token';
+const PLAYER_SESSION_INIT_LOCK = 'fallout-terminal.player-session-init';
+const PLAYER_SESSION_INIT_LEASE_KEY = 'fallout-terminal.player-session-init-lease';
+const PLAYER_SESSION_INIT_CONTENDER_PREFIX = 'fallout-terminal.player-session-init-contender.';
+const PLAYER_SESSION_INIT_LEASE_MS = 5000;
+const PLAYER_SESSION_INIT_RETRY_MS = 100;
+const PLAYER_SESSION_INIT_ELECTION_MS = 100;
 
 // ── State ─────────────────────────────────────────────────
 // navStack / mode(list|entry) / viewEntryId / commandOutput are mirrors of
 // the server's shared nav state — every connected player sees the same
 // position. Only selIndex (the keyboard highlight) stays local per client.
 let hasLive       = false;
+let terminalID    = '';
+let terminalBroadcastID = '';
 let terminalName  = '';
 let introText     = '';
 let serverNum     = 1;
@@ -41,8 +50,18 @@ let hackSolvedTimer   = null;
 let hackTyped         = '';
 let hackHoverKey      = null;
 let hackHoverText     = '';
+let hackHoverClearTimer = null;
 let hackWasSolved     = false;
 let lastAttemptsLeft  = null;
+let terminalLiveBaselinePending = true;
+
+// Player identity and assignment are complete server projections. Selection
+// only creates a pending request; it never changes this state optimistically.
+let sessionReady = false;
+let playerState = null;
+let pendingSelection = null;
+let pendingSharedAction = null;
+let appliedSharedRevision = 0;
 
 // ── DOM refs ──────────────────────────────────────────────
 const normalHeader = document.getElementById('normalHeader');
@@ -77,12 +96,258 @@ const pageIndicator = document.getElementById('pageIndicator');
 const connOverlay = document.getElementById('connOverlay');
 const connText    = document.getElementById('connText');
 
+const playerIdentity     = document.getElementById('playerIdentity');
+const playerCharacterName = document.getElementById('playerCharacterName');
+const playerFallbackName = document.getElementById('playerFallbackName');
+const roleBadge          = document.getElementById('roleBadge');
+const characterSelect    = document.getElementById('characterSelect');
+const characterOptions   = document.getElementById('characterOptions');
+const assignedWaiting    = document.getElementById('assignedWaiting');
+const playerNotice       = document.getElementById('playerNotice');
+
 // ════════════════════════════════════════════════════
 // WEBSOCKET
 // ════════════════════════════════════════════════════
 let ws;
 let reconnectTimer = null;
 const RECONNECT_DELAY_MS = 3000;
+const sessionInitOwner = (window.crypto && typeof window.crypto.randomUUID === 'function')
+  ? window.crypto.randomUUID()
+  : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const recognitionWaiters = new Set();
+
+function readBrowserToken() {
+  try {
+    return localStorage.getItem(PLAYER_TOKEN_KEY) || '';
+  } catch (error) {
+    console.warn('Player recognition storage is unavailable', error);
+    return '';
+  }
+}
+
+function socketIsCurrentAndOpen(socket) {
+  return ws === socket && socket.readyState === WebSocket.OPEN;
+}
+
+function sendSessionHello(socket, browserToken) {
+  if (!socketIsCurrentAndOpen(socket) || socket.sessionHelloSent) return false;
+  const hello = { type: 'SESSION_HELLO' };
+  if (browserToken) hello.browserToken = browserToken;
+  socket.sessionHelloSent = true;
+  socket.send(JSON.stringify(hello));
+  return true;
+}
+
+function signalRecognitionChange() {
+  const waiters = Array.from(recognitionWaiters);
+  recognitionWaiters.clear();
+  for (const resolve of waiters) resolve();
+}
+
+function waitForRecognitionChange() {
+  return new Promise(resolve => {
+    let timer = null;
+    const finish = () => {
+      recognitionWaiters.delete(finish);
+      if (timer !== null) clearTimeout(timer);
+      resolve();
+    };
+    recognitionWaiters.add(finish);
+    timer = setTimeout(finish, PLAYER_SESSION_INIT_RETRY_MS);
+  });
+}
+
+window.addEventListener('storage', event => {
+  if (event.key === PLAYER_TOKEN_KEY || event.key === PLAYER_SESSION_INIT_LEASE_KEY ||
+      (event.key && event.key.startsWith(PLAYER_SESSION_INIT_CONTENDER_PREFIX))) {
+    signalRecognitionChange();
+  }
+});
+
+async function waitForIssuedToken(socket) {
+  while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
+    await waitForRecognitionChange();
+  }
+}
+
+function readSessionInitLease() {
+  try {
+    const raw = localStorage.getItem(PLAYER_SESSION_INIT_LEASE_KEY);
+    if (!raw) return null;
+    const lease = JSON.parse(raw);
+    if (!lease || typeof lease.owner !== 'string' || !Number.isFinite(lease.expiresAt)) return null;
+    return lease;
+  } catch (error) {
+    return null;
+  }
+}
+
+function acquireSessionInitLease() {
+  const now = Date.now();
+  const current = readSessionInitLease();
+  if (current && current.owner !== sessionInitOwner && current.expiresAt > now) return false;
+
+  try {
+    localStorage.setItem(PLAYER_SESSION_INIT_LEASE_KEY, JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: now + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+    const confirmed = readSessionInitLease();
+    return Boolean(confirmed && confirmed.owner === sessionInitOwner);
+  } catch (error) {
+    return true;
+  }
+}
+
+function sessionInitContenderKey(owner) {
+  return `${PLAYER_SESSION_INIT_CONTENDER_PREFIX}${owner}`;
+}
+
+function registerSessionInitContender() {
+  try {
+    localStorage.setItem(sessionInitContenderKey(sessionInitOwner), JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: Date.now() + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+  } catch (error) {
+    // Without shared storage the best available behavior is one session per tab.
+  }
+}
+
+function releaseSessionInitContender() {
+  try {
+    localStorage.removeItem(sessionInitContenderKey(sessionInitOwner));
+  } catch (error) {
+    // Storage-unavailable tabs have no contender record to release.
+  }
+}
+
+function electedSessionInitOwner() {
+  const now = Date.now();
+  const owners = [];
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(PLAYER_SESSION_INIT_CONTENDER_PREFIX)) continue;
+      let contender = null;
+      try { contender = JSON.parse(localStorage.getItem(key)); } catch (error) { /* stale */ }
+      if (!contender || typeof contender.owner !== 'string' ||
+          !Number.isFinite(contender.expiresAt) || contender.expiresAt <= now) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      owners.push(contender.owner);
+    }
+  } catch (error) {
+    return sessionInitOwner;
+  }
+  owners.sort();
+  return owners[0] || sessionInitOwner;
+}
+
+function waitForSessionInitElection() {
+  return new Promise(resolve => setTimeout(resolve, PLAYER_SESSION_INIT_ELECTION_MS));
+}
+
+function renewSessionInitLease() {
+  const current = readSessionInitLease();
+  if (!current || current.owner !== sessionInitOwner) return false;
+  try {
+    localStorage.setItem(PLAYER_SESSION_INIT_LEASE_KEY, JSON.stringify({
+      owner: sessionInitOwner,
+      expiresAt: Date.now() + PLAYER_SESSION_INIT_LEASE_MS,
+    }));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function releaseSessionInitLease() {
+  const current = readSessionInitLease();
+  if (!current || current.owner !== sessionInitOwner) return;
+  try {
+    localStorage.removeItem(PLAYER_SESSION_INIT_LEASE_KEY);
+  } catch (error) {
+    // Storage-unavailable tabs have no shared lease to release.
+  }
+  signalRecognitionChange();
+}
+
+async function sendSessionHelloWithStorageLease(socket) {
+  while (socketIsCurrentAndOpen(socket) && !socket.sessionHelloSent) {
+    const browserToken = readBrowserToken();
+    if (browserToken) {
+      sendSessionHello(socket, browserToken);
+      return;
+    }
+
+    const activeLease = readSessionInitLease();
+    if (activeLease && activeLease.owner !== sessionInitOwner && activeLease.expiresAt > Date.now()) {
+      await waitForRecognitionChange();
+      continue;
+    }
+
+    registerSessionInitContender();
+    await waitForSessionInitElection();
+
+    const tokenAfterElection = readBrowserToken();
+    if (tokenAfterElection) {
+      releaseSessionInitContender();
+      sendSessionHello(socket, tokenAfterElection);
+      return;
+    }
+
+    const leaseAfterElection = readSessionInitLease();
+    if ((leaseAfterElection && leaseAfterElection.owner !== sessionInitOwner &&
+         leaseAfterElection.expiresAt > Date.now()) || electedSessionInitOwner() !== sessionInitOwner ||
+        !acquireSessionInitLease()) {
+      releaseSessionInitContender();
+      await waitForRecognitionChange();
+      continue;
+    }
+    releaseSessionInitContender();
+
+    try {
+      if (!sendSessionHello(socket, '')) return;
+      while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
+        await waitForRecognitionChange();
+        renewSessionInitLease();
+      }
+    } finally {
+      releaseSessionInitContender();
+      releaseSessionInitLease();
+    }
+    return;
+  }
+}
+
+async function beginSessionHandshake(socket) {
+  const browserToken = readBrowserToken();
+  if (browserToken) {
+    sendSessionHello(socket, browserToken);
+    return;
+  }
+
+  if (navigator.locks && typeof navigator.locks.request === 'function') {
+    try {
+      await navigator.locks.request(PLAYER_SESSION_INIT_LOCK, async () => {
+        if (!socketIsCurrentAndOpen(socket)) return;
+        const tokenAfterLock = readBrowserToken();
+        if (tokenAfterLock) {
+          sendSessionHello(socket, tokenAfterLock);
+          return;
+        }
+        if (sendSessionHello(socket, '')) await waitForIssuedToken(socket);
+      });
+      return;
+    } catch (error) {
+      console.warn('Player session lock unavailable; using storage coordination', error);
+    }
+  }
+
+  await sendSessionHelloWithStorageLease(socket);
+}
 
 function playerWebSocketURL() {
   const url = new URL('/', window.location.href);
@@ -101,7 +366,12 @@ function connect() {
     if (ws !== socket) return;
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
-    connOverlay.classList.add('hidden');
+    sessionReady = false;
+    terminalLiveBaselinePending = true;
+    connOverlay.classList.remove('hidden');
+    connText.textContent = 'УСТАНОВКА СВЯЗИ...';
+
+    void beginSessionHandshake(socket);
   });
 
   socket.addEventListener('message', ev => {
@@ -112,6 +382,9 @@ function connect() {
 
   socket.addEventListener('close', () => {
     if (ws !== socket) return;
+    sessionReady = false;
+    terminalLiveBaselinePending = true;
+    signalRecognitionChange();
     connOverlay.classList.remove('hidden');
     connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
     reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
@@ -137,22 +410,160 @@ function applyNavFromServer(nav) {
   }
 }
 
+function acceptSharedSnapshot(message) {
+  const revision = Number(message.revision);
+  if (!Number.isFinite(revision)) return true;
+  const playerRevision = playerState ? Number(playerState.revision) : -1;
+  if (Number.isFinite(playerRevision) && revision < playerRevision) return false;
+  if (revision < appliedSharedRevision) return false;
+  appliedSharedRevision = revision;
+  completeAcceptedSharedAction();
+  return true;
+}
+
+function matchesActiveTerminal(message) {
+  const activeTerminalID = playerState?.activeTerminalId;
+  if (!activeTerminalID || terminalID !== activeTerminalID) return false;
+  return !message.terminalId || message.terminalId === activeTerminalID;
+}
+
+function matchesExpectedTerminalLive(message) {
+  return sessionReady && playerState !== null && playerState.character !== null &&
+    playerState.activeTerminalId !== null &&
+    message.terminalId === playerState.activeTerminalId;
+}
+
+function expectsTerminalClear() {
+  return sessionReady && playerState !== null && playerState.activeTerminalId === null;
+}
+
+function hasCurrentTerminalMirror() {
+  return hasLive && playerState !== null && playerState.character !== null &&
+    playerState.broadcastId !== null && playerState.activeTerminalId !== null &&
+    playerState.broadcastId === terminalBroadcastID &&
+    playerState.activeTerminalId === terminalID;
+}
+
+function completeAcceptedSharedAction() {
+  if (!pendingSharedAction || pendingSharedAction.acceptedRevision == null) return;
+  if (appliedSharedRevision < pendingSharedAction.acceptedRevision) return;
+  pendingSharedAction = null;
+  showPlayerNotice('');
+}
+
+function clearBroadcastMirrors() {
+  hasLive = false;
+  terminalID = '';
+  terminalBroadcastID = '';
+  terminalName = '';
+  introText = '';
+  serverNum = 1;
+  tree = null;
+  navStack = ['root'];
+  selIndex = 0;
+  mode = MODE.LIST;
+  viewEntryId = null;
+  commandOutput = null;
+  currentCommandNodeId = null;
+  lastRenderedFolderKey = null;
+  lastRenderedEntryId = null;
+  lastRenderedCommandKey = null;
+  hackLevel = 0;
+  hack = null;
+  hackTyped = '';
+  hackHoverKey = null;
+  hackHoverText = '';
+  cancelHackHoverClear();
+  hackWasSolved = false;
+  lastAttemptsLeft = null;
+  terminalLiveBaselinePending = true;
+  appliedSharedRevision = 0;
+
+  clearTimeout(hackSolvedTimer);
+  hackSolvedTimer = null;
+  setAmbientActive(false);
+  deactivatePagination();
+
+  for (const container of [termList, entryBody, termOutput]) {
+    if (container._revealTimer) clearTimeout(container._revealTimer);
+    container._revealTimer = null;
+    container.replaceChildren();
+  }
+  hackColumns.replaceChildren();
+  hackLog.replaceChildren();
+  introTextEl.textContent = '';
+  entryTitle.textContent = '';
+  attemptsLine.textContent = '';
+  hackInputPreview.textContent = '';
+}
+
+function playHackOutcomeTransition(previousHack, nextHack) {
+  if (!previousHack || !nextHack) return;
+  if (!nextHack.solved && nextHack.attemptsLeft < previousHack.attemptsLeft) {
+    playHackBad();
+  }
+  if (nextHack.solved && !previousHack.solved) {
+    playHackGood();
+  }
+}
+
+function scheduleHackSolvedNavigation() {
+  if (!hack || !hack.solved || hackSolvedTimer) return;
+  hackSolvedTimer = setTimeout(() => {
+    hackSolvedTimer = null;
+    mode = MODE.LIST;
+    render();
+  }, 2600);
+}
+
 function dispatch(msg) {
-  if (msg.type === 'TERMINAL_LIVE') {
+  if (msg.type === 'SESSION_WELCOME') {
+    if (!msg.state || typeof msg.browserToken !== 'string' || !msg.browserToken) return;
+    try {
+      localStorage.setItem(PLAYER_TOKEN_KEY, msg.browserToken);
+    } catch (error) {
+      console.warn('Player recognition token could not be stored', error);
+    }
+    signalRecognitionChange();
+    sessionReady = true;
+    terminalLiveBaselinePending = true;
+    pendingSelection = null;
+    pendingSharedAction = null;
+    showPlayerNotice('');
+    applyPlayerState(msg.state, { authoritativeWelcome: true });
+    if (!hasCurrentTerminalMirror()) appliedSharedRevision = 0;
+    connOverlay.classList.add('hidden');
+  } else if (msg.type === 'PLAYER_STATE') {
+    if (!sessionReady || !msg.state) return;
+    applyPlayerState(msg.state);
+  } else if (msg.type === 'ACTION_RESULT') {
+    if (!sessionReady) return;
+    applyActionResult(msg);
+  } else if (msg.type === 'TERMINAL_LIVE') {
+    if (!matchesExpectedTerminalLive(msg) || !acceptSharedSnapshot(msg)) return;
+    const previousHack = hack;
+    const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive &&
+      terminalID === msg.terminalId && mode === MODE.HACK;
     hasLive       = true;
+    terminalID    = msg.terminalId || '';
+    terminalBroadcastID = playerState?.broadcastId || '';
     terminalName  = msg.terminalName || '';
     introText     = msg.introText || '';
     tree          = msg.tree;
     hackLevel     = msg.hackLevel || 0;
     hack          = msg.hack || null;
     serverNum     = 1 + Math.floor(Math.random() * 9);
-    hackTyped     = '';
-    hackHoverKey  = null;
-    hackHoverText = '';
+    if (!isContinuousTerminalUpdate) {
+      hackTyped     = '';
+      hackHoverKey  = null;
+      hackHoverText = '';
+    }
     hackWasSolved = !!(hack && hack.solved);
     lastAttemptsLeft = hack ? hack.attemptsLeft : null;
-    clearTimeout(hackSolvedTimer);
-    hackSolvedTimer = null;
+    if (!isContinuousTerminalUpdate) {
+      clearTimeout(hackSolvedTimer);
+      hackSolvedTimer = null;
+    }
 
     const nav = msg.nav || { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null };
     navStack      = nav.path.slice();
@@ -164,49 +575,299 @@ function dispatch(msg) {
     lastRenderedEntryId    = null;
     lastRenderedCommandKey = null;
 
-    mode = (hackLevel > 0 && hack && !hack.solved) ? MODE.HACK : (nav.mode === 'entry' ? MODE.ENTRY : MODE.LIST);
+    mode = (hackLevel > 0 && hack && (!hack.solved || isContinuousTerminalUpdate))
+      ? MODE.HACK
+      : (nav.mode === 'entry' ? MODE.ENTRY : MODE.LIST);
 
-    tryStartAmbient();
+    if (isContinuousTerminalUpdate) playHackOutcomeTransition(previousHack, hack);
+    if (isContinuousTerminalUpdate) scheduleHackSolvedNavigation();
+    terminalLiveBaselinePending = false;
+
+    setAmbientActive(true);
     render();
   } else if (msg.type === 'TERMINAL_UPDATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     tree = msg.tree;
     if (msg.introText != null) introText = msg.introText;
     if (msg.nav) applyNavFromServer(msg.nav);
     render();
   } else if (msg.type === 'NAV_STATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     applyNavFromServer(msg.nav);
     render();
   } else if (msg.type === 'HACK_STATE') {
+    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
+    const previousHack = hack;
     hack = msg.hack;
     if (mode !== MODE.HACK || !hack) return;
-
-    if (!hack.solved && lastAttemptsLeft != null && hack.attemptsLeft < lastAttemptsLeft) {
-      playHackBad();
-    }
+    playHackOutcomeTransition(previousHack, hack);
     lastAttemptsLeft = hack.attemptsLeft;
+    hackWasSolved = hack.solved;
 
-    if (hack.solved && !hackWasSolved) {
-      hackWasSolved = true;
-      playHackGood();
-    }
-
-    if (hack.solved && !hackSolvedTimer) {
-      hackSolvedTimer = setTimeout(() => {
-        hackSolvedTimer = null;
-        mode = MODE.LIST;
-        render();
-      }, 2600);
-    }
+    scheduleHackSolvedNavigation();
     render();
   } else if (msg.type === 'TERMINAL_CLEAR') {
+    if (!expectsTerminalClear() || !acceptSharedSnapshot(msg)) return;
     hasLive = false;
+    terminalID = '';
+    terminalBroadcastID = '';
     tree = null;
     hack = null;
     clearTimeout(hackSolvedTimer);
     hackSolvedTimer = null;
-    stopAmbient();
+    setAmbientActive(false);
     render();
   }
+}
+
+function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
+  const revision = Number(nextState.revision);
+  const currentRevision = playerState ? Number(playerState.revision) : -1;
+  if (!authoritativeWelcome && Number.isFinite(revision) &&
+      Number.isFinite(currentRevision) && revision < currentRevision) return;
+
+  const previousState = playerState;
+  const roster = [];
+  const rosterByID = new Map();
+  if (Array.isArray(nextState.roster)) {
+    for (const entry of nextState.roster) {
+      if (!entry || typeof entry !== 'object') continue;
+      const id = String(entry.id || '');
+      if (!id || rosterByID.has(id)) continue;
+      const normalized = {
+        id,
+        name: String(entry.name || ''),
+        status: entry.status === 'available' ? 'available' : 'claimed',
+      };
+      roster.push(normalized);
+      rosterByID.set(id, normalized);
+    }
+  }
+
+  let character = null;
+  if (nextState.character && typeof nextState.character === 'object') {
+    const id = String(nextState.character.id || '');
+    if (id) {
+      const rosterCharacter = rosterByID.get(id);
+      character = {
+        id,
+        name: rosterCharacter ? rosterCharacter.name : String(nextState.character.name || ''),
+      };
+    }
+  }
+
+  const nextPlayerState = {
+    revision: Number.isFinite(revision) ? revision : 0,
+    sessionId: String(nextState.sessionId || ''),
+    fallbackName: String(nextState.fallbackName || ''),
+    character,
+    role: String(nextState.role || 'unassigned'),
+    phase: String(nextState.phase || 'no-broadcast'),
+    broadcastId: nextState.broadcastId == null ? null : String(nextState.broadcastId),
+    activeTerminalId: nextState.activeTerminalId == null ? null : String(nextState.activeTerminalId),
+    roster,
+  };
+  playerState = nextPlayerState;
+
+  const broadcastChanged = previousState !== null &&
+    previousState.broadcastId !== nextPlayerState.broadcastId;
+  const outsideBroadcast = nextPlayerState.broadcastId === null ||
+    nextPlayerState.phase === 'no-broadcast';
+  if (broadcastChanged || outsideBroadcast) {
+    pendingSelection = null;
+    pendingSharedAction = null;
+    clearBroadcastMirrors();
+    showPlayerNotice('');
+  } else if (pendingSelection && nextPlayerState.phase !== 'selecting') {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+
+  if (authoritativeWelcome || !hasCurrentTerminalMirror()) {
+    setAmbientActive(false);
+  }
+
+  if (pendingSelection && pendingSelection.acceptedRevision != null &&
+      playerState.revision >= pendingSelection.acceptedRevision) {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+
+  const terminalPhases = new Set(['controlling', 'observing']);
+  const retainsCurrentTerminalSurface = previousState !== null && hasLive &&
+    previousState.character !== null && nextPlayerState.character !== null &&
+    terminalPhases.has(previousState.phase) && terminalPhases.has(nextPlayerState.phase) &&
+    previousState.broadcastId === nextPlayerState.broadcastId &&
+    nextPlayerState.broadcastId === terminalBroadcastID &&
+    previousState.activeTerminalId === nextPlayerState.activeTerminalId &&
+    nextPlayerState.activeTerminalId === terminalID;
+  if (retainsCurrentTerminalSurface) {
+    renderPlayerContext();
+    return;
+  }
+  render();
+}
+
+function applyActionResult(result) {
+  if (pendingSharedAction && result.requestId === pendingSharedAction.requestId) {
+    if (!result.accepted) {
+      pendingSharedAction = null;
+      showPlayerNotice(`ДЕЙСТВИЕ ОТКЛОНЕНО: ${String(result.reason || 'invalid-action')}`);
+    } else {
+      pendingSharedAction.acceptedRevision = Number(result.revision) || 0;
+      completeAcceptedSharedAction();
+    }
+    renderPlayerContext();
+    return;
+  }
+
+  if (!pendingSelection || result.requestId !== pendingSelection.requestId) return;
+
+  if (!result.accepted) {
+    pendingSelection = null;
+    const messages = {
+      conflict: 'ПЕРСОНАЖ УЖЕ ЗАНЯТ (conflict). ВЫБЕРИТЕ ДРУГОГО.',
+      'stale-broadcast': 'ТРАНСЛЯЦИЯ ИЗМЕНИЛАСЬ. ДОЖДИТЕСЬ НОВОГО СПИСКА.',
+      duplicate: 'ЗАПРОС УЖЕ БЫЛ ОБРАБОТАН.',
+    };
+    showPlayerNotice(messages[result.reason] || `ВЫБОР ОТКЛОНЕН: ${String(result.reason || 'invalid-action')}`);
+    render();
+    return;
+  }
+
+  pendingSelection.acceptedRevision = Number(result.revision) || 0;
+  if (playerState && playerState.revision >= pendingSelection.acceptedRevision) {
+    pendingSelection = null;
+    showPlayerNotice('');
+  }
+  render();
+}
+
+function createRequestID() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function canControlSharedTerminal() {
+  return sessionReady && playerState !== null && hasCurrentTerminalMirror() &&
+    playerState.role === 'active' &&
+    playerState.phase === 'controlling' &&
+    playerState.broadcastId !== null &&
+    playerState.activeTerminalId !== null &&
+    playerState.activeTerminalId === terminalID &&
+    pendingSharedAction === null;
+}
+
+function beginSharedAction(type, fields) {
+  if (!canControlSharedTerminal()) return false;
+
+  const requestId = createRequestID();
+  pendingSharedAction = { requestId, type, acceptedRevision: null };
+  showPlayerNotice('');
+  renderPlayerContext();
+  send({
+    type,
+    requestId,
+    broadcastId: playerState.broadcastId,
+    terminalId: playerState.activeTerminalId,
+    ...fields,
+  });
+  return true;
+}
+
+function selectCharacter(characterID) {
+  if (!sessionReady || !playerState || pendingSelection ||
+      playerState.phase !== 'selecting' || !playerState.broadcastId) return;
+
+  const entry = playerState.roster.find(candidate =>
+    candidate.id === characterID && candidate.status === 'available'
+  );
+  if (!entry) return;
+
+  const requestId = createRequestID();
+  pendingSelection = { requestId, acceptedRevision: null };
+  showPlayerNotice('');
+  render();
+  send({
+    type: 'CHARACTER_SELECT',
+    requestId,
+    broadcastId: playerState.broadcastId,
+    characterId: entry.id,
+  });
+}
+
+function showPlayerNotice(message) {
+  playerNotice.textContent = message;
+  playerNotice.hidden = !message;
+}
+
+function renderRoster() {
+  characterOptions.replaceChildren();
+  for (const entry of playerState.roster) {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'character-option';
+    option.dataset.characterId = entry.id;
+    option.dataset.status = entry.status;
+    option.setAttribute('role', 'listitem');
+    option.textContent = entry.name;
+    option.disabled = entry.status !== 'available' || pendingSelection !== null;
+    option.addEventListener('click', () => selectCharacter(entry.id));
+    characterOptions.appendChild(option);
+  }
+}
+
+function renderPlayerContext() {
+  const hasState = sessionReady && playerState !== null;
+  playerIdentity.hidden = !hasState;
+  characterSelect.hidden = !hasState || playerState.phase !== 'selecting';
+  assignedWaiting.hidden = !hasState || playerState.phase !== 'waiting';
+
+  const observerReadOnly = hasState && playerState.role === 'observer';
+  roleBadge.dataset.role = hasState ? playerState.role : '';
+  screen.classList.toggle('observer-read-only', observerReadOnly);
+  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null);
+  screen.setAttribute('aria-readonly', String(observerReadOnly));
+
+  if (!hasState) return false;
+
+  if (playerState.character) {
+    playerCharacterName.textContent = playerState.character.name;
+    playerFallbackName.textContent = playerState.fallbackName;
+  } else {
+    playerCharacterName.textContent = playerState.fallbackName;
+    playerFallbackName.textContent = '';
+  }
+  const roleLabels = {
+    active: 'АКТИВНЫЙ КОНТРОЛЛЕР',
+    observer: 'НАБЛЮДАТЕЛЬ',
+    unassigned: 'НЕ НАЗНАЧЕН',
+  };
+  roleBadge.textContent = roleLabels[playerState.role] || playerState.role;
+
+  const selecting = playerState.phase === 'selecting';
+  characterSelect.classList.toggle('pending', selecting && pendingSelection !== null);
+  characterSelect.setAttribute('aria-busy', String(selecting && pendingSelection !== null));
+  if (selecting) renderRoster();
+
+  return selecting || playerState.phase === 'waiting';
+}
+
+function hideTerminalSurface() {
+  deactivatePagination();
+  normalHeader.hidden = true;
+  hackHeader.hidden = true;
+  termIdle.hidden = true;
+  termList.hidden = true;
+  termEntry.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  termOutput.hidden = true;
+  termPrompt.hidden = true;
+  backBtn.hidden = true;
+  pageNav.hidden = true;
 }
 
 // ════════════════════════════════════════════════════
@@ -239,17 +900,17 @@ function currentFolderNode() {
 // ════════════════════════════════════════════════════
 function activateRow(node) {
   if (node.type === 'folder') {
-    send({ type: 'NAV_ACTION', action: 'enter', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'enter', nodeId: node.id });
   } else if (node.type === 'command') {
-    send({ type: 'NAV_ACTION', action: 'command', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'command', nodeId: node.id });
   } else if (node.type === 'entry') {
-    send({ type: 'NAV_ACTION', action: 'entry', nodeId: node.id });
+    beginSharedAction('NAV_ACTION', { action: 'entry', nodeId: node.id });
   }
 }
 
 function goBack() {
   if (mode === MODE.HACK) return;
-  send({ type: 'NAV_ACTION', action: 'back' });
+  beginSharedAction('NAV_ACTION', { action: 'back' });
 }
 
 backBtn.addEventListener('click', goBack);
@@ -279,11 +940,9 @@ function cssEscape(s) {
   return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
 }
 
-function setHackHover(key) {
-  if (hackHoverKey === key) return;
-  if (hackHoverKey != null) {
-    hackColumns.querySelectorAll(`[data-target="${cssEscape(hackHoverKey)}"]`).forEach(el => el.classList.remove('hi'));
-  }
+function setHackHover(key, force = false) {
+  if (!force && hackHoverKey === key) return;
+  hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
   hackHoverKey = key;
   hackHoverText = '';
   if (key != null) {
@@ -294,25 +953,103 @@ function setHackHover(key) {
   renderHackInputPreview();
 }
 
-hackColumns.addEventListener('mouseover', (e) => {
-  const cell = e.target.closest('.hcell');
+function cancelHackHoverClear() {
+  if (hackHoverClearTimer === null) return;
+  clearTimeout(hackHoverClearTimer);
+  hackHoverClearTimer = null;
+}
+
+function scheduleHackHoverClear(key) {
+  cancelHackHoverClear();
+  hackHoverClearTimer = setTimeout(() => {
+    hackHoverClearTimer = null;
+    if (hackHoverKey === key) setHackHover(null, true);
+  }, 0);
+}
+
+function patternAtCell(cell) {
+  if (!hack || !cell || cell.dataset.row == null || cell.dataset.offset == null) return null;
+  const row = Number(cell.dataset.row);
+  const offset = Number(cell.dataset.offset);
+  return (hack.patterns || []).find(pattern =>
+    pattern.row === row && pattern.start === offset
+  ) || null;
+}
+
+function setHackPatternHover(pattern) {
+  hackColumns.querySelectorAll('.hcell.hi').forEach(el => el.classList.remove('hi'));
+  hackHoverKey = pattern ? pattern.id : null;
+  hackHoverText = '';
+  if (pattern && !pattern.used) {
+    const cells = hackColumns.querySelectorAll(`[data-row="${pattern.row}"][data-offset]`);
+    cells.forEach(cell => {
+      const offset = Number(cell.dataset.offset);
+      if (offset >= pattern.start && offset <= pattern.end) cell.classList.add('hi');
+    });
+    hackHoverText = Array.from(cells)
+      .filter(cell => {
+        const offset = Number(cell.dataset.offset);
+        return offset >= pattern.start && offset <= pattern.end;
+      })
+      .map(cell => cell.textContent)
+      .join('');
+  }
+  renderHackInputPreview();
+}
+
+function previewHackCell(cell) {
   if (!cell) return;
+  cancelHackHoverClear();
+  const pattern = patternAtCell(cell);
+  if (pattern) {
+    if (pattern.used) setHackPatternHover(null);
+    else if (pattern.id !== hackHoverKey) {
+      setHackPatternHover(pattern);
+      playMultiple();
+    }
+    return;
+  }
   const key = cell.dataset.target;
   if (key === hackHoverKey) return;
   setHackHover(key);
   if (cell.classList.contains('word')) playMultiple(); else playSingle();
+}
+
+hackColumns.addEventListener('mouseover', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
 });
 hackColumns.addEventListener('mouseout', (e) => {
   const cell = e.target.closest('.hcell');
-  if (!cell) return;
+  if (!cell || !cell.isConnected) return;
+  const pattern = patternAtCell(cell);
+  if (pattern) {
+    const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
+    const relatedPattern = patternAtCell(related);
+    if (!relatedPattern || relatedPattern.id !== pattern.id) scheduleHackHoverClear(pattern.id);
+    return;
+  }
   const related = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.hcell') : null;
-  if (!related || related.dataset.target !== cell.dataset.target) setHackHover(null);
+  if (!related || related.dataset.target !== cell.dataset.target) scheduleHackHoverClear(cell.dataset.target);
+});
+hackColumns.addEventListener('focusin', (e) => {
+  previewHackCell(e.target.closest('.hcell'));
+});
+hackColumns.addEventListener('focusout', (e) => {
+  const cell = e.target.closest('.hcell');
+  if (!cell || !cell.isConnected) return;
+  const pattern = patternAtCell(cell);
+  scheduleHackHoverClear(pattern ? pattern.id : cell.dataset.target);
 });
 hackColumns.addEventListener('click', (e) => {
   const cell = e.target.closest('.hcell');
   if (!cell || !hack || hack.solved || hack.failed) return;
-  playEnter();
-  send({ type: 'HACK_GUESS', targetId: cell.dataset.target });
+  const pattern = patternAtCell(cell);
+  if (pattern && !pattern.used) {
+    if (beginSharedAction('HACK_PATTERN', { patternId: pattern.id })) playEnter();
+    return;
+  }
+  if (pattern) return;
+  if (beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })) playEnter();
 });
 
 // ════════════════════════════════════════════════════
@@ -324,9 +1061,7 @@ document.addEventListener('keydown', (e) => {
   if (mode === MODE.HACK) {
     if (!hack || hack.solved || hack.failed) return;
     if (e.key === 'Enter') {
-      const val = hackTyped.trim();
       hackTyped = '';
-      if (val === '1') send({ type: 'HACK_ADMIN' });
       renderHackInputPreview();
       e.preventDefault();
     } else if (e.key === 'Backspace') {
@@ -707,7 +1442,12 @@ function scheduleHackFit() {
 }
 
 function render() {
-  if (!hasLive) {
+  if (renderPlayerContext()) {
+    hideTerminalSurface();
+    return;
+  }
+
+  if (!hasCurrentTerminalMirror()) {
     deactivatePagination();
     normalHeader.hidden = true;
     hackHeader.hidden   = true;
@@ -852,7 +1592,7 @@ function renderHackScreen() {
   scheduleHackFit();
 }
 
-function buildColumnHtml(col, colIndex) {
+function buildColumnHtml(col, colIndex, rowBase) {
   const wordAt = new Array(col.text.length).fill(null);
   col.words.forEach(w => { for (let i = w.start; i < w.start + w.length; i++) wordAt[i] = w.id; });
 
@@ -868,10 +1608,10 @@ function buildColumnHtml(col, colIndex) {
       if (wid) {
         let j = i;
         while (j < rowEnd && wordAt[j] === wid) j++;
-        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}">${esc(col.text.slice(i, j))}</span>`;
+        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}" tabindex="0">${esc(col.text.slice(i, j))}</span>`;
         i = j;
       } else {
-        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}">${esc(col.text[i])}</span>`;
+        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0">${esc(col.text[i])}</span>`;
         i++;
       }
     }
@@ -882,13 +1622,28 @@ function buildColumnHtml(col, colIndex) {
 }
 
 function renderHackColumns() {
-  hackHoverKey = null;
-  hackHoverText = '';
-  hackColumns.innerHTML = hack.columns.map((col, ci) => buildColumnHtml(col, ci)).join('');
+  let rowBase = 0;
+  hackColumns.innerHTML = hack.columns.map((col, ci) => {
+    const html = buildColumnHtml(col, ci, rowBase);
+    rowBase += Math.ceil(col.text.length / ROW_WIDTH);
+    return html;
+  }).join('');
+
+  if (hackHoverKey === null) return;
+  const hoveredPattern = (hack.patterns || []).find(pattern =>
+    pattern.id === hackHoverKey && !pattern.used
+  );
+  if (hoveredPattern) {
+    setHackPatternHover(hoveredPattern);
+    return;
+  }
+  const hoveredCells = hackColumns.querySelectorAll(`[data-target="${cssEscape(hackHoverKey)}"]`);
+  setHackHover(hoveredCells.length ? hackHoverKey : null, true);
 }
 
 function renderHackLog() {
-  hackLog.innerHTML = hack.log.map(line => `<div>${esc(line)}</div>`).join('');
+  const lines = Array.isArray(hack.log) ? hack.log : [];
+  hackLog.innerHTML = lines.map(line => `<div>${esc(line)}</div>`).join('');
 }
 
 function renderHackInputPreview() {
