@@ -227,6 +227,89 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 	}
 }
 
+func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(raw)
+	}
+	functionBoundary := func(script, start, end string) string {
+		t.Helper()
+		startIndex := strings.Index(script, start)
+		if startIndex < 0 {
+			t.Fatalf("missing JavaScript boundary %q", start)
+		}
+		endIndex := strings.Index(script[startIndex+len(start):], end)
+		if endIndex < 0 {
+			t.Fatalf("missing JavaScript boundary %q after %q", end, start)
+		}
+		return script[startIndex : startIndex+len(start)+endIndex]
+	}
+
+	soundScript := read("client/sound.js")
+	for _, state := range []string{"ambientRequested", "ambientPlayAttempt", "webAudioEligible", "webAudioReady"} {
+		if !strings.Contains(soundScript, state) {
+			t.Errorf("player sound adapter is missing explicit audio state %q", state)
+		}
+	}
+	activation := functionBoundary(soundScript, "function enableWebAudio()", "async function prefetch")
+	for _, boundary := range []string{
+		"if (webAudioEligible)",
+		"if (webAudioReady)",
+		"webAudioReady = attempt",
+		"webAudioReady = null",
+	} {
+		if !strings.Contains(activation, boundary) {
+			t.Errorf("Web Audio activation is missing retry boundary %q", boundary)
+		}
+	}
+	for _, event := range []string{"'pointerdown'", "'keydown'"} {
+		if strings.Count(soundScript, "document.addEventListener("+event+", handleAudioGesture)") != 1 {
+			t.Errorf("player sound adapter must observe qualifying gesture %s exactly once", event)
+		}
+	}
+
+	reconcile := functionBoundary(soundScript, "function reconcileAmbient()", "function setAmbientActive(active)")
+	for _, boundary := range []string{
+		"ambientRequested",
+		"ambientReady",
+		"ambientAudio.paused",
+		"ambientPlayAttempt",
+		"ambientAudio.play()",
+		".catch(",
+		".finally(",
+	} {
+		if !strings.Contains(reconcile, boundary) {
+			t.Errorf("ambient reconciliation is missing state boundary %q", boundary)
+		}
+	}
+	ambientState := functionBoundary(soundScript, "function setAmbientActive(active)", "function stopAmbient()")
+	for _, boundary := range []string{"Boolean(active)", "ambientRequested = requested", "reconcileAmbient()", "stopAmbient()"} {
+		if !strings.Contains(ambientState, boundary) {
+			t.Errorf("ambient state API is missing transition boundary %q", boundary)
+		}
+	}
+
+	playerScript := read("client/client.js")
+	if strings.Count(playerScript, "setAmbientActive(true);") != 1 {
+		t.Error("accepted terminal-live dispatch must be the sole ambient activation boundary")
+	}
+	if strings.Count(playerScript, "setAmbientActive(false);") < 3 {
+		t.Error("player lifecycle must revoke ambient state across clear, reset, and reconnect boundaries")
+	}
+	for _, obsolete := range []string{"tryStartAmbient", "stopAmbient"} {
+		if strings.Contains(playerScript, obsolete) {
+			t.Errorf("player lifecycle must use the explicit ambient state API, found %q", obsolete)
+		}
+	}
+}
+
 func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 	t.Parallel()
 
@@ -751,9 +834,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"const pattern = patternAtCell(cell)",
 		"pattern.row === row && pattern.start === offset",
 		"if (pattern && !pattern.used)",
-		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id });",
+		"if (beginSharedAction('HACK_PATTERN', { patternId: pattern.id })) playEnter();",
 		"if (pattern) return;",
-		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target });",
+		"if (beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })) playEnter();",
 		"class=\"hcell word\"",
 		"class=\"hcell filler\"",
 	} {

@@ -227,6 +227,29 @@ func TestHTTPHandlerListsOnlyAllowlistedSoundFiles(t *testing.T) {
 	}
 }
 
+func TestHTTPHandlerSoundManifestExcludesNonRegularEntries(t *testing.T) {
+	t.Parallel()
+
+	handler := NewHTTPHandler(fstest.MapFS{
+		"sounds/ambient/hum.wav":    {Data: []byte("wav")},
+		"sounds/ambient/linked.wav": {Data: []byte("symlink"), Mode: fs.ModeSymlink},
+		"sounds/ambient/device.mp3": {Data: []byte("device"), Mode: fs.ModeDevice},
+	})
+	recorder := serveRequest(t, handler, "/api/sounds/ambient")
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET ambient status = %d, want 200", recorder.Code)
+	}
+
+	var got []string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode sound response: %v; body = %q", err, recorder.Body.String())
+	}
+	want := []string{"hum.wav"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ambient sounds = %#v, want regular files only %#v", got, want)
+	}
+}
+
 func TestHTTPHandlerServesHackingSoundManifestsAndAssets(t *testing.T) {
 	t.Parallel()
 

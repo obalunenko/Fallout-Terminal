@@ -1,0 +1,713 @@
+{
+  "workflow": "speckit",
+  "specName": "Sound System",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T21:04:29.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:06:44.616Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:07:13.036Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:07:45.775Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:08:31.935Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:06.920Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:07.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:07.409Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:07.651Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:07.893Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:11:08.131Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:12:08.821Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:14:19.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T21:32:20.905Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:33:42.421Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:34:59.642Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:35:14.789Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-12T21:37:24.057Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T21:57:42.716Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:58:25.252Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-12T21:59:33.874Z"
+    }
+  ],
+  "currentTask": "T034",
+  "task_summaries": {
+    "T008": {
+      "status": "DONE",
+      "did": "Made Web Audio activation retryable across pointer and keyboard gestures while coalescing concurrent initialization and preserving one-shot prefetch/decode.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Implemented ambient asset discovery and a looping 0.25-volume Audio element with immediate state-gated playback, retained requests after autoplay rejection, and non-fatal pausing.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Wired explicit ambient activation to accepted TERMINAL_LIVE state and deactivation to clear, mirror reset, terminal replacement, and authoritative reconnect baselines.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Extended both Playwright sound harnesses with pointer/keyboard activation controls, AudioContext creation and resume counters, and controllable ambient autoplay play/pause observations.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/hacking-camouflage.spec.mjs"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Covered rejected/source-failed ambient playback, ignored ineligible live snapshots, authoritative reconnect baselines, lifecycle continuity, and later eligible recovery as silent non-blocking paths.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Added explicit ambient requested-state reconciliation with immediate eligible playback, in-flight coalescing, retained rejection state, lifecycle revision protection, and gesture retry.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Replaced ambient start/stop calls with accepted live and explicit non-live lifecycle transitions for publication, clear, reset, replacement, and reconnect.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Separated gesture observation from Web Audio in-flight state, successful eligibility, failed-attempt reset, and pointer/keyboard retries without duplicate context creation.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Added deterministic browser coverage for idle silence, immediate autoplay, blocked fallback, gesture/live ordering, loop and volume, repeated reconciliation, and pause transitions.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Added deterministic browser coverage for failed-first and later-successful gesture activation, concurrent-attempt coalescing, one-context reuse, and non-blocking media rejection.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Added source-contract guards for explicit ambient request reconciliation, retryable/coalesced Web Audio activation, qualifying gesture listeners, and lifecycle-only activation/deactivation boundaries.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Built a clean self-signed macOS arm64 Wails package and launched it to verify the embedded player served sound.js, all eight manifests, and a non-empty ambient WAV with restrictive media headers.",
+      "files": [
+        "build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Extended the Playwright Web Audio double to associate successful source starts with gain values and verified all seven one-shot categories, including character scroll, at their configured gains.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Added deterministic browser coverage proving concurrent single-folder and raw-asset loads fetch once and random versus first-file categories select the expected sorted asset.",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Enforced regular-file-only sound manifests and added regression coverage for symlink and device entries.",
+      "files": [
+        "internal/player/http.go",
+        "internal/player/http_test.go"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Gated hacking enter cues on successful local dispatch and covered accepted, observer, and pending click behavior.",
+      "files": [
+        "client/client.js",
+        "tests/browser/hacking-camouflage.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Go unit and source-contract suite",
+      "command": "go test ./... -count=1",
+      "result": "passed across all packages"
+    },
+    {
+      "what": "Complete Playwright browser suite",
+      "command": "cd tests/browser && npm test",
+      "result": "37 passed",
+      "warnings": [
+        "Playwright reported the existing NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    },
+    {
+      "what": "Clean browser dependency installation",
+      "command": "npm ci --prefix tests/browser",
+      "result": "passed",
+      "warnings": [
+        "Optional fsevents install script was blocked by npm allowScripts policy; browser tests remained fully operational"
+      ]
+    },
+    {
+      "what": "Go formatting",
+      "command": "gofmt -l .",
+      "result": "passed with no paths"
+    },
+    {
+      "what": "Go static analysis",
+      "command": "go vet ./...",
+      "result": "passed"
+    },
+    {
+      "what": "Go test suite after analysis remediation",
+      "command": "go test ./... -count=1",
+      "result": "passed across all packages"
+    },
+    {
+      "what": "Complete browser suite after focused sound coverage",
+      "command": "npm test --prefix tests/browser",
+      "result": "39 passed",
+      "warnings": [
+        "Playwright reported the existing NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    },
+    {
+      "what": "Interactive Wails development launch",
+      "command": "wails dev",
+      "result": "built and launched; live player page and ambient manifest served before clean shutdown"
+    },
+    {
+      "what": "Clean packaged-player sound evidence",
+      "command": "wails build -clean -platform darwin/arm64; launch packaged app; inspect player HTTP",
+      "result": "build passed and package served sound.js, all eight manifests, and a 296320-byte ambient WAV"
+    },
+    {
+      "what": "JavaScript syntax",
+      "command": "node --check client/sound.js client/client.js and sound Playwright specs",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Full Go test suite",
+      "command": "go test ./... -count=1",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Go race test suite",
+      "command": "go test -race ./... -count=1",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Full browser journey suite",
+      "command": "npm test --prefix tests/browser",
+      "result": "39 of 39 passed",
+      "warnings": [
+        "Playwright reported that NO_COLOR is ignored because FORCE_COLOR is set; output only"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Represent ambient playback as retained requested state independent of Web Audio eligibility",
+      "why": "This permits the browser to honor autoplay immediately while preserving a request for gesture retry after policy rejection",
+      "rejected": "Require a gesture before every ambient play attempt"
+    },
+    {
+      "decision": "Keep one reusable AudioContext and reset only failed in-flight activation state",
+      "why": "Concurrent gestures coalesce, successful eligibility persists, and failed activation can retry without duplicate context initialization",
+      "rejected": "Create a new AudioContext per gesture or permanently cache a failed promise"
+    },
+    {
+      "decision": "Retain SC-002 and SC-007 at their existing strength and close them with behavioral and packaged-output evidence",
+      "why": "The implementation supports the stronger contracts, so adding focused tests and a clean-package smoke check is preferable to weakening requirements",
+      "rejected": "Narrow success criteria to source-level assertions"
+    },
+    {
+      "decision": "Resolve each manifest entry through DirEntry.Info and require Mode.IsRegular before extension filtering",
+      "why": "Info mode is authoritative even when a filesystem reports incomplete type bits",
+      "rejected": "Filtering directories alone or trusting DirEntry.Type could admit other non-regular entries"
+    },
+    {
+      "decision": "Play hacking enter feedback only when beginSharedAction returns true",
+      "why": "This preserves immediate pre-server feedback for locally dispatchable actions while keeping observer and pending clicks silent",
+      "rejected": "Waiting for server acknowledgement would make accepted local feedback lag; unconditional playback contradicts the local dispatch guard"
+    }
+  ],
+  "coverage": {
+    "FR-006": {
+      "tasks": [
+        "T008",
+        "T026",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 Web Audio coalesces a failed gesture attempt and retries successfully on a later qualifying gesture"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T011",
+        "T024",
+        "T027"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 ambient starts immediately when autoplay is allowed and stays silent outside an accepted live terminal"
+      ]
+    },
+    "FR-014": {
+      "tasks": [
+        "T008",
+        "T024",
+        "T026",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 rejected ambient playback remains requested and recovers on a later keyboard gesture without blocking lifecycle updates",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 Web Audio coalesces a failed gesture attempt and retries successfully on a later qualifying gesture"
+      ]
+    },
+    "FR-015": {
+      "tasks": [
+        "T017",
+        "T025",
+        "T027"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 ambient starts immediately when autoplay is allowed and stays silent outside an accepted live terminal",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 rejected ambient playback remains requested and recovers on a later keyboard gesture without blocking lifecycle updates"
+      ]
+    },
+    "FR-016": {
+      "tasks": [
+        "T023",
+        "T024",
+        "T026",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 rejected ambient playback remains requested and recovers on a later keyboard gesture without blocking lifecycle updates",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 Web Audio coalesces a failed gesture attempt and retries successfully on a later qualifying gesture"
+      ]
+    },
+    "FR-017": {
+      "tasks": [
+        "T017",
+        "T023",
+        "T025",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::BUG-001 rejected ambient playback remains requested and recovers on a later keyboard gesture without blocking lifecycle updates"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T007",
+        "T019",
+        "T032"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::sound discovery coalesces concurrent loads and selection honors random-versus-first-file categories"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T009",
+        "T010",
+        "T019",
+        "T031"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::sound adapter starts every one-shot category at its configured gain including character scroll"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T010",
+        "T019",
+        "T032"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::sound discovery coalesces concurrent loads and selection honors random-versus-first-file categories"
+      ]
+    },
+    "SC-002": {
+      "tasks": [
+        "T008",
+        "T009",
+        "T010",
+        "T013",
+        "T014",
+        "T015",
+        "T019",
+        "T021",
+        "T022",
+        "T026",
+        "T028",
+        "T031"
+      ],
+      "tests": [
+        "tests/browser/player-sessions-control.spec.mjs::sound adapter starts every one-shot category at its configured gain including character scroll"
+      ]
+    },
+    "SC-007": {
+      "tasks": [
+        "T002",
+        "T003",
+        "T018",
+        "T030"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerAssetsIncludeRequiredSoundCategories",
+        "packaged-app player HTTP smoke"
+      ]
+    },
+    "FR-002": {
+      "tests": [
+        "internal/player/http_test.go::TestHTTPHandlerSoundManifestExcludesNonRegularEntries"
+      ]
+    },
+    "SC-001": {
+      "tests": [
+        "internal/player/http_test.go::TestHTTPHandlerSoundManifestExcludesNonRegularEntries"
+      ]
+    },
+    "FR-009": {
+      "tests": [
+        "tests/browser/hacking-camouflage.spec.mjs::one accepted word selection plays one enter cue while a pending repeat stays silent",
+        "tests/browser/player-sessions-control.spec.mjs::BUG-006 audio-enabled active and observer views play authoritative wrong unlock and lockout cues exactly once"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "Closed sound convergence gaps by enforcing regular-only manifests and dispatch-gated hacking enter cues with focused regressions.",
+      "key_finding": "The stronger sound and packaging success criteria were supportable without runtime changes.",
+      "risks": []
+    }
+  },
+  "last_action": "T033-T034 complete; full Go, race, and 39-browser-test gates pass",
+  "concerns": [
+    {
+      "note": "The first packaged GUI launch inside the filesystem sandbox aborted in the native window boundary; the approved native launch succeeded, proving this was an execution-environment restriction rather than an application defect.",
+      "step": "implement",
+      "kind": "workaround"
+    },
+    {
+      "note": "Manual audible-output confirmation remains unclaimed because the agent environment cannot reliably observe system speakers or browser autoplay policy; deterministic Playwright media doubles verify the affected lifecycle boundaries.",
+      "step": "implement",
+      "kind": "unavailable-check"
+    }
+  ]
+}

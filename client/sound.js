@@ -39,11 +39,12 @@ function getCtx() {
 }
 
 function enableWebAudio() {
+  if (webAudioEligible) return Promise.resolve(true);
   if (webAudioReady) return webAudioReady;
   const context = getCtx();
   if (!context) return null;
 
-  webAudioReady = (async () => {
+  const attempt = (async () => {
     try {
       if (context.state === 'suspended') await context.resume();
       if (context.state !== 'running') return false;
@@ -63,7 +64,11 @@ function enableWebAudio() {
     }
     return false;
   })();
-  return webAudioReady;
+  webAudioReady = attempt;
+  attempt.then(ready => {
+    if (!ready && webAudioReady === attempt) webAudioReady = null;
+  });
+  return attempt;
 }
 
 async function prefetch(url) {
@@ -162,10 +167,12 @@ function playHackGood()  { playFirst('hack-good', 0.8); }
 function playHackBad()   { playFirst('hack-bad', 0.7); }
 function playCharScroll() { playFromFolder('charscroll', 0.4); }
 
-// ── Ambient loop (needs a user gesture before autoplay is allowed) ───
+// ── Ambient loop (requested by accepted terminal lifecycle state) ───
 let ambientAudio = null;
 let ambientReady = false;
-let userGestured = false;
+let ambientRequested = false;
+let ambientRevision = 0;
+let ambientPlayAttempt = null;
 
 async function setupAmbient() {
   try {
@@ -176,19 +183,48 @@ async function setupAmbient() {
     ambientAudio.loop = true;
     ambientAudio.volume = 0.25;
     ambientReady = true;
-    tryStartAmbient();
+    reconcileAmbient();
   } catch {
     ambientAudio = null;
     ambientReady = false;
   }
 }
 
-function tryStartAmbient() {
-  if (ambientReady && userGestured && ambientAudio && ambientAudio.paused) {
-    try {
-      const playing = ambientAudio.play();
-      if (playing && typeof playing.catch === 'function') playing.catch(() => {});
-    } catch { /* autoplay or device failure — silently skip */ }
+function reconcileAmbient() {
+  if (!ambientRequested || !ambientReady || !ambientAudio ||
+      !ambientAudio.paused || ambientPlayAttempt) return;
+
+  const revision = ambientRevision;
+  try {
+    const playing = ambientAudio.play();
+    if (!playing || typeof playing.then !== 'function') return;
+
+    const attempt = Promise.resolve(playing)
+      .then(() => {
+        if (!ambientRequested || revision !== ambientRevision) stopAmbient();
+      })
+      .catch(() => {
+        // Keep the request active so a later qualifying gesture can retry it.
+      })
+      .finally(() => {
+        if (ambientPlayAttempt === attempt) ambientPlayAttempt = null;
+      });
+    ambientPlayAttempt = attempt;
+  } catch {
+    // Autoplay and device failures are optional and retryable.
+  }
+}
+
+function setAmbientActive(active) {
+  const requested = Boolean(active);
+  if (requested !== ambientRequested) {
+    ambientRequested = requested;
+    ambientRevision += 1;
+  }
+  if (ambientRequested) {
+    reconcileAmbient();
+  } else {
+    stopAmbient();
   }
 }
 
@@ -198,13 +234,13 @@ function stopAmbient() {
   } catch { /* optional audio must not interrupt terminal state */ }
 }
 
-document.addEventListener('click', () => {
-  if (!userGestured) {
-    userGestured = true;
-    enableWebAudio();
-    tryStartAmbient();
-  }
-});
+function handleAudioGesture() {
+  enableWebAudio();
+  reconcileAmbient();
+}
+
+document.addEventListener('pointerdown', handleAudioGesture);
+document.addEventListener('keydown', handleAudioGesture);
 
 // ── Boot: prefetch everything up front ─────────────────
 oneShotFolders.forEach(loadFolder);

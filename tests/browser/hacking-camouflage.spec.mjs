@@ -91,18 +91,27 @@ async function openControlledPuzzle(page) {
     window.__playedSoundURLs = [];
     window.__falloutTerminalSoundObserver = url => window.__playedSoundURLs.push(url);
     window.__soundGestureActive = false;
-    document.addEventListener('click', () => {
+    window.__webAudioActivationAllowed = true;
+    window.__audioContextCreates = 0;
+    window.__audioResumeAttempts = 0;
+    const observeSoundGesture = () => {
       window.__soundGestureActive = true;
       setTimeout(() => { window.__soundGestureActive = false; }, 0);
-    }, true);
+    };
+    document.addEventListener('pointerdown', observeSoundGesture, true);
+    document.addEventListener('keydown', observeSoundGesture, true);
     class ObservableAudioContext {
       constructor() {
         this.state = 'suspended';
         this.destination = {};
         window.__soundTestContext = this;
+        window.__audioContextCreates += 1;
       }
       resume() {
-        if (window.__soundGestureActive) this.state = 'running';
+        window.__audioResumeAttempts += 1;
+        if (window.__soundGestureActive && window.__webAudioActivationAllowed) {
+          this.state = 'running';
+        }
         return Promise.resolve();
       }
       decodeAudioData() { return Promise.resolve({ decoded: true }); }
@@ -203,7 +212,7 @@ test('authoritative wrong-guess audio crosses the Web Audio source-start boundar
   await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.filter(url => url.includes('/sounds/hack-bad/')))).toHaveLength(1);
 });
 
-test('one word selection plays one enter cue without replaying preview audio during pending renders', async ({ page }) => {
+test('one accepted word selection plays one enter cue while a pending repeat stays silent', async ({ page }) => {
   await openControlledPuzzle(page);
   await page.locator('#hackHeader').click({ position: { x: 4, y: 4 } });
   await page.waitForTimeout(0);
@@ -218,6 +227,13 @@ test('one word selection plays one enter cue without replaying preview audio dur
   await word.click();
   const request = await expectSharedRequest(page, { type: 'HACK_GUESS', targetId: 'A1' });
   await page.waitForTimeout(50);
+  expect(await page.evaluate(() => window.__playedSoundURLs.map(url =>
+    url.match(/\/sounds\/([^/]+)\//)?.[1]
+  ).filter(Boolean))).toEqual(['enter']);
+
+  await word.click();
+  await page.waitForTimeout(50);
+  await expectSharedRequest(page, { type: 'HACK_GUESS', targetId: 'A1' });
   expect(await page.evaluate(() => window.__playedSoundURLs.map(url =>
     url.match(/\/sounds\/([^/]+)\//)?.[1]
   ).filter(Boolean))).toEqual(['enter']);
@@ -246,7 +262,7 @@ test('one word selection plays one enter cue without replaying preview audio dur
   });
   await expect.poll(() => page.evaluate(() => window.__playedSoundURLs.map(url =>
     url.match(/\/sounds\/([^/]+)\//)?.[1]
-  ).filter(Boolean))).toEqual(['enter', 'hack-bad']);
+  ).filter(folder => ['enter', 'hack-bad'].includes(folder)))).toEqual(['enter', 'hack-bad']);
 });
 
 test('only a valid opening activates its whole pattern while all other symbols stay individually selectable', async ({ page }) => {

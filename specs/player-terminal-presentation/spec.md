@@ -13,6 +13,10 @@ source: existing implementation
 HTML/CSS/JavaScript and assets are now embedded and served by the in-process Go
 HTTP/WebSocket server rather than the removed Electron/Node runtime.
 
+**Sound-system reconciliation**: 2026-08-13 — The focused `specs/sound-system/`
+contract supersedes the historical click-only ambient gate with an immediate
+live-state-gated attempt and pointer-or-keyboard retry when autoplay is blocked.
+
 ## Purpose
 
 The player terminal turns server-owned live state into a themed browser experience for tabletop players. It presents connection and idle states, terminal folders, entries, command output, and the hacking gate with a green RobCo-style CRT treatment. Players can operate the shared terminal with pointer or keyboard input, while visual and audio feedback reinforces state changes without owning canonical navigation or hacking state.
@@ -87,7 +91,7 @@ As a player, I can see and interact with the hacking gate through a dense RobCo-
 
 As a player, I receive CRT styling, progressive text reveal, terminal effects, and contextual sounds so that interactions feel responsive and atmospheric.
 
-**Independent verification**: Visit new folders, entries, and command output; repeat renders without changing content; trigger interaction and hacking feedback; then clear the broadcast.
+**Independent verification**: Visit new folders, entries, and command output; repeat renders without changing content; trigger interaction and hacking feedback; exercise autoplay-allowed and autoplay-blocked live ambience with pointer and keyboard fallback; then clear the broadcast.
 
 **Acceptance scenarios**:
 
@@ -95,7 +99,7 @@ As a player, I receive CRT styling, progressive text reveal, terminal effects, a
 2. **Given** a folder, entry, or command output is newly shown, **when** it renders, **then** its lines or rows reveal progressively with character-scroll audio.
 3. **Given** the same content rerenders because unrelated state changed, **when** its identity is unchanged, **then** it appears immediately without replaying the reveal sequence.
 4. **Given** supported sound files are available, **when** menu, board, entry, failure, or success events occur, **then** the mapped sound category plays at its configured volume.
-5. **Given** the user has clicked the document and a live terminal exists, **when** ambient audio is ready, **then** it loops until the live terminal is cleared.
+5. ~~**Given** the user has clicked the document and a live terminal exists, **when** ambient audio is ready, **then** it loops until the live terminal is cleared.~~ **Superseded by the focused sound-system contract**: **Given** an accepted live terminal and a ready ambient asset, **when** either condition becomes true, **then** playback is attempted immediately; autoplay rejection retains the request for a later qualifying pointer or keyboard gesture, and clearing the live terminal pauses the loop.
 6. **Given** a sound folder, file, fetch, or decode operation fails, **when** playback is attempted, **then** the visual terminal remains usable without surfacing a blocking error.
 
 ## Functional Requirements
@@ -115,7 +119,7 @@ As a player, I receive CRT styling, progressive text reveal, terminal effects, a
 - **FR-013**: Text sizing MUST use the existing viewport-responsive `clamp()` values, and the terminal body and bounded output areas MUST remain scrollable when content exceeds their available height.
 - **FR-014**: The client MUST discover audio only through the allowlisted `/api/sounds/:folder` endpoint and MUST support the existing ambient, success, failure, focus, single-character, multi-character, entry, and reveal categories.
 - **FR-015**: Sound discovery, prefetch, decoding, and playback failures MUST degrade silently without preventing visual rendering or player input.
-- **FR-016**: Ambient audio MUST require the existing browser user-gesture gate, loop while active, and pause when the live terminal is cleared.
+- **FR-016**: ~~Ambient audio MUST require the existing browser user-gesture gate, loop while active, and pause when the live terminal is cleared.~~ **Superseded by the focused sound-system contract**: Ambient audio MUST remain gated by accepted live-terminal state, MUST attempt playback immediately when the live request and asset are ready, MUST retry blocked playback on a qualifying pointer or keyboard gesture, and MUST pause when live state is cleared or replaced.
 
 ## Presentation Inputs and Outputs
 
@@ -135,7 +139,7 @@ As a player, I receive CRT styling, progressive text reveal, terminal effects, a
 - A malformed incoming WebSocket frame is ignored after a console warning and does not replace the current view.
 - Selection resets to the first row whenever authoritative navigation state is applied.
 - A missing entry ID renders an empty record title and body rather than an explicit error state.
-- Ambient playback begins only after a document click; keyboard interaction does not set the current user-gesture flag.
+- ~~Ambient playback begins only after a document click; keyboard interaction does not set the current user-gesture flag.~~ The current client attempts live ambience immediately and uses document-level `pointerdown` or `keydown` as retry opportunities when browser policy blocks playback.
 - Reveal timers are cancelled before a container starts a replacement render, preventing overlapping append sequences.
 - Hacking words split at a 12-character row boundary render as separate spans but share one target ID and highlight together.
 - The sound endpoint returns an empty list for unknown folders, unreadable directories, and directories without supported file extensions.
@@ -162,10 +166,10 @@ As a player, I receive CRT styling, progressive text reveal, terminal effects, a
 
 ## Known Gaps
 
-- No automated browser, DOM, accessibility, visual-regression, or sound-endpoint tests exist.
+- ~~No automated browser, DOM, accessibility, visual-regression, or sound-endpoint tests exist.~~ **Partially resolved**: Playwright browser journeys and focused sound-endpoint tests now exist; accessibility and visual-regression coverage remain follow-ups.
 - There is no explicit narrow-screen media query; the hacking board's two-column layout and fixed proportional log panel may become cramped on phones.
 - Selectable terminal rows and hacking cells are non-semantic elements without roles, ARIA labels, or native focus behavior.
 - CRT flicker, blinking, and reveal animation do not honor `prefers-reduced-motion`.
-- Ambient audio is unlocked only by a click, so keyboard-only users may never start it.
+- ~~Ambient audio is unlocked only by a click, so keyboard-only users may never start it.~~ **Resolved by the focused sound-system contract**: pointer and keyboard gestures can retry blocked playback; a visible mute/readiness control remains a separate follow-up.
 - Sound failures are intentionally silent and provide no diagnostic or user-visible muted state.
 - Player-facing strings are hardcoded and no localization mechanism exists.

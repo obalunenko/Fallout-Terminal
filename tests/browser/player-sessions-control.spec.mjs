@@ -9,20 +9,44 @@ async function openPlayer(page, storedToken = null) {
     window.__xssExecuted = false;
     window.__audioStarts = 0;
     window.__playedSoundURLs = [];
-    window.__falloutTerminalSoundObserver = url => window.__playedSoundURLs.push(url);
+    window.__playedSoundEvents = [];
+    window.__pendingSoundGains = [];
+    window.__falloutTerminalSoundObserver = url => {
+      window.__playedSoundURLs.push(url);
+      window.__playedSoundEvents.push({
+        url,
+        gain: window.__pendingSoundGains.shift() ?? null,
+      });
+    };
     window.__failAudioStarts = false;
     window.__loadedSoundURLs = [];
+    window.__soundFetchCounts = {};
     window.__soundGestureActive = false;
+    window.__webAudioActivationAllowed = true;
+    window.__audioContextCreates = 0;
+    window.__audioResumeAttempts = 0;
+    window.__ambientAutoplayAllowed = false;
+    window.__ambientPlaybackFailure = null;
+    window.__ambientPlayAttempts = 0;
+    window.__ambientPlayStarts = 0;
+    window.__ambientPauseCalls = 0;
     if (token) localStorage.setItem(tokenKey, token);
     else localStorage.removeItem(tokenKey);
 
-    document.addEventListener('click', () => {
+    const observeSoundGesture = () => {
       window.__soundGestureActive = true;
       setTimeout(() => { window.__soundGestureActive = false; }, 0);
-    }, true);
+    };
+    document.addEventListener('pointerdown', observeSoundGesture, true);
+    document.addEventListener('keydown', observeSoundGesture, true);
 
     const nativeFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
+      const requestURL = args[0] instanceof Request ? args[0].url : String(args[0]);
+      const pathname = new URL(requestURL, window.location.href).pathname;
+      if (pathname.startsWith('/api/sounds/') || pathname.startsWith('/sounds/')) {
+        window.__soundFetchCounts[pathname] = (window.__soundFetchCounts[pathname] || 0) + 1;
+      }
       const response = await nativeFetch(...args);
       if (response.url.includes('/sounds/')) {
         const nativeArrayBuffer = response.arrayBuffer.bind(response);
@@ -39,10 +63,14 @@ async function openPlayer(page, storedToken = null) {
       constructor() {
         this.state = 'suspended';
         this.destination = {};
+        window.__audioContextCreates += 1;
       }
 
       resume() {
-        if (window.__soundGestureActive) this.state = 'running';
+        window.__audioResumeAttempts += 1;
+        if (window.__soundGestureActive && window.__webAudioActivationAllowed) {
+          this.state = 'running';
+        }
         return Promise.resolve();
       }
 
@@ -51,12 +79,14 @@ async function openPlayer(page, storedToken = null) {
       }
 
       createBufferSource() {
+        let output = null;
         return {
           buffer: null,
-          connect() {},
+          connect(node) { output = node; },
           start() {
             if (window.__soundTestContext.state !== 'running') throw new Error('audio context is not eligible');
             if (window.__failAudioStarts) throw new Error('simulated playback failure');
+            window.__pendingSoundGains.push(output?.gain?.value ?? null);
             window.__audioStarts += 1;
           },
         };
@@ -106,7 +136,37 @@ async function openPlayer(page, storedToken = null) {
     }
 
     window.WebSocket = FakeWebSocket;
-    HTMLMediaElement.prototype.play = () => Promise.resolve();
+    const NativeAudio = window.Audio;
+    window.Audio = function ObservableAudio(src) {
+      const audio = new NativeAudio(src);
+      window.__ambientElement = audio;
+      let playing = false;
+      Object.defineProperty(audio, 'paused', {
+        configurable: true,
+        get: () => !playing,
+      });
+      audio.play = () => {
+        window.__ambientPlayAttempts += 1;
+        if (window.__ambientPlaybackFailure) {
+          return Promise.reject(new DOMException(
+            'simulated ambient playback failure',
+            window.__ambientPlaybackFailure,
+          ));
+        }
+        if (!window.__ambientAutoplayAllowed && !window.__soundGestureActive) {
+          return Promise.reject(new DOMException('autoplay blocked', 'NotAllowedError'));
+        }
+        playing = true;
+        window.__ambientPlayStarts += 1;
+        return Promise.resolve();
+      };
+      audio.pause = () => {
+        playing = false;
+        window.__ambientPauseCalls += 1;
+      };
+      return audio;
+    };
+    window.Audio.prototype = NativeAudio.prototype;
   }, { tokenKey: TOKEN_KEY, token: storedToken });
 
   await page.goto('/');
@@ -368,6 +428,197 @@ async function welcomeSession(page, browserToken, sessionId, overrides = {}) {
     },
   });
 }
+
+async function waitForAmbientAsset(page) {
+  await expect.poll(() => page.evaluate(() =>
+    window.__loadedSoundURLs.some(url => url.includes('/sounds/ambient/'))
+  )).toBe(true);
+}
+
+async function ambientMetrics(page) {
+  return page.evaluate(() => ({
+    attempts: window.__ambientPlayAttempts,
+    starts: window.__ambientPlayStarts,
+    pauses: window.__ambientPauseCalls,
+  }));
+}
+
+async function playOneShotAndReadEvent(page, functionName) {
+  const before = await page.evaluate(() => window.__playedSoundEvents.length);
+  await page.evaluate(name => window[name](), functionName);
+  await expect.poll(() => page.evaluate(() => window.__playedSoundEvents.length)).toBe(before + 1);
+  return page.evaluate(() => window.__playedSoundEvents.at(-1));
+}
+
+test('BUG-001 ambient starts immediately when autoplay is allowed and stays silent outside an accepted live terminal', async ({ page }) => {
+  await openPlayer(page);
+  await waitForAmbientAsset(page);
+  await page.evaluate(() => { window.__ambientAutoplayAllowed = true; });
+
+  await emit(page, {
+    type: 'SESSION_WELCOME',
+    browserToken: 'token-1',
+    state: selectingState(),
+  });
+  expect(await ambientMetrics(page)).toEqual({ attempts: 0, starts: 0, pauses: 1 });
+
+  await emit(page, { type: 'PLAYER_STATE', state: assignedState('active', 2) });
+  expect(await ambientMetrics(page)).toEqual({ attempts: 0, starts: 0, pauses: 2 });
+  await page.keyboard.press('A');
+  expect(await ambientMetrics(page)).toEqual({ attempts: 0, starts: 0, pauses: 2 });
+
+  await emit(page, terminalLive());
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 1, starts: 1, pauses: 2 });
+  expect(await page.evaluate(() => ({
+    loop: window.__ambientElement.loop,
+    volume: window.__ambientElement.volume,
+  }))).toEqual({ loop: true, volume: 0.25 });
+
+  await emit(page, {
+    type: 'SESSION_WELCOME',
+    browserToken: 'token-1',
+    state: assignedState('active', 3),
+  });
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 1, starts: 1, pauses: 3 });
+
+  await emit(page, terminalLive({ revision: 4 }));
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 2, starts: 2, pauses: 3 });
+
+  await emit(page, {
+    type: 'PLAYER_STATE',
+    state: { ...assignedState('active', 5), activeTerminalId: 'terminal-2' },
+  });
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 2, starts: 2, pauses: 4 });
+  await emit(page, terminalLive({ revision: 6 }));
+  expect(await ambientMetrics(page)).toEqual({ attempts: 2, starts: 2, pauses: 4 });
+});
+
+test('BUG-001 rejected ambient playback remains requested and recovers on a later keyboard gesture without blocking lifecycle updates', async ({ page }) => {
+  await openPlayer(page);
+  await waitForAmbientAsset(page);
+  await page.evaluate(() => { window.__ambientPlaybackFailure = 'NotSupportedError'; });
+  await emit(page, {
+    type: 'SESSION_WELCOME',
+    browserToken: 'token-1',
+    state: assignedState('active', 2),
+  });
+  await emit(page, terminalLive());
+
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 1, starts: 0, pauses: 1 });
+  await expect(page.locator('#screen')).toBeVisible();
+
+  await page.evaluate(() => { window.__ambientPlaybackFailure = null; });
+  await page.keyboard.press('A');
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 2, starts: 1, pauses: 1 });
+
+  await page.locator('#termList').dispatchEvent('pointerdown');
+  expect(await ambientMetrics(page)).toEqual({ attempts: 2, starts: 1, pauses: 1 });
+
+  await emit(page, {
+    type: 'PLAYER_STATE',
+    state: { ...assignedState('active', 3), phase: 'waiting', activeTerminalId: null },
+  });
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 2, starts: 1, pauses: 2 });
+  await emit(page, { type: 'TERMINAL_CLEAR', revision: 4 });
+  await expect.poll(() => ambientMetrics(page)).toEqual({ attempts: 2, starts: 1, pauses: 3 });
+  await emit(page, terminalLive({ revision: 5 }));
+  expect(await ambientMetrics(page)).toEqual({ attempts: 2, starts: 1, pauses: 3 });
+});
+
+test('BUG-001 Web Audio coalesces a failed gesture attempt and retries successfully on a later qualifying gesture', async ({ page }) => {
+  await openPlayer(page);
+  await expect.poll(() => page.evaluate(() =>
+    window.__loadedSoundURLs.some(url => url.includes('/sounds/hack-good/'))
+  )).toBe(true);
+  await page.evaluate(() => {
+    window.__webAudioActivationAllowed = false;
+    document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  });
+  await expect.poll(() => page.evaluate(() => window.__audioResumeAttempts)).toBe(1);
+  expect(await page.evaluate(() => window.__audioContextCreates)).toBe(1);
+
+  await page.evaluate(() => { window.__webAudioActivationAllowed = true; });
+  await page.keyboard.press('A');
+  await expect.poll(() => page.evaluate(() => window.__soundTestContext.state)).toBe('running');
+  expect(await page.evaluate(() => ({
+    contexts: window.__audioContextCreates,
+    resumes: window.__audioResumeAttempts,
+  }))).toEqual({ contexts: 1, resumes: 2 });
+
+  await page.locator('body').dispatchEvent('pointerdown');
+  await page.keyboard.press('B');
+  expect(await page.evaluate(() => window.__audioResumeAttempts)).toBe(2);
+});
+
+test('sound adapter starts every one-shot category at its configured gain including character scroll', async ({ page }) => {
+  await openPlayer(page);
+  await page.locator('body').dispatchEvent('pointerdown');
+  await expect.poll(() => page.evaluate(() => window.__soundTestContext?.state)).toBe('running');
+  await page.evaluate(() => { window.__playedSoundEvents = []; });
+
+  const cases = [
+    ['playSingle', '/sounds/single/', 0.55],
+    ['playMultiple', '/sounds/multiple/', 0.55],
+    ['playEnter', '/sounds/enter/', 0.65],
+    ['playMenuFocus', '/sounds/menu-focus/', 0.5],
+    ['playHackGood', '/sounds/hack-good/', 0.8],
+    ['playHackBad', '/sounds/hack-bad/', 0.7],
+    ['playCharScroll', '/sounds/charscroll/', 0.4],
+  ];
+  for (const [functionName, folder, gain] of cases) {
+    const event = await playOneShotAndReadEvent(page, functionName);
+    expect(event.url).toContain(folder);
+    expect(event.gain).toBe(gain);
+  }
+});
+
+test('sound discovery coalesces concurrent loads and selection honors random-versus-first-file categories', async ({ page }) => {
+  await page.route('**/api/sounds/single', async route => {
+    await new Promise(resolve => setTimeout(resolve, 150));
+    await route.continue();
+  });
+  await openPlayer(page);
+  await page.evaluate(() => {
+    playSingle();
+    playSingle();
+    playSingle();
+  });
+
+  await expect.poll(() => page.evaluate(() =>
+    window.__loadedSoundURLs.filter(url => url.includes('/sounds/single/')).length
+  )).toBe(8);
+  const loadCounts = await page.evaluate(() => ({ ...window.__soundFetchCounts }));
+  expect(loadCounts['/api/sounds/single']).toBe(1);
+  for (const [path, count] of Object.entries(loadCounts).filter(([path]) =>
+    path.startsWith('/sounds/single/')
+  )) {
+    expect(count, path).toBe(1);
+  }
+
+  await page.locator('body').dispatchEvent('pointerdown');
+  await expect.poll(() => page.evaluate(() => window.__soundTestContext?.state)).toBe('running');
+  await page.evaluate(() => { window.__playedSoundEvents = []; });
+
+  const playWithRandom = async (functionName, randomValue) => {
+    const before = await page.evaluate(() => window.__playedSoundEvents.length);
+    await page.evaluate(({ name, value }) => {
+      const nativeRandom = Math.random;
+      Math.random = () => value;
+      window[name]();
+      Math.random = nativeRandom;
+    }, { name: functionName, value: randomValue });
+    await expect.poll(() => page.evaluate(() => window.__playedSoundEvents.length)).toBe(before + 1);
+    return page.evaluate(() => window.__playedSoundEvents.at(-1).url);
+  };
+
+  expect(await playWithRandom('playSingle', 0.999)).toContain('ui_hacking_charsingle_08.wav');
+  expect(await playWithRandom('playMultiple', 0.999)).toContain('ui_hacking_charmultiple_04.wav');
+  expect(await playWithRandom('playEnter', 0.999)).toContain('ui_hacking_charenter_03.wav');
+  expect(await playWithRandom('playMenuFocus', 0.999)).toContain('ui_menu_focus.wav');
+  expect(await playWithRandom('playHackGood', 0.999)).toContain('ui_hacking_passgood.wav');
+  expect(await playWithRandom('playHackBad', 0.999)).toContain('ui_hacking_passbad.wav');
+});
 
 test('handshake keeps connection gating active, reuses only the opaque token, and stores the replacement welcome token', async ({ page }) => {
   await openPlayer(page, 'recognized-token');
@@ -655,16 +906,20 @@ test('BUG-006 audio-enabled active and observer views play authoritative wrong, 
         await observer.locator('.hcell.word').first().hover();
         await expect.poll(() => audioStarts(active)).toBe(1);
         await expect.poll(() => audioStarts(observer)).toBe(1);
-        await active.evaluate(() => { window.__audioStarts = 0; });
-        await observer.evaluate(() => { window.__audioStarts = 0; });
+        await active.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });
+        await observer.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });
 
         await active.locator('.hcell.word').first().click();
         const request = (await sharedOutbound(active)).at(-1);
         expect(request).toMatchObject({ type: 'HACK_GUESS', targetId: 'A1' });
         await observer.locator('.hcell.word').first().click();
         expect(await sharedOutbound(observer)).toEqual([]);
-        expect(await audioStarts(active)).toBeGreaterThan(0);
-        expect(await audioStarts(observer)).toBeGreaterThan(0);
+        await expect.poll(() => active.evaluate(() => window.__playedSoundURLs.filter(url =>
+          url.includes('/sounds/enter/')
+        ))).toHaveLength(1);
+        expect(await observer.evaluate(() => window.__playedSoundURLs.filter(url =>
+          url.includes('/sounds/enter/')
+        ))).toEqual([]);
         await active.waitForTimeout(300);
         await observer.waitForTimeout(300);
         await active.evaluate(() => { window.__audioStarts = 0; window.__playedSoundURLs = []; });

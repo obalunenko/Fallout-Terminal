@@ -481,7 +481,7 @@ function clearBroadcastMirrors() {
 
   clearTimeout(hackSolvedTimer);
   hackSolvedTimer = null;
-  stopAmbient();
+  setAmbientActive(false);
   deactivatePagination();
 
   for (const container of [termList, entryBody, termOutput]) {
@@ -583,7 +583,7 @@ function dispatch(msg) {
     if (isContinuousTerminalUpdate) scheduleHackSolvedNavigation();
     terminalLiveBaselinePending = false;
 
-    tryStartAmbient();
+    setAmbientActive(true);
     render();
   } else if (msg.type === 'TERMINAL_UPDATE') {
     if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
@@ -615,7 +615,7 @@ function dispatch(msg) {
     hack = null;
     clearTimeout(hackSolvedTimer);
     hackSolvedTimer = null;
-    stopAmbient();
+    setAmbientActive(false);
     render();
   }
 }
@@ -681,6 +681,10 @@ function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
   } else if (pendingSelection && nextPlayerState.phase !== 'selecting') {
     pendingSelection = null;
     showPlayerNotice('');
+  }
+
+  if (authoritativeWelcome || !hasCurrentTerminalMirror()) {
+    setAmbientActive(false);
   }
 
   if (pendingSelection && pendingSelection.acceptedRevision != null &&
@@ -1041,13 +1045,11 @@ hackColumns.addEventListener('click', (e) => {
   if (!cell || !hack || hack.solved || hack.failed) return;
   const pattern = patternAtCell(cell);
   if (pattern && !pattern.used) {
-    playEnter();
-    beginSharedAction('HACK_PATTERN', { patternId: pattern.id });
+    if (beginSharedAction('HACK_PATTERN', { patternId: pattern.id })) playEnter();
     return;
   }
   if (pattern) return;
-  playEnter();
-  beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target });
+  if (beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })) playEnter();
 });
 
 // ════════════════════════════════════════════════════
