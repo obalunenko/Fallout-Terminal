@@ -5,6 +5,7 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-MATRIX-2026-08-14] Made the post-removal verification matrix sequential, restartable, and solely responsible for final acceptance.
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-CANDIDATE-2026-08-14] Added clean browser-test installation, final-candidate native/soak reruns, and non-self-referential evidence identity.
 **Bugfix**: 2026-08-14 — [ANALYZE-ATTRIBUTABLE-CANDIDATE-2026-08-14] Required a clean committed build candidate and separated final native, package, and soak attribution.
+**Bugfix**: 2026-08-14 — [ANALYZE-BUNDLE-IDENTITY-2026-08-14] Defined a canonical app-bundle digest and made final active documentation verification-only.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -198,6 +199,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 - Make protobuf verification, player build, binding generation, and master build explicit nonrecursive prerequisites for dev/build/package.
 - Replace v2 post-build resources with pre-sign bundle assembly; preserve resource-root behavior.
 - Package macOS 13 arm64 at the established path and inspect all assets/metadata/entitlements/icon/signature.
+- Add and test one canonical bundle-manifest SHA-256 procedure using byte-sorted bundle-relative paths, entry type, POSIX mode, regular-file content digest, and symlink target while excluding timestamps and host-specific extended attributes.
 - Prove one offline launch, one listener, representative master/local-player smoke, and clean quit.
 - Resolve the `production_resources_bindings.go` workaround only from clean evidence.
 - Checkpoint gate: clean repeated builds, final resource inventory, ad-hoc signature, offline personal-use acceptance.
@@ -216,9 +218,9 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - Reconcile all required acceptance evidence for the personal-use profile; no required gate may be `FAIL` or `NOT RUN`.
 - Remove Wails v2 imports/dependency/CLI/config/hooks, v2 generated/global assumptions, obsolete workaround if proven, active v2 instructions, and every temporary dual path.
-- Commit all prior qualification evidence separately, commit the complete v2-free application/configuration/active-documentation source, require a clean working tree, and freeze that commit as the immutable **build candidate SHA** with its exact pin set without accepting it. Later evidence-only documentation commits record that SHA and package digest but do not redefine the packaged candidate.
+- Commit all prior qualification evidence separately; complete and commit `README.md` plus every active operating document together with the v2-free application/configuration source; require a clean working tree; and freeze that commit as the immutable **build candidate SHA** with its exact pin set without accepting it. Later evidence-only documentation commits record that SHA and package digest but do not redefine the packaged candidate.
 - Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, a clean locked Playwright installation and suite, root-development/native parity, final package/offline smoke, the required final-candidate local soak, conditional public gates, and reconciled documentation/evidence as separate attributable boundaries.
-- If any verification task changes application source, generated output, a pin, or a lockfile, invalidate later evidence, freeze a new build candidate SHA, and restart the final matrix from its first task. Evidence-only edits are limited to result/status fields in the feature quickstart and Wails v3 rollback record; they require a final documentation/cutover rescan but do not rebuild an otherwise unchanged package.
+- If any verification task changes a frozen tracked path, including application source, generated output, active operating documentation, a pin, or a lockfile, invalidate later evidence, commit and freeze a new build candidate SHA, and restart the final matrix from its first task. Evidence-only edits are limited to result/status fields in the feature quickstart and Wails v3 rollback record; they require a final documentation/cutover rescan but do not rebuild an otherwise unchanged package.
 - Checkpoint gate: zero active v2 runtime surface, zero permanent switch, all required parity gates pass; only then designate Wails v3 production.
 
 ## Workstream Attribution
@@ -245,7 +247,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 | Player | clean `npm ci --prefix tests/browser` followed by all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
 | Startup/shutdown | lifecycle unit/host integration, occupied port, adapter/event failure, tunnel fallback/invalid URL, partial/repeat/timeout triggers | close, Cmd+Q, dev interrupt | failure actionable; local fallback; reverse cleanup within 5s; no leaks |
 | Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go tool -modfile=tools/wails/go.mod wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
-| Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path |
+| Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans; canonical bundle-manifest digest | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path with stable before/after bundle identity |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
 | Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | pre-removal qualification and final v2-free-candidate 60-minute local workloads with median-RSS sampling; conditional final-candidate 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | rollback and qualification soak pass before v2 removal; the same required local workload passes against the final build candidate; exact thresholds and actual results are tied to the applicable candidate; no simulated pass |
 | Cutover | source/generated/dependency/bundle/CI/script/docs scans plus full rebuild | owner parity review | zero active v2 runtime/dual switch; historical records intact |
@@ -254,11 +256,12 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - [quickstart.md](./quickstart.md) begins with every evidence box unchecked.
 - Every result records exact source commit, version pin set, target/profile, command/procedure, timestamp/environment, and `PASS`, `FAIL`, or `NOT RUN`.
-- The build candidate SHA is captured with `git rev-parse HEAD` only after the complete v2-free application/configuration/active-documentation source is committed and `git status --porcelain` is empty. It identifies the immutable inputs used for generation, tests, packaging, native journeys, and soak.
-- The personal-use artifact identity is the SHA-256 of the final app produced from that build candidate. The required local and conditional public soaks must verify and record that unchanged identity before and after exercising it; any separately produced Developer ID app or DMG records its own distinct digest and profile.
-- A later evidence-only commit may record the build candidate SHA and artifact digest without changing either identity; it may modify only result/status fields in the feature quickstart and Wails v3 rollback record. Before each final gate, every other tracked path must remain identical to the build candidate.
+- **Build candidate SHA**: `git rev-parse HEAD` captured only after the complete v2-free application/configuration source, `README.md`, and every active operating document are committed and `git status --porcelain` is empty. It identifies the immutable inputs used for generation, tests, packaging, native journeys, and soak.
+- **Personal-use bundle identity**: the canonical bundle-manifest SHA-256 produced by `scripts/hash-macos-app.sh`, whose byte-sorted manifest includes each bundle-relative entry's type, POSIX mode, regular-file content digest, or symlink target and excludes timestamps and host-specific extended attributes. The required local and conditional public soaks verify that identity before and after exercising the app.
+- **Release artifact identity**: a distinct canonical bundle-manifest digest for each Developer ID app and a distinct file SHA-256 for each DMG, always recorded with its profile.
+- **Evidence commit**: documentation-only changes to result/status fields in the feature quickstart and Wails v3 rollback record. It may record the build candidate and artifact identities but cannot change them. Before each final gate, every other tracked path must remain identical to the build candidate.
 - A version change invalidates generated, build, package, and acceptance evidence until research/pins/locks/CI/scripts are updated and gates rerun.
-- Any application source, generated-output, pin, or lockfile change restarts the final matrix. An evidence-only documentation change requires the final active-documentation and cutover scan but does not rebuild the unchanged candidate.
+- Any frozen tracked-path change, including active documentation, restarts the final matrix. An allowlisted evidence-only documentation change requires the final active-documentation and cutover scan but does not rebuild the unchanged candidate.
 - A v2 artifact digest is recorded only for an artifact actually built and accepted.
 - Developer ID, notarization, stapling, DMG, Gatekeeper, and public ngrok evidence cannot be inferred from personal-use checks.
 
