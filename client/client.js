@@ -1,4 +1,22 @@
-'use strict';
+import { createClient } from '@connectrpc/connect';
+import { createConnectTransport } from '@connectrpc/connect-web';
+import {
+  ActionReason,
+  PlayerPhase,
+  PlayerRole,
+  PlayerService,
+  RosterAvailability,
+} from './gen/fallout/terminal/player/v1/player_pb.js';
+import {
+  playCharScroll,
+  playEnter,
+  playHackBad,
+  playHackGood,
+  playMenuFocus,
+  playMultiple,
+  playSingle,
+  setAmbientActive,
+} from './sound.js';
 
 const MODE = { LIST: 'list', ENTRY: 'entry', HACK: 'hack' };
 const ROW_WIDTH = 12; // must match server/hack.js
@@ -106,10 +124,11 @@ const assignedWaiting    = document.getElementById('assignedWaiting');
 const playerNotice       = document.getElementById('playerNotice');
 
 // ════════════════════════════════════════════════════
-// WEBSOCKET
+// GENERATED CONNECT CLIENT
 // ════════════════════════════════════════════════════
-let ws;
 let reconnectTimer = null;
+let streamAbortController = null;
+let streamGeneration = 0;
 const RECONNECT_DELAY_MS = 3000;
 const sessionInitOwner = (window.crypto && typeof window.crypto.randomUUID === 'function')
   ? window.crypto.randomUUID()
@@ -125,18 +144,11 @@ function readBrowserToken() {
   }
 }
 
-function socketIsCurrentAndOpen(socket) {
-  return ws === socket && socket.readyState === WebSocket.OPEN;
-}
-
-function sendSessionHello(socket, browserToken) {
-  if (!socketIsCurrentAndOpen(socket) || socket.sessionHelloSent) return false;
-  const hello = { type: 'SESSION_HELLO' };
-  if (browserToken) hello.browserToken = browserToken;
-  socket.sessionHelloSent = true;
-  socket.send(JSON.stringify(hello));
-  return true;
-}
+const playerTransport = createConnectTransport({
+  baseUrl: window.location.origin,
+  useBinaryFormat: true,
+});
+const playerRPC = createClient(PlayerService, playerTransport);
 
 function signalRecognitionChange() {
   const waiters = Array.from(recognitionWaiters);
@@ -163,12 +175,6 @@ window.addEventListener('storage', event => {
     signalRecognitionChange();
   }
 });
-
-async function waitForIssuedToken(socket) {
-  while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
-    await waitForRecognitionChange();
-  }
-}
 
 function readSessionInitLease() {
   try {
@@ -274,11 +280,11 @@ function releaseSessionInitLease() {
   signalRecognitionChange();
 }
 
-async function sendSessionHelloWithStorageLease(socket) {
-  while (socketIsCurrentAndOpen(socket) && !socket.sessionHelloSent) {
+async function subscribeWithStorageLease() {
+  while (!sessionReady) {
     const browserToken = readBrowserToken();
     if (browserToken) {
-      sendSessionHello(socket, browserToken);
+      await establishSubscription(browserToken);
       return;
     }
 
@@ -294,7 +300,7 @@ async function sendSessionHelloWithStorageLease(socket) {
     const tokenAfterElection = readBrowserToken();
     if (tokenAfterElection) {
       releaseSessionInitContender();
-      sendSessionHello(socket, tokenAfterElection);
+      await establishSubscription(tokenAfterElection);
       return;
     }
 
@@ -309,11 +315,7 @@ async function sendSessionHelloWithStorageLease(socket) {
     releaseSessionInitContender();
 
     try {
-      if (!sendSessionHello(socket, '')) return;
-      while (socketIsCurrentAndOpen(socket) && !sessionReady && !readBrowserToken()) {
-        await waitForRecognitionChange();
-        renewSessionInitLease();
-      }
+      await establishSubscription('');
     } finally {
       releaseSessionInitContender();
       releaseSessionInitLease();
@@ -322,23 +324,18 @@ async function sendSessionHelloWithStorageLease(socket) {
   }
 }
 
-async function beginSessionHandshake(socket) {
+async function beginSubscription() {
   const browserToken = readBrowserToken();
   if (browserToken) {
-    sendSessionHello(socket, browserToken);
+    await establishSubscription(browserToken);
     return;
   }
 
   if (navigator.locks && typeof navigator.locks.request === 'function') {
     try {
       await navigator.locks.request(PLAYER_SESSION_INIT_LOCK, async () => {
-        if (!socketIsCurrentAndOpen(socket)) return;
         const tokenAfterLock = readBrowserToken();
-        if (tokenAfterLock) {
-          sendSessionHello(socket, tokenAfterLock);
-          return;
-        }
-        if (sendSessionHello(socket, '')) await waitForIssuedToken(socket);
+        await establishSubscription(tokenAfterLock);
       });
       return;
     } catch (error) {
@@ -346,55 +343,245 @@ async function beginSessionHandshake(socket) {
     }
   }
 
-  await sendSessionHelloWithStorageLease(socket);
+  await subscribeWithStorageLease();
 }
 
-function playerWebSocketURL() {
-  const url = new URL('/', window.location.href);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  return url.href;
-}
-
-function connect() {
+async function connectPlayer() {
   clearTimeout(reconnectTimer);
   reconnectTimer = null;
 
-  const socket = new WebSocket(playerWebSocketURL());
-  ws = socket;
-
-  socket.addEventListener('open', () => {
-    if (ws !== socket) return;
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-    sessionReady = false;
-    terminalLiveBaselinePending = true;
-    connOverlay.classList.remove('hidden');
-    connText.textContent = 'УСТАНОВКА СВЯЗИ...';
-
-    void beginSessionHandshake(socket);
-  });
-
-  socket.addEventListener('message', ev => {
-    if (ws !== socket) return;
-    try { dispatch(JSON.parse(ev.data)); }
-    catch (e) { console.warn('WS parse error', e); }
-  });
-
-  socket.addEventListener('close', () => {
-    if (ws !== socket) return;
-    sessionReady = false;
-    terminalLiveBaselinePending = true;
-    signalRecognitionChange();
-    connOverlay.classList.remove('hidden');
-    connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
-    reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS);
-  });
-
-  socket.addEventListener('error', () => socket.close());
+  sessionReady = false;
+  terminalLiveBaselinePending = true;
+  connOverlay.classList.remove('hidden');
+  connText.textContent = 'УСТАНОВКА СВЯЗИ...';
+  try {
+    await beginSubscription();
+  } catch (error) {
+    console.warn('Player Connect subscription failed', error);
+    scheduleReconnect();
+  }
 }
 
-function send(msg) {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+async function establishSubscription(recognitionHandle) {
+  if (streamAbortController) streamAbortController.abort();
+  const controller = new AbortController();
+  streamAbortController = controller;
+  const generation = ++streamGeneration;
+  const request = recognitionHandle ? { recognitionHandle } : {};
+  const iterator = playerRPC.subscribe(request, { signal: controller.signal })[Symbol.asyncIterator]();
+  const first = await iterator.next();
+  if (generation !== streamGeneration || controller.signal.aborted || first.done) {
+    throw new Error('subscription ended before the complete snapshot');
+  }
+  applySubscriptionMessage(first.value, true);
+  void drainSubscription(iterator, controller, generation);
+}
+
+async function drainSubscription(iterator, controller, generation) {
+  try {
+    for (;;) {
+      const next = await iterator.next();
+      if (next.done) break;
+      if (generation !== streamGeneration || controller.signal.aborted) return;
+      applySubscriptionMessage(next.value, false);
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) console.warn('Player Connect stream ended', error);
+  }
+  if (generation === streamGeneration && !controller.signal.aborted) scheduleReconnect();
+}
+
+function scheduleReconnect() {
+  sessionReady = false;
+  terminalLiveBaselinePending = true;
+  signalRecognitionChange();
+  connOverlay.classList.remove('hidden');
+  connText.textContent = 'СВЯЗЬ ПОТЕРЯНА — ПЕРЕПОДКЛЮЧЕНИЕ...';
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => { void connectPlayer(); }, RECONNECT_DELAY_MS);
+}
+
+function applySubscriptionMessage(message, first) {
+  if (first && message.payload.case !== 'snapshot') {
+    throw new Error('first subscription value is not a complete snapshot');
+  }
+  if (message.payload.case === 'snapshot') {
+    applyGeneratedSnapshot(message.payload.value);
+  } else if (message.payload.case === 'update') {
+    applyGeneratedUpdate(message.payload.value);
+  }
+}
+
+function applyGeneratedSnapshot(snapshot) {
+  applyRecognitionSnapshot(snapshot.recognitionHandle, generatedPlayerState(snapshot.playerState, snapshot.revision));
+  applyGeneratedTerminal(snapshot.terminalPresentation, snapshot.revision);
+}
+
+function applyGeneratedUpdate(update) {
+  if (update.playerState) {
+  applyPlayerState(generatedPlayerState(update.playerState, update.revision));
+  }
+  if (update.terminalPresentation) applyGeneratedTerminal(update.terminalPresentation, update.revision);
+  if (update.navigation) {
+  applyNavigationProjection(generatedNavigation(update.navigation), Number(update.revision), terminalID);
+  }
+  if (update.hacking) {
+  applyHackingProjection(generatedHack(update.hacking), Number(update.revision), terminalID);
+  }
+}
+
+function applyGeneratedTerminal(presentation, revision) {
+  if (!presentation) return;
+  if (presentation.presentation.case === 'noLiveTerminal') {
+  applyNoLiveTerminal(Number(revision));
+    return;
+  }
+  if (presentation.presentation.case !== 'liveTerminal') return;
+  const live = presentation.presentation.value;
+  applyLiveTerminal({
+    revision: Number(revision),
+    terminalId: live.terminalId,
+    terminalName: live.terminalName,
+    tree: generatedContentNode(live.tree),
+    hackLevel: live.hackLevel,
+    introText: live.introText,
+    nav: generatedNavigation(live.navigation),
+    hack: generatedHack(live.hacking),
+  });
+}
+
+function generatedPlayerState(state, revision) {
+  if (!state) return null;
+  return {
+    revision: Number(revision),
+    sessionId: state.logicalSessionId,
+    fallbackName: state.fallbackName,
+    character: state.assignedCharacter ? {
+      id: state.assignedCharacter.characterId,
+      name: state.assignedCharacter.displayName,
+    } : null,
+    role: ({
+      [PlayerRole.UNASSIGNED]: 'unassigned',
+      [PlayerRole.ACTIVE]: 'active',
+      [PlayerRole.OBSERVER]: 'observer',
+    })[state.role] || 'unassigned',
+    phase: ({
+      [PlayerPhase.NO_BROADCAST]: 'no-broadcast',
+      [PlayerPhase.SELECTING]: 'selecting',
+      [PlayerPhase.WAITING]: 'waiting',
+      [PlayerPhase.CONTROLLING]: 'controlling',
+      [PlayerPhase.OBSERVING]: 'observing',
+    })[state.phase] || 'no-broadcast',
+    broadcastId: state.broadcastId || null,
+    activeTerminalId: state.activeTerminalId || null,
+    roster: (state.roster || []).map(entry => ({
+      id: entry.characterId,
+      name: entry.displayName,
+      status: entry.availability === RosterAvailability.AVAILABLE ? 'available' : 'claimed',
+    })),
+  };
+}
+
+function generatedContentNode(node) {
+  if (!node) return null;
+  const result = { id: node.id, name: node.name, type: node.content.case };
+  if (node.content.case === 'folder') result.children = (node.content.value.children || []).map(generatedContentNode);
+  if (node.content.case === 'command') result.text = node.content.value.text;
+  if (node.content.case === 'entry') result.description = node.content.value.description;
+  return result;
+}
+
+function generatedNavigation(nav) {
+  if (!nav) return { path: ['root'], mode: 'list', viewEntryId: null, commandNodeId: null };
+  return {
+    path: Array.from(nav.path || []),
+    mode: nav.mode === 2 ? 'entry' : 'list',
+    viewEntryId: nav.viewEntryId || null,
+    commandNodeId: nav.commandNodeId || null,
+  };
+}
+
+function generatedHack(hackState) {
+  if (!hackState) return null;
+  return {
+    level: hackState.level,
+    wordLength: hackState.wordLength,
+    attemptsMax: hackState.attemptsMax,
+    attemptsLeft: hackState.attemptsLeft,
+    solved: hackState.solved,
+    failed: hackState.failed,
+    log: Array.from(hackState.log || []),
+    columns: (hackState.columns || []).map(column => ({
+      addresses: Array.from(column.addresses || []), text: column.text,
+      words: (column.words || []).map(word => ({ id: word.id, start: word.start, length: word.length })),
+    })),
+    patterns: (hackState.patterns || []).map(pattern => ({
+      id: pattern.patternId, row: pattern.row, start: pattern.start, end: pattern.end, used: pattern.used,
+    })),
+  };
+}
+
+async function applyMutationResult(operation) {
+  if (!sessionReady) return;
+  try {
+  const result = await operation();
+  if (result) applyActionResult({
+    requestId: result.requestId, accepted: result.accepted,
+      reason: actionReasonName(result.reason), revision: Number(result.revision),
+    });
+  } catch (error) {
+    console.warn('Player mutation failed', error);
+    pendingSelection = null;
+    pendingSharedAction = null;
+    showPlayerNotice('ДЕЙСТВИЕ ОТКЛОНЕНО');
+    render();
+  }
+}
+
+function selectCharacterRPC(requestId, broadcastId, characterId) {
+  return applyMutationResult(() => playerRPC.selectCharacter({
+    recognitionHandle: readBrowserToken(), requestId, broadcastId, characterId,
+  }));
+}
+
+function navigateRPC(requestId, broadcastId, terminalId, actionName, nodeId) {
+  const action = actionName === 'back'
+    ? { case: 'back', value: {} }
+    : { case: actionName, value: { nodeId } };
+  return applyMutationResult(() => playerRPC.navigate({
+    recognitionHandle: readBrowserToken(), requestId, broadcastId, terminalId, action,
+  }));
+}
+
+function guessRPC(requestId, broadcastId, terminalId, targetId) {
+  const filler = /^(\d+):(\d+)$/.exec(targetId);
+  const target = filler
+    ? { case: 'filler', value: { column: Number(filler[1]), character: Number(filler[2]) } }
+    : { case: 'wordId', value: targetId };
+  return applyMutationResult(() => playerRPC.guess({
+    recognitionHandle: readBrowserToken(), requestId, broadcastId, terminalId, target,
+  }));
+}
+
+function activatePatternRPC(requestId, broadcastId, terminalId, patternId) {
+  return applyMutationResult(() => playerRPC.activatePattern({
+    recognitionHandle: readBrowserToken(), requestId, broadcastId, terminalId, patternId,
+  }));
+}
+
+function actionReasonName(reason) {
+  return ({
+    [ActionReason.ACCEPTED]: 'accepted',
+    [ActionReason.INVALID_SESSION]: 'invalid-session',
+    [ActionReason.STALE_BROADCAST]: 'stale-broadcast',
+    [ActionReason.UNASSIGNED]: 'unassigned',
+    [ActionReason.NOT_CONTROLLER]: 'not-controller',
+    [ActionReason.CONTROLLER_DISCONNECTED]: 'controller-disconnected',
+    [ActionReason.STALE_TERMINAL]: 'stale-terminal',
+    [ActionReason.INVALID_ACTION]: 'invalid-action',
+    [ActionReason.CONFLICT]: 'conflict',
+    [ActionReason.DUPLICATE]: 'duplicate',
+  })[reason] || 'invalid-action';
 }
 
 // Applies a nav position pushed by the server. Never touches MODE.HACK —
@@ -497,12 +684,14 @@ function clearBroadcastMirrors() {
   hackInputPreview.textContent = '';
 }
 
-function playHackOutcomeTransition(previousHack, nextHack) {
+function playHackOutcomeTransition(previousHack, nextHack, revision = appliedSharedRevision) {
   if (!previousHack || !nextHack) return;
-  if (!nextHack.solved && nextHack.attemptsLeft < previousHack.attemptsLeft) {
+  if (!nextHack.solved && nextHack.attemptsLeft < previousHack.attemptsLeft &&
+      window.__falloutTerminalShouldPlayAuthoritativeCue?.(revision, 'hack-bad')) {
     playHackBad();
   }
-  if (nextHack.solved && !previousHack.solved) {
+  if (nextHack.solved && !previousHack.solved &&
+      window.__falloutTerminalShouldPlayAuthoritativeCue?.(revision, 'hack-good')) {
     playHackGood();
   }
 }
@@ -516,11 +705,10 @@ function scheduleHackSolvedNavigation() {
   }, 2600);
 }
 
-function dispatch(msg) {
-  if (msg.type === 'SESSION_WELCOME') {
-    if (!msg.state || typeof msg.browserToken !== 'string' || !msg.browserToken) return;
+function applyRecognitionSnapshot(recognitionHandle, state) {
+    if (!state || typeof recognitionHandle !== 'string' || !recognitionHandle) return;
     try {
-      localStorage.setItem(PLAYER_TOKEN_KEY, msg.browserToken);
+      localStorage.setItem(PLAYER_TOKEN_KEY, recognitionHandle);
     } catch (error) {
       console.warn('Player recognition token could not be stored', error);
     }
@@ -530,16 +718,12 @@ function dispatch(msg) {
     pendingSelection = null;
     pendingSharedAction = null;
     showPlayerNotice('');
-    applyPlayerState(msg.state, { authoritativeWelcome: true });
+    applyPlayerState(state, { authoritativeWelcome: true });
     if (!hasCurrentTerminalMirror()) appliedSharedRevision = 0;
     connOverlay.classList.add('hidden');
-  } else if (msg.type === 'PLAYER_STATE') {
-    if (!sessionReady || !msg.state) return;
-    applyPlayerState(msg.state);
-  } else if (msg.type === 'ACTION_RESULT') {
-    if (!sessionReady) return;
-    applyActionResult(msg);
-  } else if (msg.type === 'TERMINAL_LIVE') {
+}
+
+function applyLiveTerminal(msg) {
     if (!matchesExpectedTerminalLive(msg) || !acceptSharedSnapshot(msg)) return;
     const previousHack = hack;
     const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive &&
@@ -585,20 +769,21 @@ function dispatch(msg) {
 
     setAmbientActive(true);
     render();
-  } else if (msg.type === 'TERMINAL_UPDATE') {
-    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
-    tree = msg.tree;
-    if (msg.introText != null) introText = msg.introText;
-    if (msg.nav) applyNavFromServer(msg.nav);
+}
+
+function applyNavigationProjection(nav, revision, projectedTerminalID) {
+    const projection = { nav, revision, terminalId: projectedTerminalID };
+    if (!matchesActiveTerminal(projection) || !acceptSharedSnapshot(projection)) return;
+    applyNavFromServer(nav);
     render();
-  } else if (msg.type === 'NAV_STATE') {
-    if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
-    applyNavFromServer(msg.nav);
-    render();
-  } else if (msg.type === 'HACK_STATE') {
+}
+
+function applyHackingProjection(nextHack, revision, projectedTerminalID) {
+    const projection = { hack: nextHack, revision, terminalId: projectedTerminalID };
+    const msg = projection;
     if (!matchesActiveTerminal(msg) || !acceptSharedSnapshot(msg)) return;
     const previousHack = hack;
-    hack = msg.hack;
+    hack = nextHack;
     if (mode !== MODE.HACK || !hack) return;
     playHackOutcomeTransition(previousHack, hack);
     lastAttemptsLeft = hack.attemptsLeft;
@@ -606,8 +791,11 @@ function dispatch(msg) {
 
     scheduleHackSolvedNavigation();
     render();
-  } else if (msg.type === 'TERMINAL_CLEAR') {
-    if (!expectsTerminalClear() || !acceptSharedSnapshot(msg)) return;
+}
+
+function applyNoLiveTerminal(revision) {
+    const projection = { revision };
+    if (!expectsTerminalClear() || !acceptSharedSnapshot(projection)) return;
     hasLive = false;
     terminalID = '';
     terminalBroadcastID = '';
@@ -617,7 +805,6 @@ function dispatch(msg) {
     hackSolvedTimer = null;
     setAmbientActive(false);
     render();
-  }
 }
 
 function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
@@ -760,21 +947,30 @@ function canControlSharedTerminal() {
     pendingSharedAction === null;
 }
 
-function beginSharedAction(type, fields) {
+function beginSharedMutation(procedure, invoke) {
   if (!canControlSharedTerminal()) return false;
 
   const requestId = createRequestID();
-  pendingSharedAction = { requestId, type, acceptedRevision: null };
+  pendingSharedAction = { requestId, procedure, acceptedRevision: null };
   showPlayerNotice('');
   renderPlayerContext();
-  send({
-    type,
-    requestId,
-    broadcastId: playerState.broadcastId,
-    terminalId: playerState.activeTerminalId,
-    ...fields,
-  });
+  void invoke(requestId, playerState.broadcastId, playerState.activeTerminalId);
   return true;
+}
+
+function beginNavigation(action, nodeId = '') {
+  return beginSharedMutation('navigate', (requestId, broadcastId, terminalId) =>
+    navigateRPC(requestId, broadcastId, terminalId, action, nodeId));
+}
+
+function beginGuess(targetId) {
+  return beginSharedMutation('guess', (requestId, broadcastId, terminalId) =>
+    guessRPC(requestId, broadcastId, terminalId, targetId));
+}
+
+function beginPattern(patternId) {
+  return beginSharedMutation('activatePattern', (requestId, broadcastId, terminalId) =>
+    activatePatternRPC(requestId, broadcastId, terminalId, patternId));
 }
 
 function selectCharacter(characterID) {
@@ -790,12 +986,7 @@ function selectCharacter(characterID) {
   pendingSelection = { requestId, acceptedRevision: null };
   showPlayerNotice('');
   render();
-  send({
-    type: 'CHARACTER_SELECT',
-    requestId,
-    broadcastId: playerState.broadcastId,
-    characterId: entry.id,
-  });
+  void selectCharacterRPC(requestId, playerState.broadcastId, entry.id);
 }
 
 function showPlayerNotice(message) {
@@ -895,22 +1086,22 @@ function currentFolderNode() {
 }
 
 // ════════════════════════════════════════════════════
-// NORMAL-SCREEN NAVIGATION ACTIONS — sent to the server, the shared
-// position only actually changes once NAV_STATE / TERMINAL_UPDATE echoes back.
+// NORMAL-SCREEN NAVIGATION ACTIONS — the shared position changes only after
+// the generated subscription carries the applicable authoritative revision.
 // ════════════════════════════════════════════════════
 function activateRow(node) {
   if (node.type === 'folder') {
-    beginSharedAction('NAV_ACTION', { action: 'enter', nodeId: node.id });
+  beginNavigation('enter', node.id);
   } else if (node.type === 'command') {
-    beginSharedAction('NAV_ACTION', { action: 'command', nodeId: node.id });
+  beginNavigation('command', node.id);
   } else if (node.type === 'entry') {
-    beginSharedAction('NAV_ACTION', { action: 'entry', nodeId: node.id });
+  beginNavigation('entry', node.id);
   }
 }
 
 function goBack() {
   if (mode === MODE.HACK) return;
-  beginSharedAction('NAV_ACTION', { action: 'back' });
+  beginNavigation('back');
 }
 
 backBtn.addEventListener('click', goBack);
@@ -1045,11 +1236,11 @@ hackColumns.addEventListener('click', (e) => {
   if (!cell || !hack || hack.solved || hack.failed) return;
   const pattern = patternAtCell(cell);
   if (pattern && !pattern.used) {
-    if (beginSharedAction('HACK_PATTERN', { patternId: pattern.id })) playEnter();
+  if (beginPattern(pattern.id)) playEnter();
     return;
   }
   if (pattern) return;
-  if (beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })) playEnter();
+  if (beginGuess(cell.dataset.target)) playEnter();
 });
 
 // ════════════════════════════════════════════════════
@@ -1666,4 +1857,4 @@ if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(scheduleHackFit);
 }
 render();
-connect();
+void connectPlayer();

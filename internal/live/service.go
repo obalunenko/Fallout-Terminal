@@ -229,7 +229,7 @@ func (service *Service) ApplyNav(action, nodeID string) (*domain.NavState, bool)
 
 	runtime := terminalRuntime(service.live)
 	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
-		Kind: domain.RuntimeCommandNavAction, Action: action, NodeID: nodeID,
+		Kind: domain.RuntimeCommandNavigate, Action: action, NodeID: nodeID,
 	})
 	if !ok {
 		return nil, false
@@ -248,7 +248,7 @@ func (service *Service) ApplyHackGuess(targetID string) (*domain.PublicHackState
 
 	runtime := terminalRuntime(service.live)
 	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
-		Kind: domain.RuntimeCommandHackGuess, TargetID: targetID,
+		Kind: domain.RuntimeCommandGuess, TargetID: targetID,
 	})
 	if !ok {
 		return nil, false
@@ -267,7 +267,7 @@ func (service *Service) ApplyHackPattern(patternID string, publish func(*domain.
 
 	runtime := terminalRuntime(service.live)
 	projection, ok := service.applyRuntimeLocked(runtime, domain.RuntimeCommand{
-		Kind: domain.RuntimeCommandHackPattern, PatternID: patternID,
+		Kind: domain.RuntimeCommandActivatePattern, PatternID: patternID,
 	})
 	if !ok {
 		service.mu.Unlock()
@@ -314,9 +314,9 @@ func (service *Service) applyRuntimeLocked(state *domain.TerminalRuntime, comman
 	}
 
 	switch command.Kind {
-	case domain.RuntimeCommandNavAction:
+	case domain.RuntimeCommandNavigate:
 		state.Nav = nav.ApplyAction(state.Nav, state.Tree, command.Action, command.NodeID)
-	case domain.RuntimeCommandHackGuess:
+	case domain.RuntimeCommandGuess:
 		if !activeRuntimePuzzle(state) {
 			return nil, false
 		}
@@ -328,7 +328,7 @@ func (service *Service) applyRuntimeLocked(state *domain.TerminalRuntime, comman
 		if state.Hack.AttemptsLeft == attemptsBefore && state.Hack.Solved == solvedBefore && state.Hack.Failed == failedBefore && len(state.Hack.Log) == logLengthBefore {
 			return nil, false
 		}
-	case domain.RuntimeCommandHackPattern:
+	case domain.RuntimeCommandActivatePattern:
 		if !activeRuntimePuzzle(state) || !hack.ApplyPattern(state.Hack, command.PatternID, service.random) {
 			return nil, false
 		}

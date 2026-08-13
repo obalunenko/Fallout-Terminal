@@ -154,6 +154,9 @@ func (service *Service) Create(ctx context.Context) SessionResult {
 	}
 
 	created := starterSession(sessionNameFromPath(target))
+	if err := verifySessionContract(created); err != nil {
+		return sessionFailure("could not verify the new session contract")
+	}
 	data, err := domain.EncodeSession(created)
 	if err != nil {
 		return sessionFailure("could not prepare the new session")
@@ -209,6 +212,9 @@ func (service *Service) Open(ctx context.Context) SessionResult {
 	if err != nil {
 		return sessionFailure("the selected file is not a valid version-1 session")
 	}
+	if err := verifySessionContract(opened); err != nil {
+		return sessionFailure("the selected file does not satisfy the session contract")
+	}
 	return service.activate(target, opened)
 }
 
@@ -252,6 +258,9 @@ func (service *Service) CopyDemo(ctx context.Context) SessionResult {
 	if err != nil {
 		return sessionFailure("the bundled demo is not a valid version-1 session")
 	}
+	if err := verifySessionContract(demo); err != nil {
+		return sessionFailure("the bundled demo does not satisfy the session contract")
+	}
 	if err := service.store.CopyAtomic(service.locations.BundledDemo, destination); err != nil {
 		return sessionFailure("could not create a writable demo copy")
 	}
@@ -266,6 +275,9 @@ func (service *Service) Save(ctx context.Context, session domain.Session, revisi
 	}
 	if revision == 0 {
 		return saveFailure(revision, 0, "save revision must be greater than zero")
+	}
+	if err := verifySessionContract(session); err != nil {
+		return saveFailure(revision, 0, "session is invalid and was not saved")
 	}
 
 	data, err := domain.EncodeSession(session)
@@ -347,6 +359,9 @@ func (service *Service) AssociatePlayerConfig(ctx context.Context, playerConfigP
 	}
 	candidate := cloneSession(*active.Session)
 	candidate.PlayerConfig = filepath.Clean(reference)
+	if err := verifySessionContract(candidate); err != nil {
+		return sessionFailure("could not verify the player config association")
+	}
 	data, err := domain.EncodeSession(candidate)
 	if err != nil {
 		return sessionFailure("could not prepare the player config association")

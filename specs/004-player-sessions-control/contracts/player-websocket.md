@@ -1,5 +1,10 @@
 # Player WebSocket Contract: Sessions, Selection, Roles, and Ordered Actions
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 ## Scope and compatibility
 
 This contract extends the existing same-origin player WebSocket. The embedded server and bundled player are released together; there is no negotiation with older browser assets. JSON objects remain bounded to 4 KiB for client messages, strictly decoded, and rejected on duplicate, unknown, missing, blank, or wrong-typed fields. JSON field names are camelCase and message types are uppercase snake case.

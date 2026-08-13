@@ -99,7 +99,7 @@ Roll back or halt cutover for any of these conditions:
 - semantic session data loss or a save revision older than the last accepted
   edit;
 - private hacking fields crossing the player or desktop boundary;
-- anonymous access to a public HTTP or WebSocket endpoint;
+- anonymous access to public static or ConnectRPC resources;
 - repeatable 4–7-client divergence or reconnect puzzle regeneration;
 - an installed app that requires Go, Node, npm, Wails, Vite, or a separately
   started player server;

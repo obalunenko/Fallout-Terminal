@@ -2,13 +2,15 @@ package live
 
 import (
 	"encoding/json"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetSnapshotIsDetachedAndSecretFree(t *testing.T) {
@@ -16,9 +18,8 @@ func TestSetSnapshotIsDetachedAndSecretFree(t *testing.T) {
 	tree := testTree()
 
 	first := service.Set("terminal-1", "Overseer", tree, 1, "WELCOME")
-	if first == nil || first.Hack == nil {
-		t.Fatalf("Set() = %#v, want live terminal with puzzle", first)
-	}
+	require.Falsef(t, first == nil || first.Hack == nil,
+		"Set() = %#v, want live terminal with puzzle", first)
 
 	tree.Name = "MUTATED INPUT"
 	first.Tree.Name = "MUTATED RESULT"
@@ -26,100 +27,109 @@ func TestSetSnapshotIsDetachedAndSecretFree(t *testing.T) {
 	first.Hack.Log = append(first.Hack.Log, "private mutation")
 
 	snapshot := service.Snapshot()
-	if snapshot == nil {
-		t.Fatal("Snapshot() returned nil")
-	}
-	if snapshot.Tree.Name != "ROOT" || !reflect.DeepEqual(snapshot.Nav.Path, []string{"root"}) || len(snapshot.Hack.Log) != 0 {
-		t.Fatalf("canonical state was mutated through a boundary: %#v", snapshot)
-	}
+	require.False(t, snapshot == nil,
+		"Snapshot() returned nil")
+	require.Falsef(t, snapshot.Tree.Name != "ROOT" || !cmp.Equal(snapshot.Nav.Path, []string{"root"}) || len(snapshot.Hack.Log) != 0,
+		"canonical state was mutated through a boundary: %#v", snapshot)
 
 	raw, err := json.Marshal(snapshot)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	for _, privateField := range []string{"secretWord", "wordsById"} {
-		if strings.Contains(string(raw), privateField) {
-			t.Errorf("public snapshot leaked %q: %s", privateField, raw)
-		}
+		assert.Falsef(t, strings.Contains(string(raw), privateField),
+			"public snapshot leaked %q: %s", privateField, raw)
+
 	}
 }
 
 func TestUpdateRevalidatesNavigationAndPreservesPuzzle(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	service.Set("terminal-1", "Overseer", testTree(), 1, "OLD")
-	if _, ok := service.ApplyNav("enter", "docs"); !ok {
-		t.Fatal("ApplyNav() rejected active live terminal")
+	{
+		_, ok := service.ApplyNav("enter", "docs")
+		require.False(t, !ok,
+			"ApplyNav() rejected active live terminal")
 	}
-	if _, ok := service.ApplyNav("entry", "report"); !ok {
-		t.Fatal("ApplyNav() rejected active entry")
+	{
+
+		_, ok := service.ApplyNav("entry", "report")
+		require.False(t, !ok,
+			"ApplyNav() rejected active entry")
 	}
+
 	before := service.Snapshot()
 	intro := "NEW"
 
 	updated, ok := service.Update(treeWithoutReport(), &intro)
-	if !ok {
-		t.Fatal("Update() rejected active live terminal")
-	}
-	if updated.IntroText != intro || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil {
-		t.Fatalf("Update() did not revalidate navigation: %#v", updated)
-	}
-	if !reflect.DeepEqual(updated.Hack, before.Hack) {
-		t.Fatal("Update() reset or changed the active puzzle")
-	}
+	require.False(t, !ok,
+		"Update() rejected active live terminal")
+	require.Falsef(t, updated.IntroText != intro || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil,
+		"Update() did not revalidate navigation: %#v", updated)
+	require.False(t, !cmp.Equal(updated.Hack, before.Hack),
+		"Update() reset or changed the active puzzle")
+
 }
 
 func TestApplyHackPatternReturnsDetachedAcceptedState(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	initial := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
-	if initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0 {
-		t.Fatalf("Set() pattern state = %#v", initial)
-	}
+	require.Falsef(t, initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0,
+		"Set() pattern state = %#v", initial)
+
 	patternID := initial.Hack.Patterns[0].ID
 
 	result, ok := activatePattern(service, patternID)
-	if !ok || result == nil {
-		t.Fatalf("ApplyHackPattern(%q) = %#v, %t", patternID, result, ok)
-	}
+	require.Falsef(t, !ok || result == nil,
+		"ApplyHackPattern(%q) = %#v, %t", patternID, result, ok)
+
 	used := false
 	for _, pattern := range result.Patterns {
 		if pattern.ID == patternID {
 			used = pattern.Used
 		}
 	}
-	if !used {
-		t.Fatalf("accepted pattern %q was not marked used: %#v", patternID, result.Patterns)
-	}
+	require.Falsef(t, !used,
+		"accepted pattern %q was not marked used: %#v", patternID, result.Patterns)
+
 	result.Patterns[0].ID = "mutated"
 	snapshot := service.Snapshot()
-	if snapshot == nil || snapshot.Hack == nil || snapshot.Hack.Patterns[0].ID == "mutated" {
-		t.Fatal("public pattern projection mutated canonical state")
-	}
+	require.False(t, snapshot == nil || snapshot.Hack == nil || snapshot.Hack.Patterns[0].ID == "mutated",
+		"public pattern projection mutated canonical state")
+
 }
 
 func TestClearAndAbsentActions(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
-	if service.Snapshot() != nil {
-		t.Fatal("new service unexpectedly has live state")
+	require.False(t, service.Snapshot() != nil,
+		"new service unexpectedly has live state")
+	{
+
+		_, ok := service.Update(testTree(), nil)
+		require.False(t, ok,
+			"Update() succeeded without live state")
 	}
-	if _, ok := service.Update(testTree(), nil); ok {
-		t.Fatal("Update() succeeded without live state")
+	{
+
+		_, ok := service.ApplyNav("back", "")
+		require.False(t, ok,
+			"ApplyNav() succeeded without live state")
 	}
-	if _, ok := service.ApplyNav("back", ""); ok {
-		t.Fatal("ApplyNav() succeeded without live state")
+	{
+
+		_, ok := service.ApplyHackGuess("A1")
+		require.False(t, ok,
+			"ApplyHackGuess() succeeded without a puzzle")
 	}
-	if _, ok := service.ApplyHackGuess("A1"); ok {
-		t.Fatal("ApplyHackGuess() succeeded without a puzzle")
-	}
-	if service.ApplyHackPattern("opaque-stale-pattern", nil) {
-		t.Fatal("ApplyHackPattern() succeeded without a puzzle")
-	}
+	require.False(t, service.ApplyHackPattern("opaque-stale-pattern", nil),
+		"ApplyHackPattern() succeeded without a puzzle")
 
 	service.Set("terminal-1", "Overseer", testTree(), 0, "")
 	service.Clear()
 	service.Clear()
-	if service.Snapshot() != nil {
-		t.Fatal("Clear() left stale live state")
-	}
+	require.False(t, service.Snapshot() != nil,
+		"Clear() left stale live state")
+
 }
 
 func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
@@ -155,17 +165,17 @@ func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
 	workers.Wait()
 
 	snapshot := service.Snapshot()
-	if snapshot == nil || snapshot.Tree.Name != "ROOT" || len(snapshot.Nav.Path) == 0 || snapshot.Nav.Path[0] != "root" {
-		t.Fatalf("concurrent use corrupted canonical state: %#v", snapshot)
-	}
+	require.Falsef(t, snapshot == nil || snapshot.Tree.Name != "ROOT" || len(snapshot.Nav.Path) == 0 || snapshot.Nav.Path[0] != "root",
+		"concurrent use corrupted canonical state: %#v", snapshot)
+
 }
 
 func TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	initial := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
-	if initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0 {
-		t.Fatalf("Set() pattern state = %#v", initial)
-	}
+	require.Falsef(t, initial == nil || initial.Hack == nil || len(initial.Hack.Patterns) == 0,
+		"Set() pattern state = %#v", initial)
+
 	patternID := initial.Hack.Patterns[0].ID
 
 	var accepted atomic.Int32
@@ -180,26 +190,27 @@ func TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage(t *testing.T) {
 		}()
 	}
 	workers.Wait()
-	if accepted.Load() != 1 {
-		t.Fatalf("accepted concurrent actions = %d, want 1", accepted.Load())
-	}
+	require.Falsef(t, accepted.Load() != 1,
+		"accepted concurrent actions = %d, want 1", accepted.Load())
 
 	beforeRejected := service.Snapshot()
-	if service.ApplyHackPattern(patternID, nil) {
-		t.Fatal("repeated pattern was accepted")
-	}
-	if afterRejected := service.Snapshot(); !reflect.DeepEqual(afterRejected, beforeRejected) {
-		t.Fatalf("repeated pattern changed state\ngot: %#v\nwant: %#v", afterRejected, beforeRejected)
+	require.False(t, service.ApplyHackPattern(patternID, nil),
+		"repeated pattern was accepted")
+	{
+
+		afterRejected := service.Snapshot()
+		require.Falsef(t, !cmp.Equal(afterRejected, beforeRejected),
+			"repeated pattern changed state\ngot: %#v\nwant: %#v", afterRejected, beforeRejected)
 	}
 
 	fresh := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
-	if fresh == nil || fresh.Hack == nil || len(fresh.Hack.Patterns) == 0 {
-		t.Fatalf("fresh Set() pattern state = %#v", fresh)
-	}
+	require.Falsef(t, fresh == nil || fresh.Hack == nil || len(fresh.Hack.Patterns) == 0,
+		"fresh Set() pattern state = %#v", fresh)
+
 	for _, pattern := range fresh.Hack.Patterns {
-		if pattern.Used {
-			t.Fatalf("fresh puzzle retained used pattern %#v", pattern)
-		}
+		require.Falsef(t, pattern.Used,
+			"fresh puzzle retained used pattern %#v", pattern)
+
 	}
 }
 
@@ -208,26 +219,27 @@ func TestPatternGenerationRejectsStaleIDWithoutRandomnessOrPublication(t *testin
 	service := New(random, fixedWords{})
 	service.generationIDs = &sequenceGenerationIDs{values: []string{"generation-old", "generation-new"}}
 	old := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
-	if old == nil || old.Hack == nil || len(old.Hack.Patterns) == 0 {
-		t.Fatalf("old puzzle = %#v", old)
-	}
+	require.Falsef(t, old == nil || old.Hack == nil || len(old.Hack.Patterns) == 0,
+		"old puzzle = %#v", old)
+
 	staleID := old.Hack.Patterns[0].ID
 	current := service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
-	if current == nil || current.Hack == nil || len(current.Hack.Patterns) == 0 || current.Hack.Patterns[0].ID == staleID {
-		t.Fatalf("fresh generation did not replace opaque identities: old=%q current=%#v", staleID, current)
-	}
+	require.Falsef(t, current == nil || current.Hack == nil || len(current.Hack.Patterns) == 0 || current.Hack.Patterns[0].ID == staleID,
+		"fresh generation did not replace opaque identities: old=%q current=%#v", staleID, current)
 
 	beforeCalls := random.calls.Load()
 	publications := atomic.Int32{}
-	if service.ApplyHackPattern(staleID, func(*domain.PublicHackState) { publications.Add(1) }) {
-		t.Fatal("stale generation pattern was accepted")
+	require.False(t, service.ApplyHackPattern(staleID, func(*domain.PublicHackState) { publications.Add(1) }),
+		"stale generation pattern was accepted")
+	require.Falsef(t, random.calls.Load() != beforeCalls || publications.Load() != 0,
+		"stale request consumed RNG or published: calls=%d->%d publications=%d", beforeCalls, random.calls.Load(), publications.Load())
+	{
+
+		after := service.Snapshot()
+		require.Falsef(t, !cmp.Equal(after, current),
+			"stale request mutated current generation\ngot: %#v\nwant: %#v", after, current)
 	}
-	if random.calls.Load() != beforeCalls || publications.Load() != 0 {
-		t.Fatalf("stale request consumed RNG or published: calls=%d->%d publications=%d", beforeCalls, random.calls.Load(), publications.Load())
-	}
-	if after := service.Snapshot(); !reflect.DeepEqual(after, current) {
-		t.Fatalf("stale request mutated current generation\ngot: %#v\nwant: %#v", after, current)
-	}
+
 }
 
 func TestAcceptedPatternPublishesOnceAfterMutationAndDuplicatePublishesNever(t *testing.T) {
@@ -242,25 +254,26 @@ func TestAcceptedPatternPublishesOnceAfterMutationAndDuplicatePublishesNever(t *
 	var published []*domain.PublicHackState
 	accepted := service.ApplyHackPattern(patternID, func(state *domain.PublicHackState) {
 		published = append(published, state)
-		if !publicPatternIsUsed(state, patternID) {
-			t.Fatalf("callback ran before used marking: %#v", state.Patterns)
-		}
+		require.Falsef(t, !publicPatternIsUsed(state, patternID),
+			"callback ran before used marking: %#v", state.Patterns)
+
 	})
-	if !accepted || len(published) != 1 || random.calls.Load() != beforeCalls+1 {
-		t.Fatalf("accepted=%t publications=%d RNG=%d->%d, want true/1/+1", accepted, len(published), beforeCalls, random.calls.Load())
-	}
+	require.Falsef(t, !accepted || len(published) != 1 || random.calls.Load() != beforeCalls+1,
+		"accepted=%t publications=%d RNG=%d->%d, want true/1/+1", accepted, len(published), beforeCalls, random.calls.Load())
+
 	published[0].Patterns[0].ID = "mutated-return"
-	if snapshot := service.Snapshot(); snapshot.Hack.Patterns[0].ID == "mutated-return" {
-		t.Fatal("callback projection retained a canonical reference")
+	{
+		snapshot := service.Snapshot()
+		require.False(t, snapshot.Hack.Patterns[0].ID == "mutated-return",
+			"callback projection retained a canonical reference")
 	}
 
 	beforeCalls = random.calls.Load()
-	if service.ApplyHackPattern(patternID, func(*domain.PublicHackState) { published = append(published, nil) }) {
-		t.Fatal("duplicate pattern was accepted")
-	}
-	if len(published) != 1 || random.calls.Load() != beforeCalls {
-		t.Fatalf("duplicate request published or consumed RNG: publications=%d calls=%d->%d", len(published), beforeCalls, random.calls.Load())
-	}
+	require.False(t, service.ApplyHackPattern(patternID, func(*domain.PublicHackState) { published = append(published, nil) }),
+		"duplicate pattern was accepted")
+	require.Falsef(t, len(published) != 1 || random.calls.Load() != beforeCalls,
+		"duplicate request published or consumed RNG: publications=%d calls=%d->%d", len(published), beforeCalls, random.calls.Load())
+
 }
 
 func TestTerminalRuntimeLifecycleCreatesUpdatesAndProjectsDetachedCheckpoints(t *testing.T) {
@@ -270,51 +283,51 @@ func TestTerminalRuntimeLifecycleCreatesUpdatesAndProjectsDetachedCheckpoints(t 
 		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: testTree(), HackLevel: 1, IntroText: "OLD",
 	}
 	runtime, created := service.CreateRuntime(target)
-	if runtime == nil || created == nil || runtime.Hack == nil || runtime.Hack.GenerationID != "runtime-generation-1" {
-		t.Fatalf("CreateRuntime() = runtime %#v projection %#v", runtime, created)
-	}
-	if runtime.Lifecycle != domain.TerminalLifecycleActive || !reflect.DeepEqual(runtime.Nav.Path, []string{"root"}) {
-		t.Fatalf("fresh runtime lifecycle/nav = %#v", runtime)
-	}
-	if created.Hack == nil || created.TerminalID != target.TerminalID {
-		t.Fatalf("fresh public projection = %#v", created)
-	}
+	require.Falsef(t, runtime == nil || created == nil || runtime.Hack == nil || runtime.Hack.GenerationID != "runtime-generation-1",
+		"CreateRuntime() = runtime %#v projection %#v", runtime, created)
+	require.Falsef(t, runtime.Lifecycle != domain.TerminalLifecycleActive || !cmp.Equal(runtime.Nav.Path, []string{"root"}),
+		"fresh runtime lifecycle/nav = %#v", runtime)
+	require.Falsef(t, created.Hack == nil || created.TerminalID != target.TerminalID,
+		"fresh public projection = %#v", created)
+
 	created.Tree.Name = "MUTATED PROJECTION"
 	created.Nav.Path[0] = "mutated"
 	created.Hack.Log = append(created.Hack.Log, "mutated")
 	projected := service.ProjectRuntime(runtime)
-	if projected.Tree.Name != "ROOT" || !reflect.DeepEqual(projected.Nav.Path, []string{"root"}) || len(projected.Hack.Log) != 0 {
-		t.Fatalf("projection aliases private runtime: %#v", projected)
+	require.Falsef(t, projected.Tree.Name != "ROOT" || !cmp.Equal(projected.Nav.Path, []string{"root"}) || len(projected.Hack.Log) != 0,
+		"projection aliases private runtime: %#v", projected)
+	{
+
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs"})
+		require.False(t, !ok,
+			"Apply() rejected created runtime")
+	}
+	{
+
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "entry", NodeID: "report"})
+		require.False(t, !ok,
+			"Apply() rejected created runtime entry")
 	}
 
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
-		t.Fatal("Apply() rejected created runtime")
-	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
-		t.Fatal("Apply() rejected created runtime entry")
-	}
 	privateHackBefore := cloneHackForLifecycleTest(runtime.Hack)
 	updatedTarget := target
 	updatedTarget.TerminalName = "Overseer Updated"
 	updatedTarget.Tree = treeWithoutReport()
 	updatedTarget.IntroText = "NEW"
 	updated := service.UpdateRuntime(runtime, updatedTarget)
-	if updated == nil || updated.TerminalName != "Overseer Updated" || updated.IntroText != "NEW" || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil {
-		t.Fatalf("UpdateRuntime() did not update metadata/revalidate nav: %#v", updated)
-	}
-	if !reflect.DeepEqual(runtime.Hack, privateHackBefore) || runtime.Hack.GenerationID != "runtime-generation-1" {
-		t.Fatal("UpdateRuntime() regenerated or changed private puzzle")
-	}
-	if service.generationIDs.(*sequenceGenerationIDs).next != 1 {
-		t.Fatalf("UpdateRuntime() consumed a new generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
-	}
+	require.Falsef(t, updated == nil || updated.TerminalName != "Overseer Updated" || updated.IntroText != "NEW" || updated.Nav.Mode != "list" || updated.Nav.ViewEntryID != nil,
+		"UpdateRuntime() did not update metadata/revalidate nav: %#v", updated)
+	require.False(t, !cmp.Equal(runtime.Hack, privateHackBefore) || runtime.Hack.GenerationID != "runtime-generation-1",
+		"UpdateRuntime() regenerated or changed private puzzle")
+	require.Falsef(t, service.generationIDs.(*sequenceGenerationIDs).next != 1,
+		"UpdateRuntime() consumed a new generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
 
 	second, _ := service.CreateRuntime(domain.TerminalTarget{
 		TerminalID: "terminal-2", TerminalName: "Archive", Tree: testTree(), HackLevel: 1,
 	})
-	if second.Hack == nil || second.Hack.GenerationID != "runtime-generation-2" {
-		t.Fatalf("second fresh runtime did not generate a fresh puzzle: %#v", second.Hack)
-	}
+	require.Falsef(t, second.Hack == nil || second.Hack.GenerationID != "runtime-generation-2",
+		"second fresh runtime did not generate a fresh puzzle: %#v", second.Hack)
+
 }
 
 func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegenerates(t *testing.T) {
@@ -324,15 +337,21 @@ func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegene
 		TerminalID: "terminal-1", TerminalName: "Overseer", Tree: testTree(), HackLevel: 1, IntroText: "OLD",
 	}
 	runtime, initial := service.CreateRuntime(target)
-	if runtime == nil || runtime.Hack == nil || initial == nil || initial.Hack == nil {
-		t.Fatalf("CreateRuntime() = runtime %#v projection %#v", runtime, initial)
+	require.Falsef(t, runtime == nil || runtime.Hack == nil || initial == nil || initial.Hack == nil,
+		"CreateRuntime() = runtime %#v projection %#v", runtime, initial)
+	{
+
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs"})
+		require.False(t, !ok,
+			"navigation into checkpoint was rejected")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
-		t.Fatal("navigation into checkpoint was rejected")
+	{
+
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "entry", NodeID: "report"})
+		require.False(t, !ok,
+			"entry navigation into checkpoint was rejected")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
-		t.Fatal("entry navigation into checkpoint was rejected")
-	}
+
 	wrongTarget := ""
 	for id, candidate := range runtime.Hack.WordsByID {
 		if candidate.Text != runtime.Hack.SecretWord {
@@ -340,63 +359,60 @@ func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegene
 			break
 		}
 	}
-	if wrongTarget == "" {
-		t.Fatal("generated puzzle has no non-secret candidate")
+	require.False(t, wrongTarget == "",
+		"generated puzzle has no non-secret candidate")
+	{
+
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandGuess, TargetID: wrongTarget})
+		require.False(t, !ok,
+			"wrong guess was rejected")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: wrongTarget}); !ok {
-		t.Fatal("wrong guess was rejected")
-	}
+
 	patternID := service.ProjectRuntime(runtime).Hack.Patterns[0].ID
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackPattern, PatternID: patternID}); !ok {
-		t.Fatal("pattern use was rejected")
+	{
+		_, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandActivatePattern, PatternID: patternID})
+		require.False(t, !ok,
+			"pattern use was rejected")
 	}
 
 	privateBefore := cloneHackForLifecycleTest(runtime.Hack)
 	navBefore := cloneNav(runtime.Nav)
 	service.SuspendRuntime(runtime)
-	if runtime.Lifecycle != domain.TerminalLifecycleSuspended || !reflect.DeepEqual(runtime.Hack, privateBefore) || !reflect.DeepEqual(runtime.Nav, navBefore) {
-		t.Fatalf("SuspendRuntime() changed exact checkpoint: %#v", runtime)
-	}
+	require.Falsef(t, runtime.Lifecycle != domain.TerminalLifecycleSuspended || !cmp.Equal(runtime.Hack, privateBefore) || !cmp.Equal(runtime.Nav, navBefore),
+		"SuspendRuntime() changed exact checkpoint: %#v", runtime)
 
 	latest := target
 	latest.TerminalName = "Overseer Renamed"
 	latest.IntroText = "LATEST"
 	latest.Tree = treeWithoutReport()
 	restored := service.ReactivateRuntime(runtime, latest)
-	if restored == nil || runtime.Lifecycle != domain.TerminalLifecycleActive {
-		t.Fatalf("ReactivateRuntime() = %#v, lifecycle %q", restored, runtime.Lifecycle)
-	}
-	if runtime.TerminalName != latest.TerminalName || runtime.IntroText != latest.IntroText || runtime.Tree.ID != latest.Tree.ID || len(runtime.Tree.Children) != 1 || len(runtime.Tree.Children[0].Children) != 1 || runtime.Tree.Children[0].Children[0].ID != "read" {
-		t.Fatalf("reactivation did not apply latest authored content: %#v", runtime)
-	}
-	if !reflect.DeepEqual(runtime.Hack, privateBefore) {
-		t.Fatalf("reactivation changed secret/generation/board/attempts/candidates/patterns/log/outcome:\n got %#v\nwant %#v", runtime.Hack, privateBefore)
-	}
-	if runtime.Nav.Mode != "list" || runtime.Nav.ViewEntryID != nil || !reflect.DeepEqual(runtime.Nav.Path, []string{"root", "docs"}) {
-		t.Fatalf("reactivation did not revalidate navigation against refreshed content: %#v", runtime.Nav)
-	}
-	if service.generationIDs.(*sequenceGenerationIDs).next != 1 {
-		t.Fatalf("preserve consumed a fresh generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
-	}
+	require.Falsef(t, restored == nil || runtime.Lifecycle != domain.TerminalLifecycleActive,
+		"ReactivateRuntime() = %#v, lifecycle %q", restored, runtime.Lifecycle)
+	require.Falsef(t, runtime.TerminalName != latest.TerminalName || runtime.IntroText != latest.IntroText || runtime.Tree.ID != latest.Tree.ID || len(runtime.Tree.Children) != 1 || len(runtime.Tree.Children[0].Children) != 1 || runtime.Tree.Children[0].Children[0].ID != "read",
+		"reactivation did not apply latest authored content: %#v", runtime)
+	require.Falsef(t, !cmp.Equal(runtime.Hack, privateBefore),
+		"reactivation changed secret/generation/board/attempts/candidates/patterns/log/outcome:\n got %#v\nwant %#v", runtime.Hack, privateBefore)
+	require.Falsef(t, runtime.Nav.Mode != "list" || runtime.Nav.ViewEntryID != nil || !cmp.Equal(runtime.Nav.Path, []string{"root", "docs"}),
+		"reactivation did not revalidate navigation against refreshed content: %#v", runtime.Nav)
+	require.Falsef(t, service.generationIDs.(*sequenceGenerationIDs).next != 1,
+		"preserve consumed a fresh generation: %d", service.generationIDs.(*sequenceGenerationIDs).next)
 
 	discarded, fresh := service.DiscardRuntime(latest)
-	if discarded == nil || fresh == nil || discarded.Hack == nil {
-		t.Fatalf("DiscardRuntime() = runtime %#v projection %#v", discarded, fresh)
-	}
-	if discarded.Hack.GenerationID != "checkpoint-generation-2" || discarded.Hack.GenerationID == privateBefore.GenerationID {
-		t.Fatalf("discard retained prior generation: old %q new %#v", privateBefore.GenerationID, discarded.Hack)
-	}
-	if discarded.Hack.AttemptsLeft != discarded.Hack.AttemptsMax || discarded.Hack.Solved || discarded.Hack.Failed || len(discarded.Hack.Log) != 0 || len(discarded.Hack.UsedPatterns) != 0 {
-		t.Fatalf("discard did not create a fresh puzzle: %#v", discarded.Hack)
-	}
-	if !reflect.DeepEqual(discarded.Nav, domain.NavState{Mode: "list", Path: []string{"root"}}) {
-		t.Fatalf("discard did not reset navigation: %#v", discarded.Nav)
-	}
-	// Generation identity remains private; the fresh public board proves the
-	// replacement without exposing that identifier.
-	if fresh.Hack == nil {
-		t.Fatal("discard projection omitted fresh public puzzle")
-	}
+	require.Falsef(t, discarded == nil || fresh == nil || discarded.Hack == nil,
+		"DiscardRuntime() = runtime %#v projection %#v", discarded, fresh)
+	require.Falsef(t, discarded.Hack.GenerationID != "checkpoint-generation-2" || discarded.Hack.GenerationID == privateBefore.GenerationID,
+		"discard retained prior generation: old %q new %#v", privateBefore.GenerationID, discarded.Hack)
+	require.Falsef(t, discarded.Hack.AttemptsLeft != discarded.Hack.AttemptsMax || discarded.Hack.Solved || discarded.Hack.Failed || len(discarded.Hack.Log) != 0 || len(discarded.Hack.UsedPatterns) != 0,
+		"discard did not create a fresh puzzle: %#v", discarded.Hack)
+	require.Falsef(t, !cmp.Equal(discarded.Nav, domain.NavState{Mode: "list", Path: []string{"root"}}),
+		"discard did not reset navigation: %#v", discarded.Nav)
+	require.
+
+		// Generation identity remains private; the fresh public board proves the
+		// replacement without exposing that identifier.
+		False(t, fresh.Hack == nil,
+			"discard projection omitted fresh public puzzle")
+
 }
 
 func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T) {
@@ -421,24 +437,26 @@ func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T
 	latest.HackLevel = 2
 	latest.IntroText = "LATEST"
 	replacement, projection := service.ResetFailedHack(runtime, latest)
-	if replacement == nil || projection == nil || replacement.Hack == nil {
-		t.Fatalf("ResetFailedHack() = runtime %#v projection %#v", replacement, projection)
+	require.Falsef(t, replacement == nil || projection == nil || replacement.Hack == nil,
+		"ResetFailedHack() = runtime %#v projection %#v", replacement, projection)
+	require.Falsef(t, replacement.Hack.GenerationID != "retry-generation" || replacement.Hack.Level != 2 || replacement.Hack.AttemptsLeft != replacement.Hack.AttemptsMax || replacement.Hack.Failed || replacement.Hack.Solved || len(replacement.Hack.Log) != 0,
+		"replacement puzzle = %#v, want fresh level-2 generation", replacement.Hack)
+	require.Falsef(t, replacement.TerminalID != latest.TerminalID || replacement.TerminalName != latest.TerminalName || replacement.IntroText != latest.IntroText || replacement.Tree.ID != latest.Tree.ID || len(replacement.Tree.Children) != len(latest.Tree.Children),
+		"replacement authored state = %#v, want latest target %#v", replacement, latest)
+	require.Falsef(t, projection.Hack == nil || projection.Hack.AttemptsLeft != projection.Hack.AttemptsMax || projection.Hack.Failed,
+		"replacement projection = %#v", projection)
+	{
+
+		_, reused := replacement.Hack.WordsByID[oldTargetID]
+		require.Falsef(t, reused,
+			"fresh generation reused stale candidate identity %q", oldTargetID)
 	}
-	if replacement.Hack.GenerationID != "retry-generation" || replacement.Hack.Level != 2 || replacement.Hack.AttemptsLeft != replacement.Hack.AttemptsMax || replacement.Hack.Failed || replacement.Hack.Solved || len(replacement.Hack.Log) != 0 {
-		t.Fatalf("replacement puzzle = %#v, want fresh level-2 generation", replacement.Hack)
-	}
-	if replacement.TerminalID != latest.TerminalID || replacement.TerminalName != latest.TerminalName || replacement.IntroText != latest.IntroText || replacement.Tree.ID != latest.Tree.ID || len(replacement.Tree.Children) != len(latest.Tree.Children) {
-		t.Fatalf("replacement authored state = %#v, want latest target %#v", replacement, latest)
-	}
-	if projection.Hack == nil || projection.Hack.AttemptsLeft != projection.Hack.AttemptsMax || projection.Hack.Failed {
-		t.Fatalf("replacement projection = %#v", projection)
-	}
-	if _, reused := replacement.Hack.WordsByID[oldTargetID]; reused {
-		t.Fatalf("fresh generation reused stale candidate identity %q", oldTargetID)
-	}
+
 	freshBeforeStaleAction := cloneRuntimeForLifecycleTest(replacement)
-	if _, accepted := service.Apply(replacement, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: oldTargetID}); accepted || !reflect.DeepEqual(replacement, freshBeforeStaleAction) {
-		t.Fatalf("stale generation action was accepted or mutated replacement: accepted=%t", accepted)
+	{
+		_, accepted := service.Apply(replacement, domain.RuntimeCommand{Kind: domain.RuntimeCommandGuess, TargetID: oldTargetID})
+		require.Falsef(t, accepted || !cmp.Equal(replacement, freshBeforeStaleAction),
+			"stale generation action was accepted or mutated replacement: accepted=%t", accepted)
 	}
 
 	for name, mutate := range map[string]func(*domain.TerminalRuntime, *domain.TerminalTarget){
@@ -456,9 +474,9 @@ func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T
 			before := cloneRuntimeForLifecycleTest(candidate)
 			beforeGeneration := service.generationIDs.(*sequenceGenerationIDs).next
 			got, public := service.ResetFailedHack(candidate, target)
-			if got != nil || public != nil || !reflect.DeepEqual(candidate, before) || service.generationIDs.(*sequenceGenerationIDs).next != beforeGeneration {
-				t.Fatalf("ineligible reset = runtime %#v projection %#v candidate %#v", got, public, candidate)
-			}
+			require.Falsef(t, got != nil || public != nil || !cmp.Equal(candidate, before) || service.generationIDs.(*sequenceGenerationIDs).next != beforeGeneration,
+				"ineligible reset = runtime %#v projection %#v candidate %#v", got, public, candidate)
+
 		})
 	}
 }

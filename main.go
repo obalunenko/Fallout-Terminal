@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -18,6 +19,7 @@ import (
 
 	controlservice "github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	configv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1"
 	liveservice "github.com/obalunenko/Fallout-Terminal/internal/live"
 	"github.com/obalunenko/Fallout-Terminal/internal/platform"
 	playerserver "github.com/obalunenko/Fallout-Terminal/internal/player"
@@ -35,7 +37,7 @@ var frontendSource embed.FS
 // The player remains a distinct browser application but is owned and served
 // by the same Go process.
 //
-//go:embed all:client
+//go:embed all:client/dist
 var playerSource embed.FS
 
 func main() {
@@ -43,7 +45,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	playerAssets, err := fs.Sub(playerSource, "client")
+	playerAssets, err := fs.Sub(playerSource, "client/dist")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,6 +81,7 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 	if err := validateProductionResources(playerAssets, locations.BundledDemo); err != nil {
 		return nil, err
 	}
+	runtimeConfig := defaultApplicationConfig(locations)
 	desktop := platform.NewDesktop(nil)
 	events := &wailsEventSink{}
 	live := liveservice.New(nil, nil)
@@ -87,25 +90,33 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 	)
 	effectRouter := &coordinationEffectRouter{}
 	coordination := controlservice.New(controlservice.Config{
-		Enqueue:     effectRouter.Enqueue,
-		Runtime:     live,
-		Terminals:   live,
-		TrustedHack: live,
-		RosterStore: playerConfigs,
+		Enqueue:            effectRouter.Enqueue,
+		Runtime:            live,
+		Terminals:          live,
+		TrustedHack:        live,
+		RosterStore:        playerConfigs,
+		RequestResultLimit: int(runtimeConfig.Coordination.RequestResultLimit),
 	})
-	playerCoordination := newPlayerCoordinatorAdapter(coordination)
-	playerConfig := playerserver.Config{Assets: playerAssets, Live: live}
-	playerConfig.Coordinator = playerCoordination
-	playerConfig.OnClientCount = func(count int) {
-		if app := effectRouter.App(); app != nil {
-			app.updateClientCount(count)
-		}
+	tunnel, tunnelEnabled, publicAccess := configureTunnel(os.Args[1:])
+	playerConfig := playerserver.Config{
+		Address:      runtimeConfig.PlayerServer.Address,
+		Assets:       playerAssets,
+		PublicAccess: publicAccess,
 	}
-	playerConfig.OnHackState = func(state *domain.PublicHackState) {
-		if app := effectRouter.App(); app != nil {
-			app.updateHackState(state)
-		}
+	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
+		Coordinator: coordination,
+		Assets:      playerAssets,
+		QueueSize:   int(runtimeConfig.PlayerServer.DeliveryQueueSize),
+		OnClientCount: func(count int) {
+			if app := effectRouter.App(); app != nil {
+				app.updateClientCount(count)
+			}
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("construct Connect player service: %w", err)
 	}
+	playerConfig.Connect = connectPlayer
 	player, err := playerserver.NewServer(playerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("construct player server: %w", err)
@@ -119,25 +130,60 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 			ApplicationSupport: locations.ApplicationSupport,
 		},
 	)
-	tunnel, tunnelEnabled := configureTunnel(os.Args[1:])
 	app := NewAppWithDependencies(AppDependencies{
-		Sessions:      sessions,
-		PlayerConfigs: playerConfigs,
-		Live:          live,
-		Coordination:  coordination,
-		Player:        player,
-		Tunnel:        tunnel,
-		Desktop:       desktop,
-		Browser:       desktop,
-		Events:        events,
-		TunnelEnabled: tunnelEnabled,
+		Sessions:        sessions,
+		PlayerConfigs:   playerConfigs,
+		Live:            live,
+		Coordination:    coordination,
+		Player:          player,
+		Tunnel:          tunnel,
+		Desktop:         desktop,
+		Browser:         desktop,
+		Events:          events,
+		TunnelEnabled:   tunnelEnabled,
+		StartupTimeout:  time.Duration(runtimeConfig.Startup.TimeoutMilliseconds) * time.Millisecond,
+		ShutdownTimeout: time.Duration(runtimeConfig.Shutdown.TimeoutMilliseconds) * time.Millisecond,
 	})
 	effectRouter.Bind(player, app)
 	return app, nil
 }
 
+func defaultApplicationConfig(locations platform.SessionLocations) *configv1.ApplicationConfig {
+	return &configv1.ApplicationConfig{
+		PlayerServer: &configv1.PlayerServerConfig{
+			Address: "0.0.0.0:3690", DeliveryQueueSize: 32, StartupTimeoutMilliseconds: 20_000,
+			RequestLimits: &configv1.PublicRequestLimits{
+				UncompressedMessageBytes: playerserver.MaxUncompressedMessageBytes,
+				EncodedBodyBytes:         playerserver.MaxEncodedBodyBytes,
+				DecompressedMessageBytes: playerserver.MaxDecompressedMessageBytes,
+				RecognitionHandleBytes:   domain.MaxRecognitionHandleBytes,
+				RequestIdBytes:           domain.MaxRequestIDBytes,
+				BroadcastIdBytes:         domain.MaxBroadcastIDBytes,
+				GenerationIdBytes:        domain.MaxGenerationIDBytes,
+				TerminalIdBytes:          domain.MaxTerminalIDBytes,
+				CharacterIdBytes:         domain.MaxCharacterIDBytes,
+				ActionTargetBytes:        domain.MaxActionTargetBytes,
+				SoundCategoryBytes:       domain.MaxSoundCategoryBytes,
+			},
+		},
+		Coordination: &configv1.CoordinationConfig{RequestResultLimit: 256},
+		Browser: &configv1.BrowserClientConfig{
+			RecognitionStorageKey:      "fallout-terminal.player-token",
+			ReconnectDelayMilliseconds: 3_000,
+			ElectionLeaseMilliseconds:  5_000,
+		},
+		Paths: &configv1.PathConfig{
+			DocumentsDirectory:          locations.DocumentsDefault,
+			BundledDemoPath:             locations.BundledDemo,
+			ApplicationSupportDirectory: locations.ApplicationSupport,
+		},
+		Startup:  &configv1.StartupConfig{TimeoutMilliseconds: 30_000},
+		Shutdown: &configv1.ShutdownConfig{GracePeriodMilliseconds: 2_000, TimeoutMilliseconds: 5_000},
+	}
+}
+
 // coordinationEffectRouter closes the construction cycle without letting the
-// coordinator know about WebSockets or Wails. Enqueue snapshots its targets
+// coordinator know about Connect streams or Wails. Enqueue snapshots its targets
 // under a short lock and releases that lock before dispatch, so coordinator
 // publication cannot re-enter the router or invert lock ownership.
 type coordinationEffectRouter struct {
@@ -181,100 +227,21 @@ func (router *coordinationEffectRouter) Enqueue(effect controlservice.Effect) {
 	}
 }
 
-// playerCoordinatorAdapter presents the player server seam over the same
-// canonical control.Service injected into App. It retains only the
-// connection-to-session lookup needed to translate character selections; the
-// service owns token recognition and aggregate connection presence.
-type playerCoordinatorAdapter struct {
-	mu                  sync.RWMutex
-	service             *controlservice.Service
-	sessionByConnection map[domain.ConnectionID]domain.LogicalSessionID
-}
-
-func newPlayerCoordinatorAdapter(service *controlservice.Service) *playerCoordinatorAdapter {
-	return &playerCoordinatorAdapter{
-		service:             service,
-		sessionByConnection: make(map[domain.ConnectionID]domain.LogicalSessionID),
-	}
-}
-
-func (adapter *playerCoordinatorAdapter) AttachConnection(connectionID domain.ConnectionID, browserToken domain.BrowserToken) (domain.BrowserToken, *domain.PlayerState) {
-	if adapter == nil || adapter.service == nil {
-		return "", nil
-	}
-	returnedToken, state := adapter.service.AttachConnection(connectionID, browserToken)
-	if returnedToken == "" || state == nil || state.SessionID == "" {
-		return "", nil
-	}
-	adapter.mu.Lock()
-	adapter.sessionByConnection[connectionID] = state.SessionID
-	adapter.mu.Unlock()
-	return returnedToken, state
-}
-
-func (adapter *playerCoordinatorAdapter) DetachConnection(connectionID domain.ConnectionID) {
-	if adapter == nil || adapter.service == nil {
-		return
-	}
-	adapter.mu.Lock()
-	delete(adapter.sessionByConnection, connectionID)
-	adapter.mu.Unlock()
-	adapter.service.DetachConnection(connectionID)
-}
-
-func (adapter *playerCoordinatorAdapter) SelectCharacter(connectionID domain.ConnectionID, requestID string, broadcastID domain.BroadcastID, characterID domain.CharacterID) {
-	if adapter == nil || adapter.service == nil {
-		return
-	}
-	adapter.mu.RLock()
-	sessionID := adapter.sessionByConnection[connectionID]
-	adapter.mu.RUnlock()
-	adapter.service.SelectCharacter(controlservice.CharacterSelection{
-		ConnectionID: connectionID,
-		SessionID:    sessionID,
-		RequestID:    requestID,
-		BroadcastID:  broadcastID,
-		CharacterID:  characterID,
-	})
-}
-
-func (adapter *playerCoordinatorAdapter) DispatchPlayerAction(connectionID domain.ConnectionID, command domain.RuntimeCommand) {
-	if adapter == nil || adapter.service == nil {
-		return
-	}
-	adapter.service.DispatchPlayerAction(connectionID, command)
-}
-
-func (adapter *playerCoordinatorAdapter) CurrentLiveForSession(sessionID domain.LogicalSessionID) (*domain.PublicLiveState, uint64, bool) {
-	if adapter == nil || adapter.service == nil {
-		return nil, 0, false
-	}
-	return adapter.service.CurrentLiveForSession(sessionID)
-}
-
-func validateProductionResources(playerAssets fs.FS, bundledDemo string) error {
-	if playerAssets == nil {
-		return errors.New("player assets are unavailable")
-	}
-	if info, err := fs.Stat(playerAssets, "index.html"); err != nil || !info.Mode().IsRegular() {
-		return fmt.Errorf("player assets are incomplete: index.html is unavailable")
-	}
-	if info, err := os.Stat(bundledDemo); err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
-		return fmt.Errorf("bundled demo is unavailable at %s", bundledDemo)
-	}
-	return nil
-}
-
-func configureTunnel(args []string) (TunnelService, bool) {
+func configureTunnel(args []string) (TunnelService, bool, *playerserver.PublicAccess) {
 	config, err := tunnelservice.ParseConfig(args, os.LookupEnv)
 	enabled := config.Enabled || publicModeRequested(args)
 	if !enabled {
-		return nil, false
+		return nil, false, nil
 	}
 	if err != nil {
-		return configurationErrorTunnel{err: err}, true
+		return configurationErrorTunnel{err: err}, true, nil
 	}
-	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true
+	publicAccess := &playerserver.PublicAccess{
+		Host:     config.Domain,
+		Username: config.Credentials.Username,
+		Password: config.Credentials.Password,
+	}
+	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true, publicAccess
 }
 
 func publicModeRequested(args []string) bool {

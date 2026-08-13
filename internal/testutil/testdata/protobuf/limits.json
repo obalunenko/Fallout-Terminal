@@ -1,0 +1,6 @@
+{
+  "decoded_protobuf_bytes": { "accepted": 4096, "rejected": 4097 },
+  "encoded_http_body_bytes": { "accepted": 8192, "rejected": 8193 },
+  "unknown_field_seed": "unknown-field.hex",
+  "compressed_seed": "sound-manifest-valid.gzip.base64"
+}

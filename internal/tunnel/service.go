@@ -28,8 +28,9 @@ type ServiceOptions struct {
 	GracePeriod time.Duration
 }
 
-// Service owns one optional ngrok process and its short-lived credential
-// policy. The policy is removed as soon as startup succeeds or fails.
+// Service owns one optional ngrok forwarding process. Basic Auth is enforced
+// by the player application for the exact configured public host because ngrok
+// traffic-policy authentication buffers non-empty Connect streaming requests.
 type Service struct {
 	mu      sync.Mutex
 	config  Config
@@ -75,12 +76,6 @@ func (service *Service) Start(ctx context.Context) (domain.ServerInfo, error) {
 		return domain.ServerInfo{}, err
 	}
 
-	policy, err := CreatePolicy(service.config.PolicyParent, service.config.Credentials)
-	if err != nil {
-		return domain.ServerInfo{}, fmt.Errorf("prepare protected public access: %w", err)
-	}
-	defer policy.Cleanup()
-
 	urls := make(chan string, 1)
 	stdout := newURLWriter(urls)
 	stderr := newTailWriter(diagnosticLimit)
@@ -89,14 +84,12 @@ func (service *Service) Start(ctx context.Context) (domain.ServerInfo, error) {
 		Args: []string{
 			"http", strconv.Itoa(service.config.Port),
 			"--url", endpoint,
-			"--traffic-policy-file", policy.Path,
 			"--log", "stdout",
 			"--log-format", "json",
 		},
-		Env:         os.Environ(),
-		Stdout:      stdout,
-		Stderr:      stderr,
-		CleanupPath: policy.directory,
+		Env:    os.Environ(),
+		Stdout: stdout,
+		Stderr: stderr,
 	}
 	if err := service.process.Start(ctx, spec); err != nil {
 		return domain.ServerInfo{}, service.redactedError("start ngrok", err.Error())

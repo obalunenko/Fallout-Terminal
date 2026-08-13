@@ -1,5 +1,10 @@
 # Implementation Plan: Phase 1 Generation-Bound Hacking Patterns
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Branch**: `feature/003-hacking-game-evolution` | **Date**: 2026-08-11 | **Spec**: `specs/003-hacking-game-evolution/spec.md` | **Handoff**: `specs/003-hacking-game-evolution/planning-handoff.md`
 
 **Bugfix**: 2026-08-11 — BUG-001 Updated from bugfix patch; artifact consistency and verification coverage remediated after analysis.

@@ -104,6 +104,11 @@ export CGO_ENABLED=1
 export MACOSX_DEPLOYMENT_TARGET=13.0
 
 cd "$repository_root"
+npm ci --prefix frontend
+npm ci --prefix client
+scripts/proto-check.sh
+npm run build --prefix frontend
+npm run build --prefix client
 "$wails_binary" build -clean -platform darwin/arm64
 
 test -d "$app_path" || fail "Wails did not create the expected app: $app_path"

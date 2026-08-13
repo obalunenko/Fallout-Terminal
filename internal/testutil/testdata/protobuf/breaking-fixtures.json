@@ -1,0 +1,37 @@
+[
+  {
+    "id": "field-number",
+    "kind": "field-number",
+    "file": "fallout/terminal/player/v1/player.proto",
+    "before": "string request_id = 2;",
+    "after": "string request_id = 200;"
+  },
+  {
+    "id": "field-type",
+    "kind": "field-type",
+    "file": "fallout/terminal/player/v1/player.proto",
+    "before": "string request_id = 2;",
+    "after": "bytes request_id = 2;"
+  },
+  {
+    "id": "enum-value",
+    "kind": "enum",
+    "file": "fallout/terminal/player/v1/player.proto",
+    "before": "  ACTION_REASON_DUPLICATE = 10;",
+    "after": ""
+  },
+  {
+    "id": "package-name",
+    "kind": "package",
+    "file": "fallout/terminal/player/v1/sound.proto",
+    "before": "package fallout.terminal.player.v1;",
+    "after": "package fallout.terminal.player.v2;"
+  },
+  {
+    "id": "service-method",
+    "kind": "service",
+    "file": "fallout/terminal/player/v1/player.proto",
+    "before": "  rpc SoundManifest(SoundManifestRequest) returns (SoundManifestResponse);",
+    "after": "  rpc SoundManifestV2(SoundManifestRequest) returns (SoundManifestResponse);"
+  }
+]
