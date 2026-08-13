@@ -2,8 +2,8 @@
   "workflow": "companion",
   "specName": "connectrpc protobuf migration",
   "branch": "005-connectrpc-protobuf-migration",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "plan",
+  "status": "planned",
   "history": [
     {
       "step": "specify",
@@ -18,6 +18,34 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-13T00:00:48.156Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T09:33:21.511Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:43:47.891Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:49:30.259Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T09:49:46.700Z"
     }
   ],
   "last_action": "living specs evaluated — skipped (not configured)",
@@ -483,5 +511,64 @@
     "No support for old external WebSocket clients after final cutover.",
     "No wildcard CORS, CDN, or required player development server.",
     "No change to the public ngrok domain, default player port, credential rules, release signing, notarization, or supported packaging scope."
-  ]
+  ],
+  "approach": "Introduce separate versioned public, private, persistence, and configuration protobuf graphs; generate pinned Go artifacts for all graphs and public-only ECMAScript artifacts; and adapt them at the existing Wails, JSON, and Connect boundaries while keeping control.Service canonical. Prove a same-origin Connect vertical slice before migrating every typed mutation and compound stream, then remove the WebSocket stack completely.",
+  "decisions": [
+    {
+      "decision": "Use binary Connect transport for the public browser protocol.",
+      "why": "It provides generated typed browser/server contracts and the required same-origin streaming path without retaining handwritten JSON envelopes.",
+      "rejected": "Connect JSON mode or a custom WebSocket protobuf framing layer."
+    },
+    {
+      "decision": "Pin Buf CLI v1.72.0, Protocol Buffers v35.0, protobuf-go/protoc-gen-go v1.36.11, Connect-Go/protoc-gen-connect-go v1.20.0, Protobuf-ES/protoc-gen-es v2.13.0, and Connect-ES v2.1.2.",
+      "why": "Exact pins make generated output reproducible across local and CI environments.",
+      "rejected": "Floating latest versions or checked-in output without a reproducible generation toolchain."
+    },
+    {
+      "decision": "Separate player.v1, private.v1, persistence.v1, and config.v1 schema graphs, generating ECMAScript only for player.v1.",
+      "why": "The import graph becomes an enforceable capability boundary that prevents private or persistence data from entering the browser bundle.",
+      "rejected": "One shared schema package or browser generation from every package."
+    },
+    {
+      "decision": "Expose one PlayerService with server-streaming Subscribe plus typed unary SelectCharacter, Navigate, Guess, ActivatePattern, and SoundManifest procedures.",
+      "why": "Distinct request types preserve capability-specific validation and avoid rebuilding a generic command dispatcher.",
+      "rejected": "A bidirectional command envelope or one generic mutation procedure."
+    },
+    {
+      "decision": "Register each bounded physical stream before taking and enqueuing its complete personalized snapshot.",
+      "why": "This ordering closes the snapshot-to-live race while retaining the current logical-session identity model.",
+      "rejected": "Snapshot first and stream registration afterward."
+    },
+    {
+      "decision": "Publish one personalized CompoundUpdate per logical session and committed revision.",
+      "why": "It preserves the existing copy-on-write commit boundary and lets each browser apply board, coordination, and sound consequences atomically.",
+      "rejected": "Independent terminal, navigation, hacking, coordination, and sound messages."
+    },
+    {
+      "decision": "Limit decoded public request messages to 4096 bytes and encoded HTTP bodies to 8192 bytes, with explicit semantic string and enum bounds.",
+      "why": "Layered limits protect decoding and decompression while retaining deterministic validation outcomes.",
+      "rejected": "Relying only on server defaults or transport body size."
+    },
+    {
+      "decision": "Fingerprint deterministic serialized protobuf request bytes for replay idempotency.",
+      "why": "Generated request messages provide a stable procedure-specific identity without preserving handwritten JSON canonicalization.",
+      "rejected": "Raw HTTP bytes, JSON stringification, or request ID alone."
+    },
+    {
+      "decision": "Keep native Wails values and compatibility-preserving JSON files as boundary representations, using generated protobuf messages only as internal semantic adapters.",
+      "why": "This introduces typed schemas without breaking exact desktop method/event identifiers or persistence compatibility rules.",
+      "rejected": "Passing protobuf binary, Base64, or ProtoJSON across Wails or replacing file formats."
+    },
+    {
+      "decision": "Prove a vertical Connect slice first, then complete a one-protocol cutover that removes all WebSocket code and dependencies.",
+      "why": "The slice reduces integration risk while the final gate enforces the specification prohibition on dual production protocols.",
+      "rejected": "Permanent WebSocket compatibility or a flag-selectable dual stack."
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned pinned protobuf and ConnectRPC generation, typed public RPCs, exhaustive private and persistence adapters, atomic compound streaming, and a gated one-protocol cutover.",
+      "key_finding": "The existing control.Service commit boundary can remain canonical if stream registration and snapshot capture join its ordering and each revision becomes one personalized compound publication per logical session."
+    }
+  }
 }

@@ -5,6 +5,16 @@
 **Status**: Draft  
 **Baseline**: `develop` at `8f306ce42e55b199ada4761d165461e2ebedc8ae`
 
+## Clarifications
+
+### Session 2026-08-13
+
+- Q: Which validation and authority rules apply to character selection versus shared terminal mutations? → A: Every mutation receives common structural, recognition, live-session, subscription, request, broadcast, and action-semantic validation; an unassigned recognized session may select without controller, terminal, or generation authority, while navigation and hacking mutations require the eligible connected active controller and current applicable identities.
+- Q: Does exactly one authoritative update guarantee receipt by every physical stream? → A: No; each commit creates one logical compound update offered once per affected logical session, while only active responsive physical streams must observe it exactly once and an unhealthy stream may observe zero before bounded termination.
+- Q: How do absent, malformed, unknown, and expired recognition handles behave? → A: An absent Subscribe handle creates a session; malformed present handles return `invalid_argument`; well-formed unknown or expired Subscribe handles create replacement sessions; malformed unary handles return `invalid_argument`; and well-formed unknown or expired unary handles return typed `invalid-session` without creating state.
+- Q: How must protobuf variants and scalar presence be represented? → A: Mutually exclusive variants use `oneof`; parallel optionals and string discriminators are prohibited; `optional` is reserved for meaningful scalar presence; removals reserve names and numbers; and enums retain `UNSPECIFIED` zero values unless a well-known imported type governs representation.
+- Q: Which public requests are subject to the request-size boundary? → A: Every public player RPC has a 4 KiB maximum uncompressed protobuf request message enforced before adapters or canonical services, plus finite HTTP-body, decompression, and lower semantic bounds.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - First-time player joins and selects a character (Priority: P1)
@@ -18,8 +28,10 @@ A first-time browser player opens the same-origin player page, receives one comp
 **Acceptance Scenarios**:
 
 1. **Given** a clean same-origin browser profile with no recognition handle, **When** the player subscribes, **Then** exactly one logical session is created and the first application message is exactly one complete personalized snapshot containing an accepted opaque handle, current revision, complete player state, and exactly one terminal-presentation variant.
-2. **Given** an available character in the current broadcast, **When** the player submits a structurally valid selection with a new request identity, **Then** the server resolves the logical session, returns a typed result, and all streams for that session receive the authoritative assignment at the committed revision.
+2. **Given** a connected, recognized, currently unassigned logical session and an available character in the current broadcast, **When** the player submits a structurally valid selection with a new request identity, **Then** the server accepts the selection without requiring an existing assignment, controller authority, terminal identity, or hacking generation, returns a typed result, and offers the authoritative assignment update once to that logical session at the committed revision; the accepted selection may establish controller ownership under current domain rules.
 3. **Given** a first-time player page, **When** the snapshot and selection complete, **Then** local storage contains only the opaque recognition handle and contains no assignment, role, phase, controller, broadcast, terminal, navigation, hacking, or pending-action state.
+4. **Given** a connected, recognized, currently unassigned logical session, **When** it submits navigation, password-or-filler guess, or special-pattern activation before becoming the active controller, **Then** the server returns the applicable typed rejection and creates no mutation, revision, publication, replay entry for an accepted effect, attempt, or random-source advancement.
+5. **Given** Subscribe requests whose recognition handle is respectively absent, present but blank, present but oversized, structurally malformed, or well-formed but unknown or expired, **When** each request is decoded within the public size boundary, **Then** absence creates a fresh session, invalid present values return Connect `invalid_argument` without creating a session, and well-formed unknown or expired values create a fresh session with a replacement opaque handle and complete current snapshot.
 
 ---
 
@@ -36,7 +48,7 @@ A returning player reconnects during the same application process with the store
 1. **Given** a currently recognized handle, **When** a new subscription presents it, **Then** the stream reattaches to the same logical session and begins with one current complete snapshot.
 2. **Given** an active puzzle changed after the prior connection closed, **When** the player reconnects, **Then** the snapshot reflects the latest board, attempts, log, patterns, removed duds, outcome, assignment, and controller state without generating a puzzle.
 3. **Given** a reconnect snapshot, **When** the client applies it, **Then** no ambient transition, hacking outcome cue, stale action, or previously accepted action is replayed.
-4. **Given** an unknown or expired nonblank handle, **When** it is used for subscription, **Then** the first snapshot contains a replacement handle and a fresh logical session.
+4. **Given** a well-formed nonblank handle that is unknown or expired, **When** it is used for subscription, **Then** the first snapshot contains a replacement opaque handle, a fresh logical session, and complete current state without restoring expired assignment or controller authority unless current canonical rules independently establish it.
 
 ---
 
@@ -51,7 +63,7 @@ Several tabs in one browser profile converge on one accepted handle and behave a
 **Acceptance Scenarios**:
 
 1. **Given** several concurrent first-time tabs sharing same-origin local storage, **When** they establish subscriptions, **Then** they converge on one accepted handle and one logical session rather than creating durable competing identities.
-2. **Given** multiple active streams with one valid handle, **When** an authoritative revision affects the logical session, **Then** every physical stream receives an equivalent personalized compound update.
+2. **Given** multiple active streams with one valid handle, **When** an authoritative revision affects the logical session, **Then** that session is offered one equivalent personalized compound update and every attached physical stream that remains active and responsive through delivery observes the revision exactly once.
 3. **Given** multiple streams for one logical session, **When** all but one close, **Then** raw displayed stream count decreases while aggregate logical presence remains connected.
 4. **Given** one remaining stream, **When** it closes, **Then** the logical session becomes disconnected without automatically releasing its character claim or controller identity.
 
@@ -67,27 +79,30 @@ Several players use separately typed character-selection, navigation, password-o
 
 **Acceptance Scenarios**:
 
-1. **Given** an eligible connected controller, **When** it submits any supported unary mutation, **Then** the action is validated and either rejected without state change or accepted as exactly one canonical mutation and one revision.
-2. **Given** one accepted mutation changes several projections, **When** updates are delivered, **Then** each affected logical session receives one compound update for that revision rather than several same-revision application messages.
+1. **Given** a connected, recognized, currently unassigned logical session, **When** it selects an available character in the current broadcast, **Then** the selection is eligible for acceptance without existing assignment, controller authority, terminal identity, or hacking generation and may establish controller ownership under current domain rules.
+2. **Given** an assigned, eligible, connected active controller, **When** it submits navigation, password-or-filler guess, or special-pattern activation with the applicable current identities, **Then** the action is validated and either rejected without state change or accepted as exactly one canonical mutation, one revision advance, and one logical compound update containing every public state component changed by the action.
 3. **Given** clients with different roles or personalized roster views, **When** one revision is committed, **Then** each receives only its correct personalized compound projection and may skip irrelevant revisions.
 4. **Given** a browser action is pending, **When** its unary result and applicable stream update arrive in either order, **Then** the pending state clears only after both conditions are satisfied for an accepted action and immediately for a rejected action.
+5. **Given** one affected physical stream cancels, disconnects, or overflows before delivery while other streams remain responsive, **When** a state-changing action commits, **Then** canonical state, revision, and logical publication occur once, responsive streams observe the revision exactly once, and only the unhealthy stream may observe zero messages before termination.
 
 ---
 
-### User Story 5 - Controller authority remains exact (Priority: P1)
+### User Story 5 - Character selection and controller authority remain exact (Priority: P1)
 
-The current assigned, connected controller can mutate shared state, while observers, unassigned sessions, stale sessions, unknown sessions, and a disconnected controller cannot.
+A connected, recognized, currently unassigned logical session can select an available character without preexisting controller authority, while only the assigned, eligible, connected active controller can perform shared terminal mutations; observers, unassigned sessions, stale sessions, unknown sessions, and disconnected controllers cannot navigate or mutate hacking state.
 
 **Why this priority**: Preserving server-side authority prevents divergent or unauthorized gameplay.
 
-**Independent Test**: Exercise every mutation family from active, observer, unassigned, disconnected-controller, stale-broadcast, stale-terminal, unknown-session, and structurally invalid contexts and compare revision, state, attempts, and randomness before and after.
+**Independent Test**: Select an available character from a new unassigned session, then exercise navigation and hacking families from active-controller, observer, unassigned, disconnected-controller, stale-broadcast, stale-terminal, stale-generation, unknown-session, and structurally invalid contexts and compare revision, state, publication, replay records, attempts, and randomness before and after.
 
 **Acceptance Scenarios**:
 
-1. **Given** the current assigned controller has at least one active stream, **When** it sends a valid applicable action, **Then** the action may be accepted under unchanged gameplay rules.
-2. **Given** an observer or unassigned logical session, **When** it sends a decoded mutation, **Then** it receives the applicable typed rejection with no mutation, revision, publication, attempt, or random draw.
-3. **Given** the controller's final stream has closed, **When** a mutation is attempted with its recognized handle, **Then** the controller identity remains visible but the action is rejected as `controller-disconnected`.
-4. **Given** an unknown nonblank recognition handle on a well-formed unary mutation, **When** the request is handled, **Then** it returns `invalid-session` and creates neither a logical session nor a replacement handle.
+1. **Given** a connected, recognized, currently unassigned logical session, **When** it selects an available character with current request and broadcast identities, **Then** the selection is evaluated under current character-availability and conflict rules without requiring controller, terminal, or hacking-generation authority.
+2. **Given** an unknown, unavailable, conflicting, malformed, stale, or duplicate character-selection attempt, **When** it is handled, **Then** it is rejected through the applicable Connect error or typed result without changing shared state; an exact retry whose result remains retained instead replays only that original result under bounded replay rules, with no new mutation or publication.
+3. **Given** an observer, unassigned session, non-controller, disconnected session, stale broadcast, stale terminal, or stale generation, **When** it sends navigation or hacking mutation, **Then** it receives the applicable typed rejection with no mutation, revision, publication, accepted-effect replay entry, attempt, or random-source advancement.
+4. **Given** the controller's final stream has closed, **When** a navigation or hacking mutation is attempted with its recognized handle, **Then** the controller identity remains visible but the action is rejected as `controller-disconnected`.
+5. **Given** a unary request with a missing, blank, oversized, or structurally malformed recognition handle, **When** it is handled, **Then** it returns Connect `invalid_argument` before canonical service invocation and creates no session, replacement handle, mutation, revision, publication, replay record, or random-source advancement.
+6. **Given** a unary request with a well-formed nonblank recognition handle that is unknown or expired, **When** it is handled, **Then** it returns typed `invalid-session` and creates no logical session, replacement handle, mutation, revision, publication, replay record, or random-source advancement.
 
 ---
 
@@ -135,8 +150,9 @@ A slow, blocked, overflowing, canceled, or disconnected player stream cannot del
 **Acceptance Scenarios**:
 
 1. **Given** one blocked stream and one responsive stream, **When** an accepted mutation commits, **Then** the mutation completes and the responsive stream receives its update before the blocked stream is released.
-2. **Given** a subscriber buffer overflows, **When** publication continues, **Then** only that stream is canceled or closed and the logical session stays connected if another stream remains.
-3. **Given** shutdown begins with active, blocked, or canceled streams, **When** owned resources close, **Then** streams, presence, listener, tunnel resources, and workers are released idempotently within the bounded deadline.
+2. **Given** a subscriber cancels, disconnects, or its buffer overflows before an offered revision is physically delivered, **When** publication continues, **Then** that stream may observe zero messages for the revision, only that stream is canceled or closed, no old incremental update is retried as acknowledged delivery, and the logical session stays connected if another stream remains.
+3. **Given** the terminated stream reconnects, **When** it subscribes again, **Then** recovery begins with one complete current authoritative snapshot rather than replaying old incremental events.
+4. **Given** shutdown begins with active, blocked, or canceled streams, **When** owned resources close, **Then** streams, presence, listener, tunnel resources, and workers are released idempotently within the bounded five-second deadline.
 
 ---
 
@@ -205,6 +221,8 @@ An operator starts the application with the same one-command development lifecyc
 2. **Given** protected ngrok mode with valid credentials, **When** an authenticated player connects, **Then** the same page and RPC procedures work through the configured public domain without wildcard CORS.
 3. **Given** missing or invalid Basic Auth, **When** a public request reaches the tunnel, **Then** HTTP `401` is returned before player capabilities are reached.
 4. **Given** a packaged application without external network availability, **When** it starts, **Then** all generated player code, fonts, images, scripts, sounds, and application assets load without a CDN, development server, or network-time package download.
+5. **Given** oversized unary mutation, Subscribe, SoundManifest, compressed, and unknown-field-enlarged public requests, **When** each crosses the applicable uncompressed-message, encoded-body, or decompression limit, **Then** it returns Connect `resource_exhausted` at the transport or decoding boundary and a canonical-service spy records zero invocations and zero side effects.
+6. **Given** an in-size SoundManifest request, **When** its category is absent, `UNSPECIFIED`, outside the existing catalog, path-like, or arbitrary filesystem input, **Then** it returns Connect `invalid_argument` before canonical service invocation and exposes no filesystem behavior.
 
 ---
 
@@ -226,15 +244,19 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 ## Edge Cases
 
 - Two clean tabs race before either has stored a recognition handle; both must converge without treating recognition as authentication.
-- A subscription presents an unknown, expired, blank, or malformed handle, while a unary mutation presents the same classes of values; subscription replacement and unary invalid-session behavior must remain distinct.
-- A mutation exceeds the effective 4 KiB limit, is malformed, uses an illegal or missing variant, supplies an `UNSPECIFIED` required enum, or omits required identity before canonical services are invoked.
+- A Subscribe request omits its recognition handle, presents a blank, oversized, or structurally malformed handle, or presents a well-formed nonblank unknown or expired handle; only omission and the well-formed unknown-or-expired cases create fresh sessions, while invalid present values fail with `invalid_argument` and no session.
+- A unary request has a missing, blank, oversized, structurally malformed, well-formed unknown, or expired recognition handle; structural cases fail with `invalid_argument`, while only well-formed unknown or expired values reach typed `invalid-session`, and neither path creates or replaces a session.
+- A new unassigned session selects an available character and then attempts navigation or hacking before controller ownership is established; selection remains eligible but shared terminal actions are rejected without effects.
+- A character selection is unavailable, unknown, conflicting, malformed, stale, or duplicated; it must not change shared state, and accepted selection alone may establish controller ownership under current domain rules.
+- Any public request, including Subscribe or SoundManifest, exceeds the 4 KiB uncompressed message limit, encoded-body limit, or decompression limit; rejection occurs before application adapters or canonical services and creates no state or random effects.
+- A compressed public request or a request enlarged only with unknown protobuf fields crosses a transport bound and must fail with `resource_exhausted` before canonical service invocation.
 - A unary result arrives before its stream update, its stream update arrives before its result, the stream closes between them, or an irrelevant later revision is the next projection received.
 - A snapshot is captured while a mutation commits; attachment must be gap-free without duplicate or missing relevant revisions.
 - One revision changes player, terminal presentation, navigation, and hacking together, but affects different logical sessions differently.
 - A retained request identity is replayed exactly, reused across procedures, reused with a changed payload, or retried after deterministic eviction.
 - An action is decoded correctly but becomes stale between validation stages because broadcast, controller, assignment, terminal, puzzle generation, or pattern availability changed.
 - Many contenders activate the same pattern while a terminal switch, failed-hack reset, disconnect, or broadcast end is ordered concurrently.
-- One stream for a multi-tab session overflows while sibling streams remain healthy; aggregate presence must remain connected.
+- One stream for a multi-tab session overflows while sibling streams remain healthy; the affected stream may miss the revision and terminates within the bounded lifecycle, sibling streams receive it exactly once, and aggregate presence remains connected.
 - A stream is canceled or the listener shuts down while its outbound buffer is full or a send is blocked.
 - A valid sound category has a missing, unreadable, empty, mixed-extension, or case-varied folder; discovery remains safe, deterministic, and non-blocking.
 - A player loses connectivity after an accepted mutation commits but before receiving its result, its update, or both, then reconnects to a complete later snapshot.
@@ -279,20 +301,20 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 
 #### Recognition, logical sessions, and presence
 
-- **FR-024**: A first-time subscription without a recognition handle MUST create exactly one process-local logical session and return its opaque handle in the first snapshot.
-- **FR-025**: The browser MUST persist only the opaque recognition handle in same-origin local storage.
-- **FR-026**: The browser MUST NOT persist assignment, role, phase, controller, broadcast, terminal, navigation, hacking, pending-action, or replay state.
-- **FR-027**: A subscription with a currently recognized handle MUST reattach to the same logical session.
-- **FR-028**: A subscription with an unknown or expired nonblank handle MUST create a fresh logical session and return a replacement handle.
-- **FR-029**: A structurally valid unary mutation with an unknown nonblank handle MUST return `invalid-session` without creating a session or replacement handle.
-- **FR-030**: Concurrent first-time tabs in one browser profile MUST converge on one accepted recognition handle and one logical session.
-- **FR-031**: Every active stream using one valid handle MUST attach to the same logical session and receive equivalent personalized state.
-- **FR-032**: Raw displayed browser connection count MUST equal active public server streams.
-- **FR-033**: Aggregate logical-session presence MUST remain connected while at least one stream for that session remains active.
-- **FR-034**: Closing a logical session's final stream MUST mark it disconnected without automatically releasing its character claim or controller identity.
-- **FR-035**: Reconnecting within the same process MUST restore current presence and current authoritative assignment.
-- **FR-036**: Process restart MUST restore no recognition mapping, logical session, character claim, controller, broadcast, revision, live terminal, navigation, hacking, pending action, or replay-cache state.
-- **FR-037**: Recognition handles MUST be treated only as process-local conveniences and MUST never bypass assignment, presence, controller, broadcast, terminal, gameplay, or replay validation.
+- **FR-024**: Recognition handles MUST remain opaque to clients, and clients MUST NOT parse them or infer session identity, age, validity, assignment, presence, controller authority, or any lifecycle state from their contents.
+- **FR-025**: The Subscribe request MUST use explicit protobuf presence for its recognition-handle scalar so absence is distinguishable from a present empty value.
+- **FR-026**: A Subscribe request with the recognition handle absent MUST create exactly one process-local logical session and return its opaque handle in the initial complete snapshot.
+- **FR-027**: A Subscribe request with a present blank, oversized, or structurally malformed recognition handle MUST return Connect `invalid_argument` without creating a logical session or replacement handle.
+- **FR-028**: A Subscribe request with a currently recognized handle MUST reattach to the same logical session.
+- **FR-029**: A Subscribe request with a well-formed nonblank handle that is unknown or expired MUST create a fresh logical session, issue a replacement handle, and return a complete current snapshot without restoring expired assignment or controller authority unless existing canonical rules independently establish it.
+- **FR-030**: A unary request with a missing, blank, oversized, or structurally malformed recognition handle MUST return Connect `invalid_argument`.
+- **FR-031**: A unary request with a well-formed nonblank handle that is unknown or expired MUST return typed `invalid-session` without creating a logical session or replacement handle and without mutation, revision advancement, random-source advancement, publication, or a replay result for the nonexistent session.
+- **FR-032**: Recognition-handle validation MUST impose a finite documented semantic bound while preserving handle opacity.
+- **FR-033**: Concurrent first-time tabs in one browser profile MUST converge on one accepted recognition handle and one logical session.
+- **FR-034**: Every active stream using one valid handle MUST attach to the same logical session and receive equivalent personalized state.
+- **FR-035**: Raw displayed browser connection count MUST equal active public server streams.
+- **FR-036**: Aggregate logical-session presence MUST remain connected while at least one stream for that session remains active.
+- **FR-037**: Closing a logical session's final stream MUST mark it disconnected without automatically releasing its character claim or controller identity; reconnecting within the same process MUST restore current presence and authoritative assignment, while process restart MUST restore no recognition mapping, logical session, claim, controller, broadcast, revision, live terminal, navigation, hacking, pending action, or replay-cache state.
 
 #### Snapshot, update, revision, and pending-action semantics
 
@@ -302,10 +324,10 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 - **FR-041**: Snapshot creation MUST never generate or regenerate a hacking puzzle.
 - **FR-042**: Reconnect snapshots MUST NOT replay ambient transitions, hacking outcome cues, stale actions, or prior accepted actions.
 - **FR-043**: Stream attachment and snapshot capture MUST form a gap-free boundary such that a snapshot at revision R is followed by no application message at revision R or lower.
-- **FR-044**: Every relevant committed revision after a subscriber's snapshot MUST be delivered or that stream MUST terminate so the client can reconnect to a new complete snapshot.
+- **FR-044**: Every relevant committed revision after a subscriber's snapshot MUST be offered once to its affected logical session; every attached physical stream that remains active and responsive through delivery MUST observe that revision exactly once, while a canceled, disconnected, or overflowing stream MAY observe zero messages for it and MUST terminate so recovery can use a new complete snapshot.
 - **FR-045**: One accepted mutation MUST commit exactly one coordinator revision.
-- **FR-046**: Each affected logical session MUST receive exactly one personalized compound authoritative update for an accepted mutation's revision.
-- **FR-047**: Every physical stream for the same logical session MUST receive an equivalent personalized update for a given revision.
+- **FR-046**: Each affected logical session MUST be offered exactly once the accepted mutation's single logical compound authoritative update, personalized to contain every public state component changed for that session by the action.
+- **FR-047**: No physical stream MUST observe the same revision more than once, and every physical stream attached to an affected logical session that remains active and responsive through delivery MUST observe the session's equivalent personalized update exactly once.
 - **FR-048**: The compound-update contract MUST permit several complete changed player, terminal-presentation, navigation, and hacking projections in one value.
 - **FR-049**: An omitted compound-update component MUST mean unchanged and MUST NOT act as an ambiguous partial patch.
 - **FR-050**: A subscriber MUST NOT receive several player, terminal, navigation, or hacking application messages with the same revision.
@@ -317,9 +339,9 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 
 #### Mutation, replay, authority, and randomness
 
-- **FR-056**: Every player mutation MUST resolve its recognition handle to a current logical session before domain mutation.
-- **FR-057**: Every player mutation MUST validate request identity, current broadcast identity, assignment, active-stream presence, controller authority, applicable terminal identity, and action-specific rules.
-- **FR-058**: An accepted mutation MUST mutate canonical state exactly once, commit exactly one revision, and enqueue its authoritative transition before completing the unary response.
+- **FR-056**: Every player mutation MUST validate request structure and finite bounds, recognition handle, live logical session with the required active subscription relationship, request identity, broadcast identity, and action-specific semantic fields before domain mutation.
+- **FR-057**: Character selection MUST be allowed only for a connected, recognized, currently unassigned logical session; MUST NOT require an existing assignment, controller authority, terminal identity, or hacking generation; MUST reject unavailable, unknown, conflicting, malformed, stale, or duplicate selection attempts without shared-state mutation, except that an exact request whose result remains retained replays only that result without a new effect under FR-062; and MUST preserve the current domain behavior by which acceptance can establish controller ownership.
+- **FR-058**: Navigation actions, password-or-filler guesses, and special-pattern activation MUST require an assigned, eligible, connected active controller, the applicable current terminal or broadcast identity, and the current hacking generation when generation-bound; requests from unassigned sessions, observers, non-controllers, disconnected sessions, stale broadcasts, stale terminals, or stale generations MUST be rejected without mutation or random-source advancement.
 - **FR-059**: A rejected, stale, duplicate, structurally invalid, observer-originated, disconnected-controller, or non-actionable request MUST NOT mutate canonical state, increment revision, publish an update, consume an attempt, or consume hacking randomness.
 - **FR-060**: Replay storage MUST default to 256 request-result records per logical session and broadcast.
 - **FR-061**: Exact replay MUST be guaranteed only while the matching request-result record remains retained.
@@ -334,11 +356,12 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 - **FR-070**: Every stale, used, duplicate, rejected, or losing concurrent special-pattern activation MUST consume zero random calls.
 - **FR-071**: The feature MUST preserve current pattern probabilities, dud-removal rules, attempts-reset rules, board-generation rules, and opaque generation-bound `patternId` semantics.
 - **FR-072**: `HACK_ADMIN` MUST remain removed from every public contract, handler, generated client, fixture, and active document.
+- **FR-144**: Every accepted state-changing action MUST mutate canonical state exactly once, advance the authoritative revision exactly once, produce exactly one logical compound update for the committed revision, and offer it once to each affected logical session before completing the unary response.
 
 #### Error classification and public safety
 
-- **FR-073**: Malformed protobuf, illegal or missing variants, required `UNSPECIFIED` enums, blank or structurally invalid request identity, blank unary recognition handle, missing required broadcast or terminal identity, and structurally invalid action targets MUST return Connect `invalid_argument`.
-- **FR-074**: A request above the effective 4 KiB player-controlled mutation limit or another documented public bound MUST return Connect `resource_exhausted` before canonical service invocation.
+- **FR-073**: Malformed bounded protobuf messages, illegal or missing variants, prohibited required `UNSPECIFIED` enums, a present invalid Subscribe recognition handle, a missing or invalid unary recognition handle, blank or structurally invalid request identity, missing required broadcast or terminal identity, invalid sound category, and structurally invalid action targets MUST return Connect `invalid_argument` before canonical service invocation.
+- **FR-074**: Every public player RPC, including Subscribe and SoundManifest, MUST enforce a maximum 4 KiB uncompressed protobuf request-message size at the Connect transport or decoding boundary before application adapters or canonical services are invoked; exceeding that limit MUST return Connect `resource_exhausted`.
 - **FR-075**: Unsupported public services or procedures MUST return Connect `unimplemented`.
 - **FR-076**: Request or stream cancellation MUST return Connect `canceled`.
 - **FR-077**: Temporary public service unavailability MUST return Connect `unavailable`.
@@ -348,6 +371,10 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 - **FR-081**: Stale-generation, used-pattern, absent-puzzle, non-actionable-puzzle, solved-puzzle, failed-puzzle, exhausted-puzzle, and well-formed invalid-target rejections MUST use `invalid-action` unless `stale-terminal` is more specific.
 - **FR-082**: Invalid Basic Auth MUST fail closed with HTTP `401` before player capabilities are reached.
 - **FR-083**: Public errors MAY include safe correction or retry guidance but MUST NOT expose request bytes, legacy JSON, recognition handles, credentials, native paths, stack traces, private identities, private candidates, secret words, future outcomes, tunnel policy details, or internal dependency errors.
+- **FR-145**: Planning MUST record and tests MUST enforce a finite encoded HTTP-body limit and decompression limit consistent with Connect framing overhead, including compressed requests and messages enlarged with unknown protobuf fields.
+- **FR-146**: Recognition handles, request identities, broadcast identities, terminal and generation identifiers, pattern identifiers, navigation targets, guesses, and sound categories MUST each have finite semantic limits below the public request-message maximum.
+- **FR-147**: Sound categories MUST be validated against the existing allowed catalog and MUST NOT accept paths, path fragments, or arbitrary filesystem input.
+- **FR-148**: Rejection at any public message-size, encoded-body, decompression, structural, finite field-bound, or sound-category boundary check MUST create no logical session, mutation, revision, logical publication, replay entry, or random-source advancement and MUST occur before canonical service invocation.
 
 #### Private Wails semantic contracts and adapters
 
@@ -399,7 +426,8 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 
 - **FR-121**: Every subscriber MUST have bounded buffering.
 - **FR-122**: A slow, blocked, overflowing, canceled, or disconnected subscriber MUST NOT block canonical mutation, another subscriber, effect publication, detachment, or shutdown.
-- **FR-123**: Subscriber buffer overflow MUST cancel or close only the affected physical stream.
+- **FR-123**: Subscriber cancellation, disconnection, or buffer overflow MUST cancel or close only the affected physical stream within bounded time, release its resources, and MUST NOT block canonical mutation, other logical sessions, or sibling physical streams.
+- **FR-149**: The server MUST NOT retry old incremental events as though physical delivery had been acknowledged; a terminated stream MUST recover only by reconnecting to a complete current authoritative snapshot.
 - **FR-124**: Shutdown MUST cancel streams, release subscribers and logical presence, close the listener, stop tunnel-owned resources, wait for owned workers, and remain idempotent.
 - **FR-125**: The browser MUST retain the current three-second reconnect delay unless planning documents an equivalent or safer bounded policy.
 - **FR-126**: Before bulk migration, planning MUST require a thin vertical proof covering generated subscription and snapshot, at least one unary mutation, same-origin local mode, authenticated ngrok mode, Basic Auth failure, and bundled packaged assets.
@@ -419,10 +447,10 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 - **FR-137**: Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping.
 - **FR-138**: Breaking-change checks MUST reject incompatible field-number, field-type, enum, package, and service changes against the committed baseline once it exists.
 - **FR-139**: Compatible unknown protobuf fields MUST follow standard forward-compatible protobuf behavior while known request fields remain authoritatively validated.
-- **FR-140**: Removed protobuf fields and enum values MUST reserve prior names and numbers as applicable.
-- **FR-141**: Every protobuf enum MUST define an `UNSPECIFIED` zero value.
-- **FR-142**: Protobuf fields MUST use explicit presence when absence differs from a scalar default.
-- **FR-143**: Mutually exclusive protobuf states MUST use `oneof` or another explicit protobuf variant.
+- **FR-140**: Removed protobuf fields, mutually exclusive variants, and enum values MUST reserve their former names and numbers as applicable.
+- **FR-141**: Every protobuf enum MUST define an `UNSPECIFIED` zero value unless the schema imports a well-known type whose governing rules already define its representation.
+- **FR-142**: Protobuf `optional` MUST be reserved for scalar presence when absence is semantically different from the scalar default.
+- **FR-143**: Mutually exclusive protobuf payload variants MUST use `oneof`; parallel optional variant fields and string discriminator fields are prohibited.
 
 ### Existing Private Wails Inventory
 
@@ -488,12 +516,12 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 ## Key Entities
 
 - **Contract Inventory Item**: One application-owned structured boundary or serializable configuration field, with an owner, producer, consumers, classification, schema location or exclusion rationale, and public-or-private exposure designation.
-- **Recognition Handle**: An opaque browser-stored value that maps to one process-local logical session and carries no authentication or authorization power.
+- **Recognition Handle**: An opaque, finitely bounded browser-stored value that maps to one process-local logical session and carries no authentication or authorization power; clients never parse it or infer lifecycle state from it.
 - **Logical Session**: The process-local identity shared by all active streams using one accepted handle; it owns aggregate presence, fallback name, current assignment reference, and bounded request replay records.
 - **Physical Stream**: One active server-streaming subscription for a browser tab; several streams may belong to one logical session and together determine aggregate presence.
 - **Personalized Snapshot**: The mandatory first stream value containing the accepted handle, complete player state, one revision, and exactly one complete terminal-presentation variant.
-- **Compound Authoritative Update**: One revisioned, personalized stream value containing complete changed projections while omitted components mean unchanged.
-- **Player Mutation**: One separately typed unary request with recognition, request, broadcast, and when applicable terminal identity plus procedure-specific action data.
+- **Compound Authoritative Update**: The single revisioned logical publication for one committed action, personalized when offered once to each affected session so it contains every complete public projection changed for that session while omitted components mean unchanged; physical receipt depends on a stream remaining active and responsive through delivery.
+- **Player Mutation**: One separately typed unary request with recognition, request, broadcast, and procedure-specific semantic data; character selection requires no controller, terminal, or generation authority, while shared terminal mutations carry applicable terminal and generation identity and require the connected active controller.
 - **Action Result**: A correlated authoritative mutation outcome containing acceptance, stable reason, and the authoritative revision relevant to pending-action reconciliation.
 - **Request Replay Record**: A bounded per-logical-session, per-broadcast association of request identity, procedure-and-payload fingerprint, original result, and revision.
 - **Terminal Presentation**: The exclusive public variant representing either a complete live-terminal projection or explicit no-live-terminal state.
@@ -517,12 +545,12 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - **SC-008**: Concurrent first-time tabs in one browser profile converge on one accepted handle and one logical session in every trial.
 - **SC-009**: In multi-tab disconnect tests, raw stream count decreases per closed stream while aggregate logical presence changes to disconnected only when the final stream closes.
 - **SC-010**: Across at least 100 concurrent character-claim trials for one character, each trial accepts at most one claimant.
-- **SC-011**: Authorization tests covering every mutation family prove that only the current connected assigned controller can mutate shared terminal state.
+- **SC-011**: Authorization tests prove that a new connected, recognized, unassigned session can select an available character without controller, terminal, or generation authority, that acceptance can establish controller ownership under current rules, and that the same unassigned session cannot perform navigation or hacking mutations before it becomes the assigned, eligible, connected active controller.
 - **SC-012**: At least 100 exact request replays whose records remain retained return the original result and revision with zero second canonical effects.
 - **SC-013**: Reuse of a retained request identity with a changed procedure or fingerprint returns `duplicate` with zero canonical effects in every tested case.
 - **SC-014**: Replay-cache stress tests prove the configured record bound is never exceeded and make no replay claim for evicted records.
 - **SC-015**: Across at least 100 concurrent activations of one special pattern, every trial produces exactly one accepted mutation, exactly one normal accepted outcome draw, at most one accepted dud-selection draw, and zero random calls from rejected contenders.
-- **SC-016**: Every affected stream receives at most one compound application update for one committed revision.
+- **SC-016**: For every accepted state-changing action, tests observe exactly one canonical mutation, one revision advance, one logical compound update containing all changed public components, and one offer to each affected logical session; every physical stream that remains active and responsive through delivery observes that revision exactly once, no stream observes it more than once, and canceled, disconnected, or overflowing streams may observe zero.
 - **SC-017**: Every subscriber's post-snapshot revisions are strictly increasing while tests confirm irrelevant revisions may be skipped.
 - **SC-018**: Four to seven simultaneous browser streams converge after at least 25 mixed character-selection, navigation, guess, pattern, replay, rejection, and reconnect operations.
 - **SC-019**: Result-first and stream-first tests prove accepted pending actions clear only after both required conditions are met, while rejected actions clear immediately.
@@ -534,7 +562,7 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - **SC-025**: The generated player code and public service descriptor transitively contain zero private desktop, persistence, credential, native-path, tunnel, or private hacking contracts.
 - **SC-026**: Session-v1 fixture round trips preserve every known field, normalized relative player-config reference, and compatible unknown field at every currently supported level.
 - **SC-027**: Player-config-v1 fixture tests preserve every current strict validation case and prove no roster or association publication occurs before successful atomic save.
-- **SC-028**: Requests above the effective 4 KiB player-mutation limit return `resource_exhausted` with zero canonical-service invocations, while in-limit requests still undergo normal structural and domain validation.
+- **SC-028**: Oversized unary mutation, Subscribe, SoundManifest, compressed, and unknown-field-enlarged requests exceeding the 4 KiB uncompressed message limit or planned encoded-body or decompression limit return `resource_exhausted`, and malformed bounded requests return `invalid_argument`; spies prove zero application-adapter and canonical-service invocations and zero session, mutation, revision, publication, replay, or random-source effects for every boundary rejection.
 - **SC-029**: Sound tests cover all eight current categories, five allowlisted extensions, deterministic ordering, empty successful manifests, asynchronous failure, and authoritative one-shot cues.
 - **SC-030**: Local-network and authenticated-ngrok journeys cover page loading, first snapshot, all five unary responsibilities, compound updates, multi-tab behavior, reconnect, HTTP `401`, sound discovery, and sound playback.
 - **SC-031**: Before final cutover, a manual or scheduled soak representative of a three-to-four-hour game proves an idle local and authenticated-ngrok stream either remains usable or reconnects after interruption and receives a complete current snapshot.
@@ -547,7 +575,8 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - Exact public protobuf package, service, procedure, and message names will be finalized during planning while preserving every separately typed responsibility in this specification.
 - Planning will select browser protobuf JSON or binary encoding from current official ConnectRPC browser guidance and pin the chosen runtime and generation toolchain.
 - The current process-local coordinator remains the canonical owner of navigation, hacking, assignment, controller, broadcast, revision, terminal runtime, presence, and replay behavior.
-- The effective mutation limit continues to measure player-controlled request data before canonical invocation; planning will define a deterministic measurement compatible with the 4 KiB baseline for generated requests.
+- The 4 KiB maximum measures the uncompressed protobuf request message for every public player RPC before application-adapter or canonical-service invocation; planning will record finite encoded HTTP-body and decompression limits that accommodate only documented Connect framing overhead.
+- Planning will derive finite lower semantic bounds for recognition handles, request IDs, broadcast IDs, terminal and generation identifiers, pattern IDs, navigation targets, guesses, and sound categories without making recognition handles client-readable.
 - Existing same-origin local-storage coordination used by first-time tabs may be adapted to generated subscriptions, but the only persistent value remains the accepted recognition handle.
 - A later relevant revision can satisfy an accepted pending action when its personalized projection demonstrates state at or beyond the result revision even if irrelevant revisions were skipped.
 - The current sound filename response may become safe relative paths if planning proves all values remain within the same allowlisted embedded category and origin.
@@ -564,7 +593,7 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - Public player port: `3690`.
 - Default player delivery queue size: `32`.
 - Default replay-cache limit: `256` entries per logical session and broadcast.
-- Effective player mutation maximum: `4 KiB`.
+- Maximum uncompressed public player RPC request message: `4 KiB`.
 - Current reconnect delay: `three seconds`.
 - Public ngrok domain: `fallout-terminal.ngrok.app`.
 - Invalid Basic Auth response: HTTP `401`.
