@@ -2,6 +2,7 @@
 
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Replaced the conflicting lifecycle-phase schema task, completed isolated protobuf-tool coverage, and moved final P1 journeys behind bridge integration.
 **Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, preserved historical artifacts unchanged, and made frontend/status and soak dependencies explicit.
+**Bugfix**: 2026-08-14 — [ANALYZE-FINAL-MATRIX-2026-08-14] Established one sequential final-verification owner and restart-on-change evidence semantics.
 
 **Input**: Design documents from `/specs/006-wails-v3-migration/`
 
@@ -18,6 +19,7 @@
 - Every task names exact repository paths
 - Verification tasks name the command or observable manual journey
 - An unchecked task is not evidence that its command or journey passed
+- Task IDs are stable traceability identifiers; file order and explicit dependency statements govern execution, not numeric order alone
 
 ## Phase 1: Setup and Contract Reconciliation
 
@@ -200,27 +202,27 @@
 - [ ] T066 [US7] Perform the source or genuinely accepted-artifact rollback drill with safety copies and record actual version-1 master/player results in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
 - [ ] T067 [US7] Run the required 60-minute local soak with 4–7 players, 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, five `ps -o rss= -p <APP_PID>` samples ten seconds apart at minutes 15/30/60, failure when both later medians exceed 125% of the 15-minute median, and five-second post-quit cleanup; with real credentials/connectivity run the 30-minute authenticated-ngrok soak with 4–7 players, 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel-loss/local-fallback proof, convergence, isolation, and five-second cleanup, recording `PASS`, `FAIL`, or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
 - [ ] T068 [US7] Only after T066–T067 and every other required parity/package gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
-- [ ] T069 [US7] Rebuild and rerun all required gates after v2 removal, attach final cutover scan/package evidence, and mark Wails v3 accepted only if every required profile gate passes in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T069 [US7] After T068, create the provisional v2-free verification candidate, record its SHA and exact pin set, and run only the preliminary compile/cutover preflight needed to enter Phase 11 in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`; do not mark Wails v3 accepted, and restart T070–T078 if later verification changes source
 
-**Checkpoint**: Rollback is real and data-compatible; final accepted source has zero active Wails v2 path or permanent switch; unavailable external checks are never represented as passes.
+**Checkpoint**: Rollback is real and data-compatible; the provisional candidate has zero active Wails v2 path or permanent switch and is ready for the one authoritative final matrix; unavailable external checks are never represented as passes.
 
 ---
 
 ## Phase 11: Cross-Cutting Verification and Polish
 
-**Purpose**: Run the complete matrix against the final cutover source and reconcile all evidence without weakening existing assertions.
+**Purpose**: Run the one authoritative complete matrix sequentially against the provisional v2-free candidate and reconcile all evidence without weakening existing assertions.
 
-- [ ] T070 [P] Run `gofmt -l .`, `go vet ./...`, and `go test ./...`, fixing only migration-caused failures in `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, and affected packages under `internal/`
-- [ ] T071 [P] Run `go test -race ./...` and resolve migration-caused lifecycle, stream, session-worker, event, or process ownership races in `app.go`, `wails_host.go`, `internal/player/`, `internal/session/`, `internal/tunnel/`, and `internal/platform/`
-- [ ] T072 [P] Run isolated Buf format/lint/build/generation, `scripts/proto-drift-test.sh`, `scripts/proto-breaking.sh --all-fixtures`, graph-isolation checks, and `git diff --exit-code -- internal/gen client/gen`
-- [ ] T073 [P] Run locked clean installs and production builds for `frontend/` and `client/`, then verify no CDN/runtime download, v2 global, private generated JavaScript, or privileged fallback in `frontend/dist/` and `client/dist/`
-- [ ] T074 [P] Run the complete Playwright suite in `tests/browser/` and preserve all feature-005 multi-client, authority, replay, reconnect, overflow, sound, and privacy assertions
-- [ ] T075 Run two clean Wails binding generations plus `scripts/wails-bindings-check.sh`, `scripts/tool-modules-check.sh`, and `scripts/reproducible-build-check.sh`, leaving zero unexplained tracked or root-module drift
+- [ ] T070 Run `scripts/tool-modules-check.sh`, isolated Buf format/lint/build/generation, `scripts/proto-drift-test.sh`, `scripts/proto-breaking.sh --all-fixtures`, graph-isolation checks, and `git diff --exit-code -- internal/gen client/gen`, leaving zero root-module or generated drift
+- [ ] T071 Run two clean Wails binding generations plus `scripts/wails-bindings-check.sh`, leaving identical content/inventory, the exact allowlisted surface, and zero unexplained tracked drift in `frontend/bindings`
+- [ ] T072 Run locked clean installs and production builds for `frontend/` and `client/`, then `scripts/reproducible-build-check.sh` and bundle scans for zero CDN/runtime download, v2 global, private generated JavaScript, privileged fallback, stale binding, or root-module drift in `frontend/dist/` and `client/dist/`
+- [ ] T073 Run `gofmt -l .`, `go vet ./...`, and `go test ./...`, fixing only migration-caused failures in `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, and affected packages under `internal/`
+- [ ] T074 Run `go test -race ./...` and resolve migration-caused lifecycle, stream, session-worker, event, or process ownership races in `app.go`, `wails_host.go`, `internal/player/`, `internal/session/`, `internal/tunnel/`, and `internal/platform/`
+- [ ] T075 Run the complete Playwright suite in `tests/browser/` and preserve all feature-005 multi-client, authority, replay, reconnect, overflow, sound, and privacy assertions
 - [ ] T076 Run the final personal-use macOS arm64 package plus `scripts/verify-macos-app.sh` and `scripts/wails-v3-cutover-check.sh`, then repeat offline launch/one-listener/clean-quit smoke against `build/bin/Fallout Terminal.app`
 - [ ] T077 Run credential-gated ngrok and `scripts/build-macos.sh` Developer ID/notary/staple/DMG/Gatekeeper gates only with real prerequisites; otherwise record each as `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
 - [ ] T078 Reconcile candidate SHA, exact pins, commands, automated/manual results, `NOT RUN` reasons, artifact digests, soak, rollback, and cutover status across `README.md`, `specs/006-wails-v3-migration/quickstart.md`, and `docs/wails-v3-migration-rollback.md`
 
-**Checkpoint**: Every required gate is tied to one final source/pin set; conditional evidence is honest; no test or contract assertion was weakened to obtain acceptance.
+**Checkpoint**: Every required gate is tied to one unchanged final source/pin set; conditional evidence is honest; no test or contract assertion was weakened to obtain acceptance. Any source change during T070–T077 invalidates later evidence and restarts Phase 11 at T070 against the new candidate SHA.
 
 ---
 
@@ -260,7 +262,7 @@ Phase 2 isolated pins + host/service/status foundation
 - US1–US4 implementation and automated-test slices may advance as coordinated P1 work after Phase 2, but tasks touching `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, or `desktop-api.js` remain sequential.
 - T024, T032, and T037 run only after T041–T046 complete, so no final native journey can pass through a v2/global binding fallback or before readiness behavior exists.
 - US5 requires the integrated P1 checkpoint; US6 requires the stable build graph; US7 requires all parity and personal-package gates.
-- Within US7, T066 rollback and T067 soak must pass before T068 removes v2; T069 then rebuilds and reruns the complete required matrix against the v2-free source.
+- Within US7, T066 rollback and T067 soak must pass before T068 removes v2; T069 then records the provisional v2-free candidate and hands it to the authoritative Phase 11 matrix without accepting it.
 - Final cross-cutting verification runs only after the cutover candidate contains no active v2 implementation.
 
 ### User-story completion order
@@ -306,7 +308,7 @@ Phase 2 isolated pins + host/service/status foundation
 
 ### Final verification
 
-- T070–T074 can run in parallel on a frozen candidate; T075–T078 consume their results sequentially.
+- T070–T078 execute sequentially because generation, builds, tests, packaging, and evidence consume the preceding task's frozen outputs. Only subcommands explicitly proven to use disjoint immutable inputs may run concurrently within one task.
 
 ## Implementation Strategy
 

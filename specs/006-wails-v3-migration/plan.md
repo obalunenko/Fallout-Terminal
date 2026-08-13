@@ -2,6 +2,7 @@
 
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Updated the design for isolated Go tool modules, the unchanged runtime-status schema, measurable soak gates, and dependency-ordered P1 acceptance.
 **Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, protected historical artifacts, and specified deterministic local/public soak procedures.
+**Bugfix**: 2026-08-14 — [ANALYZE-FINAL-MATRIX-2026-08-14] Made the post-removal verification matrix sequential, restartable, and solely responsible for final acceptance.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -213,8 +214,9 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - Reconcile all required acceptance evidence for the personal-use profile; no required gate may be `FAIL` or `NOT RUN`.
 - Remove Wails v2 imports/dependency/CLI/config/hooks, v2 generated/global assumptions, obsolete workaround if proven, active v2 instructions, and every temporary dual path.
-- Run source, generated-output, dependency, final bundle, CI/script, and documentation scans.
-- Rebuild/repackage after removal and rerun all required gates so the accepted artifact corresponds to final source.
+- Record the provisional v2-free candidate SHA and exact pins without accepting it.
+- Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, Playwright, source/generated/dependency scans, the final package, conditional gates, and reconciled documentation/evidence.
+- If any verification task changes source, generated output, a pin, or a lockfile, invalidate later evidence, record the new candidate identity, and restart the final matrix from its first task.
 - Checkpoint gate: zero active v2 runtime surface, zero permanent switch, all required parity gates pass; only then designate Wails v3 production.
 
 ## Workstream Attribution
