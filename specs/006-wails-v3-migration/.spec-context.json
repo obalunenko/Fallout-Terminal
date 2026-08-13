@@ -1,0 +1,293 @@
+{
+  "workflow": "companion",
+  "specName": "wails v3 migration",
+  "branch": "006-wails-v3-migration",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T18:07:56.751Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T18:14:12.328Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T18:54:39.127Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T19:44:59.086Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T19:52:16.092Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T19:52:45.911Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T20:19:33.967Z"
+    }
+  ],
+  "last_action": "living specs evaluated — skipped (not configured)",
+  "coverage": {
+    "FR-001": {
+      "title": "The migration MUST replace the accepted Wails v2 desktop runtime with Wails v3 without intentionally changing gameplay, persistence, security, visual presentation, public network behavior, or user workflows."
+    },
+    "FR-002": {
+      "title": "The implementation MUST use the current constitution, baseline code, and completed specifications 001–005 as evidence, giving precedence to feature 005 and current code for post-ConnectRPC private and public behavior while surfacing rather than silently resolving active-contract discrepancies."
+    },
+    "FR-003": {
+      "title": "The candidate MUST retain one native master window on macOS 13+ arm64 with title `Fallout Terminal — Master Control`, initial size 1200×780, minimum size 900×600, and the accepted dark presentation."
+    },
+    "FR-004": {
+      "title": "The master experience MUST preserve every accepted control and the create, open, edit, explicit-copy, and save outcomes for representative sessions and player rosters."
+    },
+    "FR-005": {
+      "title": "Session persistence MUST preserve version-1 JSON field names, compatible unknown fields, relative references, validation, explicit selected targets, ordered revisions, atomic replacement, and zero semantic round-trip change."
+    },
+    "FR-006": {
+      "title": "Player-config persistence MUST preserve version 1, strict unknown-field and trailing-data rejection, identity validation, relative session references, complete-file atomic saves, and publication only after durable success."
+    },
+    "FR-007": {
+      "title": "macOS storage MUST preserve the Documents session default, Application Support metadata location, user-selected autosave target, and read-only bundled demonstration behavior until explicit copy."
+    },
+    "FR-008": {
+      "title": "One application process MUST compose, start, own, and stop the player listener, generated player service, optional owned ngrok process, session-storage worker, and desktop adapter exactly once."
+    },
+    "FR-009": {
+      "title": "Startup MUST remain bounded and MUST make current phase, local server information, and any actionable redacted startup failure observable to the master experience."
+    },
+    "FR-010": {
+      "title": "Local player access MUST remain enabled by default, while public tunneling MUST remain opt-in, authenticated, credential-redacted, and fail-closed before player capabilities when configuration is absent or invalid."
+    },
+    "FR-011": {
+      "title": "Failure of optional public tunneling MUST preserve usable local play and publish a non-secret failure status."
+    },
+    "FR-012": {
+      "title": "Player-listener startup failure MUST unwind partially acquired resources and remain observable to the master rather than appearing only as an unexplained process exit."
+    },
+    "FR-013": {
+      "title": "Shutdown MUST preserve the accepted ownership order and timeout for tunnel, player listener and streams, session worker, and desktop adapter and MUST remain safe after partial startup or repeated calls."
+    },
+    "FR-014": {
+      "title": "The player listener MUST expose only the bundled static player resources and the generated public player service and MUST expose no Wails runtime, private desktop bridge, health, reflection, generic capability discovery, or native operation."
+    },
+    "FR-015": {
+      "title": "The public service MUST preserve `fallout.terminal.player.v1.PlayerService`, every accepted procedure cardinality and meaning, same-origin binary protobuf transport, request limits, authentication boundary, player URL and port, revision ordering, replay, concurrency, cancellation, and reconnect behavior."
+    },
+    "FR-016": {
+      "title": "The final candidate MUST retain generated ConnectRPC as the only public player protocol and MUST NOT reintroduce the removed WebSocket protocol or a compatibility route."
+    },
+    "FR-017": {
+      "title": "Four to seven simultaneous browser players MUST continue to converge through character selection, authoritative snapshots and streamed revisions, navigation, hacking, reconnect, and sound behavior under the feature-005 authority rules."
+    },
+    "FR-018": {
+      "title": "Public projections, descriptors, errors, and generated player code MUST continue to expose zero desktop capabilities, credentials, native paths, runtime status, secret words, private candidates, future outcomes, or other private state."
+    },
+    "FR-019": {
+      "title": "Every private desktop operation in the accepted feature-005 inventory MUST remain available with its exact validation, cancellation, eligibility, redacted error, result semantics, and JavaScript-visible value or object shape."
+    },
+    "FR-020": {
+      "title": "`frontend/src/desktop-api.js` MUST remain the only runtime-neutral facade used by the master UI and MUST absorb Wails v3 generated namespace or module-path changes without leaking them to UI consumers."
+    },
+    "FR-021": {
+      "title": "Existing versioned private protobuf contracts and explicit adapters MUST continue to govern every application-owned bridge request, result, status, and event without becoming canonical mutable domain state."
+    },
+    "FR-022": {
+      "title": "The Wails bridge MUST NOT carry protobuf binary, Base64, ProtoJSON, a serialized protobuf envelope, or a generic map or dispatcher."
+    },
+    "FR-023": {
+      "title": "A protobuf schema change MUST occur only for a separately specified real application-contract semantic change and MUST NOT be justified solely by Wails binding metadata or namespace changes."
+    },
+    "FR-024": {
+      "title": "The event names `server-info`, `client-count`, `hack-state`, and `coordination-state` and their JavaScript-visible payload shapes MUST remain exact."
+    },
+    "FR-025": {
+      "title": "Every desktop event subscription MUST return one idempotent release function that releases exactly one underlying runtime listener and prevents callbacks after release."
+    },
+    "FR-026": {
+      "title": "Every desktop event subscriber MUST receive current initial runtime, server, client, hacking, and coordination state without polling, missed initial state, duplicate effects, or a stale snapshot overwriting a newer event."
+    },
+    "FR-027": {
+      "title": "The generated Wails v3 desktop binding inventory MUST contain every required private operation and zero lifecycle methods, generic dispatchers, arbitrary filesystem, process, environment, or browser primitives, or public player procedures."
+    },
+    "FR-028": {
+      "title": "`Start` and `Shutdown` MUST remain internal lifecycle operations and MUST NOT appear in generated desktop bindings, while `CopyDemo` MUST remain a private operation with its accepted explicit-copy semantics and no newly introduced UI control."
+    },
+    "FR-029": {
+      "title": "All Wails v3 Go module, CLI, frontend runtime, and frontend plugin versions MUST be concrete, mutually compatible, documented, lockfile-recorded, and verified without any reproducible command resolving `latest`."
+    },
+    "FR-030": {
+      "title": "A developer with the documented pinned prerequisites MUST be able to run `wails3 dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor."
+    },
+    "FR-031": {
+      "title": "A clean checkout MUST deterministically generate Wails bindings and protobuf code, build both browser applications, run applicable tests, build the native application, and package the supported target without an undeclared manual prerequisite."
+    },
+    "FR-032": {
+      "title": "Clean binding and protobuf generation MUST be reproducible across two consecutive runs and MUST leave no unexplained tracked diff or manually edited generated file."
+    },
+    "FR-033": {
+      "title": "Two consecutive clean native builds with identical inputs MUST complete successfully without relying on stale generated output, a development server, a network-time package lookup, or a separately started process."
+    },
+    "FR-034": {
+      "title": "Existing Go, race, frontend, player, Playwright, Buf generation, drift, breaking, and relevant platform tests MUST pass unchanged or be deliberately adapted for Wails v3 without reducing their assertions."
+    },
+    "FR-035": {
+      "title": "The personal-use package MUST be a self-contained local or ad-hoc-signed macOS 13+ arm64 `.app` that launches without Go, Node, npm, Vite, Wails, a development server, or internet access."
+    },
+    "FR-036": {
+      "title": "The packaged application MUST contain and load the master assets, Wails generated bindings, generated player client, player assets, fonts, sounds, and read-only bundled demonstration session."
+    },
+    "FR-037": {
+      "title": "The packaged application MUST start the player listener once and release it and any owned ngrok process on normal quit and handled partial startup within the accepted shutdown timeout."
+    },
+    "FR-038": {
+      "title": "Developer ID signing, hardened runtime, notarization, stapling, DMG creation, and Gatekeeper-without-bypass MUST be required only for an explicitly selected public-release candidate and MUST be recorded as `NOT RUN` when credentials are unavailable."
+    },
+    "FR-039": {
+      "title": "Before code cutover, rollback evidence MUST record the immutable accepted Wails v2 source commit `f1084b3df8b5630862bdf7a0f347b599156653ef` as the canonical source rollback."
+    },
+    "FR-040": {
+      "title": "If an accepted Wails v2 baseline application is built, rollback evidence MUST record its exact executable, SHA-256 digest, build provenance, and acceptance status."
+    },
+    "FR-041": {
+      "title": "Before final cutover, the owner MUST be able to return to the recorded Wails v2 source or accepted artifact without transforming session-v1 or player-config-v1 data."
+    },
+    "FR-042": {
+      "title": "Temporary v2/v3 coexistence MUST be limited to the migration branch, have a named owner and expiry at cutover, include a removal task, and MUST NOT become a permanent runtime flag or dual implementation."
+    },
+    "FR-043": {
+      "title": "Rollback triggers MUST include session corruption or loss, bridge capability or payload drift, master or player parity loss, startup or shutdown leaks, public-access regression, missing packaged assets, unhandled beta-runtime crashes, and package or signature failure."
+    },
+    "FR-044": {
+      "title": "Wails v2 MUST remain the accepted production fallback until every required parity, security, persistence, lifecycle, generation, build, package, soak, and rollback gate for the selected profile passes."
+    },
+    "FR-045": {
+      "title": "Final cutover MUST remove every active Wails v2 import, CLI installation path, v2 command, generated binding dependency, runtime global, obsolete configuration, and permanent dual-runtime implementation while preserving historical completed specifications as history."
+    },
+    "FR-046": {
+      "title": "Final acceptance MUST include one representative long-running local master/player soak, and the authenticated-ngrok soak MUST run only when credentials and connectivity exist or otherwise be recorded as `NOT RUN` without serving as passing public-mode evidence."
+    },
+    "FR-047": {
+      "title": "Multi-window, mobile, system tray, updater, new desktop capabilities, persistence-format migration, public RPC redesign, ConnectRPC replacement, Wails-driven protobuf changes, new platforms, and mandatory public distribution MUST remain outside this migration."
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 35,
+    "projectedTasks": 60,
+    "scopeSignal": "larger",
+    "verdict": "oversized"
+  },
+  "context": [
+    "baseline: main at f1084b3df8b5630862bdf7a0f347b599156653ef",
+    "governance: constitution 3.2.0 and completed specs 001-005",
+    "area: root Wails composition and internal/platform desktop adapters",
+    "area: frontend/src/desktop-api.js private operations and named events",
+    "area: generated ConnectRPC player service, browser client, persistence, startup, shutdown, tooling, and macOS packaging",
+    "constraint: preserve accepted product contracts while replacing only runtime, bridge integration, tooling, and packaging"
+  ],
+  "intent": "Replace the Wails v2 desktop host with a pinned Wails v3 runtime while preserving the complete accepted master, player, persistence, security, lifecycle, and packaging experience.",
+  "expectations": [
+    "No product redesign or gameplay change",
+    "No new desktop capabilities, multi-window UI, mobile support, system tray, or updater",
+    "No persistence-format migration",
+    "No public RPC redesign, ConnectRPC replacement, WebSocket compatibility, or Wails-driven protobuf change",
+    "No Intel, universal, Windows, Linux, iOS, or Android target",
+    "No mandatory public distribution; signing and notarization remain conditional"
+  ],
+  "decisions": [
+    {
+      "decision": "Pin Wails Go module, wails3 CLI, @wailsio/runtime, and its Vite plugin to exact v3.0.0-beta.8 artifacts",
+      "why": "Immutable tag/runtime/npm inspection proves compatibility despite release-label drift; floating beta inputs cannot reproduce acceptance",
+      "rejected": [
+        "wait for GA",
+        "matching labels without inspection",
+        "floating latest/ranges"
+      ]
+    },
+    {
+      "decision": "Compose one Wails application first, inject a narrow platform capability, then register an internal lifecycle service and exact 25-method desktop service",
+      "why": "Late registration breaks the brownfield construction cycle without globals and prevents lifecycle/helper exposure",
+      "rejected": [
+        "register the composition root",
+        "package globals",
+        "spread Wails into domain packages"
+      ]
+    },
+    {
+      "decision": "Preserve the four-event listener-first snapshot protocol and render the existing startupError without a protobuf phase change",
+      "why": "This preserves feature-005 shapes while closing the verified master-UI startup observability gap",
+      "rejected": [
+        "DomReady-only replay",
+        "silent framework exit",
+        "new serialized phase solely for Wails"
+      ]
+    },
+    {
+      "decision": "Adopt Wails v3 Taskfiles/configuration with build/bin output and copy all resources before final signature",
+      "why": "The visible v3 graph can order protobuf, player, bindings, master, packaging, resources, and signing deterministically while preserving external consumers",
+      "rejected": [
+        "force v2 wails.json",
+        "default bin path churn",
+        "mutate a signed bundle"
+      ]
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Produced a checkpointed brownfield Wails v3 beta.8 migration plan with version research, unchanged-data model, exact desktop bridge/events/lifecycle/build-package contracts, and an evidence-first quickstart.",
+      "key_finding": "The baseline retains startupError in RuntimeStatus but does not render fatal startup failure in the master UI; the plan closes this through the existing facade/status contract without protobuf drift.",
+      "risks": [
+        "Wails v3 remains prerelease with open blockers",
+        "lifecycle abort semantics can hide application failures",
+        "generated surface or event readiness can drift",
+        "resource insertion/signing order can invalidate the final bundle"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Planning baseline matches latest fetched main",
+      "result": "HEAD, main, origin/main, and FETCH_HEAD all f1084b3df8b5630862bdf7a0f347b599156653ef",
+      "command": "git fetch origin main plus rev-parse"
+    },
+    {
+      "what": "Selected Wails beta.8 compatibility matrix",
+      "result": "Go tag commit 81a1499 and npm gitHead 86b39da differ only by runtime package metadata version bump; exact beta.8 set selected",
+      "warnings": "Wails v3 remains prerelease with open release blockers"
+    },
+    {
+      "what": "Planning artifact structural validation",
+      "result": "8 required plan/design artifacts have valid relative links, final newlines, and no unresolved template markers",
+      "command": "local Python link/template validation plus git diff --check"
+    }
+  ]
+}

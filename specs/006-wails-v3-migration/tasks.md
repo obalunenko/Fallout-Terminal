@@ -1,0 +1,326 @@
+# Tasks: Wails v3 Runtime Migration
+
+**Input**: Design documents from `/specs/006-wails-v3-migration/`
+
+**Prerequisites**: `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, and constitution 3.3.1
+
+**Testing**: This migration explicitly requires focused automated tests, deterministic generation, race testing, Playwright journeys, macOS package inspection, manual native journeys, soak, and rollback evidence. Tests use Testify, table-driven cases, `t.Context()`, and protobuf-aware comparison conventions.
+
+**Organization**: Tasks are grouped by prioritized user story after shared setup and foundations. Constitution 3.3.1 supersedes older direct-CLI examples: every Go development tool is isolated under `tools/<tool>/`, invoked from the repository root with `go tool -modfile=tools/<tool>/go.mod <command>`, and absent from the application `go.mod`.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: Safe to execute in parallel because files do not overlap and prerequisites are complete
+- **[Story]**: User-story traceability label such as `[US1]`
+- Every task names exact repository paths
+- Verification tasks name the command or observable manual journey
+- An unchecked task is not evidence that its command or journey passed
+
+## Phase 1: Setup and Contract Reconciliation
+
+**Purpose**: Reconcile post-plan governance, capture rollback authority, and isolate every Go development tool before runtime migration.
+
+- [ ] T001 Reconcile constitution 3.3.1 tool-module commands and the separately justified lifecycle-phase status delta across `specs/006-wails-v3-migration/spec.md`, `specs/006-wails-v3-migration/plan.md`, `specs/006-wails-v3-migration/research.md`, `specs/006-wails-v3-migration/data-model.md`, `specs/006-wails-v3-migration/contracts/desktop-bridge.md`, `specs/006-wails-v3-migration/contracts/build-package.md`, and `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T002 Create the feature-006 rollback evidence shell with canonical source SHA `f1084b3df8b5630862bdf7a0f347b599156653ef`, empty real-evidence fields, triggers, owner, and cutover expiry in `docs/wails-v3-migration-rollback.md`
+- [ ] T003 [P] Declare exact Wails CLI `v3.0.0-beta.8` as the sole direct tool in `tools/wails/go.mod` and commit its isolated resolution in `tools/wails/go.sum`
+- [ ] T004 [P] Declare exact Buf `v1.72.0` as the sole direct tool in `tools/buf/go.mod` and commit its isolated resolution in `tools/buf/go.sum`
+- [ ] T005 [P] Declare exact `protoc-gen-go` `v1.36.11` as the sole direct tool in `tools/protoc-gen-go/go.mod` and commit its isolated resolution in `tools/protoc-gen-go/go.sum`
+- [ ] T006 [P] Declare exact `protoc-gen-connect-go` `v1.20.0` as the sole direct tool in `tools/protoc-gen-connect-go/go.mod` and commit its isolated resolution in `tools/protoc-gen-connect-go/go.sum`
+- [ ] T007 Remove the root `tool` block and every tool-only dependency/checksum while retaining only application dependencies in `go.mod` and `go.sum`, then prove each `tools/*/go.mod` can resolve without root module drift
+- [ ] T008 Add a deterministic tool-module and forbidden-global-install verifier for `tools/*/go.mod`, root `go.mod`, active scripts, workflows, and docs in `scripts/tool-modules-check.sh`
+
+**Checkpoint**: Rollback source is recorded; design artifacts agree with constitution 3.3.1; every current Go tool has one isolated module; root application module has zero tool declarations or tool-only dependencies.
+
+---
+
+## Phase 2: Foundational Wails v3 Host and Contract Prerequisites
+
+**Purpose**: Establish exact runtime pins, visible build assets, host/service boundaries, and the private runtime-status contract required by all stories.
+
+**⚠️ CRITICAL**: Complete this phase before user-story implementation.
+
+- [ ] T009 Pin `github.com/wailsapp/wails/v3 v3.0.0-beta.8` as an application dependency and exact `@wailsio/runtime` `3.0.0-beta.8` plus its Vite plugin subpath in `go.mod`, `go.sum`, `frontend/package.json`, and `frontend/package-lock.json`
+- [ ] T010 [P] Add beta.8-derived visible build assets with preserved product metadata, macOS 13 arm64 profile, and `build/bin` output in `Taskfile.yml`, `build/config.yml`, `build/Taskfile.yml`, `build/common/Taskfile.yml`, and `build/darwin/Taskfile.yml`
+- [ ] T011 Convert Buf and protobuf generator calls to their isolated module invocations without recursive generation in `scripts/proto-generate.sh`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh`, and `scripts/proto-drift-test.sh`
+- [ ] T012 [P] Add table-driven assertions for isolated tool modules, zero root tool directives, exact Wails pin consistency, Taskfile/config ownership, and one root command in `internal/platform/startup_test.go`
+- [ ] T013 Introduce narrow Wails v3 host capabilities and a dedicated 25-operation forwarding service, keeping core lifecycle methods on an unbound type in `wails_host.go` and `desktop_service.go`
+- [ ] T014 Add reflection/inventory tests proving exactly 25 desktop operations and zero lifecycle/generic/native/player capabilities in `app_contract_test.go`
+- [ ] T015 Add a separately justified private `LifecyclePhase` enum and `RuntimeStatus.phase` field without changing public, persistence, or session contracts in `proto/fallout/terminal/private/v1/runtime.proto`, `proto/schema-revision.txt`, and regenerated `internal/gen/fallout/terminal/private/v1/runtime.pb.go`, then verify compatibility against unchanged `proto/compatibility-baseline.binpb` with `scripts/proto-breaking.sh`
+- [ ] T016 Map internal lifecycle phases through generated private semantics to the detached native runtime-status object in `app.go`, `app_contract.go`, `app_contract_test.go`, and `app_test.go`
+- [ ] T017 Replace v2-specific source assertions with Wails v3 application/service/window/assets seams while retaining master/player separation and resource checks in `internal/platform/assets_test.go` and `production_resources_test.go`
+
+**Checkpoint**: Exact pins resolve reproducibly; root module remains application-only; v3 build/host seams compile; the private lifecycle phase is explicitly governed; the allowlisted service inventory is testable before frontend integration.
+
+---
+
+## Phase 3: User Story 1 — Run the Same Native Master Application (Priority: P1) 🎯 MVP
+
+**Goal**: Launch one accepted native master window and preserve session, player-configuration, dialog, URL, and visible master behavior.
+
+**Independent Test**: On macOS 13+ arm64, launch the candidate, verify the exact one-window properties and dark controls, then create/open/edit/copy/save/reopen representative session-v1 and player-config-v1 files with baseline-compatible results.
+
+### Verification for User Story 1
+
+- [ ] T018 [P] [US1] Add Wails v3 window/options/assets composition tests for one title, size, minimum, background, master filesystem, and macOS last-window behavior in `wails_host_test.go` and `internal/platform/assets_test.go`
+- [ ] T019 [P] [US1] Add injected dialog/browser adapter tests for titles, JSON filters, default paths/filenames, alias policy, directory creation, cancel-as-empty, errors, and HTTP(S)-only URLs in `internal/platform/desktop_test.go`
+
+### Implementation for User Story 1
+
+- [ ] T020 [US1] Replace `wails.Run(options.App)` with Wails v3 application creation, master assets, late service registration, and exactly one accepted window in `main.go` and `wails_host.go`
+- [ ] T021 [US1] Replace Wails v2 global dialog/browser calls with injected Wails v3 managers while preserving defaults, cancellation, validation, and redaction in `internal/platform/desktop.go` and `internal/platform/paths.go`
+- [ ] T022 [US1] Wire every accepted session, player-config, coordination, terminal, hack, demo-copy, save, and URL operation through `desktop_service.go`, `app.go`, and `app_contract.go` without adding authored UI capabilities
+- [ ] T023 [US1] Preserve session-v1/player-config-v1 paths, strictness, unknown-field behavior, explicit demo copy, and newest-revision durability in `app_test.go`, `internal/session/`, `internal/playerconfig/`, and `sessions/demo.json`
+- [ ] T024 [US1] Execute and record the one-window and representative master persistence journey without prechecking results in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: The master application works independently with one window and accepted persistence/native-operation behavior; no Wails v3 product feature has been added.
+
+---
+
+## Phase 4: User Story 2 — Start and Stop Every Owned Runtime Resource Once (Priority: P1)
+
+**Goal**: Preserve bounded, observable startup and reverse, idempotent cleanup across player, tunnel, session worker, desktop adapter, and window triggers.
+
+**Independent Test**: Exercise normal startup, occupied listener, desktop/event failure, tunnel failure/unsafe URL, timeout, partial acquisition, repeated shutdown, window close, Cmd+Q, and development interrupt while verifying status, local fallback, order, deadlines, and zero leaks.
+
+### Verification for User Story 2
+
+- [ ] T025 [P] [US2] Add table-driven lifecycle-host tests for Wails startup abort classification, application-lifetime command context, fresh shutdown context, partial acquisition, and repeated calls in `wails_host_test.go`
+- [ ] T026 [P] [US2] Extend core tests for phase/status publication, tunnel acquired-before-validation ownership, failed first stop retry, reverse cleanup, timeouts, and safe redaction in `app_test.go` and `internal/tunnel/service_test.go`
+
+### Implementation for User Story 2
+
+- [ ] T027 [US2] Implement the Wails v3 lifecycle service with bounded core startup, application-lifetime operation context, and non-aborting handling for status-visible application failures in `wails_host.go` and `app.go`
+- [ ] T028 [US2] Mark tunnel ownership before public-URL validation and preserve local-ready fallback plus retryable cleanup after an invalid or failed tunnel in `app.go` and `internal/tunnel/service.go`
+- [ ] T029 [US2] Implement one fresh five-second background shutdown context and preserve tunnel → player → session worker → desktop cleanup without skipping later resources after errors in `wails_host.go` and `app.go`
+- [ ] T030 [US2] Replace retained v2 startup/DomReady contexts with an application-lifetime event/desktop capability and bounded acquisition children in `main.go`, `app.go`, and `internal/platform/desktop.go`
+- [ ] T031 [US2] Render starting, ready-local, ready-public, and failed status with actionable redacted startup/tunnel errors in `frontend/src/desktop-api.js`, `frontend/src/master.js`, and `frontend/src/master.css`
+- [ ] T032 [US2] Execute and record normal close, Cmd+Q, handled development interrupt, occupied port, tunnel failure, partial startup, and repeated shutdown evidence in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: Each owned resource is acquired/released at most once effectively, application failures are explainable in the master, local mode survives tunnel failure, and cleanup completes within five seconds.
+
+---
+
+## Phase 5: User Story 3 — Keep Browser-Player Gameplay and Privacy Unchanged (Priority: P1)
+
+**Goal**: Preserve the generated ConnectRPC player surface, 4–7-client convergence, reconnect/replay/concurrency behavior, sounds, and private-field isolation.
+
+**Independent Test**: Run four-, five-, six-, and seven-browser generated-player journeys with at least 25 mixed valid/rejected actions, reconnect, replay, slow/overflow streams, and sounds; inspect the listener/bundle for zero Wails/private/legacy exposure.
+
+- [ ] T033 [P] [US3] Strengthen public descriptor, generated-bundle, route, CSP, and forbidden Wails/private/WebSocket surface assertions in `internal/platform/assets_test.go` and `internal/player/server_test.go`
+- [ ] T034 [P] [US3] Extend generated ConnectRPC journeys to explicit 4–7-client mixed actions, reconnect, replay, slow/overflow, sound, and private-field assertions in `tests/browser/connectrpc-player.spec.mjs` and `tests/browser/player-sessions-control.spec.mjs`
+- [ ] T035 [US3] Preserve separate `client/dist` embedding and same-origin generated `PlayerService` serving while adapting only Wails host asset composition in `main.go`, `production_resources.go`, and `internal/player/server.go`
+- [ ] T036 [US3] Run `go test ./internal/player ./internal/control ./internal/live ./internal/hack` and `npm test --prefix tests/browser`, recording actual generated-player results in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T037 [US3] Execute the local 4–7-player parity journey and record credential-gated public behavior as real evidence or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: Browser gameplay remains feature-005-compatible and the public listener exposes exactly the generated player service plus bundled assets, with zero desktop/private capability.
+
+---
+
+## Phase 6: User Story 4 — Preserve the Private Desktop Facade and Events (Priority: P1)
+
+**Goal**: Preserve exact 25-operation semantics and four event payloads/readiness rules behind the runtime-neutral facade, with no lifecycle or privileged fallback exposure.
+
+**Independent Test**: Generate bindings twice, compare inventory/content, exercise every method/result/error/cancel path and all four event races/releases, then scan source and production bundle for required and forbidden surfaces.
+
+### Verification for User Story 4
+
+- [ ] T038 [P] [US4] Add deterministic double-generation, exact method inventory, content comparison, and forbidden lifecycle/native surface checks in `scripts/wails-bindings-check.sh`
+- [ ] T039 [P] [US4] Add browser-level facade tests with structurally test-only generated-service/event doubles for calls, normalization, four events, listener-first snapshot races, release, and hot disposal in `tests/browser/desktop-api.spec.mjs`, `tests/browser/fixtures/desktop-bindings.js`, and `tests/browser/playwright.config.mjs`
+- [ ] T040 [P] [US4] Extend private adapter/event/status tests for lifecycle phase, exact native shapes, detachment, cancellation, errors, and all 25 operations in `app_contract_test.go` and `app_test.go`
+
+### Implementation for User Story 4
+
+- [ ] T041 [US4] Register the exact four typed Wails v3 events and replace retained-context `runtime.EventsEmit` with the injected application event manager in `wails_host.go`, `main.go`, and `app.go`
+- [ ] T042 [US4] Generate the allowlisted service only into `frontend/bindings` and configure the exact official runtime Vite plugin in `build/config.yml` and `frontend/vite.config.js`
+- [ ] T043 [US4] Replace `frontend/wailsjs`, `window.go`, and `window.runtime` discovery with explicit v3 service/runtime imports and production-failing missing-binding behavior in `frontend/src/desktop-api.js`
+- [ ] T044 [US4] Implement all-four-listeners-before-snapshot readiness, per-field newer-event precedence, `.data` unwrapping, local-URL retention, exact-once release, and no DomReady dependency in `frontend/src/desktop-api.js`
+- [ ] T045 [US4] Keep `master.js` on `window.desktopAPI` only, consume governed phase/startup status, and add no `CopyDemo` or generic/native UI capability in `frontend/src/master.js` and `frontend/src/index.html`
+- [ ] T046 [US4] Run the binding/facade/event suites and source/bundle scans, recording exact inventory and readiness evidence in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: The generated service contains exactly 25 accepted operations, the facade preserves native semantics, all four event subscriptions are race-safe, and production contains no lifecycle/global/generic capability.
+
+---
+
+## Phase 7: User Story 5 — Develop and Build Reproducibly from the Repository Root (Priority: P2)
+
+**Goal**: Provide one root development entry and a deterministic nonrecursive protobuf → player → bindings → master → native graph using isolated Go tool modules.
+
+**Independent Test**: From a clean checkout, resolve locked dependencies, run the one root development entry, generate twice, build both frontends directly, build native twice, and observe zero floating resolution, root module drift, stale output, or unexplained tracked diff.
+
+- [ ] T047 [P] [US5] Add Taskfile graph/source tests for isolated tools, protobuf-before-player, bindings-before-master, run-once generation, no recursion, build-asset ownership, and `build/bin` output in `internal/platform/startup_test.go`
+- [ ] T048 [US5] Implement the root `Taskfile.yml` and common build graph so `go tool -modfile=tools/wails/go.mod wails3 dev` owns protobuf verification, `client/` build, binding generation, `frontend/` build, host start, and optional configured tunnel without duplicate generation
+- [ ] T049 [US5] Make locked direct frontend builds compatible with the graph and keep the player independent of Wails in `frontend/package.json`, `frontend/package-lock.json`, `frontend/vite.config.js`, `client/package.json`, `client/package-lock.json`, and `client/vite.config.js`
+- [ ] T050 [US5] Add clean repeated protobuf/binding/frontend/native-build orchestration and tracked-drift checks in `scripts/reproducible-build-check.sh`
+- [ ] T051 [US5] Update `.github/workflows/wails-macos.yml` to resolve every Go tool through `tools/*/go.mod`, cache every module sum, generate bindings before master compilation, and run pin/tool/root-module-drift checks
+- [ ] T052 [US5] Remove direct/global Wails and root-module Go tool instructions from active setup/build documentation in `README.md` and `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T053 [US5] Run both direct locked frontend builds, two clean generations, two clean native builds, and `scripts/tool-modules-check.sh`, recording actual outcomes in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T054 [US5] Launch and stop the complete system once with `go tool -modfile=tools/wails/go.mod wails3 dev`, recording one-command startup and zero post-stop listener/process drift in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: Clean local and CI builds use the same isolated pins and ordered graph; the root application module stays tool-free; one repository-root development entry starts and stops the complete system.
+
+---
+
+## Phase 8: User Story 6 — Package a Self-Contained Personal-Use macOS App (Priority: P2)
+
+**Goal**: Produce a final ad-hoc-signed macOS 13+ arm64 app at `build/bin/Fallout Terminal.app` with all resources inserted before signing and no runtime developer/network dependency.
+
+**Independent Test**: Package from clean source, inspect architecture/metadata/entitlements/icon/resources/signature, disconnect external networking, launch one app/listener, run master/local-player smoke, and quit with zero owned resources.
+
+- [ ] T055 [P] [US6] Add package/resource/sign-order/output/deployment-target assertions in `production_resources_test.go`, `internal/platform/assets_test.go`, and `internal/platform/startup_test.go`
+- [ ] T056 [US6] Customize Darwin assembly to copy `sessions/demo.json` and every non-embedded resource before final ad-hoc signing while preserving plist, entitlements, icon, macOS 13, arm64, and `build/bin` in `build/darwin/Taskfile.yml`, `build/darwin/Info.plist`, `build/darwin/Info.dev.plist`, and `build/darwin/entitlements.plist`
+- [ ] T057 [US6] Preserve/test `Contents/Resources` resolution and remove `production_resources_bindings.go` only after clean v3 generation/package proof, otherwise document and narrow it in `internal/platform/paths.go`, `production_resources.go`, `production_resources_bindings.go`, and `production_resources_test.go`
+- [ ] T058 [US6] Add final-bundle architecture, plist, minimum OS, entitlements, icon, resource, signature, offline-assets, and mutation-order verification in `scripts/verify-macos-app.sh`
+- [ ] T059 [US6] Adapt the proven Developer ID/notary/staple/DMG/Gatekeeper pipeline to the isolated pinned Wails tool without weakening preflight, redaction, or SHA-256 behavior in `scripts/build-macos.sh`
+- [ ] T060 [US6] Package and inspect the arm64 personal-use app through isolated Wails tooling and upload the established path in `.github/workflows/wails-macos.yml`
+- [ ] T061 [US6] Execute the offline personal-use package launch, one-listener master/player smoke, and clean quit; record conditional public trust gates as real results or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: The final app is complete before signing, valid for the personal-use profile, launches offline from the established path, and cleans up owned runtime resources.
+
+---
+
+## Phase 9: User Story 7 — Cut Over Safely with Immutable Wails v2 Rollback (Priority: P2)
+
+**Goal**: Prove rollback without data conversion, complete parity/soak evidence, and remove every active Wails v2 path only after required gates pass.
+
+**Independent Test**: Verify the canonical v2 SHA, use safety copies for an actual rollback source/artifact journey, restore unchanged version-1 data, then scan final source/dependencies/bindings/bundle/docs for zero active v2 or dual-runtime path.
+
+- [ ] T062 [P] [US7] Add source rollback identity, optional-artifact evidence discipline, data safety, triggers, drill, and historical-document separation assertions in `internal/platform/startup_test.go` and `internal/platform/assets_test.go`
+- [ ] T063 [P] [US7] Add comprehensive active-v2, dual-runtime, floating-tool, generated-global, dependency, bundle, CI/script, and documentation scans in `scripts/wails-v3-cutover-check.sh`
+- [ ] T064 [US7] Complete actual candidate identity, rollback procedure, safety-copy steps, owner/expiry, trigger table, and evidence fields without inventing a v2 artifact hash in `docs/wails-v3-migration-rollback.md`
+- [ ] T065 [US7] Mark active v2 guidance historical/superseded while preserving completed specifications and the Electron→Wails v2 record in `README.md`, `docs/wails-migration-rollback.md`, and links under `specs/001-wails-v2-migration/`
+- [ ] T066 [US7] After every required parity/package/rollback gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
+- [ ] T067 [US7] Perform the source or genuinely accepted-artifact rollback drill with safety copies and record actual version-1 master/player results in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T068 [US7] Run the representative long local master/player soak and the authenticated-ngrok soak only when real credentials/connectivity exist, recording `PASS`, `FAIL`, or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T069 [US7] Rebuild and rerun all required gates after v2 removal, attach final cutover scan/package evidence, and mark Wails v3 accepted only if every required profile gate passes in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
+
+**Checkpoint**: Rollback is real and data-compatible; final accepted source has zero active Wails v2 path or permanent switch; unavailable external checks are never represented as passes.
+
+---
+
+## Phase 10: Cross-Cutting Verification and Polish
+
+**Purpose**: Run the complete matrix against the final cutover source and reconcile all evidence without weakening existing assertions.
+
+- [ ] T070 [P] Run `gofmt -l .`, `go vet ./...`, and `go test ./...`, fixing only migration-caused failures in `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, and affected packages under `internal/`
+- [ ] T071 [P] Run `go test -race ./...` and resolve migration-caused lifecycle, stream, session-worker, event, or process ownership races in `app.go`, `wails_host.go`, `internal/player/`, `internal/session/`, `internal/tunnel/`, and `internal/platform/`
+- [ ] T072 [P] Run isolated Buf format/lint/build/generation, `scripts/proto-drift-test.sh`, `scripts/proto-breaking.sh --all-fixtures`, graph-isolation checks, and `git diff --exit-code -- internal/gen client/gen`
+- [ ] T073 [P] Run locked clean installs and production builds for `frontend/` and `client/`, then verify no CDN/runtime download, v2 global, private generated JavaScript, or privileged fallback in `frontend/dist/` and `client/dist/`
+- [ ] T074 [P] Run the complete Playwright suite in `tests/browser/` and preserve all feature-005 multi-client, authority, replay, reconnect, overflow, sound, and privacy assertions
+- [ ] T075 Run two clean Wails binding generations plus `scripts/wails-bindings-check.sh`, `scripts/tool-modules-check.sh`, and `scripts/reproducible-build-check.sh`, leaving zero unexplained tracked or root-module drift
+- [ ] T076 Run the final personal-use macOS arm64 package plus `scripts/verify-macos-app.sh` and `scripts/wails-v3-cutover-check.sh`, then repeat offline launch/one-listener/clean-quit smoke against `build/bin/Fallout Terminal.app`
+- [ ] T077 Run credential-gated ngrok and `scripts/build-macos.sh` Developer ID/notary/staple/DMG/Gatekeeper gates only with real prerequisites; otherwise record each as `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T078 Reconcile candidate SHA, exact pins, commands, automated/manual results, `NOT RUN` reasons, artifact digests, soak, rollback, and cutover status across `README.md`, `specs/006-wails-v3-migration/quickstart.md`, and `docs/wails-v3-migration-rollback.md`
+
+**Checkpoint**: Every required gate is tied to one final source/pin set; conditional evidence is honest; no test or contract assertion was weakened to obtain acceptance.
+
+---
+
+## Dependencies and Execution Order
+
+### Phase dependencies
+
+```text
+Phase 1 Setup / artifact reconciliation
+                │
+                ▼
+Phase 2 isolated pins + host/service/status foundation
+                │
+       ┌────────┼───────────┐
+       ▼        ▼           ▼
+     US1      US2         US4
+       │        │           │
+       └────────┴─────┬─────┘
+                      ▼
+                    US3 parity
+                      │
+                      ▼
+                 US5 build graph
+                      │
+                      ▼
+                  US6 package
+                      │
+                      ▼
+              US7 rollback/cutover
+                      │
+                      ▼
+             Cross-cutting final matrix
+```
+
+- Phase 1 blocks all implementation because current artifacts and root tooling predate constitution 3.3.1.
+- Phase 2 blocks all stories because every v3 slice needs exact runtime/tool pins, host seams, service inventory, and governed runtime status.
+- US1, US2, and US4 may advance as coordinated P1 work after Phase 2, but tasks touching `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, or `desktop-api.js` remain sequential.
+- US3 can run its test expansion in parallel, but final parity waits for the master host/lifecycle/bridge P1 slices.
+- US5 requires stable P1 host/binding behavior; US6 requires the stable build graph; US7 requires all parity and personal-package gates.
+- Final cross-cutting verification runs only after the cutover candidate contains no active v2 implementation.
+
+### User-story completion order
+
+| Story | Depends on | Independently complete when |
+|---|---|---|
+| US1 — native master | Phase 2; coordinated minimal bridge from US4 | one window and representative persistence/native workflows match baseline |
+| US2 — lifecycle ownership | Phase 2 | normal/failure/partial/repeat triggers publish actionable status and clean resources within five seconds |
+| US3 — player parity | Phase 2; final run after US1/US2/US4 | 4–7 generated-player journeys converge and expose no private/Wails/legacy surface |
+| US4 — bridge/events | Phase 2 | exact 25 methods/four events pass generation, shape, race, release, and forbidden-surface checks |
+| US5 — reproducible development | US1–US4 stable | isolated tools and one ordered root graph produce repeatable clean generations/builds |
+| US6 — personal package | US5 | final pre-sign resource inventory and ad-hoc arm64 app pass offline smoke |
+| US7 — rollback/cutover | US1–US6 | rollback drill and soak are recorded, then final source scans contain zero active v2/dual path |
+
+## Parallel Opportunities
+
+### Setup/foundation
+
+- T003–T006 can create independent tool modules in parallel after T001 fixes the command contract.
+- T010, T012, and T014 touch independent build/test files after exact pins are known.
+
+### User Story 1
+
+- T018 window/assets tests and T019 platform adapter tests can run in parallel before T020–T022.
+
+### User Story 2
+
+- T025 host lifecycle tests and T026 core/tunnel tests can run in parallel before lifecycle implementation.
+
+### User Story 3
+
+- T033 Go/source isolation assertions and T034 Playwright expansion can run in parallel.
+
+### User Story 4
+
+- T038 binding checks, T039 browser facade tests, and T040 Go adapter tests can run in parallel before T041–T045.
+
+### User Stories 5–7
+
+- T047 build-graph tests can precede graph implementation while documentation work stays sequential with final commands.
+- T055 package tests can run independently before Darwin task changes.
+- T062 rollback assertions and T063 cutover scanner can run in parallel before final removal.
+
+### Final verification
+
+- T070–T074 can run in parallel on a frozen candidate; T075–T078 consume their results sequentially.
+
+## Implementation Strategy
+
+### MVP first
+
+1. Complete Phase 1 so tool isolation and design contracts are consistent.
+2. Complete Phase 2 so the host, exact service surface, status phase, and build skeleton compile.
+3. Complete the US1 master slice, coordinating only the minimum US4 generated binding needed for its independent journey.
+4. Do not designate the MVP production-ready; Wails v2 remains fallback until every P1, package, soak, and rollback gate passes.
+
+### Incremental delivery
+
+1. Prove master behavior (US1), lifecycle ownership (US2), player parity (US3), and bridge/events (US4) as attributable P1 checkpoints.
+2. Freeze those behaviors before completing deterministic build orchestration (US5).
+3. Package and inspect the personal-use app (US6) without invoking unavailable public trust gates.
+4. Perform rollback/soak, remove v2, rebuild, and cut over only after the complete required matrix passes (US7).
+
+## Notes
+
+- Constitution 3.3.1 overrides every older `go install`, global binary, root `tool` block, or direct `wails3` example in feature artifacts.
+- The lifecycle phase addition is an application-owned private runtime-status semantic delta justified by FR-009; it MUST remain private and MUST NOT change domain, public player, session-v1, or player-config-v1 models.
+- Do not opportunistically upgrade the Wails v2 fallback before it is recorded and retired.
+- Do not edit generated protobuf or Wails binding output manually.
+- Do not remove `production_resources_bindings.go` until clean v3 evidence proves it obsolete.
+- Do not mutate an application bundle after its final signature.
+- Do not claim formatting, vet, test, race, browser, CI, packaging, soak, rollback, ngrok, or public-release success unless the command or journey actually ran.
+- Record unavailable credentials, connectivity, native UI access, or release services as `NOT RUN`, never `PASS`.
