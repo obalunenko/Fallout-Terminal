@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package fallout.terminal.player.v1;
+
+import "fallout/terminal/player/v1/hacking.proto";
+import "fallout/terminal/player/v1/navigation.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
+
+message ContentFolder {
+  repeated ContentNode children = 1;
+}
+
+message ContentCommand {
+  string text = 1;
+}
+
+message ContentEntry {
+  string description = 1;
+}
+
+message ContentNode {
+  string id = 1;
+  string name = 2;
+  oneof content {
+    ContentFolder folder = 3;
+    ContentCommand command = 4;
+    ContentEntry entry = 5;
+  }
+}
+
+message LiveTerminal {
+  string terminal_id = 1;
+  string terminal_name = 2;
+  ContentNode tree = 3;
+  int32 hack_level = 4;
+  string intro_text = 5;
+  NavigationState navigation = 6;
+  PublicHackState hacking = 7;
+}
+
+message NoLiveTerminal {}
+
+message TerminalPresentation {
+  oneof presentation {
+    LiveTerminal live_terminal = 1;
+    NoLiveTerminal no_live_terminal = 2;
+  }
+}

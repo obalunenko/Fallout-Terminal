@@ -1,5 +1,10 @@
 # Data Model: Wails v2 Runtime Migration
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 ## Modeling principles
 
 - Durable session data and runtime live data are different aggregate roots.

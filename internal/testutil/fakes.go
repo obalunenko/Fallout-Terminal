@@ -534,6 +534,106 @@ type FakeOpaqueIDSource struct {
 	next   int
 }
 
+// FakeRandom returns a caller-supplied deterministic integer sequence and
+// records every limit so rejected paths can prove they consumed no randomness.
+type FakeRandom struct {
+	mu sync.Mutex
+
+	values []int
+	next   int
+	limits []int
+}
+
+// NewFakeRandom returns a deterministic random source.
+func NewFakeRandom(values ...int) *FakeRandom {
+	return &FakeRandom{values: append([]int(nil), values...)}
+}
+
+// Intn returns the next configured value reduced to limit.
+func (r *FakeRandom) Intn(limit int) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.limits = append(r.limits, limit)
+	if limit <= 1 {
+		return 0
+	}
+	if r.next >= len(r.values) {
+		panic("testutil: fake random source exhausted")
+	}
+	value := r.values[r.next]
+	r.next++
+	if value < 0 {
+		value = -value
+	}
+	return value % limit
+}
+
+// Calls returns the number of random draws.
+func (r *FakeRandom) Calls() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.limits)
+}
+
+// Limits returns each requested random bound in order.
+func (r *FakeRandom) Limits() []int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]int(nil), r.limits...)
+}
+
+// FakeCanonicalInvoker records structurally valid requests that reached an
+// application adapter and returns a configured result.
+type FakeCanonicalInvoker[Request, Response any] struct {
+	mu sync.Mutex
+
+	Response Response
+	Err      error
+	requests []Request
+}
+
+// Invoke records request and returns the configured response.
+func (s *FakeCanonicalInvoker[Request, Response]) Invoke(_ context.Context, request Request) (Response, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requests = append(s.requests, request)
+	return s.Response, s.Err
+}
+
+// Requests returns all canonical invocations in order.
+func (s *FakeCanonicalInvoker[Request, Response]) Requests() []Request {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Request(nil), s.requests...)
+}
+
+// FakeStreamSink records detached stream values and can deterministically
+// reject an offer after a configured count.
+type FakeStreamSink[Message any] struct {
+	mu sync.Mutex
+
+	RejectAfter int
+	values      []Message
+}
+
+// Offer records value unless the configured bound has been reached.
+func (s *FakeStreamSink[Message]) Offer(value Message) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.RejectAfter > 0 && len(s.values) >= s.RejectAfter {
+		return false
+	}
+	s.values = append(s.values, value)
+	return true
+}
+
+// Values returns all accepted stream values in order.
+func (s *FakeStreamSink[Message]) Values() []Message {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Message(nil), s.values...)
+}
+
 // NewFakeOpaqueIDSource returns an ID source that yields values in order.
 func NewFakeOpaqueIDSource(values ...string) *FakeOpaqueIDSource {
 	return &FakeOpaqueIDSource{values: append([]string(nil), values...)}

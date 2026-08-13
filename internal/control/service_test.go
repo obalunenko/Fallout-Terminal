@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -12,16 +11,145 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/obalunenko/Fallout-Terminal/internal/hack"
 	"github.com/obalunenko/Fallout-Terminal/internal/live"
 	"github.com/obalunenko/Fallout-Terminal/internal/nav"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // These tests intentionally exercise the package-private transaction seam.
 // Story commands build on this seam, while commit remains the single place
 // that assigns revisions, detaches effects, and orders their publication.
+
+func TestAttachSubscriptionCreatesCompleteSnapshotAndSelectionCommitsOnce(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	require.NoError(t, err)
+	_, err = service.StartBroadcast()
+	require.NoError(t, err)
+
+	snapshot, err := service.AttachSubscription("stream-1", nil)
+	require.NoError(t, err)
+	require.Equal(t, domain.RecognitionHandle("recognition-1"), snapshot.RecognitionHandle)
+	require.Equal(t, domain.LogicalSessionID("session-1"), snapshot.PlayerState.SessionID)
+	require.True(t, snapshot.Terminal.NoLiveTerminal)
+	require.Nil(t, snapshot.Terminal.Live)
+	require.Equal(t, snapshot.Revision, snapshot.PlayerState.Revision)
+	require.Equal(t, 1, service.ActiveStreamCount())
+
+	beforeSelection := service.Revision()
+	result := service.SelectCharacterForRecognition(snapshot.RecognitionHandle, domain.RequestID("request-1"), domain.BroadcastID("broadcast-1"), domain.CharacterID("character-1"))
+	require.True(t, result.Accepted)
+	require.Equal(t, domain.ActionReasonAccepted, result.Reason)
+	require.Equal(t, beforeSelection+1, result.Revision)
+	require.Equal(t, result.Revision, service.Revision())
+}
+
+func TestAttachSubscriptionRegistrationIsOrderedBeforeConcurrentMutation(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("session-1", "recognition-1", "character-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+
+	registrationEntered := make(chan struct{})
+	releaseRegistration := make(chan struct{})
+	attachDone := make(chan *domain.PersonalizedSnapshot, 1)
+	go func() {
+		snapshot, err := service.AttachSubscriptionAndRegister("stream-1", nil, func(registered *domain.PersonalizedSnapshot) {
+			close(registrationEntered)
+			<-releaseRegistration
+			require.NotNil(t, registered)
+		})
+		require.NoError(t, err)
+		attachDone <- snapshot
+	}()
+
+	<-registrationEntered
+	mutationDone := make(chan struct{})
+	go func() {
+		_, err := service.AddCharacter("Lucy")
+		require.NoError(t, err)
+		close(mutationDone)
+	}()
+	select {
+	case <-mutationDone:
+		assert.FailNow(t, "mutation crossed the subscription registration boundary")
+	case <-time.After(20 * time.Millisecond):
+	}
+
+	close(releaseRegistration)
+	snapshot := <-attachDone
+	<-mutationDone
+	require.Equal(t, uint64(1), snapshot.Revision)
+	require.Equal(t, uint64(2), service.Revision())
+
+	var revisionTwoUpdates int
+	for _, effect := range effects.Values() {
+		if effect.Update != nil && effect.Update.Revision == 2 && effect.SessionID == snapshot.PlayerState.SessionID {
+			revisionTwoUpdates++
+		}
+	}
+	require.Equal(t, 1, revisionTwoUpdates, "the first post-snapshot revision must be offered exactly once")
+}
+
+func TestAcceptedMutationPublishesOnePreassembledUpdatePerSessionBeforeReturn(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("session-1", "recognition-1", "session-2", "recognition-2", "character-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+	first, err := service.AttachSubscription("stream-1", nil)
+	require.NoError(t, err)
+	second, err := service.AttachSubscription("stream-2", nil)
+	require.NoError(t, err)
+	baseline := effects.Calls()
+
+	state, err := service.AddCharacter("Lucy")
+	require.NoError(t, err)
+	require.Equal(t, service.Revision(), state.Revision)
+
+	updates := make(map[domain.LogicalSessionID]int)
+	for _, effect := range effects.Values()[baseline:] {
+		if effect.Update == nil {
+			continue
+		}
+		require.Equal(t, state.Revision, effect.Update.Revision)
+		updates[effect.SessionID]++
+	}
+	require.Equal(t, map[domain.LogicalSessionID]int{
+		first.PlayerState.SessionID:  1,
+		second.PlayerState.SessionID: 1,
+	}, updates)
+}
+
+func TestUnassignedSubscriptionCannotMutateSharedTerminalState(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	require.NoError(t, err)
+	_, err = service.StartBroadcast()
+	require.NoError(t, err)
+	snapshot, err := service.AttachSubscription("stream-1", nil)
+	require.NoError(t, err)
+
+	before := service.Revision()
+	service.DispatchPlayerAction("stream-1", domain.RuntimeCommand{
+		RequestID: "request-unauthorized", BroadcastID: "broadcast-1", TerminalID: "terminal-1",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.Equal(t, before, service.Revision())
+	values := effects.Values()
+	require.NotEmpty(t, values)
+	last := values[len(values)-1]
+	require.NotNil(t, last.Result)
+	require.Equal(t, domain.ActionReasonUnassigned, last.Result.Reason)
+	require.False(t, last.Result.Accepted)
+	require.Equal(t, snapshot.PlayerState.SessionID, last.SessionID)
+}
 
 func TestServiceUsesInjectedOpaqueIDSourceDeterministically(t *testing.T) {
 	ids := &sequenceIDSource{values: []string{
@@ -32,9 +160,12 @@ func TestServiceUsesInjectedOpaqueIDSourceDeterministically(t *testing.T) {
 	service := New(Config{IDs: ids})
 
 	for index, want := range ids.values {
-		if got := service.nextID(); got != want {
-			t.Fatalf("nextID() call %d = %q, want injected opaque value %q", index+1, got, want)
+		{
+			got := service.nextID()
+			require.Falsef(t, got != want,
+				"nextID() call %d = %q, want injected opaque value %q", index+1, got, want)
 		}
+
 	}
 }
 
@@ -53,25 +184,21 @@ func TestCommitAdvancesRevisionOnlyForAcceptedTransitions(t *testing.T) {
 	second := service.commit(func(*domain.ProcessRuntime) transition {
 		return transition{accepted: true, effects: []Effect{{Live: testLiveState("second")}}}
 	})
-
-	if !first.accepted || first.revision != 1 {
-		t.Fatalf("first commit = %#v, want accepted revision 1", first)
-	}
-	if rejected.accepted || rejected.revision != 1 {
-		t.Fatalf("rejected commit = %#v, want rejected at unchanged revision 1", rejected)
-	}
-	if !second.accepted || second.revision != 2 {
-		t.Fatalf("second commit = %#v, want accepted revision 2", second)
-	}
+	require.Falsef(t, !first.accepted || first.revision != 1,
+		"first commit = %#v, want accepted revision 1", first)
+	require.Falsef(t, rejected.accepted || rejected.revision != 1,
+		"rejected commit = %#v, want rejected at unchanged revision 1", rejected)
+	require.Falsef(t, !second.accepted || second.revision != 2,
+		"second commit = %#v, want accepted revision 2", second)
 
 	wantRevisions := []uint64{1, 1, 2}
 	gotRevisions := make([]uint64, 0, len(effects))
 	for _, effect := range effects {
 		gotRevisions = append(gotRevisions, effect.Revision)
 	}
-	if !reflect.DeepEqual(gotRevisions, wantRevisions) {
-		t.Fatalf("effect revisions = %v, want %v", gotRevisions, wantRevisions)
-	}
+	require.Falsef(t, !cmp.Equal(gotRevisions, wantRevisions),
+		"effect revisions = %v, want %v", gotRevisions, wantRevisions)
+
 }
 
 func TestCommitDetachesEffectsBeforeEnqueue(t *testing.T) {
@@ -84,23 +211,21 @@ func TestCommitDetachesEffectsBeforeEnqueue(t *testing.T) {
 	result := service.commit(func(*domain.ProcessRuntime) transition {
 		return transition{accepted: true, effects: []Effect{produced}}
 	})
-	if !result.accepted || result.revision != 1 {
-		t.Fatalf("commit() = %#v, want accepted revision 1", result)
-	}
+	require.Falsef(t, !result.accepted || result.revision != 1,
+		"commit() = %#v, want accepted revision 1", result)
 
 	produced.Live.TerminalName = "mutated producer"
 	produced.Live.Tree.Children[0].Name = "mutated child"
 	produced.Live.Nav.Path[0] = "mutated path"
 	produced.Live.Hack.Log[0] = "mutated log"
 	produced.Live.Hack.Columns[0].Words[0].ID = "mutated word"
+	require.Falsef(t, enqueued.Revision != 1,
+		"enqueued revision = %d, want 1", enqueued.Revision)
 
-	if enqueued.Revision != 1 {
-		t.Fatalf("enqueued revision = %d, want 1", enqueued.Revision)
-	}
 	want := testLiveState("canonical")
-	if !reflect.DeepEqual(enqueued.Live, want) {
-		t.Fatalf("enqueued effect aliases its producer\ngot:  %#v\nwant: %#v", enqueued.Live, want)
-	}
+	require.Falsef(t, !cmp.Equal(enqueued.Live, want),
+		"enqueued effect aliases its producer\ngot:  %#v\nwant: %#v", enqueued.Live, want)
+
 }
 
 func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
@@ -132,7 +257,7 @@ func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
 	select {
 	case <-firstEnqueueStarted:
 	case <-time.After(time.Second):
-		t.Fatal("first effect was not enqueued")
+		assert.FailNow(t, "first effect was not enqueued")
 	}
 
 	secondDone := make(chan struct{})
@@ -145,7 +270,7 @@ func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
 
 	select {
 	case <-secondDone:
-		t.Fatal("second transition committed while the first effect enqueue still held the transaction boundary")
+		assert.FailNow(t, "second transition committed while the first effect enqueue still held the transaction boundary")
 	case <-time.After(50 * time.Millisecond):
 	}
 
@@ -153,88 +278,89 @@ func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
 	select {
 	case <-firstDone:
 	case <-time.After(time.Second):
-		t.Fatal("first transition did not finish after its enqueue was released")
+		assert.FailNow(t, "first transition did not finish after its enqueue was released")
 	}
 	select {
 	case <-secondDone:
 	case <-time.After(time.Second):
-		t.Fatal("second transition did not finish after the first transaction unlocked")
+		assert.FailNow(t, "second transition did not finish after the first transaction unlocked")
 	}
 
 	mu.Lock()
 	got := append([]uint64(nil), revisions...)
 	mu.Unlock()
-	if want := []uint64{1, 2}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("enqueued revisions = %v, want %v", got, want)
+	{
+		want := []uint64{1, 2}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"enqueued revisions = %v, want %v", got, want)
 	}
+
 }
 
 func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 	service := newUS1Service()
 
 	state, err := service.AddCharacter("Mara")
-	if err != nil {
-		t.Fatalf("AddCharacter(Mara) error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"AddCharacter(Mara) error = %v", err)
+
 	state, err = service.AddCharacter("Boone")
-	if err != nil {
-		t.Fatalf("AddCharacter(Boone) error = %v", err)
-	}
-	if len(state.Roster) != 2 || state.Roster[0].Name != "Mara" || state.Roster[1].Name != "Boone" {
-		t.Fatalf("roster after creation = %#v, want Mara then Boone", state.Roster)
-	}
-	if state.Roster[0].ID == "" || state.Roster[1].ID == "" || state.Roster[0].ID == state.Roster[1].ID {
-		t.Fatalf("roster IDs are not distinct opaque values: %#v", state.Roster)
-	}
+	require.Falsef(t, err != nil,
+		"AddCharacter(Boone) error = %v", err)
+	require.Falsef(t, len(state.Roster) != 2 || state.Roster[0].Name != "Mara" || state.Roster[1].Name != "Boone",
+		"roster after creation = %#v, want Mara then Boone", state.Roster)
+	require.Falsef(t, state.Roster[0].ID == "" || state.Roster[1].ID == "" || state.Roster[0].ID == state.Roster[1].ID,
+		"roster IDs are not distinct opaque values: %#v", state.Roster)
 
 	state, err = service.StartBroadcast()
-	if err != nil {
-		t.Fatalf("StartBroadcast() error = %v", err)
-	}
-	if state.Broadcast == nil || state.Broadcast.ID == "" || state.Broadcast.ControllerSessionID != nil {
-		t.Fatalf("fresh broadcast = %#v, want new ID with no controller", state.Broadcast)
-	}
+	require.Falsef(t, err != nil,
+		"StartBroadcast() error = %v", err)
+	require.Falsef(t, state.Broadcast == nil || state.Broadcast.ID == "" || state.Broadcast.ControllerSessionID != nil,
+		"fresh broadcast = %#v, want new ID with no controller", state.Broadcast)
+
 	for _, character := range state.Roster {
-		if character.ClaimedBySessionID != nil {
-			t.Fatalf("fresh broadcast retained claim %#v", character)
-		}
+		require.Falsef(t, character.ClaimedBySessionID != nil,
+			"fresh broadcast retained claim %#v", character)
+
 	}
 
 	identity := service.CreateSession(domain.ConnectionID("connection-1"))
-	if identity.SessionID == "" || identity.BrowserToken == "" || identity.State == nil || identity.State.FallbackName == "" {
-		t.Fatalf("CreateSession() = %#v, want opaque identity, token, and fallback state", identity)
-	}
+	require.Falsef(t, identity.SessionID == "" || identity.BrowserToken == "" || identity.State == nil || identity.State.FallbackName == "",
+		"CreateSession() = %#v, want opaque identity, token, and fallback state", identity)
+
 	result := service.SelectCharacter(CharacterSelection{
 		SessionID:   identity.SessionID,
 		RequestID:   "select-1",
 		BroadcastID: state.Broadcast.ID,
 		CharacterID: state.Roster[0].ID,
 	})
-	if !result.Accepted {
-		t.Fatalf("fresh SelectCharacter() = %#v, want accepted", result)
-	}
+	require.Falsef(t, !result.Accepted,
+		"fresh SelectCharacter() = %#v, want accepted", result)
 
 	selected := service.Snapshot()
-	if selected.Broadcast == nil || selected.Broadcast.ControllerSessionID == nil || *selected.Broadcast.ControllerSessionID != identity.SessionID {
-		t.Fatalf("initial controller = %#v, want %q", selected.Broadcast, identity.SessionID)
-	}
+	require.Falsef(t, selected.Broadcast == nil || selected.Broadcast.ControllerSessionID == nil || *selected.Broadcast.ControllerSessionID != identity.SessionID,
+		"initial controller = %#v, want %q", selected.Broadcast, identity.SessionID)
+
 	assertExclusiveClaimInvariants(t, selected)
-	if got := masterSession(t, selected, identity.SessionID); got.Role != domain.PlayerRoleActive || got.Character == nil || got.Character.ID != state.Roster[0].ID {
-		t.Fatalf("selected session = %#v, want active Mara assignment", got)
+	{
+		got := masterSession(t, selected, identity.SessionID)
+		require.Falsef(t, got.Role != domain.PlayerRoleActive || got.Character == nil || got.Character.ID != state.Roster[0].ID,
+			"selected session = %#v, want active Mara assignment", got)
 	}
+
 }
 
 func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testing.T) {
 	for trial := 0; trial < 100; trial++ {
 		service := newUS1Service()
 		state, err := service.AddCharacter("Mara")
-		if err != nil {
-			t.Fatalf("trial %d AddCharacter() error = %v", trial, err)
-		}
+		require.Falsef(t, err != nil,
+			"trial %d AddCharacter() error = %v", trial, err)
+
 		state, err = service.StartBroadcast()
-		if err != nil {
-			t.Fatalf("trial %d StartBroadcast() error = %v", trial, err)
-		}
+		require.Falsef(t, err != nil,
+			"trial %d StartBroadcast() error = %v", trial, err)
+
 		first := service.CreateSession(domain.ConnectionID(fmt.Sprintf("trial-%d-first", trial)))
 		second := service.CreateSession(domain.ConnectionID(fmt.Sprintf("trial-%d-second", trial)))
 		selection := func(identity SessionIdentity, requestID string) domain.ActionResult {
@@ -265,14 +391,14 @@ func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testi
 				accepted++
 			}
 		}
-		if accepted != 1 {
-			t.Fatalf("trial %d accepted claims = %d, want exactly 1", trial, accepted)
-		}
+		require.Falsef(t, accepted != 1,
+			"trial %d accepted claims = %d, want exactly 1", trial, accepted)
+
 		snapshot := service.Snapshot()
 		assertExclusiveClaimInvariants(t, snapshot)
-		if claimedRosterCount(snapshot) != 1 || activeSessionCount(snapshot) != 1 {
-			t.Fatalf("trial %d state = %#v, want one claim and one controller", trial, snapshot)
-		}
+		require.Falsef(t, claimedRosterCount(snapshot) != 1 || activeSessionCount(snapshot) != 1,
+			"trial %d state = %#v, want one claim and one controller", trial, snapshot)
+
 	}
 }
 
@@ -280,17 +406,17 @@ func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100T
 	for trial := 0; trial < 100; trial++ {
 		service := newUS1Service()
 		state, err := service.AddCharacter("Mara")
-		if err != nil {
-			t.Fatalf("trial %d AddCharacter(Mara) error = %v", trial, err)
-		}
+		require.Falsef(t, err != nil,
+			"trial %d AddCharacter(Mara) error = %v", trial, err)
+
 		state, err = service.AddCharacter("Boone")
-		if err != nil {
-			t.Fatalf("trial %d AddCharacter(Boone) error = %v", trial, err)
-		}
+		require.Falsef(t, err != nil,
+			"trial %d AddCharacter(Boone) error = %v", trial, err)
+
 		state, err = service.StartBroadcast()
-		if err != nil {
-			t.Fatalf("trial %d StartBroadcast() error = %v", trial, err)
-		}
+		require.Falsef(t, err != nil,
+			"trial %d StartBroadcast() error = %v", trial, err)
+
 		first := service.CreateSession(domain.ConnectionID(fmt.Sprintf("trial-%d-first", trial)))
 		second := service.CreateSession(domain.ConnectionID(fmt.Sprintf("trial-%d-second", trial)))
 
@@ -316,15 +442,15 @@ func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100T
 		close(results)
 
 		for result := range results {
-			if !result.Accepted {
-				t.Fatalf("trial %d different-character selection rejected: %#v", trial, result)
-			}
+			require.Falsef(t, !result.Accepted,
+				"trial %d different-character selection rejected: %#v", trial, result)
+
 		}
 		snapshot := service.Snapshot()
 		assertExclusiveClaimInvariants(t, snapshot)
-		if claimedRosterCount(snapshot) != 2 || activeSessionCount(snapshot) != 1 || observerSessionCount(snapshot) != 1 {
-			t.Fatalf("trial %d roles/claims = %#v, want two claims with one active and one observer", trial, snapshot)
-		}
+		require.Falsef(t, claimedRosterCount(snapshot) != 2 || activeSessionCount(snapshot) != 1 || observerSessionCount(snapshot) != 1,
+			"trial %d roles/claims = %#v, want two claims with one active and one observer", trial, snapshot)
+
 	}
 }
 
@@ -332,43 +458,51 @@ func TestSessionCannotClaimTwoCharactersAndCharacterCannotHaveTwoSessions(t *tes
 	service := newUS1Service()
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.AddCharacter("Boone")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	first := service.CreateSession("connection-first")
 	second := service.CreateSession("connection-second")
+	{
 
-	if result := service.SelectCharacter(CharacterSelection{
-		SessionID: first.SessionID, RequestID: "first-mara",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); !result.Accepted {
-		t.Fatalf("first claim = %#v, want accepted", result)
+		result := service.SelectCharacter(CharacterSelection{
+			SessionID: first.SessionID, RequestID: "first-mara",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"first claim = %#v, want accepted", result)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		SessionID: first.SessionID, RequestID: "first-boone",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[1].ID,
-	}); result.Accepted {
-		t.Fatalf("same session second claim = %#v, want rejected", result)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			SessionID: first.SessionID, RequestID: "first-boone",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[1].ID,
+		})
+		require.Falsef(t, result.Accepted,
+			"same session second claim = %#v, want rejected", result)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		SessionID: second.SessionID, RequestID: "second-mara",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); result.Accepted {
-		t.Fatalf("same character second session claim = %#v, want rejected", result)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			SessionID: second.SessionID, RequestID: "second-mara",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, result.Accepted,
+			"same character second session claim = %#v, want rejected", result)
 	}
 
 	snapshot := service.Snapshot()
 	assertExclusiveClaimInvariants(t, snapshot)
-	if claimedRosterCount(snapshot) != 1 || masterSession(t, snapshot, first.SessionID).Character.ID != state.Roster[0].ID || masterSession(t, snapshot, second.SessionID).Character != nil {
-		t.Fatalf("rejected claims changed assignments: %#v", snapshot)
-	}
+	require.Falsef(t, claimedRosterCount(snapshot) != 1 || masterSession(t, snapshot, first.SessionID).Character.ID != state.Roster[0].ID || masterSession(t, snapshot, second.SessionID).Character != nil,
+		"rejected claims changed assignments: %#v", snapshot)
+
 }
 
 func TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness(t *testing.T) {
@@ -416,20 +550,110 @@ func TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness(t *
 
 			fixture.service.DispatchPlayerAction(test.connection(fixture), domain.RuntimeCommand{
 				RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: terminalID,
-				Kind: domain.RuntimeCommandHackPattern, PatternID: "opaque-current-pattern",
+				Kind: domain.RuntimeCommandActivatePattern, PatternID: "opaque-current-pattern",
 			})
 
 			result := actionResultForRequest(t, fixture.effects, requestID)
-			if result.Accepted || result.Reason != test.wantReason || result.Revision != beforeRevision {
-				t.Fatalf("DispatchPlayerAction() result = %#v, want rejected %q at revision %d", result, test.wantReason, beforeRevision)
+			require.Falsef(t, result.Accepted || result.Reason != test.wantReason || result.Revision != beforeRevision,
+				"DispatchPlayerAction() result = %#v, want rejected %q at revision %d", result, test.wantReason, beforeRevision)
+			{
+
+				got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+				require.Falsef(t, !cmp.Equal(got, beforeTerminal),
+					"rejected action changed canonical terminal bytes\nbefore: %s\nafter:  %s", beforeTerminal, got)
 			}
-			if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, beforeTerminal) {
-				t.Fatalf("rejected action changed canonical terminal bytes\nbefore: %s\nafter:  %s", beforeTerminal, got)
+			require.Falsef(t, fixture.service.Revision() != beforeRevision || runtime.Calls() != beforeCalls || runtime.RandomCalls() != beforeRandom,
+				"rejected action changed revision/runtime/RNG: revision %d->%d calls %d->%d RNG %d->%d",
+				beforeRevision, fixture.service.Revision(), beforeCalls, runtime.Calls(), beforeRandom, runtime.RandomCalls())
+
+		})
+	}
+}
+
+func TestRecognitionAuthorityMatrixRejectsWithoutCanonicalReplayOrRandomEffects(t *testing.T) {
+	tests := []struct {
+		name       string
+		handle     func(us2Fixture) domain.RecognitionHandle
+		mutate     func(us2Fixture)
+		broadcast  func(us2Fixture) domain.BroadcastID
+		terminalID func(us2Fixture) string
+		wantReason domain.ActionReason
+	}{
+		{
+			name: "unknown handle", handle: func(us2Fixture) domain.RecognitionHandle { return "unknown-handle" },
+			wantReason: domain.ActionReasonInvalidSession,
+		},
+		{
+			name: "observer", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.observerToken)
+			},
+			wantReason: domain.ActionReasonNotController,
+		},
+		{
+			name: "unassigned", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.unassignedToken)
+			},
+			wantReason: domain.ActionReasonUnassigned,
+		},
+		{
+			name: "disconnected controller",
+			handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			mutate:     func(fixture us2Fixture) { fixture.service.DetachConnection(fixture.controllerConnection) },
+			wantReason: domain.ActionReasonControllerDisconnected,
+		},
+		{
+			name: "stale broadcast", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			broadcast:  func(us2Fixture) domain.BroadcastID { return "stale-broadcast" },
+			wantReason: domain.ActionReasonStaleBroadcast,
+		},
+		{
+			name: "stale terminal", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			terminalID: func(us2Fixture) string { return "stale-terminal" },
+			wantReason: domain.ActionReasonStaleTerminal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingTerminalRuntime{}
+			fixture := newUS2Fixture(t, runtime)
+			if test.mutate != nil {
+				test.mutate(fixture)
 			}
-			if fixture.service.Revision() != beforeRevision || runtime.Calls() != beforeCalls || runtime.RandomCalls() != beforeRandom {
-				t.Fatalf("rejected action changed revision/runtime/RNG: revision %d->%d calls %d->%d RNG %d->%d",
-					beforeRevision, fixture.service.Revision(), beforeCalls, runtime.Calls(), beforeRandom, runtime.RandomCalls())
+			broadcastID := fixture.broadcastID
+			if test.broadcast != nil {
+				broadcastID = test.broadcast(fixture)
 			}
+			terminalID := fixture.terminalID
+			if test.terminalID != nil {
+				terminalID = test.terminalID(fixture)
+			}
+			beforeTerminal := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+			beforeRevision := fixture.service.Revision()
+			beforeCalls := runtime.Calls()
+			beforeRandom := runtime.RandomCalls()
+
+			result := fixture.service.DispatchPlayerActionForRecognition(test.handle(fixture), domain.RuntimeCommand{
+				RequestID: "authority-" + domain.RequestID(test.name), BroadcastID: broadcastID, TerminalID: terminalID,
+				Kind: domain.RuntimeCommandActivatePattern, PatternID: "current-pattern",
+			})
+			require.Falsef(t, result.Accepted || result.Reason != test.wantReason || result.Revision != beforeRevision,
+				"result = %#v, want %q at revision %d", result, test.wantReason, beforeRevision)
+			require.Falsef(t, fixture.service.Revision() != beforeRevision || runtime.Calls() != beforeCalls || runtime.RandomCalls() != beforeRandom,
+				"rejection changed canonical counters: revision=%d calls=%d random=%d", fixture.service.Revision(), runtime.Calls(), runtime.RandomCalls())
+			{
+
+				got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+				require.Falsef(t, !cmp.Equal(got, beforeTerminal),
+					"rejection changed canonical terminal\nbefore: %s\nafter: %s", beforeTerminal, got)
+			}
+
 		})
 	}
 }
@@ -441,21 +665,21 @@ func TestControllerActionIsAuthorizedAndObserverStateRemainsCanonical(t *testing
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "controller-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
 
 	result := actionResultForRequest(t, fixture.effects, "controller-nav")
-	if !result.Accepted || result.Reason != domain.ActionReasonAccepted || result.Revision != beforeRevision+1 {
-		t.Fatalf("controller action result = %#v, want accepted revision %d", result, beforeRevision+1)
-	}
+	require.Falsef(t, !result.Accepted || result.Reason != domain.ActionReasonAccepted || result.Revision != beforeRevision+1,
+		"controller action result = %#v, want accepted revision %d", result, beforeRevision+1)
+
 	terminal := canonicalTerminal(t, fixture.service, fixture.terminalID)
-	if !reflect.DeepEqual(terminal.Nav.Path, []string{"root", "docs"}) || runtime.Calls() != 1 {
-		t.Fatalf("controller navigation = %#v, runtime calls = %d", terminal.Nav, runtime.Calls())
-	}
+	require.Falsef(t, !cmp.Equal(terminal.Nav.Path, []string{"root", "docs"}) || runtime.Calls() != 1,
+		"controller navigation = %#v, runtime calls = %d", terminal.Nav, runtime.Calls())
+
 	observer, ok := fixture.service.PlayerSnapshot(fixture.observerSession)
-	if !ok || observer.Role != domain.PlayerRoleObserver {
-		t.Fatalf("observer state changed after controller action: %#v, ok=%t", observer, ok)
-	}
+	require.Falsef(t, !ok || observer.Role != domain.PlayerRoleObserver,
+		"observer state changed after controller action: %#v, ok=%t", observer, ok)
+
 }
 
 func TestDuplicatePlayerActionFingerprintNeverMutatesTwice(t *testing.T) {
@@ -463,36 +687,181 @@ func TestDuplicatePlayerActionFingerprintNeverMutatesTwice(t *testing.T) {
 	fixture := newUS2Fixture(t, runtime)
 	command := domain.RuntimeCommand{
 		RequestID: "duplicate-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	}
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
 	first := actionResultForRequest(t, fixture.effects, command.RequestID)
-	if !first.Accepted {
-		t.Fatalf("first action = %#v, want accepted", first)
-	}
+	require.Falsef(t, !first.Accepted,
+		"first action = %#v, want accepted", first)
+
 	afterFirst := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
 	afterFirstRevision := fixture.service.Revision()
 	afterFirstCalls := runtime.Calls()
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
 	replayed := actionResultForRequest(t, fixture.effects, command.RequestID)
-	if !reflect.DeepEqual(replayed, first) {
-		t.Fatalf("exact duplicate result = %#v, want cached %#v", replayed, first)
-	}
-	if runtime.Calls() != afterFirstCalls || fixture.service.Revision() != afterFirstRevision || !reflect.DeepEqual(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), afterFirst) {
-		t.Fatal("exact duplicate repeated canonical mutation")
-	}
+	require.Falsef(t, !cmp.Equal(replayed, first),
+		"exact duplicate result = %#v, want cached %#v", replayed, first)
+	require.False(t, runtime.Calls() != afterFirstCalls || fixture.service.Revision() != afterFirstRevision || !cmp.Equal(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), afterFirst),
+		"exact duplicate repeated canonical mutation")
 
 	different := command
 	different.NodeID = "other-node"
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, different)
 	conflict := actionResultForRequest(t, fixture.effects, command.RequestID)
-	if conflict.Accepted || conflict.Reason != domain.ActionReasonDuplicate || conflict.Revision != afterFirstRevision {
-		t.Fatalf("different duplicate fingerprint = %#v, want duplicate rejection", conflict)
+	require.Falsef(t, conflict.Accepted || conflict.Reason != domain.ActionReasonDuplicate || conflict.Revision != afterFirstRevision,
+		"different duplicate fingerprint = %#v, want duplicate rejection", conflict)
+	require.False(t, runtime.Calls() != afterFirstCalls || fixture.service.Revision() != afterFirstRevision || !cmp.Equal(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), afterFirst),
+		"different duplicate fingerprint changed canonical state")
+
+}
+
+func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpoch(t *testing.T) {
+	fixture := newUS2Fixture(t, &recordingTerminalRuntime{})
+	fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+		runtime.SessionsByID[fixture.controllerSession].RequestResults = make(map[domain.RequestID]domain.RequestResultRecord)
+		return transition{persist: true}
+	})
+	beforeRevision := fixture.service.Revision()
+
+	for index := 0; index < 257; index++ {
+		requestID := domain.RequestID(fmt.Sprintf("request-%03d", index))
+		result := fixture.service.SelectCharacter(CharacterSelection{
+			ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: requestID,
+			BroadcastID: fixture.broadcastID, CharacterID: "character-does-not-matter",
+		})
+		require.Falsef(t, result.Accepted || result.Reason != domain.ActionReasonConflict,
+			"fill request %q = %#v, want conflict", requestID, result)
+
 	}
-	if runtime.Calls() != afterFirstCalls || fixture.service.Revision() != afterFirstRevision || !reflect.DeepEqual(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), afterFirst) {
-		t.Fatal("different duplicate fingerprint changed canonical state")
+
+	fixture.service.mu.RLock()
+	cache := fixture.service.runtime.SessionsByID[fixture.controllerSession].RequestResults
+	_, oldestRetained := cache["request-000"]
+	_, newestRetained := cache["request-256"]
+	cacheSize := len(cache)
+	fixture.service.mu.RUnlock()
+	require.Falsef(t, cacheSize != defaultRequestResultLimit || oldestRetained || !newestRetained,
+		"bounded replay cache size=%d oldest=%t newest=%t", cacheSize, oldestRetained, newestRetained)
+
+	exact := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-256",
+		BroadcastID: fixture.broadcastID, CharacterID: "character-does-not-matter",
+	})
+	require.Falsef(t, exact.Accepted || exact.Reason != domain.ActionReasonConflict || exact.Revision != beforeRevision,
+		"retained exact replay = %#v", exact)
+
+	changed := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-256",
+		BroadcastID: fixture.broadcastID, CharacterID: "different-payload",
+	})
+	require.Falsef(t, changed.Accepted || changed.Reason != domain.ActionReasonDuplicate || changed.Revision != beforeRevision,
+		"retained changed replay = %#v", changed)
+
+	evicted := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-000",
+		BroadcastID: fixture.broadcastID, CharacterID: "different-payload",
+	})
+	require.Falsef(t, evicted.Accepted || evicted.Reason != domain.ActionReasonConflict || evicted.Revision != beforeRevision,
+		"evicted request was not evaluated anew: %#v", evicted)
+	require.Falsef(t, fixture.service.Revision() != beforeRevision,
+		"replay stress changed revision: got %d want %d", fixture.service.Revision(), beforeRevision)
+
+	if _, err := fixture.service.EndBroadcast(); err != nil {
+		require.NoError(t, err)
+	}
+	if _, err := fixture.service.StartBroadcast(); err != nil {
+		require.NoError(t, err)
+	}
+	fixture.service.mu.RLock()
+	defer fixture.service.mu.RUnlock()
+	{
+		got := len(fixture.service.runtime.SessionsByID[fixture.controllerSession].RequestResults)
+		require.Falsef(t, got != 0,
+			"broadcast restart retained %d replay records", got)
+	}
+
+}
+
+func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequenceAcross100Races(t *testing.T) {
+	for trial := 0; trial < 100; trial++ {
+		random := &controlCountingRandom{}
+		liveRuntime := live.New(random, controlFixedWords{})
+		effects := testutil.NewFakeOrderedEffectSink[Effect]()
+		service := New(Config{
+			IDs: &counterIDSource{}, Enqueue: effects.Enqueue,
+			Runtime: liveRuntime, Terminals: liveRuntime, TrustedHack: liveRuntime,
+		})
+		state, err := service.AddCharacter("Mara")
+		if err != nil {
+			require.NoError(t, err)
+		}
+		state, err = service.StartBroadcast()
+		if err != nil {
+			require.NoError(t, err)
+		}
+		connectionID := domain.ConnectionID(fmt.Sprintf("pattern-controller-%d", trial))
+		controller := service.CreateSession(connectionID)
+		{
+			result := service.SelectCharacter(CharacterSelection{
+				ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "select-controller",
+				BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+			})
+			require.Falsef(t, !result.Accepted,
+				"trial %d selection = %#v", trial, result)
+		}
+		{
+
+			_, err = service.RequestTerminalActivation(domain.TerminalTarget{
+				TerminalID: "terminal-pattern", TerminalName: "Pattern", HackLevel: 1, Tree: testPatternTree(),
+			})
+			require.Falsef(t, err != nil,
+				"trial %d activation: %v", trial, err)
+		}
+
+		projection, _, ok := service.CurrentLiveForSession(controller.SessionID)
+		require.Falsef(t, !ok || projection == nil || projection.Hack == nil || len(projection.Hack.Patterns) == 0,
+			"trial %d has no generated pattern: %#v", trial, projection)
+
+		patternID := projection.Hack.Patterns[0].ID
+		beforeRandom := random.Calls()
+		beforeRevision := service.Revision()
+
+		start := make(chan struct{})
+		results := make(chan domain.ActionResult, 2)
+		for contender := 0; contender < 2; contender++ {
+			contender := contender
+			go func() {
+				<-start
+				results <- service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+					RequestID:   domain.RequestID(fmt.Sprintf("pattern-%d-%d", trial, contender)),
+					BroadcastID: state.Broadcast.ID, TerminalID: "terminal-pattern",
+					Kind: domain.RuntimeCommandActivatePattern, PatternID: patternID,
+				})
+			}()
+		}
+		close(start)
+		first, second := <-results, <-results
+		accepted := 0
+		for _, result := range []domain.ActionResult{first, second} {
+			if result.Accepted {
+				accepted++
+			} else {
+				require.Falsef(t, result.Reason != domain.ActionReasonInvalidAction,
+					"trial %d losing result = %#v", trial, result)
+			}
+
+		}
+		require.Falsef(t, accepted != 1 || service.Revision() != beforeRevision+1,
+			"trial %d accepted=%d revision=%d want %d", trial, accepted, service.Revision(), beforeRevision+1)
+		{
+
+			draws := random.Calls() - beforeRandom
+			require.Falsef(t, draws < 1 || draws > 2,
+				"trial %d action random draws=%d, want one outcome plus at most one dud draw", trial, draws)
+		}
+
 	}
 }
 
@@ -507,13 +876,13 @@ func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.
 		defer close(actionDone)
 		fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 			RequestID: "before-reassign", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-			Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+			Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 		})
 	}()
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("controller action did not enter runtime boundary")
+		assert.FailNow(t, "controller action did not enter runtime boundary")
 	}
 
 	reassigned := make(chan struct{})
@@ -523,22 +892,24 @@ func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.
 	}()
 	select {
 	case <-reassigned:
-		t.Fatal("controller reassignment overtook an action already inside the coordinator transaction")
+		assert.FailNow(t, "controller reassignment overtook an action already inside the coordinator transaction")
 	case <-time.After(50 * time.Millisecond):
 	}
 	close(release)
 	select {
 	case <-actionDone:
 	case <-time.After(time.Second):
-		t.Fatal("ordered controller action did not finish")
+		assert.FailNow(t, "ordered controller action did not finish")
 	}
 	select {
 	case <-reassigned:
 	case <-time.After(time.Second):
-		t.Fatal("controller reassignment did not follow the completed action")
+		assert.FailNow(t, "controller reassignment did not follow the completed action")
 	}
-	if result := actionResultForRequest(t, fixture.effects, "before-reassign"); !result.Accepted {
-		t.Fatalf("action ordered before reassignment = %#v, want accepted", result)
+	{
+		result := actionResultForRequest(t, fixture.effects, "before-reassign")
+		require.Falsef(t, !result.Accepted,
+			"action ordered before reassignment = %#v, want accepted", result)
 	}
 
 	before := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
@@ -546,15 +917,14 @@ func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.
 	beforeRevision := fixture.service.Revision()
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "after-reassign", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "back",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
 	})
 	result := actionResultForRequest(t, fixture.effects, "after-reassign")
-	if result.Accepted || result.Reason != domain.ActionReasonNotController || result.Revision != beforeRevision {
-		t.Fatalf("former controller action after reassignment = %#v, want not-controller rejection", result)
-	}
-	if runtime.Calls() != beforeCalls || !reflect.DeepEqual(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), before) {
-		t.Fatal("action ordered after reassignment mutated canonical terminal")
-	}
+	require.Falsef(t, result.Accepted || result.Reason != domain.ActionReasonNotController || result.Revision != beforeRevision,
+		"former controller action after reassignment = %#v, want not-controller rejection", result)
+	require.False(t, runtime.Calls() != beforeCalls || !cmp.Equal(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), before),
+		"action ordered after reassignment mutated canonical terminal")
+
 }
 
 func TestSetActiveControllerRequiresConnectedAssignedObserverAndPreservesCanonicalRuntime(t *testing.T) {
@@ -566,25 +936,28 @@ func TestSetActiveControllerRequiresConnectedAssignedObserverAndPreservesCanonic
 	beforeRevision := fixture.service.Revision()
 
 	state, err := fixture.service.SetActiveController(fixture.observerSession)
-	if err != nil {
-		t.Fatalf("SetActiveController(eligible observer) error = %v", err)
-	}
-	if state == nil || state.Revision != beforeRevision+1 {
-		t.Fatalf("SetActiveController() state = %#v, want revision %d", state, beforeRevision+1)
-	}
+	require.Falsef(t, err != nil,
+		"SetActiveController(eligible observer) error = %v", err)
+	require.Falsef(t, state == nil || state.Revision != beforeRevision+1,
+		"SetActiveController() state = %#v, want revision %d", state, beforeRevision+1)
+
 	assertExactlyOneController(t, state, fixture.observerSession)
-	if got := masterSession(t, state, fixture.controllerSession).Role; got != domain.PlayerRoleObserver {
-		t.Fatalf("former controller role = %q, want observer", got)
+	{
+		got := masterSession(t, state, fixture.controllerSession).Role
+		require.Falsef(t, got != domain.PlayerRoleObserver,
+			"former controller role = %q, want observer", got)
 	}
-	if !reflect.DeepEqual(masterAssignments(state), beforeAssignments) {
-		t.Fatalf("reassignment changed character assignments\nbefore: %#v\nafter:  %#v", beforeAssignments, masterAssignments(state))
+	require.Falsef(t, !cmp.Equal(masterAssignments(state), beforeAssignments),
+		"reassignment changed character assignments\nbefore: %#v\nafter:  %#v", beforeAssignments, masterAssignments(state))
+	{
+
+		got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+		require.Falsef(t, !cmp.Equal(got, beforeTerminal),
+			"reassignment changed terminal/private puzzle bytes\nbefore: %s\nafter:  %s", beforeTerminal, got)
 	}
-	if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, beforeTerminal) {
-		t.Fatalf("reassignment changed terminal/private puzzle bytes\nbefore: %s\nafter:  %s", beforeTerminal, got)
-	}
-	if runtime.Calls() != 0 || runtime.RandomCalls() != 0 {
-		t.Fatalf("reassignment entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
-	}
+	require.Falsef(t, runtime.Calls() != 0 || runtime.RandomCalls() != 0,
+		"reassignment entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
+
 }
 
 func TestSetActiveControllerRejectsEveryIneligibleTargetWithoutMutation(t *testing.T) {
@@ -627,7 +1000,7 @@ func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavin
 			requestID := domain.RequestID(fmt.Sprintf("reassign-race-%03d", trial))
 			command := domain.RuntimeCommand{
 				RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-				Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+				Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 			}
 
 			type reassignmentResult struct {
@@ -678,31 +1051,36 @@ func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavin
 			select {
 			case reassignment = <-reassigned:
 			case <-time.After(time.Second):
-				t.Fatal("interleaved controller reassignment did not finish")
+				assert.FailNow(t, "interleaved controller reassignment did not finish")
 			}
-			if reassignment.err != nil || reassignment.state == nil {
-				t.Fatalf("SetActiveController() = state %#v error %v", reassignment.state, reassignment.err)
-			}
+			require.Falsef(t, reassignment.err != nil || reassignment.state == nil,
+				"SetActiveController() = state %#v error %v", reassignment.state, reassignment.err)
+
 			assertExactlyOneController(t, reassignment.state, fixture.observerSession)
-			if !reflect.DeepEqual(masterAssignments(reassignment.state), beforeAssignments) {
-				t.Fatalf("trial %d changed assignments: got %#v want %#v", trial, masterAssignments(reassignment.state), beforeAssignments)
-			}
+			require.Falsef(t, !cmp.Equal(masterAssignments(reassignment.state), beforeAssignments),
+				"trial %d changed assignments: got %#v want %#v", trial, masterAssignments(reassignment.state), beforeAssignments)
 
 			result := actionResultForRequest(t, fixture.effects, string(requestID))
 			if actionFirst {
-				if !result.Accepted || result.Reason != domain.ActionReasonAccepted || runtime.Calls() != 1 {
-					t.Fatalf("action-before-reassignment result = %#v runtime calls=%d", result, runtime.Calls())
+				require.Falsef(t, !result.Accepted || result.Reason != domain.ActionReasonAccepted || runtime.Calls() != 1,
+					"action-before-reassignment result = %#v runtime calls=%d", result, runtime.Calls())
+				{
+
+					got := canonicalTerminal(t, fixture.service, fixture.terminalID).Nav.Path
+					require.Falsef(t, !cmp.Equal(got, []string{"root", "docs"}),
+						"accepted ordered action navigation = %#v", got)
 				}
-				if got := canonicalTerminal(t, fixture.service, fixture.terminalID).Nav.Path; !reflect.DeepEqual(got, []string{"root", "docs"}) {
-					t.Fatalf("accepted ordered action navigation = %#v", got)
-				}
+
 			} else {
-				if result.Accepted || result.Reason != domain.ActionReasonNotController || runtime.Calls() != 0 {
-					t.Fatalf("reassignment-before-action result = %#v runtime calls=%d", result, runtime.Calls())
+				require.Falsef(t, result.Accepted || result.Reason != domain.ActionReasonNotController || runtime.Calls() != 0,
+					"reassignment-before-action result = %#v runtime calls=%d", result, runtime.Calls())
+				{
+
+					got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+					require.Falsef(t, !cmp.Equal(got, beforeTerminal),
+						"rejected former-controller action changed terminal\nbefore: %s\nafter:  %s", beforeTerminal, got)
 				}
-				if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, beforeTerminal) {
-					t.Fatalf("rejected former-controller action changed terminal\nbefore: %s\nafter:  %s", beforeTerminal, got)
-				}
+
 			}
 
 			beforeRejected := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
@@ -710,15 +1088,14 @@ func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavin
 			beforeRejectedRevision := fixture.service.Revision()
 			fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 				RequestID: domain.RequestID(fmt.Sprintf("former-controller-%03d", trial)), BroadcastID: fixture.broadcastID,
-				TerminalID: fixture.terminalID, Kind: domain.RuntimeCommandNavAction, Action: "back",
+				TerminalID: fixture.terminalID, Kind: domain.RuntimeCommandNavigate, Action: "back",
 			})
 			formerResult := actionResultForRequest(t, fixture.effects, fmt.Sprintf("former-controller-%03d", trial))
-			if formerResult.Accepted || formerResult.Reason != domain.ActionReasonNotController || formerResult.Revision != beforeRejectedRevision {
-				t.Fatalf("former controller retry = %#v, want not-controller at revision %d", formerResult, beforeRejectedRevision)
-			}
-			if runtime.Calls() != beforeRejectedCalls || !reflect.DeepEqual(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), beforeRejected) {
-				t.Fatal("former-controller rejection changed canonical terminal/private puzzle")
-			}
+			require.Falsef(t, formerResult.Accepted || formerResult.Reason != domain.ActionReasonNotController || formerResult.Revision != beforeRejectedRevision,
+				"former controller retry = %#v, want not-controller at revision %d", formerResult, beforeRejectedRevision)
+			require.False(t, runtime.Calls() != beforeRejectedCalls || !cmp.Equal(canonicalTerminalBytes(t, fixture.service, fixture.terminalID), beforeRejected),
+				"former-controller rejection changed canonical terminal/private puzzle")
+
 		})
 	}
 }
@@ -732,34 +1109,32 @@ func assertControllerReassignmentRejected(t *testing.T, service *Service, sessio
 		beforeTerminal = canonicalTerminalBytes(t, service, terminalID)
 	}
 	state, err := service.SetActiveController(sessionID)
-	if err == nil {
-		t.Fatalf("SetActiveController(%q) unexpectedly succeeded with %#v", sessionID, state)
-	}
-	if !reflect.DeepEqual(state, before) || !reflect.DeepEqual(service.Snapshot(), before) || service.Revision() != beforeRevision {
-		t.Fatalf("rejected reassignment changed authoritative state\nbefore: %#v\nresult: %#v\nafter:  %#v", before, state, service.Snapshot())
-	}
-	if terminalID != "" && !reflect.DeepEqual(canonicalTerminalBytes(t, service, terminalID), beforeTerminal) {
-		t.Fatal("rejected reassignment changed terminal/private puzzle")
-	}
+	require.Falsef(t, err == nil,
+		"SetActiveController(%q) unexpectedly succeeded with %#v", sessionID, state)
+	require.Falsef(t, !cmp.Equal(state, before) || !cmp.Equal(service.Snapshot(), before) || service.Revision() != beforeRevision,
+		"rejected reassignment changed authoritative state\nbefore: %#v\nresult: %#v\nafter:  %#v", before, state, service.Snapshot())
+	require.False(t, terminalID != "" && !cmp.Equal(canonicalTerminalBytes(t, service, terminalID), beforeTerminal),
+		"rejected reassignment changed terminal/private puzzle")
+
 }
 
 func assertExactlyOneController(t *testing.T, state *domain.MasterCoordinationState, want domain.LogicalSessionID) {
 	t.Helper()
-	if state == nil || state.Broadcast == nil || state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != want {
-		t.Fatalf("controller state = %#v, want %q", state, want)
-	}
+	require.Falsef(t, state == nil || state.Broadcast == nil || state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != want,
+		"controller state = %#v, want %q", state, want)
+
 	active := 0
 	for _, session := range state.Sessions {
 		if session.Role == domain.PlayerRoleActive {
 			active++
-			if session.ID != want {
-				t.Fatalf("unexpected active session %q, want %q", session.ID, want)
-			}
+			require.Falsef(t, session.ID != want,
+				"unexpected active session %q, want %q", session.ID, want)
+
 		}
 	}
-	if active != 1 {
-		t.Fatalf("active controller count = %d, want exactly 1 in %#v", active, state.Sessions)
-	}
+	require.Falsef(t, active != 1,
+		"active controller count = %d, want exactly 1 in %#v", active, state.Sessions)
+
 }
 
 func masterAssignments(state *domain.MasterCoordinationState) map[domain.LogicalSessionID]domain.CharacterID {
@@ -780,7 +1155,7 @@ func waitForSignal(t *testing.T, signal <-chan struct{}, description string) {
 	select {
 	case <-signal:
 	case <-time.After(time.Second):
-		t.Fatalf("timed out waiting for %s", description)
+		assert.FailNowf(t, "assertion failed", "timed out waiting for %s", description)
 	}
 }
 
@@ -792,13 +1167,18 @@ func TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes(t *testing.T)
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "outcome-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
-	if result := actionResultForRequest(t, fixture.effects, "outcome-nav"); !result.Accepted {
-		t.Fatalf("navigation result = %#v, want accepted", result)
+	{
+		result := actionResultForRequest(t, fixture.effects, "outcome-nav")
+		require.Falsef(t, !result.Accepted,
+			"navigation result = %#v, want accepted", result)
 	}
-	if got := canonicalTerminal(t, fixture.service, fixture.terminalID).Nav; !reflect.DeepEqual(got, wantNav) {
-		t.Fatalf("coordinated navigation = %#v, want unchanged gameplay result %#v", got, wantNav)
+	{
+
+		got := canonicalTerminal(t, fixture.service, fixture.terminalID).Nav
+		require.Falsef(t, !cmp.Equal(got, wantNav),
+			"coordinated navigation = %#v, want unchanged gameplay result %#v", got, wantNav)
 	}
 
 	beforeHack := cloneHackState(canonicalTerminal(t, fixture.service, fixture.terminalID).Hack)
@@ -806,14 +1186,20 @@ func TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes(t *testing.T)
 	hack.ApplyGuess(wantHack, "candidate-wrong")
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "outcome-guess", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandHackGuess, TargetID: "candidate-wrong",
+		Kind: domain.RuntimeCommandGuess, TargetID: "candidate-wrong",
 	})
-	if result := actionResultForRequest(t, fixture.effects, "outcome-guess"); !result.Accepted {
-		t.Fatalf("hacking result = %#v, want accepted", result)
+	{
+		result := actionResultForRequest(t, fixture.effects, "outcome-guess")
+		require.Falsef(t, !result.Accepted,
+			"hacking result = %#v, want accepted", result)
 	}
-	if got := canonicalTerminal(t, fixture.service, fixture.terminalID).Hack; !reflect.DeepEqual(got, wantHack) {
-		t.Fatalf("coordinated hacking outcome changed\ngot:  %#v\nwant: %#v", got, wantHack)
+	{
+
+		got := canonicalTerminal(t, fixture.service, fixture.terminalID).Hack
+		require.Falsef(t, !cmp.Equal(got, wantHack),
+			"coordinated hacking outcome changed\ngot:  %#v\nwant: %#v", got, wantHack)
 	}
+
 }
 
 func TestAttachConnectionAbsentAndUnknownTokensIssueUniqueReplacementIdentities(t *testing.T) {
@@ -831,28 +1217,36 @@ func TestAttachConnectionAbsentAndUnknownTokensIssueUniqueReplacementIdentities(
 	seenSessions := make(map[domain.LogicalSessionID]struct{}, len(states))
 	seenFallbacks := make(map[string]struct{}, len(states))
 	for index, state := range states {
-		if state == nil || state.SessionID == "" || state.FallbackName == "" {
-			t.Fatalf("AttachConnection() state %d = %#v, want fresh logical identity", index, state)
+		require.Falsef(t, state == nil || state.SessionID == "" || state.FallbackName == "",
+			"AttachConnection() state %d = %#v, want fresh logical identity", index, state)
+		require.Falsef(t, tokens[index] == "" || tokens[index] == "client-stale-token",
+			"AttachConnection() token %d = %q, want server-issued replacement", index, tokens[index])
+		{
+
+			_, duplicate := seenTokens[tokens[index]]
+			require.Falsef(t, duplicate,
+				"replacement browser token %q was reused", tokens[index])
 		}
-		if tokens[index] == "" || tokens[index] == "client-stale-token" {
-			t.Fatalf("AttachConnection() token %d = %q, want server-issued replacement", index, tokens[index])
+		{
+
+			_, duplicate := seenSessions[state.SessionID]
+			require.Falsef(t, duplicate,
+				"unrecognized attachment reused logical session %q", state.SessionID)
 		}
-		if _, duplicate := seenTokens[tokens[index]]; duplicate {
-			t.Fatalf("replacement browser token %q was reused", tokens[index])
+		{
+
+			_, duplicate := seenFallbacks[state.FallbackName]
+			require.Falsef(t, duplicate,
+				"fresh logical sessions reused fallback name %q", state.FallbackName)
 		}
-		if _, duplicate := seenSessions[state.SessionID]; duplicate {
-			t.Fatalf("unrecognized attachment reused logical session %q", state.SessionID)
-		}
-		if _, duplicate := seenFallbacks[state.FallbackName]; duplicate {
-			t.Fatalf("fresh logical sessions reused fallback name %q", state.FallbackName)
-		}
+
 		seenTokens[tokens[index]] = struct{}{}
 		seenSessions[state.SessionID] = struct{}{}
 		seenFallbacks[state.FallbackName] = struct{}{}
 	}
-	if masterEffectCount(effects.Values()) != 4 {
-		t.Fatalf("fresh first-connection master effects = %d, want 4", masterEffectCount(effects.Values()))
-	}
+	require.Falsef(t, masterEffectCount(effects.Values()) != 4,
+		"fresh first-connection master effects = %d, want 4", masterEffectCount(effects.Values()))
+
 }
 
 func TestKnownTokenReusesStableSessionAcrossFirstAndLastPresenceTransitions(t *testing.T) {
@@ -862,70 +1256,78 @@ func TestKnownTokenReusesStableSessionAcrossFirstAndLastPresenceTransitions(t *t
 	token, initial := service.AttachConnection(firstConnection, "")
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	selection := service.SelectCharacter(CharacterSelection{
 		ConnectionID: firstConnection, SessionID: initial.SessionID, RequestID: "select-mara",
 		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
 	})
-	if !selection.Accepted {
-		t.Fatalf("initial claim = %#v", selection)
-	}
+	require.Falsef(t, !selection.Accepted,
+		"initial claim = %#v", selection)
+
 	claimed := service.Snapshot()
 	fallback := masterSession(t, claimed, initial.SessionID).FallbackName
 
 	service.DetachConnection(firstConnection)
 	disconnected := service.Snapshot()
 	disconnectedSession := masterSession(t, disconnected, initial.SessionID)
-	if disconnectedSession.Connected || disconnectedSession.Character == nil || disconnectedSession.Role != domain.PlayerRoleActive {
-		t.Fatalf("last detach changed stable claim/role: %#v", disconnectedSession)
-	}
+	require.Falsef(t, disconnectedSession.Connected || disconnectedSession.Character == nil || disconnectedSession.Role != domain.PlayerRoleActive,
+		"last detach changed stable claim/role: %#v", disconnectedSession)
+
 	baseline := effects.Calls()
 
 	secondConnection := domain.ConnectionID("connection-second")
 	returnedToken, reconnected := service.AttachConnection(secondConnection, token)
-	if returnedToken != token || reconnected == nil || reconnected.SessionID != initial.SessionID || reconnected.FallbackName != fallback {
-		t.Fatalf("known-token reconnect = token %q state %#v, want stable %q/%q", returnedToken, reconnected, token, initial.SessionID)
-	}
-	if reconnected.Character == nil || reconnected.Character.ID != state.Roster[0].ID || reconnected.Role != domain.PlayerRoleActive {
-		t.Fatalf("known-token reconnect lost assignment/role: %#v", reconnected)
-	}
-	if got := masterEffectCount(effects.Values()[baseline:]); got != 1 {
-		t.Fatalf("disconnected-to-connected transition emitted %d master effects, want 1", got)
+	require.Falsef(t, returnedToken != token || reconnected == nil || reconnected.SessionID != initial.SessionID || reconnected.FallbackName != fallback,
+		"known-token reconnect = token %q state %#v, want stable %q/%q", returnedToken, reconnected, token, initial.SessionID)
+	require.Falsef(t, reconnected.Character == nil || reconnected.Character.ID != state.Roster[0].ID || reconnected.Role != domain.PlayerRoleActive,
+		"known-token reconnect lost assignment/role: %#v", reconnected)
+	{
+
+		got := masterEffectCount(effects.Values()[baseline:])
+		require.Falsef(t, got != 1,
+			"disconnected-to-connected transition emitted %d master effects, want 1", got)
 	}
 
 	baseline = effects.Calls()
 	thirdConnection := domain.ConnectionID("connection-third")
 	thirdToken, third := service.AttachConnection(thirdConnection, token)
-	if thirdToken != token || third == nil || third.SessionID != initial.SessionID {
-		t.Fatalf("second tab = token %q state %#v, want same logical session", thirdToken, third)
-	}
-	if got := masterEffectCount(effects.Values()[baseline:]); got != 0 {
-		t.Fatalf("additional connection emitted %d presence effects, want 0", got)
+	require.Falsef(t, thirdToken != token || third == nil || third.SessionID != initial.SessionID,
+		"second tab = token %q state %#v, want same logical session", thirdToken, third)
+	{
+
+		got := masterEffectCount(effects.Values()[baseline:])
+		require.Falsef(t, got != 0,
+			"additional connection emitted %d presence effects, want 0", got)
 	}
 
 	baseline = effects.Calls()
 	service.DetachConnection(secondConnection)
-	if !masterSession(t, service.Snapshot(), initial.SessionID).Connected {
-		t.Fatal("closing one of two connections marked the logical session disconnected")
-	}
-	if got := masterEffectCount(effects.Values()[baseline:]); got != 0 {
-		t.Fatalf("non-final detach emitted %d presence effects, want 0", got)
+	require.False(t, !masterSession(t, service.Snapshot(), initial.SessionID).Connected,
+		"closing one of two connections marked the logical session disconnected")
+	{
+
+		got := masterEffectCount(effects.Values()[baseline:])
+		require.Falsef(t, got != 0,
+			"non-final detach emitted %d presence effects, want 0", got)
 	}
 
 	baseline = effects.Calls()
 	service.DetachConnection(thirdConnection)
 	final := masterSession(t, service.Snapshot(), initial.SessionID)
-	if final.Connected || final.Character == nil || final.Character.ID != state.Roster[0].ID || final.Role != domain.PlayerRoleActive {
-		t.Fatalf("final detach changed stable logical-session state: %#v", final)
+	require.Falsef(t, final.Connected || final.Character == nil || final.Character.ID != state.Roster[0].ID || final.Role != domain.PlayerRoleActive,
+		"final detach changed stable logical-session state: %#v", final)
+	{
+
+		got := masterEffectCount(effects.Values()[baseline:])
+		require.Falsef(t, got != 1,
+			"final detach emitted %d presence effects, want 1", got)
 	}
-	if got := masterEffectCount(effects.Values()[baseline:]); got != 1 {
-		t.Fatalf("final detach emitted %d presence effects, want 1", got)
-	}
+
 }
 
 func TestUnrecognizedSessionAttachmentDoesNotReleaseExistingClaim(t *testing.T) {
@@ -934,36 +1336,37 @@ func TestUnrecognizedSessionAttachmentDoesNotReleaseExistingClaim(t *testing.T) 
 	ownerToken, owner := service.AttachConnection(ownerConnection, "")
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: ownerConnection, SessionID: owner.SessionID, RequestID: "select-owner",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); !result.Accepted {
-		t.Fatalf("owner selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: ownerConnection, SessionID: owner.SessionID, RequestID: "select-owner",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"owner selection = %#v", result)
 	}
+
 	service.DetachConnection(ownerConnection)
 
 	replacementToken, newcomer := service.AttachConnection("connection-newcomer", "unknown-after-restart")
-	if replacementToken == "" || replacementToken == "unknown-after-restart" || replacementToken == ownerToken || newcomer == nil || newcomer.SessionID == owner.SessionID {
-		t.Fatalf("unrecognized attachment = token %q state %#v", replacementToken, newcomer)
-	}
+	require.Falsef(t, replacementToken == "" || replacementToken == "unknown-after-restart" || replacementToken == ownerToken || newcomer == nil || newcomer.SessionID == owner.SessionID,
+		"unrecognized attachment = token %q state %#v", replacementToken, newcomer)
+
 	snapshot := service.Snapshot()
 	ownerState := masterSession(t, snapshot, owner.SessionID)
 	newcomerState := masterSession(t, snapshot, newcomer.SessionID)
-	if ownerState.Character == nil || ownerState.Character.ID != state.Roster[0].ID || ownerState.Role != domain.PlayerRoleActive {
-		t.Fatalf("unrecognized session released or demoted existing owner: %#v", ownerState)
-	}
-	if newcomerState.Character != nil || newcomerState.Role != domain.PlayerRoleUnassigned {
-		t.Fatalf("unrecognized newcomer inherited claim: %#v", newcomerState)
-	}
-	if snapshot.Roster[0].ClaimedBySessionID == nil || *snapshot.Roster[0].ClaimedBySessionID != owner.SessionID {
-		t.Fatalf("roster claim moved after unrecognized attachment: %#v", snapshot.Roster)
-	}
+	require.Falsef(t, ownerState.Character == nil || ownerState.Character.ID != state.Roster[0].ID || ownerState.Role != domain.PlayerRoleActive,
+		"unrecognized session released or demoted existing owner: %#v", ownerState)
+	require.Falsef(t, newcomerState.Character != nil || newcomerState.Role != domain.PlayerRoleUnassigned,
+		"unrecognized newcomer inherited claim: %#v", newcomerState)
+	require.Falsef(t, snapshot.Roster[0].ClaimedBySessionID == nil || *snapshot.Roster[0].ClaimedBySessionID != owner.SessionID,
+		"roster claim moved after unrecognized attachment: %#v", snapshot.Roster)
+
 }
 
 func TestFinalDetachRetainsObserverAndControllerClaimsWithoutPromotionOrRuntimeMutation(t *testing.T) {
@@ -976,13 +1379,13 @@ func TestFinalDetachRetainsObserverAndControllerClaimsWithoutPromotionOrRuntimeM
 	observerRevision := fixture.service.Revision()
 	fixture.service.DetachConnection(fixture.observerConnection)
 	observerDetached := fixture.service.Snapshot()
-	if observerDetached.Revision != observerRevision+1 {
-		t.Fatalf("observer final detach revision = %d, want %d", observerDetached.Revision, observerRevision+1)
-	}
+	require.Falsef(t, observerDetached.Revision != observerRevision+1,
+		"observer final detach revision = %d, want %d", observerDetached.Revision, observerRevision+1)
+
 	observer := masterSession(t, observerDetached, fixture.observerSession)
-	if observer.Connected || observer.Character == nil || observer.Role != domain.PlayerRoleObserver {
-		t.Fatalf("detached observer lost stable claim/role: %#v", observer)
-	}
+	require.Falsef(t, observer.Connected || observer.Character == nil || observer.Role != domain.PlayerRoleObserver,
+		"detached observer lost stable claim/role: %#v", observer)
+
 	assertExactlyOneController(t, observerDetached, fixture.controllerSession)
 	assertPresenceOnlyEffects(t, fixture.effects.Values()[baseline:], observerDetached.Revision)
 
@@ -990,27 +1393,32 @@ func TestFinalDetachRetainsObserverAndControllerClaimsWithoutPromotionOrRuntimeM
 	controllerRevision := fixture.service.Revision()
 	fixture.service.DetachConnection(fixture.controllerConnection)
 	controllerDetached := fixture.service.Snapshot()
-	if controllerDetached.Revision != controllerRevision+1 {
-		t.Fatalf("controller final detach revision = %d, want %d", controllerDetached.Revision, controllerRevision+1)
-	}
+	require.Falsef(t, controllerDetached.Revision != controllerRevision+1,
+		"controller final detach revision = %d, want %d", controllerDetached.Revision, controllerRevision+1)
+
 	controller := masterSession(t, controllerDetached, fixture.controllerSession)
-	if controller.Connected || controller.Character == nil || controller.Role != domain.PlayerRoleActive {
-		t.Fatalf("detached controller lost stable claim/designation: %#v", controller)
+	require.Falsef(t, controller.Connected || controller.Character == nil || controller.Role != domain.PlayerRoleActive,
+		"detached controller lost stable claim/designation: %#v", controller)
+	{
+
+		got := masterSession(t, controllerDetached, fixture.observerSession).Role
+		require.Falsef(t, got != domain.PlayerRoleObserver,
+			"observer role after controller disconnect = %q, want no automatic promotion", got)
 	}
-	if got := masterSession(t, controllerDetached, fixture.observerSession).Role; got != domain.PlayerRoleObserver {
-		t.Fatalf("observer role after controller disconnect = %q, want no automatic promotion", got)
-	}
+
 	assertExactlyOneController(t, controllerDetached, fixture.controllerSession)
 	assertPresenceOnlyEffects(t, fixture.effects.Values()[baseline:], controllerDetached.Revision)
-	if !reflect.DeepEqual(masterAssignments(controllerDetached), assignmentsBefore) {
-		t.Fatalf("final detaches changed claims\nbefore: %#v\nafter:  %#v", assignmentsBefore, masterAssignments(controllerDetached))
+	require.Falsef(t, !cmp.Equal(masterAssignments(controllerDetached), assignmentsBefore),
+		"final detaches changed claims\nbefore: %#v\nafter:  %#v", assignmentsBefore, masterAssignments(controllerDetached))
+	{
+
+		got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+		require.Falsef(t, !cmp.Equal(got, terminalBefore),
+			"final detaches changed terminal/private puzzle\nbefore: %s\nafter:  %s", terminalBefore, got)
 	}
-	if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, terminalBefore) {
-		t.Fatalf("final detaches changed terminal/private puzzle\nbefore: %s\nafter:  %s", terminalBefore, got)
-	}
-	if runtime.Calls() != 0 || runtime.RandomCalls() != 0 {
-		t.Fatalf("presence transitions entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
-	}
+	require.Falsef(t, runtime.Calls() != 0 || runtime.RandomCalls() != 0,
+		"presence transitions entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
+
 }
 
 func TestControllerReconnectBeforeAndAfterReassignmentRestoresAuthoritativeRoleOnly(t *testing.T) {
@@ -1022,37 +1430,38 @@ func TestControllerReconnectBeforeAndAfterReassignmentRestoresAuthoritativeRoleO
 	fixture.service.DetachConnection(fixture.controllerConnection)
 	reconnectConnection := domain.ConnectionID("connection-controller-reconnect")
 	returnedToken, reconnected := fixture.service.AttachConnection(reconnectConnection, fixture.controllerToken)
-	if returnedToken != fixture.controllerToken || reconnected == nil || reconnected.SessionID != fixture.controllerSession || reconnected.Character == nil || reconnected.Role != domain.PlayerRoleActive {
-		t.Fatalf("unchanged controller reconnect = token %q state %#v", returnedToken, reconnected)
-	}
+	require.Falsef(t, returnedToken != fixture.controllerToken || reconnected == nil || reconnected.SessionID != fixture.controllerSession || reconnected.Character == nil || reconnected.Role != domain.PlayerRoleActive,
+		"unchanged controller reconnect = token %q state %#v", returnedToken, reconnected)
+
 	assertExactlyOneController(t, fixture.service.Snapshot(), fixture.controllerSession)
 
 	fixture.service.DetachConnection(reconnectConnection)
 	state, err := fixture.service.SetActiveController(fixture.observerSession)
-	if err != nil {
-		t.Fatalf("reassign while former controller disconnected: %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"reassign while former controller disconnected: %v", err)
+
 	assertExactlyOneController(t, state, fixture.observerSession)
 
 	secondReconnect := domain.ConnectionID("connection-former-controller-return")
 	returnedToken, formerController := fixture.service.AttachConnection(secondReconnect, fixture.controllerToken)
-	if returnedToken != fixture.controllerToken || formerController == nil || formerController.SessionID != fixture.controllerSession {
-		t.Fatalf("former-controller reconnect identity = token %q state %#v", returnedToken, formerController)
-	}
-	if formerController.Character == nil || formerController.Role != domain.PlayerRoleObserver || formerController.Phase != domain.PlayerPhaseObserving {
-		t.Fatalf("reassigned former-controller reconnect = %#v, want assigned observer", formerController)
-	}
+	require.Falsef(t, returnedToken != fixture.controllerToken || formerController == nil || formerController.SessionID != fixture.controllerSession,
+		"former-controller reconnect identity = token %q state %#v", returnedToken, formerController)
+	require.Falsef(t, formerController.Character == nil || formerController.Role != domain.PlayerRoleObserver || formerController.Phase != domain.PlayerPhaseObserving,
+		"reassigned former-controller reconnect = %#v, want assigned observer", formerController)
+
 	final := fixture.service.Snapshot()
 	assertExactlyOneController(t, final, fixture.observerSession)
-	if !reflect.DeepEqual(masterAssignments(final), assignmentsBefore) {
-		t.Fatalf("disconnect/reconnect/reassignment changed claims\nbefore: %#v\nafter:  %#v", assignmentsBefore, masterAssignments(final))
+	require.Falsef(t, !cmp.Equal(masterAssignments(final), assignmentsBefore),
+		"disconnect/reconnect/reassignment changed claims\nbefore: %#v\nafter:  %#v", assignmentsBefore, masterAssignments(final))
+	{
+
+		got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+		require.Falsef(t, !cmp.Equal(got, terminalBefore),
+			"disconnect/reconnect/reassignment changed terminal/private puzzle\nbefore: %s\nafter:  %s", terminalBefore, got)
 	}
-	if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, terminalBefore) {
-		t.Fatalf("disconnect/reconnect/reassignment changed terminal/private puzzle\nbefore: %s\nafter:  %s", terminalBefore, got)
-	}
-	if runtime.Calls() != 0 || runtime.RandomCalls() != 0 {
-		t.Fatalf("disconnect lifecycle entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
-	}
+	require.Falsef(t, runtime.Calls() != 0 || runtime.RandomCalls() != 0,
+		"disconnect lifecycle entered gameplay runtime: calls=%d RNG=%d", runtime.Calls(), runtime.RandomCalls())
+
 }
 
 func TestDirectTerminalActivationClearAndLateAssignmentPreserveBroadcastIdentity(t *testing.T) {
@@ -1063,125 +1472,133 @@ func TestDirectTerminalActivationClearAndLateAssignmentPreserveBroadcastIdentity
 
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
 	state, err = service.AddCharacter("Boone")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	booneID := state.Roster[1].ID
 	state, err = service.AddCharacter("Arcade")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	arcadeID := state.Roster[2].ID
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	broadcastID := state.Broadcast.ID
 	controller := service.CreateSession("switch-controller")
 	observer := service.CreateSession("switch-observer")
 	late := service.CreateSession("switch-late")
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: "switch-controller", SessionID: controller.SessionID, RequestID: "switch-select-controller",
-		BroadcastID: broadcastID, CharacterID: maraID,
-	}); !result.Accepted {
-		t.Fatalf("controller selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: "switch-controller", SessionID: controller.SessionID, RequestID: "switch-select-controller",
+			BroadcastID: broadcastID, CharacterID: maraID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"controller selection = %#v", result)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: "switch-observer", SessionID: observer.SessionID, RequestID: "switch-select-observer",
-		BroadcastID: broadcastID, CharacterID: booneID,
-	}); !result.Accepted {
-		t.Fatalf("observer selection = %#v", result)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: "switch-observer", SessionID: observer.SessionID, RequestID: "switch-select-observer",
+			BroadcastID: broadcastID, CharacterID: booneID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"observer selection = %#v", result)
 	}
+
 	identityBefore := service.Snapshot()
 	assignmentsBefore := masterAssignments(identityBefore)
 
 	terminalA := terminalTarget("terminal-a", "Overseer A")
 	state, err = service.RequestTerminalActivation(terminalA)
-	if err != nil {
-		t.Fatalf("RequestTerminalActivation(A) error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"RequestTerminalActivation(A) error = %v", err)
+
 	assertActiveTerminalAndIdentity(t, state, "terminal-a", broadcastID, controller.SessionID, assignmentsBefore)
 	controllerState, ok := service.PlayerSnapshot(controller.SessionID)
-	if !ok || controllerState.ActiveTerminalID != "terminal-a" || controllerState.Phase != domain.PlayerPhaseControlling {
-		t.Fatalf("controller after activation A = %#v, ok=%t", controllerState, ok)
-	}
+	require.Falsef(t, !ok || controllerState.ActiveTerminalID != "terminal-a" || controllerState.Phase != domain.PlayerPhaseControlling,
+		"controller after activation A = %#v, ok=%t", controllerState, ok)
+
 	terminalARuntime := canonicalTerminal(t, service, "terminal-a")
 
 	terminalB := terminalTarget("terminal-b", "Overseer B")
 	state, err = service.RequestTerminalActivation(terminalB)
-	if err != nil {
-		t.Fatalf("direct completed-puzzle activation B error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"direct completed-puzzle activation B error = %v", err)
+
 	assertActiveTerminalAndIdentity(t, state, "terminal-b", broadcastID, controller.SessionID, assignmentsBefore)
 	slots := canonicalTerminalSlots(t, service)
-	if len(slots) != 2 || slots["terminal-a"] == nil || slots["terminal-b"] == nil {
-		t.Fatalf("direct switch runtime slots = %#v, want owned A and B checkpoints", slots)
-	}
-	if slots["terminal-a"].Lifecycle != domain.TerminalLifecycleSuspended || slots["terminal-b"].Lifecycle != domain.TerminalLifecycleActive {
-		t.Fatalf("direct switch lifecycle = A %q B %q", slots["terminal-a"].Lifecycle, slots["terminal-b"].Lifecycle)
-	}
+	require.Falsef(t, len(slots) != 2 || slots["terminal-a"] == nil || slots["terminal-b"] == nil,
+		"direct switch runtime slots = %#v, want owned A and B checkpoints", slots)
+	require.Falsef(t, slots["terminal-a"].Lifecycle != domain.TerminalLifecycleSuspended || slots["terminal-b"].Lifecycle != domain.TerminalLifecycleActive,
+		"direct switch lifecycle = A %q B %q", slots["terminal-a"].Lifecycle, slots["terminal-b"].Lifecycle)
+
 	suspendedA := canonicalTerminal(t, service, "terminal-a")
 	terminalARuntime.Lifecycle = ""
 	suspendedA.Lifecycle = ""
-	if !reflect.DeepEqual(suspendedA, terminalARuntime) {
-		t.Fatalf("switching away changed completed source gameplay runtime\nbefore: %#v\nafter:  %#v", terminalARuntime, suspendedA)
-	}
+	require.Falsef(t, !cmp.Equal(suspendedA, terminalARuntime),
+		"switching away changed completed source gameplay runtime\nbefore: %#v\nafter:  %#v", terminalARuntime, suspendedA)
 
 	restoredA := terminalTarget("terminal-a", "Overseer A Updated")
 	state, err = service.RequestTerminalActivation(restoredA)
-	if err != nil {
-		t.Fatalf("RequestTerminalActivation(restored A) error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"RequestTerminalActivation(restored A) error = %v", err)
+
 	assertActiveTerminalAndIdentity(t, state, "terminal-a", broadcastID, controller.SessionID, assignmentsBefore)
-	if creates, updates, _ := terminals.Calls(); creates != 2 || updates != 1 {
-		t.Fatalf("runtime lifecycle calls = create/update %d/%d, want 2/1", creates, updates)
-	}
-	restored := canonicalTerminal(t, service, "terminal-a")
-	if restored.TerminalName != "Overseer A Updated" || restored.Hack == nil || !restored.Hack.Solved || restored.Hack.GenerationID != "generation-terminal-a" {
-		t.Fatalf("restored checkpoint = %#v, want updated authored metadata and preserved completed puzzle", restored)
+	{
+		creates, updates, _ := terminals.Calls()
+		require.Falsef(t, creates != 2 || updates != 1,
+			"runtime lifecycle calls = create/update %d/%d, want 2/1", creates, updates)
 	}
 
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: "switch-late", SessionID: late.SessionID, RequestID: "switch-select-late",
-		BroadcastID: broadcastID, CharacterID: arcadeID,
-	}); !result.Accepted {
-		t.Fatalf("late assignment = %#v", result)
+	restored := canonicalTerminal(t, service, "terminal-a")
+	require.Falsef(t, restored.TerminalName != "Overseer A Updated" || restored.Hack == nil || !restored.Hack.Solved || restored.Hack.GenerationID != "generation-terminal-a",
+		"restored checkpoint = %#v, want updated authored metadata and preserved completed puzzle", restored)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: "switch-late", SessionID: late.SessionID, RequestID: "switch-select-late",
+			BroadcastID: broadcastID, CharacterID: arcadeID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"late assignment = %#v", result)
 	}
+
 	lateState, ok := service.PlayerSnapshot(late.SessionID)
-	if !ok || lateState.Character == nil || lateState.ActiveTerminalID != "terminal-a" || lateState.Phase != domain.PlayerPhaseObserving {
-		t.Fatalf("late assignee current-terminal snapshot = %#v, ok=%t", lateState, ok)
-	}
+	require.Falsef(t, !ok || lateState.Character == nil || lateState.ActiveTerminalID != "terminal-a" || lateState.Phase != domain.PlayerPhaseObserving,
+		"late assignee current-terminal snapshot = %#v, ok=%t", lateState, ok)
+
 	assignmentsWithLate := masterAssignments(service.Snapshot())
 
 	state, err = service.RequestTerminalClear()
-	if err != nil {
-		t.Fatalf("direct completed-puzzle clear error = %v", err)
-	}
-	if state.Broadcast == nil || state.Broadcast.ActiveTerminalID != nil || state.Broadcast.ID != broadcastID {
-		t.Fatalf("cleared terminal state = %#v, want active broadcast with nil terminal", state.Broadcast)
-	}
+	require.Falsef(t, err != nil,
+		"direct completed-puzzle clear error = %v", err)
+	require.Falsef(t, state.Broadcast == nil || state.Broadcast.ActiveTerminalID != nil || state.Broadcast.ID != broadcastID,
+		"cleared terminal state = %#v, want active broadcast with nil terminal", state.Broadcast)
+
 	assertExactlyOneController(t, state, controller.SessionID)
-	if !reflect.DeepEqual(masterAssignments(state), assignmentsWithLate) {
-		t.Fatalf("terminal clear changed claims: got %#v want %#v", masterAssignments(state), assignmentsWithLate)
-	}
+	require.Falsef(t, !cmp.Equal(masterAssignments(state), assignmentsWithLate),
+		"terminal clear changed claims: got %#v want %#v", masterAssignments(state), assignmentsWithLate)
+
 	for _, sessionID := range []domain.LogicalSessionID{controller.SessionID, observer.SessionID, late.SessionID} {
 		player, exists := service.PlayerSnapshot(sessionID)
-		if !exists || player.Character == nil || player.ActiveTerminalID != "" || player.Phase != domain.PlayerPhaseWaiting {
-			t.Fatalf("assigned session %q after terminal clear = %#v, exists=%t", sessionID, player, exists)
-		}
+		require.Falsef(t, !exists || player.Character == nil || player.ActiveTerminalID != "" || player.Phase != domain.PlayerPhaseWaiting,
+			"assigned session %q after terminal clear = %#v, exists=%t", sessionID, player, exists)
+
 	}
 	for terminalID, slot := range canonicalTerminalSlots(t, service) {
-		if slot.Lifecycle != domain.TerminalLifecycleSuspended {
-			t.Fatalf("cleared runtime slot %q lifecycle = %q, want suspended", terminalID, slot.Lifecycle)
-		}
+		require.Falsef(t, slot.Lifecycle != domain.TerminalLifecycleSuspended,
+			"cleared runtime slot %q lifecycle = %q, want suspended", terminalID, slot.Lifecycle)
+
 	}
-	if !hasClearEffectAtRevision(effects.Values(), state.Revision) {
-		t.Fatalf("terminal clear emitted no revision-%d canonical clear effect", state.Revision)
-	}
+	require.Falsef(t, !hasClearEffectAtRevision(effects.Values(), state.Revision),
+		"terminal clear emitted no revision-%d canonical clear effect", state.Revision)
+
 }
 
 func TestInactiveAndClearedTerminalActionsAreRejectedWithoutTouchingRuntimeSlots(t *testing.T) {
@@ -1191,26 +1608,29 @@ func TestInactiveAndClearedTerminalActionsAreRejectedWithoutTouchingRuntimeSlots
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	characterID := state.Roster[0].ID
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	connectionID := domain.ConnectionID("inactive-controller")
 	controller := service.CreateSession(connectionID)
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "inactive-select",
-		BroadcastID: state.Broadcast.ID, CharacterID: characterID,
-	}); !result.Accepted {
-		t.Fatalf("controller selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "inactive-select",
+			BroadcastID: state.Broadcast.ID, CharacterID: characterID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"controller selection = %#v", result)
 	}
+
 	if _, err = service.RequestTerminalActivation(terminalTarget("terminal-a", "A")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if _, err = service.RequestTerminalActivation(terminalTarget("terminal-b", "B")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 
 	assertRejectedTerminalAction := func(requestID string, terminalID string) {
@@ -1220,20 +1640,19 @@ func TestInactiveAndClearedTerminalActionsAreRejectedWithoutTouchingRuntimeSlots
 		beforeCalls := actions.Calls()
 		service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
 			RequestID: domain.RequestID(requestID), BroadcastID: state.Broadcast.ID, TerminalID: terminalID,
-			Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+			Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 		})
 		result := actionResultForRequest(t, effects, requestID)
-		if result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || result.Revision != beforeRevision {
-			t.Fatalf("inactive action %q result = %#v, want stale-terminal revision %d", terminalID, result, beforeRevision)
-		}
-		if actions.Calls() != beforeCalls || !reflect.DeepEqual(canonicalTerminalSlotBytes(t, service), beforeSlots) {
-			t.Fatalf("inactive action %q touched gameplay/runtime slots", terminalID)
-		}
+		require.Falsef(t, result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || result.Revision != beforeRevision,
+			"inactive action %q result = %#v, want stale-terminal revision %d", terminalID, result, beforeRevision)
+		require.Falsef(t, actions.Calls() != beforeCalls || !cmp.Equal(canonicalTerminalSlotBytes(t, service), beforeSlots),
+			"inactive action %q touched gameplay/runtime slots", terminalID)
+
 	}
 
 	assertRejectedTerminalAction("inactive-a", "terminal-a")
 	if _, err = service.RequestTerminalClear(); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	assertRejectedTerminalAction("cleared-b", "terminal-b")
 }
@@ -1244,63 +1663,71 @@ func TestUnfinishedTerminalSwitchPreserveKeepsSourceActionableAndRestoresExactCh
 	revisionBefore := fixture.service.Revision()
 
 	state, err := fixture.service.RequestTerminalActivation(terminalTarget("terminal-b", "Terminal B"))
-	if err != nil {
-		t.Fatalf("unfinished switch request error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"unfinished switch request error = %v", err)
+
 	assertPendingSwitch(t, state, fixture.broadcastID, "terminal-a", "terminal-b")
-	if state.Revision != revisionBefore+1 || state.PendingSwitch.SwitchID == "" || state.PendingSwitch.SwitchID == domain.SwitchID("terminal-a") || state.PendingSwitch.SwitchID == domain.SwitchID("terminal-b") {
-		t.Fatalf("pending switch identity/revision = %#v, want opaque token at %d", state.PendingSwitch, revisionBefore+1)
-	}
+	require.Falsef(t, state.Revision != revisionBefore+1 || state.PendingSwitch.SwitchID == "" || state.PendingSwitch.SwitchID == domain.SwitchID("terminal-a") || state.PendingSwitch.SwitchID == domain.SwitchID("terminal-b"),
+		"pending switch identity/revision = %#v, want opaque token at %d", state.PendingSwitch, revisionBefore+1)
+
 	switchID := state.PendingSwitch.SwitchID
-	if got := canonicalTerminalBytes(t, fixture.service, "terminal-a"); !reflect.DeepEqual(got, sourceBefore) {
-		t.Fatalf("decision-required request changed source checkpoint\nbefore: %s\nafter:  %s", sourceBefore, got)
+	{
+		got := canonicalTerminalBytes(t, fixture.service, "terminal-a")
+		require.Falsef(t, !cmp.Equal(got, sourceBefore),
+			"decision-required request changed source checkpoint\nbefore: %s\nafter:  %s", sourceBefore, got)
 	}
-	if slots := canonicalTerminalSlots(t, fixture.service); len(slots) != 1 || slots["terminal-b"] != nil {
-		t.Fatalf("decision-required request created target prematurely: %#v", slots)
+	{
+
+		slots := canonicalTerminalSlots(t, fixture.service)
+		require.Falsef(t, len(slots) != 1 || slots["terminal-b"] != nil,
+			"decision-required request created target prematurely: %#v", slots)
 	}
 
 	fixture.service.DispatchPlayerAction(fixture.connectionID, domain.RuntimeCommand{
 		RequestID: "pending-source-action", BroadcastID: fixture.broadcastID, TerminalID: "terminal-a",
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
-	if result := actionResultForRequest(t, fixture.effects, "pending-source-action"); !result.Accepted {
-		t.Fatalf("source action while switch pending = %#v, want accepted", result)
-	}
-	sourceAfterAction := canonicalTerminalBytes(t, fixture.service, "terminal-a")
-	if reflect.DeepEqual(sourceAfterAction, sourceBefore) {
-		t.Fatal("accepted source action while pending did not update canonical checkpoint")
+	{
+		result := actionResultForRequest(t, fixture.effects, "pending-source-action")
+		require.Falsef(t, !result.Accepted,
+			"source action while switch pending = %#v, want accepted", result)
 	}
 
+	sourceAfterAction := canonicalTerminalBytes(t, fixture.service, "terminal-a")
+	require.False(t, cmp.Equal(sourceAfterAction, sourceBefore),
+		"accepted source action while pending did not update canonical checkpoint")
+
 	state, err = fixture.service.ResolveTerminalSwitch(switchID, domain.TerminalSwitchPreserve)
-	if err != nil {
-		t.Fatalf("ResolveTerminalSwitch(preserve) error = %v", err)
-	}
-	if state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-b" {
-		t.Fatalf("preserve resolution state = %#v", state)
-	}
+	require.Falsef(t, err != nil,
+		"ResolveTerminalSwitch(preserve) error = %v", err)
+	require.Falsef(t, state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-b",
+		"preserve resolution state = %#v", state)
+
 	slots := canonicalTerminalSlots(t, fixture.service)
-	if slots["terminal-a"] == nil || slots["terminal-a"].Lifecycle != domain.TerminalLifecycleSuspended || slots["terminal-b"] == nil || slots["terminal-b"].Lifecycle != domain.TerminalLifecycleActive {
-		t.Fatalf("preserve runtime slots = %#v", slots)
-	}
+	require.Falsef(t, slots["terminal-a"] == nil || slots["terminal-a"].Lifecycle != domain.TerminalLifecycleSuspended || slots["terminal-b"] == nil || slots["terminal-b"].Lifecycle != domain.TerminalLifecycleActive,
+		"preserve runtime slots = %#v", slots)
+
 	fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
 		runtime.Broadcast.TerminalRuntimes["terminal-b"].Hack.Solved = true
 		return transition{accepted: true}
 	})
 
 	state, err = fixture.service.RequestTerminalActivation(terminalTarget("terminal-a", "Terminal A Updated"))
-	if err != nil {
-		t.Fatalf("reactivate preserved A error = %v", err)
-	}
-	if state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a" {
-		t.Fatalf("reactivated preserved source state = %#v", state.Broadcast)
-	}
+	require.Falsef(t, err != nil,
+		"reactivate preserved A error = %v", err)
+	require.Falsef(t, state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a",
+		"reactivated preserved source state = %#v", state.Broadcast)
+
 	restored := canonicalTerminal(t, fixture.service, "terminal-a")
-	if restored.TerminalName != "Terminal A Updated" || restored.Nav.Path[len(restored.Nav.Path)-1] != "docs" || restored.Hack == nil || restored.Hack.GenerationID != "generation-terminal-a-1" {
-		t.Fatalf("reactivated preserved checkpoint = %#v", restored)
+	require.Falsef(t, restored.TerminalName != "Terminal A Updated" || restored.Nav.Path[len(restored.Nav.Path)-1] != "docs" || restored.Hack == nil || restored.Hack.GenerationID != "generation-terminal-a-1",
+		"reactivated preserved checkpoint = %#v", restored)
+	{
+
+		suspends, reactivates, discards := fixture.terminals.DecisionCalls()
+		require.Falsef(t, suspends != 1 || reactivates != 1 || discards != 0,
+			"preserve lifecycle calls suspend/reactivate/discard = %d/%d/%d", suspends, reactivates, discards)
 	}
-	if suspends, reactivates, discards := fixture.terminals.DecisionCalls(); suspends != 1 || reactivates != 1 || discards != 0 {
-		t.Fatalf("preserve lifecycle calls suspend/reactivate/discard = %d/%d/%d", suspends, reactivates, discards)
-	}
+
 }
 
 func TestUnfinishedTerminalSwitchCancelDiscardStaleAndDeletionGuards(t *testing.T) {
@@ -1308,20 +1735,22 @@ func TestUnfinishedTerminalSwitchCancelDiscardStaleAndDeletionGuards(t *testing.
 		fixture := newUS8SwitchFixture(t)
 		sourceBefore := canonicalTerminalBytes(t, fixture.service, "terminal-a")
 		state, err := fixture.service.RequestTerminalClear()
-		if err != nil {
-			t.Fatalf("unfinished clear request error = %v", err)
-		}
+		require.Falsef(t, err != nil,
+			"unfinished clear request error = %v", err)
+
 		assertPendingSwitch(t, state, fixture.broadcastID, "terminal-a", "")
 		state, err = fixture.service.ResolveTerminalSwitch(state.PendingSwitch.SwitchID, domain.TerminalSwitchCancel)
-		if err != nil {
-			t.Fatalf("ResolveTerminalSwitch(cancel) error = %v", err)
+		require.Falsef(t, err != nil,
+			"ResolveTerminalSwitch(cancel) error = %v", err)
+		require.Falsef(t, state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a",
+			"cancel resolution state = %#v", state)
+		{
+
+			got := canonicalTerminalBytes(t, fixture.service, "terminal-a")
+			require.Falsef(t, !cmp.Equal(got, sourceBefore),
+				"cancel changed source checkpoint\nbefore: %s\nafter:  %s", sourceBefore, got)
 		}
-		if state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a" {
-			t.Fatalf("cancel resolution state = %#v", state)
-		}
-		if got := canonicalTerminalBytes(t, fixture.service, "terminal-a"); !reflect.DeepEqual(got, sourceBefore) {
-			t.Fatalf("cancel changed source checkpoint\nbefore: %s\nafter:  %s", sourceBefore, got)
-		}
+
 	})
 
 	t.Run("discard and inactive rejection", func(t *testing.T) {
@@ -1329,69 +1758,81 @@ func TestUnfinishedTerminalSwitchCancelDiscardStaleAndDeletionGuards(t *testing.
 		firstGeneration := canonicalTerminal(t, fixture.service, "terminal-a").Hack.GenerationID
 		state, err := fixture.service.RequestTerminalActivation(terminalTarget("terminal-b", "Terminal B"))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		state, err = fixture.service.ResolveTerminalSwitch(state.PendingSwitch.SwitchID, domain.TerminalSwitchDiscard)
-		if err != nil {
-			t.Fatalf("ResolveTerminalSwitch(discard) error = %v", err)
+		require.Falsef(t, err != nil,
+			"ResolveTerminalSwitch(discard) error = %v", err)
+		require.Falsef(t, state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-b",
+			"discard resolution state = %#v", state)
+		{
+
+			slots := canonicalTerminalSlots(t, fixture.service)
+			require.Falsef(t, slots["terminal-a"] != nil,
+				"discard retained source runtime: %#v", slots)
 		}
-		if state.PendingSwitch != nil || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-b" {
-			t.Fatalf("discard resolution state = %#v", state)
-		}
-		if slots := canonicalTerminalSlots(t, fixture.service); slots["terminal-a"] != nil {
-			t.Fatalf("discard retained source runtime: %#v", slots)
-		}
+
 		beforeCalls := fixture.actions.Calls()
 		beforeSlots := canonicalTerminalSlotBytes(t, fixture.service)
 		fixture.service.DispatchPlayerAction(fixture.connectionID, domain.RuntimeCommand{
 			RequestID: "discarded-source-action", BroadcastID: fixture.broadcastID, TerminalID: "terminal-a",
-			Kind: domain.RuntimeCommandNavAction, Action: "back",
+			Kind: domain.RuntimeCommandNavigate, Action: "back",
 		})
 		result := actionResultForRequest(t, fixture.effects, "discarded-source-action")
-		if result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || fixture.actions.Calls() != beforeCalls || !reflect.DeepEqual(canonicalTerminalSlotBytes(t, fixture.service), beforeSlots) {
-			t.Fatalf("discarded source action = %#v calls=%d", result, fixture.actions.Calls())
-		}
+		require.Falsef(t, result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || fixture.actions.Calls() != beforeCalls || !cmp.Equal(canonicalTerminalSlotBytes(t, fixture.service), beforeSlots),
+			"discarded source action = %#v calls=%d", result, fixture.actions.Calls())
 
 		fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
 			runtime.Broadcast.TerminalRuntimes["terminal-b"].Hack.Solved = true
 			return transition{accepted: true}
 		})
 		if _, err = fixture.service.RequestTerminalActivation(terminalTarget("terminal-a", "Terminal A Fresh")); err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		fresh := canonicalTerminal(t, fixture.service, "terminal-a")
-		if fresh.Hack == nil || fresh.Hack.GenerationID == firstGeneration {
-			t.Fatalf("discarded source was not freshly generated: old %q new %#v", firstGeneration, fresh.Hack)
-		}
+		require.Falsef(t, fresh.Hack == nil || fresh.Hack.GenerationID == firstGeneration,
+			"discarded source was not freshly generated: old %q new %#v", firstGeneration, fresh.Hack)
+
 	})
 
 	t.Run("stale and deletion guards", func(t *testing.T) {
 		fixture := newUS8SwitchFixture(t)
 		state, err := fixture.service.RequestTerminalActivation(terminalTarget("terminal-b", "Terminal B"))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		switchID := state.PendingSwitch.SwitchID
 		before := fixture.service.Snapshot()
 		beforeSlots := canonicalTerminalSlotBytes(t, fixture.service)
-		if _, err = fixture.service.ResolveTerminalSwitch("unknown-switch", domain.TerminalSwitchPreserve); err == nil {
-			t.Fatal("unknown switch decision unexpectedly resolved")
+		{
+			_, err = fixture.service.ResolveTerminalSwitch("unknown-switch", domain.TerminalSwitchPreserve)
+			require.False(t, err == nil,
+				"unknown switch decision unexpectedly resolved")
 		}
-		if !reflect.DeepEqual(fixture.service.Snapshot(), before) || !reflect.DeepEqual(canonicalTerminalSlotBytes(t, fixture.service), beforeSlots) {
-			t.Fatal("stale decision refusal changed canonical state")
+		require.False(t, !cmp.Equal(fixture.service.Snapshot(), before) || !cmp.Equal(canonicalTerminalSlotBytes(t, fixture.service), beforeSlots),
+			"stale decision refusal changed canonical state")
+		{
+
+			err = fixture.service.CanDeleteTerminal("terminal-a")
+			require.False(t, err == nil,
+				"active source terminal deletion was allowed")
 		}
-		if err = fixture.service.CanDeleteTerminal("terminal-a"); err == nil {
-			t.Fatal("active source terminal deletion was allowed")
-		}
+
 		if _, err = fixture.service.ResolveTerminalSwitch(switchID, domain.TerminalSwitchPreserve); err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
-		if err = fixture.service.CanDeleteTerminal("terminal-a"); err == nil {
-			t.Fatal("preserved suspended terminal deletion was allowed")
+		{
+			err = fixture.service.CanDeleteTerminal("terminal-a")
+			require.False(t, err == nil,
+				"preserved suspended terminal deletion was allowed")
 		}
-		if err = fixture.service.CanDeleteTerminal("terminal-unowned"); err != nil {
-			t.Fatalf("unowned terminal deletion guard error = %v", err)
+		{
+
+			err = fixture.service.CanDeleteTerminal("terminal-unowned")
+			require.Falsef(t, err != nil,
+				"unowned terminal deletion guard error = %v", err)
 		}
+
 	})
 }
 
@@ -1417,41 +1858,48 @@ func TestResetFailedHackAtomicallyReplacesOnlyActiveSlotAndSerializesDuplicates(
 	revisionBefore := fixture.service.Revision()
 
 	state, err := fixture.service.ResetFailedHack(latest)
-	if err != nil {
-		t.Fatalf("ResetFailedHack() error = %v", err)
-	}
-	if state.Revision != revisionBefore+1 || state.Broadcast == nil || state.Broadcast.ID != fixture.broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a" {
-		t.Fatalf("reset state = %#v", state)
-	}
-	if !reflect.DeepEqual(masterAssignments(state), assignmentsBefore) || state.Broadcast.ControllerSessionID == nil || before.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != *before.Broadcast.ControllerSessionID || !reflect.DeepEqual(state.Sessions, before.Sessions) || !reflect.DeepEqual(state.Roster, before.Roster) {
-		t.Fatalf("reset changed identity/ownership state\nbefore=%#v\nafter=%#v", before, state)
-	}
-	if got := canonicalTerminalBytes(t, fixture.service, "terminal-observer"); !reflect.DeepEqual(got, otherBefore) {
-		t.Fatalf("reset changed unrelated runtime\nbefore=%s\nafter=%s", otherBefore, got)
-	}
-	fresh := canonicalTerminal(t, fixture.service, "terminal-a")
-	if fresh.Hack == nil || fresh.Hack.GenerationID == oldGeneration || fresh.Hack.Level != 2 || fresh.Hack.AttemptsLeft != fresh.Hack.AttemptsMax || fresh.Hack.Failed || fresh.Hack.Solved || len(fresh.Hack.Log) != 0 || fresh.TerminalName != latest.TerminalName || fresh.IntroText != latest.IntroText {
-		t.Fatalf("fresh active runtime = %#v", fresh)
-	}
-	if _, _, resets := fixture.terminals.DecisionCalls(); resets != 1 {
-		t.Fatalf("reset lifecycle calls = %d, want 1", resets)
-	}
-	if !hasLiveEffectAtRevision(fixture.effects.Values(), state.Revision, "terminal-a") {
-		t.Fatalf("reset emitted no live effect at revision %d", state.Revision)
+	require.Falsef(t, err != nil,
+		"ResetFailedHack() error = %v", err)
+	require.Falsef(t, state.Revision != revisionBefore+1 || state.Broadcast == nil || state.Broadcast.ID != fixture.broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != "terminal-a",
+		"reset state = %#v", state)
+	require.Falsef(t, !cmp.Equal(masterAssignments(state), assignmentsBefore) || state.Broadcast.ControllerSessionID == nil || before.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != *before.Broadcast.ControllerSessionID || !cmp.Equal(state.Sessions, before.Sessions) || !cmp.Equal(state.Roster, before.Roster),
+		"reset changed identity/ownership state\nbefore=%#v\nafter=%#v", before, state)
+	{
+
+		got := canonicalTerminalBytes(t, fixture.service, "terminal-observer")
+		require.Falsef(t, !cmp.Equal(got, otherBefore),
+			"reset changed unrelated runtime\nbefore=%s\nafter=%s", otherBefore, got)
 	}
 
+	fresh := canonicalTerminal(t, fixture.service, "terminal-a")
+	require.Falsef(t, fresh.Hack == nil || fresh.Hack.GenerationID == oldGeneration || fresh.Hack.Level != 2 || fresh.Hack.AttemptsLeft != fresh.Hack.AttemptsMax || fresh.Hack.Failed || fresh.Hack.Solved || len(fresh.Hack.Log) != 0 || fresh.TerminalName != latest.TerminalName || fresh.IntroText != latest.IntroText,
+		"fresh active runtime = %#v", fresh)
+	{
+
+		_, _, resets := fixture.terminals.DecisionCalls()
+		require.Falsef(t, resets != 1,
+			"reset lifecycle calls = %d, want 1", resets)
+	}
+	require.Falsef(t, !hasLiveEffectAtRevision(fixture.effects.Values(), state.Revision, "terminal-a"),
+		"reset emitted no live effect at revision %d", state.Revision)
+
 	afterFirst := canonicalTerminalSlotBytes(t, fixture.service)
-	if duplicate, duplicateErr := fixture.service.ResetFailedHack(latest); duplicateErr == nil || duplicate.Revision != state.Revision {
-		t.Fatalf("duplicate reset = state %#v error %v", duplicate, duplicateErr)
+	{
+		duplicate, duplicateErr := fixture.service.ResetFailedHack(latest)
+		require.Falsef(t, duplicateErr == nil || duplicate.Revision != state.Revision,
+			"duplicate reset = state %#v error %v", duplicate, duplicateErr)
 	}
-	if fixture.service.Revision() != state.Revision || !reflect.DeepEqual(canonicalTerminalSlotBytes(t, fixture.service), afterFirst) {
-		t.Fatal("duplicate reset mutated canonical state")
-	}
+	require.False(t, fixture.service.Revision() != state.Revision || !cmp.Equal(canonicalTerminalSlotBytes(t, fixture.service), afterFirst),
+		"duplicate reset mutated canonical state")
+
 	wrong := latest
 	wrong.TerminalID = "terminal-observer"
-	if stale, staleErr := fixture.service.ResetFailedHack(wrong); staleErr == nil || stale.Revision != state.Revision {
-		t.Fatalf("stale reset = state %#v error %v", stale, staleErr)
+	{
+		stale, staleErr := fixture.service.ResetFailedHack(wrong)
+		require.Falsef(t, staleErr == nil || stale.Revision != state.Revision,
+			"stale reset = state %#v error %v", stale, staleErr)
 	}
+
 }
 
 func TestResetFailedHackSerializesConcurrentDuplicateRequests(t *testing.T) {
@@ -1485,16 +1933,19 @@ func TestResetFailedHackSerializesConcurrentDuplicateRequests(t *testing.T) {
 			accepted++
 		}
 	}
-	if accepted != 1 || fixture.service.Revision() != revisionBefore+1 {
-		t.Fatalf("concurrent resets accepted=%d revision=%d, want 1/%d", accepted, fixture.service.Revision(), revisionBefore+1)
-	}
+	require.Falsef(t, accepted != 1 || fixture.service.Revision() != revisionBefore+1,
+		"concurrent resets accepted=%d revision=%d, want 1/%d", accepted, fixture.service.Revision(), revisionBefore+1)
+
 	fresh := canonicalTerminal(t, fixture.service, "terminal-a")
-	if fresh.Hack == nil || fresh.Hack.Failed || fresh.Hack.Solved || fresh.Hack.AttemptsLeft != fresh.Hack.AttemptsMax {
-		t.Fatalf("serialized reset result = %#v", fresh)
+	require.Falsef(t, fresh.Hack == nil || fresh.Hack.Failed || fresh.Hack.Solved || fresh.Hack.AttemptsLeft != fresh.Hack.AttemptsMax,
+		"serialized reset result = %#v", fresh)
+	{
+
+		_, _, resets := fixture.terminals.DecisionCalls()
+		require.Falsef(t, resets != 1,
+			"concurrent reset lifecycle calls = %d, want 1", resets)
 	}
-	if _, _, resets := fixture.terminals.DecisionCalls(); resets != 1 {
-		t.Fatalf("concurrent reset lifecycle calls = %d, want 1", resets)
-	}
+
 }
 
 func TestCurrentLiveForSessionResumesCoordinatorOwnedRuntimeWithoutRegeneration(t *testing.T) {
@@ -1502,47 +1953,51 @@ func TestCurrentLiveForSessionResumesCoordinatorOwnedRuntimeWithoutRegeneration(
 	service := New(Config{IDs: &counterIDSource{}, Runtime: liveService, Terminals: liveService})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	controller := service.CreateSession("resume-controller")
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: "resume-controller", SessionID: controller.SessionID, RequestID: "resume-select",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); !result.Accepted {
-		t.Fatalf("SelectCharacter() = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: "resume-controller", SessionID: controller.SessionID, RequestID: "resume-select",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"SelectCharacter() = %#v", result)
 	}
+
 	if _, err = service.RequestTerminalActivation(terminalTarget("terminal-resume", "Resume Terminal")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 
 	want, revision, ok := service.CurrentLiveForSession(controller.SessionID)
-	if !ok || want == nil || want.TerminalID != "terminal-resume" || want.Hack == nil {
-		t.Fatalf("CurrentLiveForSession() = %#v, %d, %v", want, revision, ok)
-	}
+	require.Falsef(t, !ok || want == nil || want.TerminalID != "terminal-resume" || want.Hack == nil,
+		"CurrentLiveForSession() = %#v, %d, %v", want, revision, ok)
+
 	want.TerminalName = "mutated detached projection"
 	want.Hack.AttemptsLeft = -1
 	canonical, canonicalRevision, ok := service.CurrentLiveForSession(controller.SessionID)
-	if !ok || canonical == nil || canonical.TerminalName != "Resume Terminal" || canonical.Hack.AttemptsLeft < 0 || canonicalRevision != revision {
-		t.Fatalf("detached current live = %#v revision=%d ok=%v", canonical, canonicalRevision, ok)
-	}
+	require.Falsef(t, !ok || canonical == nil || canonical.TerminalName != "Resume Terminal" || canonical.Hack.AttemptsLeft < 0 || canonicalRevision != revision,
+		"detached current live = %#v revision=%d ok=%v", canonical, canonicalRevision, ok)
 
 	returnedToken, resumed := service.AttachConnection("resume-new-tab", controller.BrowserToken)
-	if returnedToken != controller.BrowserToken || resumed == nil || resumed.SessionID != controller.SessionID || resumed.Role != domain.PlayerRoleActive || resumed.ActiveTerminalID != "terminal-resume" {
-		t.Fatalf("recognized resume = token %q state %#v", returnedToken, resumed)
-	}
+	require.Falsef(t, returnedToken != controller.BrowserToken || resumed == nil || resumed.SessionID != controller.SessionID || resumed.Role != domain.PlayerRoleActive || resumed.ActiveTerminalID != "terminal-resume",
+		"recognized resume = token %q state %#v", returnedToken, resumed)
+
 	resumedLive, _, ok := service.CurrentLiveForSession(resumed.SessionID)
-	if !ok || !reflect.DeepEqual(resumedLive, canonical) {
-		t.Fatalf("resumed live regenerated or drifted\nwant=%#v\ngot=%#v", canonical, resumedLive)
-	}
+	require.Falsef(t, !ok || !cmp.Equal(resumedLive, canonical),
+		"resumed live regenerated or drifted\nwant=%#v\ngot=%#v", canonical, resumedLive)
 
 	unassigned := service.CreateSession("resume-unassigned")
-	if leaked, _, available := service.CurrentLiveForSession(unassigned.SessionID); available || leaked != nil {
-		t.Fatalf("unassigned session received coordinator runtime: %#v", leaked)
+	{
+		leaked, _, available := service.CurrentLiveForSession(unassigned.SessionID)
+		require.Falsef(t, available || leaked != nil,
+			"unassigned session received coordinator runtime: %#v", leaked)
 	}
+
 }
 
 func TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime(t *testing.T) {
@@ -1554,55 +2009,64 @@ func TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime(t *testing.T) 
 	})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	controller := service.CreateSession("force-controller")
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: "force-controller", SessionID: controller.SessionID, RequestID: "force-select",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); !result.Accepted {
-		t.Fatalf("SelectCharacter() = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: "force-controller", SessionID: controller.SessionID, RequestID: "force-select",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"SelectCharacter() = %#v", result)
 	}
+
 	if _, err = service.RequestTerminalActivation(terminalTarget("terminal-force", "Force Terminal")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	before, beforeRevision, ok := service.CurrentLiveForSession(controller.SessionID)
-	if !ok || before == nil || before.Hack == nil || before.Hack.Solved || before.Hack.Failed {
-		t.Fatalf("force precondition = %#v", before)
-	}
-	if legacy := liveService.Snapshot(); legacy != nil {
-		t.Fatalf("legacy live slot unexpectedly owns coordinator runtime: %#v", legacy)
+	require.Falsef(t, !ok || before == nil || before.Hack == nil || before.Hack.Solved || before.Hack.Failed,
+		"force precondition = %#v", before)
+	{
+
+		legacy := liveService.Snapshot()
+		require.Falsef(t, legacy != nil,
+			"legacy live slot unexpectedly owns coordinator runtime: %#v", legacy)
 	}
 
 	forced, accepted := service.ForceHackSuccess()
-	if !accepted || forced == nil || !forced.Solved || forced.Failed || forced.AttemptsLeft != before.Hack.AttemptsLeft {
-		t.Fatalf("ForceHackSuccess() = %#v, %v", forced, accepted)
-	}
+	require.Falsef(t, !accepted || forced == nil || !forced.Solved || forced.Failed || forced.AttemptsLeft != before.Hack.AttemptsLeft,
+		"ForceHackSuccess() = %#v, %v", forced, accepted)
+
 	after, afterRevision, ok := service.CurrentLiveForSession(controller.SessionID)
-	if !ok || after == nil || after.Hack == nil || !after.Hack.Solved || after.Hack.Failed || afterRevision != beforeRevision+1 {
-		t.Fatalf("forced canonical runtime = %#v revision=%d", after, afterRevision)
+	require.Falsef(t, !ok || after == nil || after.Hack == nil || !after.Hack.Solved || after.Hack.Failed || afterRevision != beforeRevision+1,
+		"forced canonical runtime = %#v revision=%d", after, afterRevision)
+	{
+
+		legacy := liveService.Snapshot()
+		require.Falsef(t, legacy != nil,
+			"trusted force populated legacy live slot: %#v", legacy)
 	}
-	if legacy := liveService.Snapshot(); legacy != nil {
-		t.Fatalf("trusted force populated legacy live slot: %#v", legacy)
-	}
-	if !hasLiveEffectAtRevision(effects.Values(), afterRevision, "terminal-force") {
-		t.Fatalf("trusted force emitted no complete live projection at revision %d", afterRevision)
-	}
+	require.Falsef(t, !hasLiveEffectAtRevision(effects.Values(), afterRevision, "terminal-force"),
+		"trusted force emitted no complete live projection at revision %d", afterRevision)
+
 	liveEffects := 0
 	for _, effect := range effects.Values() {
 		if effect.Revision == afterRevision && effect.Live != nil {
 			liveEffects++
 		}
 	}
-	if liveEffects != 1 {
-		t.Fatalf("trusted force emitted %d live projections at revision %d, want 1", liveEffects, afterRevision)
-	}
-	if duplicate, duplicateOK := service.ForceHackSuccess(); duplicateOK || duplicate != nil || service.Revision() != afterRevision {
-		t.Fatalf("duplicate force = %#v, %v revision=%d", duplicate, duplicateOK, service.Revision())
+	require.Falsef(t, liveEffects != 1,
+		"trusted force emitted %d live projections at revision %d, want 1", liveEffects, afterRevision)
+	{
+
+		duplicate, duplicateOK := service.ForceHackSuccess()
+		require.Falsef(t, duplicateOK || duplicate != nil || service.Revision() != afterRevision,
+			"duplicate force = %#v, %v revision=%d", duplicate, duplicateOK, service.Revision())
 	}
 
 	service.commit(func(runtime *domain.ProcessRuntime) transition {
@@ -1613,9 +2077,12 @@ func TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime(t *testing.T) 
 		return transition{accepted: true}
 	})
 	failedRevision := service.Revision()
-	if failed, failedOK := service.ForceHackSuccess(); failedOK || failed != nil || service.Revision() != failedRevision {
-		t.Fatalf("failed-puzzle force = %#v, %v revision=%d", failed, failedOK, service.Revision())
+	{
+		failed, failedOK := service.ForceHackSuccess()
+		require.Falsef(t, failedOK || failed != nil || service.Revision() != failedRevision,
+			"failed-puzzle force = %#v, %v revision=%d", failed, failedOK, service.Revision())
 	}
+
 }
 
 func hasLiveEffectAtRevision(effects []Effect, revision uint64, terminalID string) bool {
@@ -1635,18 +2102,18 @@ func TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity(t *
 
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
 	state, err = service.AddCharacter("Boone")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	booneID := state.Roster[1].ID
 	rosterBefore := append([]domain.MasterRosterEntry(nil), state.Roster...)
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	firstBroadcastID := state.Broadcast.ID
 	firstConnection := domain.ConnectionID("lifetime-first")
@@ -1654,94 +2121,101 @@ func TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity(t *
 	first := service.CreateSession(firstConnection)
 	second := service.CreateSession(secondConnection)
 	if _, err = service.RenameLogicalSession(first.SessionID, "TABLET LEFT"); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if _, err = service.RenameLogicalSession(second.SessionID, "TABLET RIGHT"); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: firstConnection, SessionID: first.SessionID, RequestID: "lifetime-first-request",
-		BroadcastID: firstBroadcastID, CharacterID: maraID,
-	}); !result.Accepted {
-		t.Fatalf("first-broadcast controller selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: firstConnection, SessionID: first.SessionID, RequestID: "lifetime-first-request",
+			BroadcastID: firstBroadcastID, CharacterID: maraID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"first-broadcast controller selection = %#v", result)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: secondConnection, SessionID: second.SessionID, RequestID: "lifetime-second-request",
-		BroadcastID: firstBroadcastID, CharacterID: booneID,
-	}); !result.Accepted {
-		t.Fatalf("first-broadcast observer selection = %#v", result)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: secondConnection, SessionID: second.SessionID, RequestID: "lifetime-second-request",
+			BroadcastID: firstBroadcastID, CharacterID: booneID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"first-broadcast observer selection = %#v", result)
 	}
+
 	if _, err = service.RequestTerminalActivation(terminalTarget("lifetime-terminal-a", "Terminal A")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.RequestTerminalActivation(terminalTarget("lifetime-terminal-b", "Terminal B"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	assertPendingSwitch(t, state, firstBroadcastID, "lifetime-terminal-a", "lifetime-terminal-b")
-	if cacheCount := requestCacheCount(t, service); cacheCount < 2 {
-		t.Fatalf("populated first-broadcast request cache count = %d, want at least 2", cacheCount)
+	{
+		cacheCount := requestCacheCount(t, service)
+		require.Falsef(t, cacheCount < 2,
+			"populated first-broadcast request cache count = %d, want at least 2", cacheCount)
 	}
-	if slots := canonicalTerminalSlots(t, service); len(slots) == 0 {
-		t.Fatal("populated first broadcast has no coordinator-owned terminal runtime")
+	{
+
+		slots := canonicalTerminalSlots(t, service)
+		require.False(t, len(slots) == 0,
+			"populated first broadcast has no coordinator-owned terminal runtime")
 	}
 
 	baseline := effects.Calls()
 	beforeEndRevision := service.Revision()
 	ended, err := service.EndBroadcast()
-	if err != nil {
-		t.Fatalf("EndBroadcast() error = %v", err)
-	}
-	if ended == nil || ended.Revision != beforeEndRevision+1 || ended.Broadcast != nil || ended.PendingSwitch != nil {
-		t.Fatalf("EndBroadcast() state = %#v, want no broadcast at revision %d", ended, beforeEndRevision+1)
-	}
-	if !reflect.DeepEqual(masterRosterIdentities(ended), masterRosterIdentities(&domain.MasterCoordinationState{Roster: rosterBefore})) {
-		t.Fatalf("broadcast end changed retained roster\nbefore: %#v\nafter:  %#v", rosterBefore, ended.Roster)
-	}
+	require.Falsef(t, err != nil,
+		"EndBroadcast() error = %v", err)
+	require.Falsef(t, ended == nil || ended.Revision != beforeEndRevision+1 || ended.Broadcast != nil || ended.PendingSwitch != nil,
+		"EndBroadcast() state = %#v, want no broadcast at revision %d", ended, beforeEndRevision+1)
+	require.Falsef(t, !cmp.Equal(masterRosterIdentities(ended), masterRosterIdentities(&domain.MasterCoordinationState{Roster: rosterBefore})),
+		"broadcast end changed retained roster\nbefore: %#v\nafter:  %#v", rosterBefore, ended.Roster)
+
 	firstEnded := masterSession(t, ended, first.SessionID)
 	secondEnded := masterSession(t, ended, second.SessionID)
-	if firstEnded.FallbackName != "TABLET LEFT" || secondEnded.FallbackName != "TABLET RIGHT" || !firstEnded.Connected || !secondEnded.Connected {
-		t.Fatalf("broadcast end changed retained session identity/presence: first %#v second %#v", firstEnded, secondEnded)
-	}
+	require.Falsef(t, firstEnded.FallbackName != "TABLET LEFT" || secondEnded.FallbackName != "TABLET RIGHT" || !firstEnded.Connected || !secondEnded.Connected,
+		"broadcast end changed retained session identity/presence: first %#v second %#v", firstEnded, secondEnded)
+
 	for _, session := range []domain.MasterSessionEntry{firstEnded, secondEnded} {
-		if session.Character != nil || session.Role != domain.PlayerRoleUnassigned {
-			t.Fatalf("broadcast end retained assignment/controller role: %#v", session)
-		}
+		require.Falsef(t, session.Character != nil || session.Role != domain.PlayerRoleUnassigned,
+			"broadcast end retained assignment/controller role: %#v", session)
+
 	}
 	for _, character := range ended.Roster {
-		if character.ClaimedBySessionID != nil {
-			t.Fatalf("broadcast end retained roster claim: %#v", character)
-		}
+		require.Falsef(t, character.ClaimedBySessionID != nil,
+			"broadcast end retained roster claim: %#v", character)
+
 	}
 	assertEndedRuntimeRoot(t, service)
 	assertBroadcastEndEffects(t, effects.Values()[baseline:], ended.Revision, first.SessionID, second.SessionID)
 
 	returnedToken, reattached := service.AttachConnection("lifetime-first-reopen", first.BrowserToken)
-	if returnedToken != first.BrowserToken || reattached == nil || reattached.SessionID != first.SessionID || reattached.FallbackName != "TABLET LEFT" || reattached.Character != nil || reattached.Phase != domain.PlayerPhaseNoBroadcast {
-		t.Fatalf("same-process post-end token/session = token %q state %#v", returnedToken, reattached)
-	}
+	require.Falsef(t, returnedToken != first.BrowserToken || reattached == nil || reattached.SessionID != first.SessionID || reattached.FallbackName != "TABLET LEFT" || reattached.Character != nil || reattached.Phase != domain.PlayerPhaseNoBroadcast,
+		"same-process post-end token/session = token %q state %#v", returnedToken, reattached)
 
 	secondBroadcast, err := service.StartBroadcast()
-	if err != nil {
-		t.Fatalf("second StartBroadcast() error = %v", err)
-	}
-	if secondBroadcast.Broadcast == nil || secondBroadcast.Broadcast.ID == "" || secondBroadcast.Broadcast.ID == firstBroadcastID {
-		t.Fatalf("second broadcast ID = %#v, want fresh from %q", secondBroadcast.Broadcast, firstBroadcastID)
-	}
-	if secondBroadcast.Broadcast.ControllerSessionID != nil || secondBroadcast.Broadcast.ActiveTerminalID != nil || secondBroadcast.PendingSwitch != nil {
-		t.Fatalf("fresh broadcast retained controller/terminal/pending state: %#v", secondBroadcast)
-	}
-	if !reflect.DeepEqual(masterRosterIdentities(secondBroadcast), masterRosterIdentities(ended)) {
-		t.Fatalf("second broadcast changed roster identities: %#v vs %#v", secondBroadcast.Roster, ended.Roster)
-	}
+	require.Falsef(t, err != nil,
+		"second StartBroadcast() error = %v", err)
+	require.Falsef(t, secondBroadcast.Broadcast == nil || secondBroadcast.Broadcast.ID == "" || secondBroadcast.Broadcast.ID == firstBroadcastID,
+		"second broadcast ID = %#v, want fresh from %q", secondBroadcast.Broadcast, firstBroadcastID)
+	require.Falsef(t, secondBroadcast.Broadcast.ControllerSessionID != nil || secondBroadcast.Broadcast.ActiveTerminalID != nil || secondBroadcast.PendingSwitch != nil,
+		"fresh broadcast retained controller/terminal/pending state: %#v", secondBroadcast)
+	require.Falsef(t, !cmp.Equal(masterRosterIdentities(secondBroadcast), masterRosterIdentities(ended)),
+		"second broadcast changed roster identities: %#v vs %#v", secondBroadcast.Roster, ended.Roster)
+
 	for _, sessionID := range []domain.LogicalSessionID{first.SessionID, second.SessionID} {
 		player, ok := service.PlayerSnapshot(sessionID)
-		if !ok || player.Character != nil || player.Role != domain.PlayerRoleUnassigned || player.Phase != domain.PlayerPhaseSelecting {
-			t.Fatalf("fresh broadcast session %q = %#v, ok=%t", sessionID, player, ok)
-		}
+		require.Falsef(t, !ok || player.Character != nil || player.Role != domain.PlayerRoleUnassigned || player.Phase != domain.PlayerPhaseSelecting,
+			"fresh broadcast session %q = %#v, ok=%t", sessionID, player, ok)
+
 	}
-	if cacheCount := requestCacheCount(t, service); cacheCount != 0 {
-		t.Fatalf("fresh broadcast retained %d prior request results", cacheCount)
+	{
+		cacheCount := requestCacheCount(t, service)
+		require.Falsef(t, cacheCount != 0,
+			"fresh broadcast retained %d prior request results", cacheCount)
 	}
 
 	// Reusing an old request ID with a new-broadcast payload proves that the
@@ -1750,14 +2224,17 @@ func TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity(t *
 		ConnectionID: secondConnection, SessionID: second.SessionID, RequestID: "lifetime-second-request",
 		BroadcastID: secondBroadcast.Broadcast.ID, CharacterID: maraID,
 	})
-	if !newController.Accepted {
-		t.Fatalf("fresh-broadcast reused request ID = %#v, want new accepted selection", newController)
-	}
+	require.Falsef(t, !newController.Accepted,
+		"fresh-broadcast reused request ID = %#v, want new accepted selection", newController)
+
 	final := service.Snapshot()
 	assertExactlyOneController(t, final, second.SessionID)
-	if got := masterSession(t, final, first.SessionID); got.Character != nil || got.Role != domain.PlayerRoleUnassigned {
-		t.Fatalf("old controller retained ownership in fresh broadcast: %#v", got)
+	{
+		got := masterSession(t, final, first.SessionID)
+		require.Falsef(t, got.Character != nil || got.Role != domain.PlayerRoleUnassigned,
+			"old controller retained ownership in fresh broadcast: %#v", got)
 	}
+
 }
 
 func requestCacheCount(t *testing.T, service *Service) int {
@@ -1788,37 +2265,37 @@ func assertEndedRuntimeRoot(t *testing.T, service *Service) {
 	t.Helper()
 	service.mu.RLock()
 	defer service.mu.RUnlock()
-	if service.runtime.Broadcast != nil || service.runtime.PendingSwitch != nil {
-		t.Fatalf("ended runtime retained broadcast/pending switch: %#v", service.runtime)
-	}
+	require.Falsef(t, service.runtime.Broadcast != nil || service.runtime.PendingSwitch != nil,
+		"ended runtime retained broadcast/pending switch: %#v", service.runtime)
+
 	for sessionID, session := range service.runtime.SessionsByID {
-		if session == nil || len(session.RequestResults) != 0 {
-			t.Fatalf("ended runtime session %q request cache = %#v", sessionID, session)
-		}
+		require.Falsef(t, session == nil || len(session.RequestResults) != 0,
+			"ended runtime session %q request cache = %#v", sessionID, session)
+
 	}
 }
 
 func assertBroadcastEndEffects(t *testing.T, effects []Effect, revision uint64, sessionIDs ...domain.LogicalSessionID) {
 	t.Helper()
-	if masterEffectCount(effects) != 1 || !hasClearEffectAtRevision(effects, revision) {
-		t.Fatalf("broadcast end effects = %#v, want one master and terminal clear at revision %d", effects, revision)
-	}
+	require.Falsef(t, masterEffectCount(effects) != 1 || !hasClearEffectAtRevision(effects, revision),
+		"broadcast end effects = %#v, want one master and terminal clear at revision %d", effects, revision)
+
 	seenPlayers := make(map[domain.LogicalSessionID]bool)
 	for _, effect := range effects {
-		if effect.Revision != revision {
-			t.Fatalf("broadcast end effect revision = %d, want %d", effect.Revision, revision)
-		}
+		require.Falsef(t, effect.Revision != revision,
+			"broadcast end effect revision = %d, want %d", effect.Revision, revision)
+
 		if effect.Player != nil {
-			if effect.Player.Character != nil || effect.Player.Role != domain.PlayerRoleUnassigned || effect.Player.Phase != domain.PlayerPhaseNoBroadcast {
-				t.Fatalf("broadcast end player effect = %#v", effect.Player)
-			}
+			require.Falsef(t, effect.Player.Character != nil || effect.Player.Role != domain.PlayerRoleUnassigned || effect.Player.Phase != domain.PlayerPhaseNoBroadcast,
+				"broadcast end player effect = %#v", effect.Player)
+
 			seenPlayers[effect.SessionID] = true
 		}
 	}
 	for _, sessionID := range sessionIDs {
-		if !seenPlayers[sessionID] {
-			t.Fatalf("broadcast end omitted player context for session %q", sessionID)
-		}
+		require.Falsef(t, !seenPlayers[sessionID],
+			"broadcast end omitted player context for session %q", sessionID)
+
 	}
 }
 
@@ -1839,42 +2316,46 @@ func newUS8SwitchFixture(t *testing.T) us8SwitchFixture {
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	characterID := state.Roster[0].ID
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	connectionID := domain.ConnectionID("decision-controller")
 	controller := service.CreateSession(connectionID)
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "decision-select",
-		BroadcastID: state.Broadcast.ID, CharacterID: characterID,
-	}); !result.Accepted {
-		t.Fatalf("controller selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "decision-select",
+			BroadcastID: state.Broadcast.ID, CharacterID: characterID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"controller selection = %#v", result)
 	}
+
 	if _, err = service.RequestTerminalActivation(terminalTarget("terminal-a", "Terminal A")); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	return us8SwitchFixture{service: service, effects: effects, actions: actions, terminals: terminals, broadcastID: state.Broadcast.ID, connectionID: connectionID}
 }
 
 func assertPendingSwitch(t *testing.T, state *domain.MasterCoordinationState, broadcastID domain.BroadcastID, sourceTerminalID string, targetTerminalID string) {
 	t.Helper()
-	if state == nil || state.Broadcast == nil || state.Broadcast.ID != broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != sourceTerminalID || state.PendingSwitch == nil {
-		t.Fatalf("pending switch state = %#v", state)
-	}
-	if state.PendingSwitch.BroadcastID != broadcastID || state.PendingSwitch.SourceTerminalID != sourceTerminalID {
-		t.Fatalf("pending switch source/broadcast = %#v", state.PendingSwitch)
-	}
+	require.Falsef(t, state == nil || state.Broadcast == nil || state.Broadcast.ID != broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != sourceTerminalID || state.PendingSwitch == nil,
+		"pending switch state = %#v", state)
+	require.Falsef(t, state.PendingSwitch.BroadcastID != broadcastID || state.PendingSwitch.SourceTerminalID != sourceTerminalID,
+		"pending switch source/broadcast = %#v", state.PendingSwitch)
+
 	if targetTerminalID == "" {
-		if state.PendingSwitch.TargetTerminalID != nil {
-			t.Fatalf("pending clear target = %#v, want nil", state.PendingSwitch.TargetTerminalID)
-		}
-	} else if state.PendingSwitch.TargetTerminalID == nil || *state.PendingSwitch.TargetTerminalID != targetTerminalID {
-		t.Fatalf("pending activation target = %#v, want %q", state.PendingSwitch.TargetTerminalID, targetTerminalID)
+		require.Falsef(t, state.PendingSwitch.TargetTerminalID != nil,
+			"pending clear target = %#v, want nil", state.PendingSwitch.TargetTerminalID)
+
+	} else {
+		require.Falsef(t, state.PendingSwitch.TargetTerminalID == nil || *state.PendingSwitch.TargetTerminalID != targetTerminalID,
+			"pending activation target = %#v, want %q", state.PendingSwitch.TargetTerminalID, targetTerminalID)
 	}
+
 }
 
 type recordingDecisionTerminalLifecycle struct {
@@ -1962,13 +2443,13 @@ func terminalTarget(id string, name string) domain.TerminalTarget {
 
 func assertActiveTerminalAndIdentity(t *testing.T, state *domain.MasterCoordinationState, terminalID string, broadcastID domain.BroadcastID, controllerID domain.LogicalSessionID, assignments map[domain.LogicalSessionID]domain.CharacterID) {
 	t.Helper()
-	if state == nil || state.Broadcast == nil || state.Broadcast.ID != broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != terminalID {
-		t.Fatalf("active terminal state = %#v, want broadcast %q terminal %q", state, broadcastID, terminalID)
-	}
+	require.Falsef(t, state == nil || state.Broadcast == nil || state.Broadcast.ID != broadcastID || state.Broadcast.ActiveTerminalID == nil || *state.Broadcast.ActiveTerminalID != terminalID,
+		"active terminal state = %#v, want broadcast %q terminal %q", state, broadcastID, terminalID)
+
 	assertExactlyOneController(t, state, controllerID)
-	if !reflect.DeepEqual(masterAssignments(state), assignments) {
-		t.Fatalf("terminal transition changed assignments: got %#v want %#v", masterAssignments(state), assignments)
-	}
+	require.Falsef(t, !cmp.Equal(masterAssignments(state), assignments),
+		"terminal transition changed assignments: got %#v want %#v", masterAssignments(state), assignments)
+
 }
 
 func canonicalTerminalSlots(t *testing.T, service *Service) map[string]*domain.TerminalRuntime {
@@ -2052,19 +2533,17 @@ func (lifecycle *recordingTerminalLifecycle) Calls() (int, int, int) {
 
 func assertPresenceOnlyEffects(t *testing.T, effects []Effect, revision uint64) {
 	t.Helper()
-	if masterEffectCount(effects) != 1 {
-		t.Fatalf("presence transition master effects = %d, want exactly 1 in %#v", masterEffectCount(effects), effects)
-	}
+	require.Falsef(t, masterEffectCount(effects) != 1,
+		"presence transition master effects = %d, want exactly 1 in %#v", masterEffectCount(effects), effects)
+
 	for _, effect := range effects {
-		if effect.Revision != revision {
-			t.Fatalf("presence effect revision = %d, want %d", effect.Revision, revision)
-		}
-		if effect.Live != nil || effect.Hack != nil || effect.Result != nil || effect.ClearLiveTerminal || effect.TerminalID != "" || effect.ConnectionID != "" {
-			t.Fatalf("presence transition emitted gameplay/result payload: %#v", effect)
-		}
-		if effect.Master == nil && effect.Player == nil {
-			t.Fatalf("presence transition emitted empty effect: %#v", effect)
-		}
+		require.Falsef(t, effect.Revision != revision,
+			"presence effect revision = %d, want %d", effect.Revision, revision)
+		require.Falsef(t, effect.Live != nil || effect.Hack != nil || effect.Result != nil || effect.ClearLiveTerminal || effect.TerminalID != "" || effect.ConnectionID != "",
+			"presence transition emitted gameplay/result payload: %#v", effect)
+		require.Falsef(t, effect.Master == nil && effect.Player == nil && effect.Update == nil,
+			"presence transition emitted empty effect: %#v", effect)
+
 	}
 }
 
@@ -2073,26 +2552,25 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	service := New(Config{IDs: &counterIDSource{}, Runtime: runtime})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
 	state, err = service.AddCharacter("Boone")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	booneID := state.Roster[1].ID
 	state, err = service.AddCharacter("Mara")
-	if err != nil {
-		t.Fatalf("duplicate character names must remain valid: %v", err)
-	}
-	if len(state.Roster) != 3 || state.Roster[2].Name != "Mara" || state.Roster[2].ID == maraID {
-		t.Fatalf("duplicate-name roster entry = %#v, want a distinct stable identity", state.Roster)
-	}
+	require.Falsef(t, err != nil,
+		"duplicate character names must remain valid: %v", err)
+	require.Falsef(t, len(state.Roster) != 3 || state.Roster[2].Name != "Mara" || state.Roster[2].ID == maraID,
+		"duplicate-name roster entry = %#v, want a distinct stable identity", state.Roster)
+
 	duplicateMaraID := state.Roster[2].ID
 
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	first := service.CreateSession("gm-first")
 	second := service.CreateSession("gm-second")
@@ -2106,24 +2584,26 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	runtimeBefore := canonicalTerminalBytes(t, service, terminalID)
 
 	state, err = service.RenameCharacter(maraID, "  Mara Voss  ")
-	if err != nil {
-		t.Fatalf("RenameCharacter() error = %v", err)
-	}
-	if state.Roster[0].ID != maraID || state.Roster[0].Name != "Mara Voss" {
-		t.Fatalf("renamed roster entry = %#v, want stable ID and trimmed name", state.Roster[0])
-	}
+	require.Falsef(t, err != nil,
+		"RenameCharacter() error = %v", err)
+	require.Falsef(t, state.Roster[0].ID != maraID || state.Roster[0].Name != "Mara Voss",
+		"renamed roster entry = %#v, want stable ID and trimmed name", state.Roster[0])
+
 	assertRejectedCoordinationMutation(t, service, func() error {
 		_, renameErr := service.RenameCharacter(maraID, strings.Repeat("x", 81))
 		return renameErr
 	})
 
 	state, err = service.RenameLogicalSession(first.SessionID, "  TABLET LEFT  ")
-	if err != nil {
-		t.Fatalf("RenameLogicalSession() error = %v", err)
+	require.Falsef(t, err != nil,
+		"RenameLogicalSession() error = %v", err)
+	{
+
+		got := masterSession(t, state, first.SessionID).FallbackName
+		require.Falsef(t, got != "TABLET LEFT",
+			"renamed fallback = %q, want TABLET LEFT", got)
 	}
-	if got := masterSession(t, state, first.SessionID).FallbackName; got != "TABLET LEFT" {
-		t.Fatalf("renamed fallback = %q, want TABLET LEFT", got)
-	}
+
 	assertRejectedCoordinationMutation(t, service, func() error {
 		_, renameErr := service.RenameLogicalSession(second.SessionID, "TABLET LEFT")
 		return renameErr
@@ -2134,20 +2614,22 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	})
 
 	state, err = service.AssignCharacter(first.SessionID, maraID)
-	if err != nil {
-		t.Fatalf("AssignCharacter(first) error = %v", err)
-	}
-	if state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != first.SessionID {
-		t.Fatalf("first GM assignment controller = %#v, want %q", state.Broadcast, first.SessionID)
-	}
+	require.Falsef(t, err != nil,
+		"AssignCharacter(first) error = %v", err)
+	require.Falsef(t, state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != first.SessionID,
+		"first GM assignment controller = %#v, want %q", state.Broadcast, first.SessionID)
+
 	state, err = service.AssignCharacter(second.SessionID, booneID)
-	if err != nil {
-		t.Fatalf("AssignCharacter(second) error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"AssignCharacter(second) error = %v", err)
+
 	assertExclusiveClaimInvariants(t, state)
-	if got := masterSession(t, state, second.SessionID).Role; got != domain.PlayerRoleObserver {
-		t.Fatalf("second GM assignment role = %q, want observer", got)
+	{
+		got := masterSession(t, state, second.SessionID).Role
+		require.Falsef(t, got != domain.PlayerRoleObserver,
+			"second GM assignment role = %q, want observer", got)
 	}
+
 	assertRejectedCoordinationMutation(t, service, func() error {
 		_, assignErr := service.AssignCharacter(third.SessionID, booneID)
 		return assignErr
@@ -2158,59 +2640,71 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	})
 
 	state, err = service.MoveCharacter(maraID, third.SessionID)
-	if err != nil {
-		t.Fatalf("MoveCharacter() error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"MoveCharacter() error = %v", err)
+
 	assertExclusiveClaimInvariants(t, state)
-	if state.Broadcast.ControllerSessionID != nil {
-		t.Fatalf("moving the controller character retained or promoted control: %#v", state.Broadcast)
+	require.Falsef(t, state.Broadcast.ControllerSessionID != nil,
+		"moving the controller character retained or promoted control: %#v", state.Broadcast)
+	{
+
+		got := masterSession(t, state, first.SessionID)
+		require.Falsef(t, got.Character != nil || got.Role != domain.PlayerRoleUnassigned,
+			"former owner after move = %#v, want unassigned", got)
 	}
-	if got := masterSession(t, state, first.SessionID); got.Character != nil || got.Role != domain.PlayerRoleUnassigned {
-		t.Fatalf("former owner after move = %#v, want unassigned", got)
-	}
-	if got := masterSession(t, state, third.SessionID); got.Character == nil || got.Character.ID != maraID || got.Role != domain.PlayerRoleObserver {
-		t.Fatalf("move destination = %#v, want observer owning stable Mara ID", got)
+	{
+
+		got := masterSession(t, state, third.SessionID)
+		require.Falsef(t, got.Character == nil || got.Character.ID != maraID || got.Role != domain.PlayerRoleObserver,
+			"move destination = %#v, want observer owning stable Mara ID", got)
 	}
 
 	state, err = service.ReleaseCharacter(second.SessionID)
-	if err != nil {
-		t.Fatalf("ReleaseCharacter() error = %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"ReleaseCharacter() error = %v", err)
+
 	assertExclusiveClaimInvariants(t, state)
-	if got := masterSession(t, state, second.SessionID); got.Character != nil || got.Role != domain.PlayerRoleUnassigned {
-		t.Fatalf("released session = %#v, want unassigned", got)
-	}
-	state, err = service.DeleteCharacter(booneID)
-	if err != nil {
-		t.Fatalf("DeleteCharacter(unclaimed) error = %v", err)
-	}
-	for _, rosterEntry := range state.Roster {
-		if rosterEntry.ID == booneID {
-			t.Fatalf("deleted character remains in roster: %#v", state.Roster)
-		}
-	}
-	if state.Roster[1].ID != duplicateMaraID {
-		t.Fatalf("delete changed surviving stable roster order: %#v", state.Roster)
+	{
+		got := masterSession(t, state, second.SessionID)
+		require.Falsef(t, got.Character != nil || got.Role != domain.PlayerRoleUnassigned,
+			"released session = %#v, want unassigned", got)
 	}
 
-	if runtime.RandomCalls() != 0 {
-		t.Fatalf("roster/assignment commands consumed runtime randomness %d times", runtime.RandomCalls())
+	state, err = service.DeleteCharacter(booneID)
+	require.Falsef(t, err != nil,
+		"DeleteCharacter(unclaimed) error = %v", err)
+
+	for _, rosterEntry := range state.Roster {
+		require.Falsef(t, rosterEntry.ID == booneID,
+			"deleted character remains in roster: %#v", state.Roster)
+
 	}
-	if got := canonicalTerminalBytes(t, service, terminalID); !reflect.DeepEqual(got, runtimeBefore) {
-		t.Fatalf("roster/assignment commands mutated canonical terminal/puzzle\nbefore: %s\nafter:  %s", runtimeBefore, got)
+	require.Falsef(t, state.Roster[1].ID != duplicateMaraID,
+		"delete changed surviving stable roster order: %#v", state.Roster)
+	require.Falsef(t, runtime.RandomCalls() != 0,
+		"roster/assignment commands consumed runtime randomness %d times", runtime.RandomCalls())
+	{
+
+		got := canonicalTerminalBytes(t, service, terminalID)
+		require.Falsef(t, !cmp.Equal(got, runtimeBefore),
+			"roster/assignment commands mutated canonical terminal/puzzle\nbefore: %s\nafter:  %s", runtimeBefore, got)
 	}
+
 }
 
 func assertRejectedCoordinationMutation(t *testing.T, service *Service, command func() error) {
 	t.Helper()
 	before := service.Snapshot()
-	if err := command(); err == nil {
-		t.Fatal("coordination command unexpectedly succeeded")
+	{
+		err := command()
+		require.False(t, err == nil,
+			"coordination command unexpectedly succeeded")
 	}
+
 	after := service.Snapshot()
-	if !reflect.DeepEqual(after, before) {
-		t.Fatalf("rejected coordination command changed state\nbefore: %#v\nafter:  %#v", before, after)
-	}
+	require.Falsef(t, !cmp.Equal(after, before),
+		"rejected coordination command changed state\nbefore: %#v\nafter:  %#v", before, after)
+
 }
 
 func masterEffectCount(effects []Effect) int {
@@ -2236,6 +2730,7 @@ type us2Fixture struct {
 	unassignedSession    domain.LogicalSessionID
 	controllerToken      domain.BrowserToken
 	observerToken        domain.BrowserToken
+	unassignedToken      domain.BrowserToken
 }
 
 func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
@@ -2244,15 +2739,15 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: runtime})
 	state, err := service.AddCharacter("Mara")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.AddCharacter("Boone")
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	state, err = service.StartBroadcast()
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	controllerConnection := domain.ConnectionID("connection-controller")
 	observerConnection := domain.ConnectionID("connection-observer")
@@ -2260,18 +2755,24 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 	controller := service.CreateSession(controllerConnection)
 	observer := service.CreateSession(observerConnection)
 	unassigned := service.CreateSession(unassignedConnection)
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: controllerConnection, SessionID: controller.SessionID, RequestID: "select-controller",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
-	}); !result.Accepted {
-		t.Fatalf("controller selection = %#v", result)
+	{
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: controllerConnection, SessionID: controller.SessionID, RequestID: "select-controller",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"controller selection = %#v", result)
 	}
-	if result := service.SelectCharacter(CharacterSelection{
-		ConnectionID: observerConnection, SessionID: observer.SessionID, RequestID: "select-observer",
-		BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[1].ID,
-	}); !result.Accepted {
-		t.Fatalf("observer selection = %#v", result)
+	{
+
+		result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: observerConnection, SessionID: observer.SessionID, RequestID: "select-observer",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[1].ID,
+		})
+		require.Falsef(t, !result.Accepted,
+			"observer selection = %#v", result)
 	}
+
 	terminalID := "terminal-1"
 	service.commit(func(root *domain.ProcessRuntime) transition {
 		root.Broadcast.ActiveTerminalID = &terminalID
@@ -2282,7 +2783,7 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 		service: service, effects: effects, broadcastID: state.Broadcast.ID, terminalID: terminalID,
 		controllerConnection: controllerConnection, observerConnection: observerConnection, unassignedConnection: unassignedConnection,
 		controllerSession: controller.SessionID, observerSession: observer.SessionID, unassignedSession: unassigned.SessionID,
-		controllerToken: controller.BrowserToken, observerToken: observer.BrowserToken,
+		controllerToken: controller.BrowserToken, observerToken: observer.BrowserToken, unassignedToken: unassigned.BrowserToken,
 	}
 }
 
@@ -2299,7 +2800,7 @@ type recordingTerminalRuntime struct {
 func (runtime *recordingTerminalRuntime) Apply(state *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.PublicLiveState, bool) {
 	runtime.mu.Lock()
 	runtime.calls = append(runtime.calls, command)
-	if command.Kind == domain.RuntimeCommandHackPattern {
+	if command.Kind == domain.RuntimeCommandActivatePattern {
 		runtime.randomCalls++
 	}
 	started := runtime.started
@@ -2313,14 +2814,14 @@ func (runtime *recordingTerminalRuntime) Apply(state *domain.TerminalRuntime, co
 	}
 
 	switch command.Kind {
-	case domain.RuntimeCommandNavAction:
+	case domain.RuntimeCommandNavigate:
 		state.Nav = nav.ApplyAction(state.Nav, state.Tree, command.Action, command.NodeID)
-	case domain.RuntimeCommandHackGuess:
+	case domain.RuntimeCommandGuess:
 		if state.Hack == nil || state.Hack.Solved || state.Hack.Failed {
 			return nil, false
 		}
 		hack.ApplyGuess(state.Hack, command.TargetID)
-	case domain.RuntimeCommandHackPattern:
+	case domain.RuntimeCommandActivatePattern:
 		return nil, false
 	default:
 		return nil, false
@@ -2348,7 +2849,7 @@ func actionResultForRequest(t *testing.T, effects *testutil.FakeOrderedEffectSin
 			return *recorded[index].Result
 		}
 	}
-	t.Fatalf("no action result effect for request %q", requestID)
+	assert.FailNowf(t, "assertion failed", "no action result effect for request %q", requestID)
 	return domain.ActionResult{}
 }
 
@@ -2387,7 +2888,7 @@ func canonicalTerminalBytes(t *testing.T, service *Service, terminalID string) [
 		Hack    *canonicalHackSnapshot
 	}{Runtime: terminal, Hack: privateHack})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	return encoded
 }
@@ -2411,9 +2912,9 @@ func canonicalTerminal(t *testing.T, service *Service, terminalID string) *domai
 	t.Helper()
 	service.mu.RLock()
 	defer service.mu.RUnlock()
-	if service.runtime.Broadcast == nil || service.runtime.Broadcast.TerminalRuntimes[terminalID] == nil {
-		t.Fatalf("canonical terminal %q is absent", terminalID)
-	}
+	require.Falsef(t, service.runtime.Broadcast == nil || service.runtime.Broadcast.TerminalRuntimes[terminalID] == nil,
+		"canonical terminal %q is absent", terminalID)
+
 	return cloneTerminalRuntime(service.runtime.Broadcast.TerminalRuntimes[terminalID])
 }
 
@@ -2468,25 +2969,27 @@ func assertExclusiveClaimInvariants(t *testing.T, state *domain.MasterCoordinati
 		if character.ClaimedBySessionID == nil {
 			continue
 		}
-		if previous, duplicate := claimBySession[*character.ClaimedBySessionID]; duplicate {
-			t.Fatalf("session %q claims both %q and %q", *character.ClaimedBySessionID, previous, character.ID)
+		{
+			previous, duplicate := claimBySession[*character.ClaimedBySessionID]
+			require.Falsef(t, duplicate,
+				"session %q claims both %q and %q", *character.ClaimedBySessionID, previous, character.ID)
 		}
+
 		claimBySession[*character.ClaimedBySessionID] = character.ID
 	}
 	for _, session := range state.Sessions {
 		claimed, hasClaim := claimBySession[session.ID]
-		if session.Character == nil && hasClaim {
-			t.Fatalf("roster claim for %q is missing from session projection", session.ID)
-		}
-		if session.Character != nil && (!hasClaim || claimed != session.Character.ID) {
-			t.Fatalf("session claim for %q disagrees with roster: session=%#v roster=%#v", session.ID, session.Character, claimBySession)
-		}
+		require.Falsef(t, session.Character == nil && hasClaim,
+			"roster claim for %q is missing from session projection", session.ID)
+		require.Falsef(t, session.Character != nil && (!hasClaim || claimed != session.Character.ID),
+			"session claim for %q disagrees with roster: session=%#v roster=%#v", session.ID, session.Character, claimBySession)
+
 	}
 	if state.Broadcast != nil && state.Broadcast.ControllerSessionID != nil {
 		controller := masterSession(t, state, *state.Broadcast.ControllerSessionID)
-		if controller.Character == nil || controller.Role != domain.PlayerRoleActive {
-			t.Fatalf("controller is not an active assigned session: %#v", controller)
-		}
+		require.Falsef(t, controller.Character == nil || controller.Role != domain.PlayerRoleActive,
+			"controller is not an active assigned session: %#v", controller)
+
 	}
 }
 
@@ -2497,7 +3000,7 @@ func masterSession(t *testing.T, state *domain.MasterCoordinationState, sessionI
 			return session
 		}
 	}
-	t.Fatalf("master state has no logical session %q", sessionID)
+	assert.FailNowf(t, "assertion failed", "master state has no logical session %q", sessionID)
 	return domain.MasterSessionEntry{}
 }
 
@@ -2531,6 +3034,34 @@ func sessionRoleCount(state *domain.MasterCoordinationState, role domain.PlayerR
 
 type counterIDSource struct {
 	next atomic.Uint64
+}
+
+type controlFixedWords struct{}
+
+type controlCountingRandom struct{ calls atomic.Int64 }
+
+func (random *controlCountingRandom) Intn(limit int) int {
+	random.calls.Add(1)
+	if limit <= 1 {
+		return 0
+	}
+	return 1
+}
+
+func (random *controlCountingRandom) Calls() int {
+	return int(random.calls.Load())
+}
+
+func (controlFixedWords) PickWords(length, count int) []string {
+	pools := map[int][]string{
+		4: {"CODE", "CAVE", "DUST", "IRON", "GATE", "BOLT", "RAMP", "CORE", "FUSE", "GRID", "LAMP", "MASK", "NODE", "PIPE", "RING", "RUST"},
+		5: {"ALLOY", "ARMOR", "ATLAS", "BASIN", "BLAST", "BRICK", "CABLE", "CACHE", "CARGO", "CLIFF", "CLOCK", "CRANE", "CRATE", "CREEK", "DRAIN", "DRONE"},
+	}
+	return append([]string(nil), pools[length][:count]...)
+}
+
+func testPatternTree() domain.ContentNode {
+	return testTerminalRuntime("pattern-tree").Tree
 }
 
 func (source *counterIDSource) Next() string {
@@ -2584,74 +3115,86 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 	store := &fakeRosterStore{}
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
+	{
 
-	if _, err := service.AddCharacter("No Store Yet"); err == nil {
-		t.Fatal("AddCharacter() without an active player config succeeded")
+		_, err := service.AddCharacter("No Store Yet")
+		require.False(t, err == nil,
+			"AddCharacter() without an active player config succeeded")
 	}
-	if got := service.Snapshot(); len(got.Roster) != 0 || got.Revision != 0 {
-		t.Fatalf("failed add changed state: %#v", got)
+	{
+
+		got := service.Snapshot()
+		require.Falsef(t, len(got.Roster) != 0 || got.Revision != 0,
+			"failed add changed state: %#v", got)
 	}
 
 	handle := domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players"}
 	emptyInstalled, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{})
-	if err != nil {
-		t.Fatalf("InstallPlayerConfig() empty roster error = %v", err)
-	}
-	if emptyInstalled.PlayerConfig == nil || len(emptyInstalled.Roster) != 0 {
-		t.Fatalf("installed empty player config = %#v", emptyInstalled)
-	}
+	require.Falsef(t, err != nil,
+		"InstallPlayerConfig() empty roster error = %v", err)
+	require.Falsef(t, emptyInstalled.PlayerConfig == nil || len(emptyInstalled.Roster) != 0,
+		"installed empty player config = %#v", emptyInstalled)
+
 	beforeNil := service.Snapshot()
-	if _, err := service.InstallPlayerConfig(handle, nil); err == nil || err.Error() != "roster must be an array" {
-		t.Fatalf("InstallPlayerConfig() nil roster error = %v, want roster array validation", err)
+	{
+		_, err := service.InstallPlayerConfig(handle, nil)
+		require.Falsef(t, err == nil || err.Error() != "roster must be an array",
+			"InstallPlayerConfig() nil roster error = %v, want roster array validation", err)
 	}
-	if afterNil := service.Snapshot(); !reflect.DeepEqual(afterNil, beforeNil) {
-		t.Fatalf("nil roster changed coordinator\nbefore=%#v\nafter=%#v", beforeNil, afterNil)
+	{
+
+		afterNil := service.Snapshot()
+		require.Falsef(t, !cmp.Equal(afterNil, beforeNil),
+			"nil roster changed coordinator\nbefore=%#v\nafter=%#v", beforeNil, afterNil)
 	}
 
 	roster := []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}, {ID: "boone", Name: "Boone"}}
 	installed, err := service.InstallPlayerConfig(handle, roster)
-	if err != nil {
-		t.Fatalf("InstallPlayerConfig() error = %v", err)
-	}
-	if installed.PlayerConfig == nil || installed.PlayerConfig.Name != "Players" || len(installed.Roster) != 2 {
-		t.Fatalf("installed state = %#v", installed)
-	}
+	require.Falsef(t, err != nil,
+		"InstallPlayerConfig() error = %v", err)
+	require.Falsef(t, installed.PlayerConfig == nil || installed.PlayerConfig.Name != "Players" || len(installed.Roster) != 2,
+		"installed state = %#v", installed)
 
 	store.fail = true
 	before := service.Snapshot()
 	effectsBefore := effects.Calls()
-	if _, err := service.RenameCharacter("mara", "Mara Voss"); err == nil {
-		t.Fatal("RenameCharacter() with failed persistence succeeded")
+	{
+		_, err := service.RenameCharacter("mara", "Mara Voss")
+		require.False(t, err == nil,
+			"RenameCharacter() with failed persistence succeeded")
 	}
-	if after := service.Snapshot(); !reflect.DeepEqual(after, before) {
-		t.Fatalf("failed persistence changed coordinator\nbefore=%#v\nafter=%#v", before, after)
+	{
+
+		after := service.Snapshot()
+		require.Falsef(t, !cmp.Equal(after, before),
+			"failed persistence changed coordinator\nbefore=%#v\nafter=%#v", before, after)
 	}
-	if effects.Calls() != effectsBefore {
-		t.Fatalf("failed persistence published %d effects", effects.Calls()-effectsBefore)
-	}
+	require.Falsef(t, effects.Calls() != effectsBefore,
+		"failed persistence published %d effects", effects.Calls()-effectsBefore)
 
 	store.fail = false
 	renamed, err := service.RenameCharacter("mara", "Mara Voss")
-	if err != nil || renamed.Roster[0].Name != "Mara Voss" {
-		t.Fatalf("RenameCharacter() = state %#v, error %v", renamed, err)
-	}
-	if len(store.saves) != 1 || store.saves[0].Roster[0].Name != "Mara Voss" {
-		t.Fatalf("persisted candidates = %#v", store.saves)
-	}
+	require.Falsef(t, err != nil || renamed.Roster[0].Name != "Mara Voss",
+		"RenameCharacter() = state %#v, error %v", renamed, err)
+	require.Falsef(t, len(store.saves) != 1 || store.saves[0].Roster[0].Name != "Mara Voss",
+		"persisted candidates = %#v", store.saves)
+
 	added, err := service.AddCharacter("Arcade")
-	if err != nil || len(added.Roster) != 3 {
-		t.Fatalf("AddCharacter() = state %#v, error %v", added, err)
-	}
+	require.Falsef(t, err != nil || len(added.Roster) != 3,
+		"AddCharacter() = state %#v, error %v", added, err)
+
 	deleted, err := service.DeleteCharacter("boone")
-	if err != nil || len(deleted.Roster) != 2 {
-		t.Fatalf("DeleteCharacter() = state %#v, error %v", deleted, err)
+	require.Falsef(t, err != nil || len(deleted.Roster) != 2,
+		"DeleteCharacter() = state %#v, error %v", deleted, err)
+	require.Falsef(t, len(store.saves) != 3,
+		"successful roster mutations saved %d candidates, want 3", len(store.saves))
+	{
+
+		got := store.saves[2].Roster
+		require.Falsef(t, len(got) != 2 || got[0].ID != "mara" || got[1].Name != "Arcade",
+			"final persisted ordered roster = %#v", got)
 	}
-	if len(store.saves) != 3 {
-		t.Fatalf("successful roster mutations saved %d candidates, want 3", len(store.saves))
-	}
-	if got := store.saves[2].Roster; len(got) != 2 || got[0].ID != "mara" || got[1].Name != "Arcade" {
-		t.Fatalf("final persisted ordered roster = %#v", got)
-	}
+
 }
 
 func TestPlayerConfigReplacementRequiresNoBroadcastAndPreservesRuntimeOnFailure(t *testing.T) {
@@ -2661,18 +3204,24 @@ func TestPlayerConfigReplacementRequiresNoBroadcastAndPreservesRuntimeOnFailure(
 	service := New(Config{IDs: &counterIDSource{}, RosterStore: store})
 	handle := domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players"}
 	if _, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}}); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if _, err := service.StartBroadcast(); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	before := service.Snapshot()
-	if _, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/Campaigns/other.json", Version: 1, Name: "Other"}, nil); err == nil {
-		t.Fatal("InstallPlayerConfig() during broadcast succeeded")
+	{
+		_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/Campaigns/other.json", Version: 1, Name: "Other"}, nil)
+		require.False(t, err == nil,
+			"InstallPlayerConfig() during broadcast succeeded")
 	}
-	if after := service.Snapshot(); !reflect.DeepEqual(after, before) {
-		t.Fatalf("rejected replacement changed state\nbefore=%#v\nafter=%#v", before, after)
+	{
+
+		after := service.Snapshot()
+		require.Falsef(t, !cmp.Equal(after, before),
+			"rejected replacement changed state\nbefore=%#v\nafter=%#v", before, after)
 	}
+
 }
 
 type fakeRosterStore struct {

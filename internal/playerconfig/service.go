@@ -66,6 +66,9 @@ func (service *Service) Create(ctx context.Context) Result {
 		return failure(err.Error())
 	}
 	config := domain.PlayerConfig{Version: 1, Name: nameFromPath(target), Roster: []domain.CharacterRosterEntry{}}
+	if err := verifyPlayerConfigContract(config); err != nil {
+		return failure("could not verify the new player config contract")
+	}
 	if err := service.write(target, config); err != nil {
 		return failure("could not write the new player config")
 	}
@@ -146,12 +149,18 @@ func (service *Service) load(path string) Result {
 	if err != nil {
 		return failure("the selected file is not a valid version-1 player config")
 	}
+	if err := verifyPlayerConfigContract(config); err != nil {
+		return failure("the selected file does not satisfy the player config contract")
+	}
 	return success(path, config)
 }
 
 func (service *Service) write(path string, config domain.PlayerConfig) error {
 	if service == nil || service.store == nil {
 		return errStorageUnavailable
+	}
+	if err := verifyPlayerConfigContract(config); err != nil {
+		return err
 	}
 	data, err := domain.EncodePlayerConfig(config)
 	if err != nil {

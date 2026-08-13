@@ -2,28 +2,23 @@ package player
 
 import (
 	"bytes"
-	"encoding/json"
+	"crypto/subtle"
+	"errors"
+	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
-	"sort"
 	"strings"
+
+	"connectrpc.com/connect"
+	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
 )
 
-const playerContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+const playerContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 var (
-	allowedSoundFolders = map[string]struct{}{
-		"ambient":    {},
-		"hack-good":  {},
-		"hack-bad":   {},
-		"menu-focus": {},
-		"single":     {},
-		"multiple":   {},
-		"enter":      {},
-		"charscroll": {},
-	}
 	allowedSoundExtensions = map[string]struct{}{
 		".mp3":  {},
 		".wav":  {},
@@ -33,11 +28,194 @@ var (
 	}
 )
 
+// PublicAccess contains the process-local Basic Auth boundary for requests
+// addressed to the configured public host. Keeping authentication in the
+// application avoids ngrok traffic-policy buffering of Connect streams.
+type PublicAccess struct {
+	Host     string
+	Username string
+	Password string
+}
+
 // NewHTTPHandler serves a player filesystem rooted at client/. The supplied
 // filesystem is the handler's complete namespace; no host filesystem paths are
 // opened or derived from requests.
 func NewHTTPHandler(assets fs.FS) http.Handler {
 	return &playerHTTPHandler{assets: assets}
+}
+
+// NewApplicationHandler mounts generated Connect procedures before the static
+// player application. RPC paths never fall through to the SPA index, and all
+// page, generated client, sound, and RPC traffic remains same-origin.
+func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler) http.Handler {
+	return NewApplicationHandlerWithPublicAccess(assets, rpcPath, rpcHandler, nil)
+}
+
+// NewApplicationHandlerWithPublicAccess mounts the application and enforces
+// the configured credential pair on every request addressed to the exact
+// public host. Local/LAN hosts remain unchallenged.
+func NewApplicationHandlerWithPublicAccess(assets fs.FS, rpcPath string, rpcHandler http.Handler, publicAccess *PublicAccess) http.Handler {
+	staticHandler := NewHTTPHandler(assets)
+	errorWriter := connect.NewErrorWriter()
+	publicAccess = normalizedPublicAccess(publicAccess)
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if requiresPublicAuth(request, publicAccess) && !authenticatePublicRequest(response, request, publicAccess) {
+			return
+		}
+		if supportedRPCRequestPath(request.URL.Path, rpcPath) {
+			response.Header().Set("X-Content-Type-Options", "nosniff")
+			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
+			if !validRequestHost(request.Host) {
+				http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			if !sameHostOrigin(request) {
+				http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			if request.ContentLength > MaxEncodedBodyBytes {
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeResourceExhausted, "public player request exceeds the encoded-body limit")
+				return
+			}
+			if err := bufferBoundedRequestBody(request); err != nil {
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeResourceExhausted, "public player request exceeds the encoded-body limit")
+				return
+			}
+			if rpcHandler == nil {
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeUnimplemented, "public player procedure is not implemented")
+				return
+			}
+			rpcHandler.ServeHTTP(response, request)
+			return
+		}
+		if publicRPCRequestPath(request.URL.Path, rpcPath) {
+			response.Header().Set("X-Content-Type-Options", "nosniff")
+			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
+			writeConnectBoundaryError(errorWriter, response, request, connect.CodeUnimplemented, "public player procedure is not implemented")
+			return
+		}
+		staticHandler.ServeHTTP(response, request)
+	})
+}
+
+func normalizedPublicAccess(access *PublicAccess) *PublicAccess {
+	if access == nil {
+		return nil
+	}
+	normalized := *access
+	normalized.Host = strings.TrimSpace(normalized.Host)
+	if !strings.Contains(normalized.Host, "://") {
+		normalized.Host = "https://" + normalized.Host
+	}
+	parsed, err := url.Parse(normalized.Host)
+	if err != nil || parsed.Host == "" || parsed.Path != "" {
+		normalized.Host = ""
+	} else {
+		normalized.Host = parsed.Host
+	}
+	return &normalized
+}
+
+func validPublicAccess(access *PublicAccess) bool {
+	return access != nil && access.Host != "" && access.Username != "" && access.Password != ""
+}
+
+func requiresPublicAuth(request *http.Request, access *PublicAccess) bool {
+	return request != nil && access != nil && strings.EqualFold(request.Host, access.Host)
+}
+
+func authenticatePublicRequest(response http.ResponseWriter, request *http.Request, access *PublicAccess) bool {
+	username, password, ok := request.BasicAuth()
+	usernameMatches := subtle.ConstantTimeCompare([]byte(username), []byte(access.Username)) == 1
+	passwordMatches := subtle.ConstantTimeCompare([]byte(password), []byte(access.Password)) == 1
+	if ok && usernameMatches && passwordMatches {
+		return true
+	}
+	response.Header().Set("WWW-Authenticate", `Basic realm="Fallout Terminal Players"`)
+	http.Error(response, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	return false
+}
+
+func supportedRPCRequestPath(requestPath, servicePath string) bool {
+	if servicePath == "" {
+		return false
+	}
+	_, supported := map[string]struct{}{
+		playerv1connect.PlayerServiceSubscribeProcedure:       {},
+		playerv1connect.PlayerServiceSelectCharacterProcedure: {},
+		playerv1connect.PlayerServiceNavigateProcedure:        {},
+		playerv1connect.PlayerServiceGuessProcedure:           {},
+		playerv1connect.PlayerServiceActivatePatternProcedure: {},
+		playerv1connect.PlayerServiceSoundManifestProcedure:   {},
+	}[requestPath]
+	return supported
+}
+
+func publicRPCRequestPath(requestPath, servicePath string) bool {
+	servicePath = strings.TrimSuffix(servicePath, "/")
+	if requestPath == servicePath || strings.HasPrefix(requestPath, servicePath+"/") {
+		return true
+	}
+	return strings.HasPrefix(requestPath, "/fallout.terminal.player.v1.")
+}
+
+func bufferBoundedRequestBody(request *http.Request) error {
+	if request == nil || request.Body == nil {
+		return nil
+	}
+	defer request.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(request.Body, MaxEncodedBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(body) > MaxEncodedBodyBytes {
+		return errors.New("encoded request body exceeds limit")
+	}
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	request.ContentLength = int64(len(body))
+	return nil
+}
+
+func writeConnectBoundaryError(writer *connect.ErrorWriter, response http.ResponseWriter, request *http.Request, code connect.Code, message string) {
+	if err := writer.Write(response, request, connect.NewError(code, errors.New(message))); err != nil {
+		http.Error(response, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
+}
+
+func validRequestHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" || strings.ContainsAny(host, "/\\\r\n\t @") {
+		return false
+	}
+	if strings.HasPrefix(host, "[") {
+		_, _, err := net.SplitHostPort(host)
+		return err == nil || strings.HasSuffix(host, "]")
+	}
+	if strings.Count(host, ":") > 1 {
+		return false
+	}
+	if strings.Contains(host, ":") {
+		name, port, err := net.SplitHostPort(host)
+		return err == nil && name != "" && port != ""
+	}
+	return true
+}
+
+// sameHostOrigin accepts non-browser clients without Origin and browser
+// clients whose HTTP(S) origin host exactly matches the request Host.
+func sameHostOrigin(request *http.Request) bool {
+	if request == nil {
+		return false
+	}
+	rawOrigin := strings.TrimSpace(request.Header.Get("Origin"))
+	if rawOrigin == "" {
+		return true
+	}
+	origin, err := url.Parse(rawOrigin)
+	if err != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
+		return false
+	}
+	return strings.EqualFold(origin.Host, request.Host)
 }
 
 type playerHTTPHandler struct {
@@ -57,50 +235,12 @@ func (handler *playerHTTPHandler) ServeHTTP(response http.ResponseWriter, reques
 		http.NotFound(response, request)
 		return
 	}
-	if strings.HasPrefix(request.URL.Path, "/api/sounds/") {
-		handler.serveSoundList(response, request)
-		return
-	}
 	if strings.HasPrefix(request.URL.Path, "/api/") {
 		http.NotFound(response, request)
 		return
 	}
 
 	handler.serveAsset(response, request)
-}
-
-func (handler *playerHTTPHandler) serveSoundList(response http.ResponseWriter, request *http.Request) {
-	folder := strings.TrimPrefix(request.URL.Path, "/api/sounds/")
-	if _, allowed := allowedSoundFolders[folder]; !allowed || strings.Contains(folder, "/") {
-		writeSoundList(response, nil)
-		return
-	}
-
-	files := make([]string, 0)
-	if handler.assets != nil {
-		entries, err := fs.ReadDir(handler.assets, "sounds/"+folder)
-		if err == nil {
-			for _, entry := range entries {
-				info, err := entry.Info()
-				if err != nil || !info.Mode().IsRegular() {
-					continue
-				}
-				if _, allowed := allowedSoundExtensions[strings.ToLower(path.Ext(entry.Name()))]; allowed {
-					files = append(files, entry.Name())
-				}
-			}
-		}
-	}
-	sort.Strings(files)
-	writeSoundList(response, files)
-}
-
-func writeSoundList(response http.ResponseWriter, files []string) {
-	if files == nil {
-		files = make([]string, 0)
-	}
-	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(response).Encode(files)
 }
 
 func (handler *playerHTTPHandler) serveAsset(response http.ResponseWriter, request *http.Request) {

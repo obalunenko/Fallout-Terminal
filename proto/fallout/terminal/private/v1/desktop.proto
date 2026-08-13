@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package fallout.terminal.private.v1;
+
+import "fallout/terminal/persistence/v1/player_config.proto";
+import "fallout/terminal/persistence/v1/session.proto";
+import "fallout/terminal/private/v1/coordination.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1";
+
+message CommandResult {
+  bool ok = 1;
+  optional string error = 2;
+}
+
+message SessionOperationResult {
+  bool ok = 1;
+  bool canceled = 2;
+  optional string error = 3;
+  optional string file_path = 4;
+  fallout.terminal.persistence.v1.Session session = 5;
+}
+
+message SaveSessionResult {
+  bool ok = 1;
+  optional string error = 2;
+  uint64 requested_revision = 3;
+  optional uint64 saved_revision = 4;
+}
+
+message PlayerConfigOperationResult {
+  bool ok = 1;
+  bool canceled = 2;
+  optional string error = 3;
+  fallout.terminal.persistence.v1.PlayerConfig player_config = 4;
+  fallout.terminal.persistence.v1.Session session = 5;
+  CoordinationState state = 6;
+  PlayerConfigMetadata player_config_metadata = 7;
+}
+
+message CoordinationResult {
+  bool ok = 1;
+  optional string error = 2;
+  CoordinationState state = 3;
+}
+
+message TerminalSwitchResult {
+  bool ok = 1;
+  optional string error = 2;
+  TerminalSwitchStatus status = 3;
+  optional string switch_id = 4;
+  CoordinationState state = 5;
+}
+
+message TerminalActivationRequest {
+  string terminal_id = 1;
+  string terminal_name = 2;
+  fallout.terminal.persistence.v1.ContentNode tree = 3;
+  int32 hack_level = 4;
+  string intro_text = 5;
+}
+
+message LiveTerminalUpdateRequest {
+  fallout.terminal.persistence.v1.ContentNode tree = 1;
+  optional string intro_text = 2;
+}
+
+message TerminalSwitchDecisionRequest {
+  string switch_id = 1;
+  TerminalSwitchChoice choice = 2;
+}
+
+message ResetFailedHackRequest {
+  string terminal_id = 1;
+  string terminal_name = 2;
+  fallout.terminal.persistence.v1.ContentNode tree = 3;
+  int32 hack_level = 4;
+  string intro_text = 5;
+}
+
+message AddCharacterRequest {
+  string display_name = 1;
+}
+
+message RenameCharacterRequest {
+  string character_id = 1;
+  string display_name = 2;
+}
+
+message DeleteCharacterRequest {
+  string character_id = 1;
+}
+
+message RenameLogicalSessionRequest {
+  string logical_session_id = 1;
+  string fallback_name = 2;
+}
+
+message AssignCharacterRequest {
+  string logical_session_id = 1;
+  string character_id = 2;
+}
+
+message ReleaseCharacterRequest {
+  string logical_session_id = 1;
+}
+
+message MoveCharacterRequest {
+  string character_id = 1;
+  string destination_session_id = 2;
+}
+
+message SetActiveControllerRequest {
+  string logical_session_id = 1;
+}
+
+message OpenUrlRequest {
+  string url = 1;
+}

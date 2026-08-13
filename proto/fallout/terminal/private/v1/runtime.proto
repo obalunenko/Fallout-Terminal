@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package fallout.terminal.private.v1;
+
+import "fallout/terminal/player/v1/hacking.proto";
+import "fallout/terminal/private/v1/coordination.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1";
+
+message ServerInformation {
+  string local_url = 1;
+  optional string public_url = 2;
+  bool tunnel_enabled = 3;
+  string ip = 4;
+  int32 port = 5;
+  optional string tunnel_error = 6;
+  string url = 7;
+}
+
+message RuntimeStatus {
+  ServerInformation server_info = 1;
+  uint32 client_count = 2;
+  fallout.terminal.player.v1.PublicHackState hack_state = 3;
+  optional string startup_error = 4;
+  string save_state = 5;
+  uint64 requested_revision = 6;
+  optional uint64 saved_revision = 7;
+  CoordinationState coordination_state = 8;
+}
+
+message ServerInformationEvent {
+  ServerInformation server_info = 1;
+}
+
+message ClientCountEvent {
+  uint32 client_count = 1;
+}
+
+message HackStateEvent {
+  fallout.terminal.player.v1.PublicHackState hack_state = 1;
+}
+
+message CoordinationStateEvent {
+  CoordinationState coordination_state = 1;
+}

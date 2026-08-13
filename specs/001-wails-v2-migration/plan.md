@@ -1,5 +1,10 @@
 # Implementation Plan: Wails v2 Runtime Migration
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Branch**: `001-wails-v2-migration` | **Date**: 2026-08-09 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-wails-v2-migration/spec.md`

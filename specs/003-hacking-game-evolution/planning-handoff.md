@@ -1,5 +1,10 @@
 # Planning Handoff: Phase 1 Server-Authoritative Hacking Patterns
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Bugfix**: 2026-08-11 — BUG-001 superseded inert delimiter input with individual filler-symbol selection and limited whole-pattern interaction to the opening coordinate.
 
 Use `spec.md` as the normative source of truth. Rebuild the implementation plan and its research, data-model, and contract artifacts wherever the existing versions conflict with the clarified specification. Do not broaden the feature into session control, visual redesign, dictionaries, persistence, terminal switching, localization, audio, or any other Non-Goal.

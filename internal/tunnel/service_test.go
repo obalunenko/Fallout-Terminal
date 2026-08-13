@@ -2,17 +2,17 @@ package tunnel
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseConfigCredentialPrecedence(t *testing.T) {
@@ -49,15 +49,13 @@ func TestParseConfigCredentialPrecedence(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			config, err := ParseConfig(test.args, environmentLookup(environment))
-			if err != nil {
-				t.Fatalf("ParseConfig() error = %v", err)
-			}
-			if !config.Enabled {
-				t.Fatal("ParseConfig() did not enable public mode from NGROK_ENABLED")
-			}
-			if !reflect.DeepEqual(config.Credentials, test.want) {
-				t.Fatalf("credentials = %#v, want %#v", config.Credentials, test.want)
-			}
+			require.Falsef(t, err != nil,
+				"ParseConfig() error = %v", err)
+			require.False(t, !config.Enabled,
+				"ParseConfig() did not enable public mode from NGROK_ENABLED")
+			require.Falsef(t, !cmp.Equal(config.Credentials, test.want),
+				"credentials = %#v, want %#v", config.Credentials, test.want)
+
 		})
 	}
 }
@@ -81,92 +79,12 @@ func TestParseConfigRejectsInvalidCredentialsWithoutDisclosingPassword(t *testin
 			t.Parallel()
 			args := []string{"--ngrok", "--ngrok-username=" + test.username, "--ngrok-password=" + test.password}
 			_, err := ParseConfig(args, environmentLookup(nil))
-			if err == nil {
-				t.Fatal("ParseConfig() accepted invalid credentials")
-			}
-			if test.password != "" && strings.Contains(err.Error(), test.password) {
-				t.Fatalf("configuration error disclosed password: %q", err)
-			}
+			require.False(t, err == nil,
+				"ParseConfig() accepted invalid credentials")
+			require.Falsef(t, test.password != "" && strings.Contains(err.Error(), test.password),
+				"configuration error disclosed password: %q", err)
+
 		})
-	}
-}
-
-func TestCreatePolicyEscapesCredentialAndUsesPrivatePermissions(t *testing.T) {
-	t.Parallel()
-
-	parent := t.TempDir()
-	credential := Credentials{
-		Username: `player"\\name`,
-		Password: `long-"password\\value`,
-	}
-	policy, err := CreatePolicy(parent, credential)
-	if err != nil {
-		t.Fatalf("CreatePolicy() error = %v", err)
-	}
-	t.Cleanup(func() { _ = policy.Cleanup() })
-
-	raw, err := os.ReadFile(policy.Path)
-	if err != nil {
-		t.Fatalf("read policy: %v", err)
-	}
-	var document struct {
-		OnHTTPRequest []struct {
-			Actions []struct {
-				Type   string `json:"type"`
-				Config struct {
-					Realm       string   `json:"realm"`
-					Credentials []string `json:"credentials"`
-					Enforce     bool     `json:"enforce"`
-				} `json:"config"`
-			} `json:"actions"`
-		} `json:"on_http_request"`
-	}
-	if err := json.Unmarshal(raw, &document); err != nil {
-		t.Fatalf("policy is not valid escaped JSON: %v\n%s", err, raw)
-	}
-	if len(document.OnHTTPRequest) != 1 || len(document.OnHTTPRequest[0].Actions) != 1 {
-		t.Fatalf("policy actions = %#v", document.OnHTTPRequest)
-	}
-	action := document.OnHTTPRequest[0].Actions[0]
-	wantCredential := credential.Username + ":" + credential.Password
-	if action.Type != "basic-auth" || !action.Config.Enforce || !reflect.DeepEqual(action.Config.Credentials, []string{wantCredential}) {
-		t.Fatalf("basic-auth action = %#v", action)
-	}
-
-	if runtime.GOOS != "windows" {
-		fileInfo, err := os.Stat(policy.Path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := fileInfo.Mode().Perm(); got != 0o600 {
-			t.Errorf("policy permissions = %04o, want 0600", got)
-		}
-		directoryInfo, err := os.Stat(filepath.Dir(policy.Path))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := directoryInfo.Mode().Perm(); got != 0o700 {
-			t.Errorf("policy directory permissions = %04o, want 0700", got)
-		}
-	}
-}
-
-func TestPolicyCleanupIsIdempotent(t *testing.T) {
-	t.Parallel()
-
-	policy, err := CreatePolicy(t.TempDir(), Credentials{Username: "players", Password: "password-long-enough"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	directory := filepath.Dir(policy.Path)
-	if err := policy.Cleanup(); err != nil {
-		t.Fatalf("Cleanup() error = %v", err)
-	}
-	if err := policy.Cleanup(); err != nil {
-		t.Fatalf("second Cleanup() error = %v", err)
-	}
-	if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("policy directory remains after cleanup: %v", err)
 	}
 }
 
@@ -188,9 +106,12 @@ func TestFindPublicURLAcceptsOnlyHTTPSStartedTunnelMessages(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := FindPublicURL(test.line); got != test.want {
-				t.Fatalf("FindPublicURL(%q) = %q, want %q", test.line, got, test.want)
+			{
+				got := FindPublicURL(test.line)
+				require.Falsef(t, got != test.want,
+					"FindPublicURL(%q) = %q, want %q", test.line, got, test.want)
 			}
+
 		})
 	}
 }
@@ -207,7 +128,7 @@ func TestServiceTimeoutStopsProcessAndRemovesPolicy(t *testing.T) {
 
 	result := make(chan error, 1)
 	go func() {
-		_, err := service.Start(context.Background())
+		_, err := service.Start(t.Context())
 		result <- err
 	}()
 	runner.waitStarted(t)
@@ -215,15 +136,15 @@ func TestServiceTimeoutStopsProcessAndRemovesPolicy(t *testing.T) {
 
 	select {
 	case err := <-result:
-		if err == nil || !strings.Contains(strings.ToLower(err.Error()), "timed out") {
-			t.Fatalf("Start() timeout error = %v", err)
-		}
+		require.Falsef(t, err == nil || !strings.Contains(strings.ToLower(err.Error()), "timed out"),
+			"Start() timeout error = %v", err)
+
 	case <-time.After(time.Second):
-		t.Fatal("Start() did not return after its injected timeout")
+		assert.FailNow(t, "Start() did not return after its injected timeout")
 	}
-	if runner.handle.terminateCalls() != 1 {
-		t.Fatalf("timeout terminate calls = %d, want 1", runner.handle.terminateCalls())
-	}
+	require.Falsef(t, runner.handle.terminateCalls() != 1,
+		"timeout terminate calls = %d, want 1", runner.handle.terminateCalls())
+
 	assertNoPolicyDirectories(t, policyParent)
 }
 
@@ -237,23 +158,20 @@ func TestServiceEarlyExitReturnsBoundedRedactedDiagnosticAndCleansUp(t *testing.
 	runner.handle.exit(errors.New("exit status 1"))
 	service := NewService(config, runner, ServiceOptions{})
 
-	_, err := service.Start(context.Background())
-	if err == nil {
-		t.Fatal("Start() succeeded after an early process exit")
-	}
-	if strings.Contains(err.Error(), secret) {
-		t.Fatalf("Start() diagnostic disclosed password: %q", err)
-	}
-	if !strings.Contains(err.Error(), "diagnostic-tail") {
-		t.Fatalf("Start() lost actionable diagnostic tail: %q", err)
-	}
-	if len(err.Error()) > 4200 {
-		t.Fatalf("Start() diagnostic is unbounded: %d bytes", len(err.Error()))
-	}
+	_, err := service.Start(t.Context())
+	require.False(t, err == nil,
+		"Start() succeeded after an early process exit")
+	require.Falsef(t, strings.Contains(err.Error(), secret),
+		"Start() diagnostic disclosed password: %q", err)
+	require.Falsef(t, !strings.Contains(err.Error(), "diagnostic-tail"),
+		"Start() lost actionable diagnostic tail: %q", err)
+	require.Falsef(t, len(err.Error()) > 4200,
+		"Start() diagnostic is unbounded: %d bytes", len(err.Error()))
+
 	assertNoPolicyDirectories(t, config.PolicyParent)
 }
 
-func TestServiceSuccessReturnsPublicInfoWithoutCredentialsAndRemovesPolicy(t *testing.T) {
+func TestServiceSuccessReturnsPublicInfoWithoutCredentialsOrTrafficPolicy(t *testing.T) {
 	t.Parallel()
 
 	config := serviceConfig(t.TempDir())
@@ -261,25 +179,35 @@ func TestServiceSuccessReturnsPublicInfoWithoutCredentialsAndRemovesPolicy(t *te
 	runner.stdout = `{"msg":"started tunnel","url":"https://fallout.example"}` + "\n"
 	service := NewService(config, runner, ServiceOptions{})
 
-	info, err := service.Start(context.Background())
-	if err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-	if info.URL != "https://fallout.example" || info.LocalURL != config.LocalURL || !info.Tunnel || info.TunnelError != "" {
-		t.Fatalf("Start() info = %#v", info)
-	}
-	serialized := fmt.Sprintf("%+v", info)
-	if strings.Contains(serialized, config.Credentials.Username) || strings.Contains(serialized, config.Credentials.Password) {
-		t.Fatalf("public status disclosed credentials: %s", serialized)
-	}
-	if strings.Contains(strings.Join(runner.spec.Args, " "), config.Credentials.Password) {
-		t.Fatalf("process arguments disclosed password: %#v", runner.spec.Args)
-	}
-	assertNoPolicyDirectories(t, config.PolicyParent)
+	info, err := service.Start(t.Context())
+	require.Falsef(t, err != nil,
+		"Start() error = %v", err)
+	require.Falsef(t, info.URL != "https://fallout.example" || info.LocalURL != config.LocalURL || !info.Tunnel || info.TunnelError != "",
+		"Start() info = %#v", info)
 
-	if err := service.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop() error = %v", err)
+	serialized := fmt.Sprintf("%+v", info)
+	require.Falsef(t, strings.Contains(serialized, config.Credentials.Username) || strings.Contains(serialized, config.Credentials.Password),
+		"public status disclosed credentials: %s", serialized)
+	require.Falsef(t, strings.Contains(strings.Join(runner.spec.Args, " "), config.Credentials.Password),
+		"process arguments disclosed password: %#v", runner.spec.Args)
+
+	wantArgs := []string{
+		"http", "3690",
+		"--url", "https://fallout-terminal.ngrok.app",
+		"--log", "stdout",
+		"--log-format", "json",
 	}
+	require.Falsef(t, !cmp.Equal(runner.spec.Args, wantArgs),
+		"protected forwarding args = %#v, want %#v", runner.spec.Args, wantArgs)
+
+	assertNoPolicyDirectories(t, config.PolicyParent)
+	{
+
+		err := service.Stop(t.Context())
+		require.Falsef(t, err != nil,
+			"Stop() error = %v", err)
+	}
+
 }
 
 func serviceConfig(policyParent string) Config {
@@ -309,11 +237,11 @@ func assertNoPolicyDirectories(t *testing.T, parent string) {
 	t.Helper()
 	matches, err := filepath.Glob(filepath.Join(parent, "fallout-terminal-ngrok-*"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if len(matches) != 0 {
-		t.Fatalf("credential policy directories remain: %#v", matches)
-	}
+	require.Falsef(t, len(matches) != 0,
+		"credential policy directories remain: %#v", matches)
+
 }
 
 type serviceProcessRunner struct {
@@ -356,7 +284,7 @@ func (runner *serviceProcessRunner) waitStarted(t *testing.T) {
 	select {
 	case <-runner.started:
 	case <-time.After(time.Second):
-		t.Fatal("process runner was not started")
+		assert.FailNow(t, "process runner was not started")
 	}
 }
 

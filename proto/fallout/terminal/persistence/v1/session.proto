@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package fallout.terminal.persistence.v1;
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1;persistencev1";
+
+message FolderContent {
+  repeated ContentNode children = 1;
+}
+
+message CommandContent {
+  string text = 1;
+}
+
+message EntryContent {
+  string description = 1;
+}
+
+message ContentNode {
+  string id = 1;
+  string name = 2;
+  oneof content {
+    FolderContent folder = 3;
+    CommandContent command = 4;
+    EntryContent entry = 5;
+  }
+}
+
+message Terminal {
+  string id = 1;
+  string name = 2;
+  int32 hack_level = 3;
+  string intro_text = 4;
+  ContentNode root = 5;
+}
+
+message Session {
+  int32 version = 1;
+  string name = 2;
+  optional string player_config = 3;
+  repeated Terminal terminals = 4;
+}

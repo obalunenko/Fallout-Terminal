@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package fallout.terminal.private.v1;
+
+import "fallout/terminal/player/v1/player.proto";
+import "fallout/terminal/player/v1/terminal.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1";
+
+enum TerminalSwitchStatus {
+  TERMINAL_SWITCH_STATUS_UNSPECIFIED = 0;
+  TERMINAL_SWITCH_STATUS_ACTIVATED = 1;
+  TERMINAL_SWITCH_STATUS_CLEARED = 2;
+  TERMINAL_SWITCH_STATUS_PENDING = 3;
+  TERMINAL_SWITCH_STATUS_PRESERVED = 4;
+  TERMINAL_SWITCH_STATUS_DISCARDED = 5;
+  TERMINAL_SWITCH_STATUS_CANCELED = 6;
+  TERMINAL_SWITCH_STATUS_DECISION_REQUIRED = 7;
+}
+
+enum TerminalSwitchChoice {
+  TERMINAL_SWITCH_CHOICE_UNSPECIFIED = 0;
+  TERMINAL_SWITCH_CHOICE_PRESERVE = 1;
+  TERMINAL_SWITCH_CHOICE_DISCARD = 2;
+  TERMINAL_SWITCH_CHOICE_CANCEL = 3;
+}
+
+message CharacterState {
+  string character_id = 1;
+  string display_name = 2;
+  optional string logical_session_id = 3;
+}
+
+message LogicalSessionState {
+  string logical_session_id = 1;
+  string fallback_name = 2;
+  bool connected = 3;
+  uint32 active_streams = 4;
+  optional string character_id = 5;
+  fallout.terminal.player.v1.PlayerRole role = 6;
+}
+
+message BroadcastState {
+  string broadcast_id = 1;
+  optional string active_controller_session_id = 2;
+  optional string active_terminal_id = 3;
+  uint64 revision = 4;
+}
+
+message PendingTerminalSwitch {
+  string switch_id = 1;
+  string terminal_id = 2;
+  string terminal_name = 3;
+  fallout.terminal.player.v1.LiveTerminal requested_terminal = 4;
+  string broadcast_id = 5;
+  string source_terminal_id = 6;
+  optional string target_terminal_id = 7;
+}
+
+message PlayerConfigMetadata {
+  string status = 1;
+  string file_path = 2;
+  int32 version = 3;
+  string name = 4;
+}
+
+message CoordinationState {
+  repeated CharacterState roster = 1;
+  repeated LogicalSessionState logical_sessions = 2;
+  BroadcastState broadcast = 3;
+  PendingTerminalSwitch pending_terminal_switch = 4;
+  uint64 revision = 5;
+  PlayerConfigMetadata player_config = 6;
+}

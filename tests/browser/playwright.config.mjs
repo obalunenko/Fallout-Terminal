@@ -10,7 +10,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'GOCACHE=/private/tmp/fallout-browser-fixture-cache go run ./fixture-server',
+    command: 'npm run build --prefix ../../client && GOCACHE=/private/tmp/fallout-browser-fixture-cache go run ./fixture-server',
     url: 'http://127.0.0.1:34119',
     reuseExistingServer: false,
   },

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package fallout.terminal.player.v1;
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
+
+enum SoundCategory {
+  SOUND_CATEGORY_UNSPECIFIED = 0;
+  SOUND_CATEGORY_AMBIENT = 1;
+  SOUND_CATEGORY_HACK_GOOD = 2;
+  SOUND_CATEGORY_HACK_BAD = 3;
+  SOUND_CATEGORY_MENU_FOCUS = 4;
+  SOUND_CATEGORY_SINGLE = 5;
+  SOUND_CATEGORY_MULTIPLE = 6;
+  SOUND_CATEGORY_ENTER = 7;
+  SOUND_CATEGORY_CHARSCROLL = 8;
+}
+
+message SoundManifestRequest {
+  SoundCategory category = 1;
+}
+
+message SoundManifestResponse {
+  SoundCategory category = 1;
+  repeated string assets = 2;
+}

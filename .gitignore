@@ -3,6 +3,9 @@ __pycache__/
 # Node/Vite artifacts and local configuration
 node_modules/
 dist/
+!client/dist/
+client/dist/*
+!client/dist/.keep
 *.log
 .env*
 

@@ -1,5 +1,10 @@
 # Quickstart: Validate the Wails v2 Migration
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 This guide becomes runnable as the migration tasks land. Until cutover, keep the Electron baseline available for comparison.
 
 ## Prerequisites

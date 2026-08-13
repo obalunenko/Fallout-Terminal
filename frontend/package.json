@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "install:all": "npm ci && npm ci --prefix ../client",
+    "proto:generate": "../scripts/proto-generate.sh --sync-revision",
+    "dev:all": "npm run proto:generate && vite",
+    "build:all": "npm run proto:generate && npm run build --prefix ../client && vite build",
     "dev": "vite",
     "build": "vite build"
   },

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package fallout.terminal.persistence.v1;
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1;persistencev1";
+
+message RosterEntry {
+  string id = 1;
+  string name = 2;
+}
+
+message PlayerConfig {
+  int32 version = 1;
+  string name = 2;
+  repeated RosterEntry roster = 3;
+}

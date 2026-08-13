@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package fallout.terminal.player.v1;
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
+
+message PublicHackWord {
+  string id = 1;
+  int32 start = 2;
+  int32 length = 3;
+}
+
+message PublicHackColumn {
+  repeated string addresses = 1;
+  string text = 2;
+  repeated PublicHackWord words = 3;
+}
+
+message PublicHackPattern {
+  string pattern_id = 1;
+  int32 row = 2;
+  int32 start = 3;
+  int32 end = 4;
+  bool used = 5;
+}
+
+message PublicHackState {
+  int32 level = 1;
+  int32 word_length = 2;
+  int32 attempts_max = 3;
+  int32 attempts_left = 4;
+  bool solved = 5;
+  bool failed = 6;
+  repeated string log = 7;
+  repeated PublicHackColumn columns = 8;
+  repeated PublicHackPattern patterns = 9;
+}
+
+message FillerTarget {
+  int32 column = 1;
+  int32 character = 2;
+}
+
+message GuessRequest {
+  string recognition_handle = 1;
+  string request_id = 2;
+  string broadcast_id = 3;
+  string terminal_id = 4;
+  oneof target {
+    string word_id = 5;
+    FillerTarget filler = 6;
+  }
+}
+
+message ActivatePatternRequest {
+  string recognition_handle = 1;
+  string request_id = 2;
+  string broadcast_id = 3;
+  string terminal_id = 4;
+  string pattern_id = 5;
+}
