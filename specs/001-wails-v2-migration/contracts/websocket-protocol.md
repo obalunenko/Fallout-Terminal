@@ -1,5 +1,11 @@
 # Contract: Player WebSocket Protocol
 
+> **SUPERSEDED HISTORICAL RECORD — NON-AUTHORITATIVE.** This completed
+> feature-001 contract documents the removed pre-Connect implementation. The
+> application exposes no supported WebSocket/JSON player route. The current
+> public contract is
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 ## Compatibility
 
 Message names and JSON field names remain compatible with the bundled `client/client.js`. The protocol remains unversioned for this migration; adding protocol negotiation is separate feature work.
@@ -76,4 +82,3 @@ Requires active unfinished puzzle and applies at most once.
 ## Reconnection
 
 The browser retains its current three-second reconnect behavior. On success it receives the current full live snapshot if one exists. Reconnection never creates or resets a puzzle.
-

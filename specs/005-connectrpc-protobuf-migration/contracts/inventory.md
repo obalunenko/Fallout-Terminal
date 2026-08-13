@@ -106,3 +106,32 @@ Selected paths, save revisions, save state, and private active handles are runti
 
 Automated inventory verification scans exported/current boundary structs, JSON tags, generated descriptors, Wails facade identifiers, environment/flag constants, and configured defaults. A new application-owned boundary or serializable field without a matching row/schema/exclusion fails CI. Final expected counts are zero unclassified DTOs and zero unclassified serializable configuration fields.
 
+## Final reconciliation — 2026-08-13
+
+- Public descriptor: exactly one `fallout.terminal.player.v1.PlayerService` with
+  `Subscribe`, `SelectCharacter`, `Navigate`, `Guess`, `ActivatePattern`, and
+  `SoundManifest`; the public transitive import graph contains only
+  `fallout/terminal/player/v1` files.
+- Generated trees: all versioned schemas generate Go under `internal/gen`; only
+  the public player graph generates ECMAScript under `client/gen`.
+- Active browser/server boundary: generated Connect messages only. The former
+  JSON envelopes, decoder, WebSocket route/client registry, sound-list endpoint,
+  test fixtures, and direct transport dependency are removed.
+- Private desktop: every App request/result/status and all four events map
+  through the generated `private.v1` semantic registry while preserving native
+  Wails object shapes.
+- Persistence: every known session-v1 and player-config-v1 field maps through
+  generated persistence messages; JSON codecs remain authoritative for names,
+  extras, strictness, and atomic replace behavior.
+- Configuration: the composition root instantiates `config.v1.ApplicationConfig`
+  defaults for port 3690, queue 32, replay 256, public request limits, browser
+  timing, paths, and lifecycle bounds. Credentials and injected capabilities
+  remain process-local/private as classified above.
+- Explicit third-party/native exclusions remain limited to Wails/npm/Buf/GitHub
+  Actions/Apple/ngrok governed files plus runtime capabilities, callbacks,
+  clocks, resources, synchronization, and OS handles listed above.
+
+Reconciliation result: **0 unclassified application-owned DTO fields and 0
+unclassified serializable configuration fields**. Verification is enforced by
+descriptor/adapter/asset tests plus `scripts/proto-check.sh` and the final
+cutover scan.
