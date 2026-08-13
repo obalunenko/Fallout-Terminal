@@ -33,14 +33,14 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
-      - name: Run Go tests
-        run: go test ./...
+      - name: Run Go tests with race detector
+        run: go test -race ./...
 
       - name: Run Go vet
         run: go vet ./...
 
   frontend-build:
-    name: Frontend clean install and build
+    name: Frontend and player clean builds
     runs-on: macos-15
     timeout-minutes: 15
     steps:
@@ -52,13 +52,87 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            client/package-lock.json
 
       - name: Install locked frontend dependencies
         run: npm ci --prefix frontend
 
       - name: Build frontend
         run: npm run build --prefix frontend
+
+      - name: Install locked player dependencies
+        run: npm ci --prefix client
+
+      - name: Build generated player client
+        run: npm run build --prefix client
+
+  protobuf-contracts:
+    name: Protobuf contract evolution
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install locked schema dependencies
+        run: npm ci --prefix client
+
+      - name: Verify deterministic generated contracts
+        run: scripts/proto-check.sh
+
+      - name: Verify compatibility baseline and negative fixtures
+        run: scripts/proto-breaking.sh --all-fixtures
+
+  browser-parity:
+    name: Generated player browser journeys
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out clean source
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            tests/browser/package-lock.json
+
+      - name: Install locked browser dependencies
+        run: |
+          npm ci --prefix client
+          npm ci --prefix tests/browser
+
+      - name: Install Playwright Chromium
+        run: npm exec --prefix tests/browser -- playwright install --with-deps chromium
+
+      - name: Run generated Connect browser journeys
+        run: npm test --prefix tests/browser
 
   startup-contract:
     name: One-command startup contract
@@ -86,6 +160,8 @@ jobs:
     needs:
       - go-quality
       - frontend-build
+      - protobuf-contracts
+      - browser-parity
       - startup-contract
     runs-on: macos-15
     timeout-minutes: 30
@@ -107,7 +183,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            client/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix client
 
       - name: Install pinned Wails CLI
         run: |
