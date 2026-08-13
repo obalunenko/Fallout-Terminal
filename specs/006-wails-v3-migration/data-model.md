@@ -28,7 +28,7 @@ An immutable compatibility selection used by one candidate.
 |---|---|---|
 | `goModule` | exact module/version | `github.com/wailsapp/wails/v3 v3.0.0-beta.8` |
 | `goTagCommit` | Git SHA | `81a149919f91f2149d3fe9be5a27472ae7617b8e` |
-| `cli` | exact install target | `github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8` |
+| `cli` | exact isolated tool declaration and module pin | `tool github.com/wailsapp/wails/v3/cmd/wails3` plus `require github.com/wailsapp/wails/v3 v3.0.0-beta.8` in `tools/wails/go.mod` |
 | `frontendRuntime` | exact package/version | `@wailsio/runtime` `3.0.0-beta.8` |
 | `frontendArtifact` | registry identity | npm gitHead, checksum/integrity, and lockfile resolution |
 | `vitePlugin` | package subpath | `@wailsio/runtime/plugins/vite` from the same exact package |

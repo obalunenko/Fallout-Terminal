@@ -7,7 +7,11 @@ This document describes the implementation target. It is not evidence that comma
 - [ ] Candidate Git SHA recorded: `________________`
 - [ ] Baseline rollback source verified: `f1084b3df8b5630862bdf7a0f347b599156653ef`
 - [ ] Go module pin is exactly `github.com/wailsapp/wails/v3 v3.0.0-beta.8`
-- [ ] CLI pin is exactly `github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8`
+- [ ] `tools/wails/go.mod` declares only `tool github.com/wailsapp/wails/v3/cmd/wails3` and pins `github.com/wailsapp/wails/v3 v3.0.0-beta.8`, with its own committed `go.sum`
+- [ ] `tools/buf/go.mod` declares only `tool github.com/bufbuild/buf/cmd/buf` and pins `github.com/bufbuild/buf v1.72.0`, with its own committed `go.sum`
+- [ ] `tools/protoc-gen-go/go.mod` declares only `tool google.golang.org/protobuf/cmd/protoc-gen-go` and pins `google.golang.org/protobuf v1.36.11`, with its own committed `go.sum`
+- [ ] `tools/protoc-gen-connect-go/go.mod` declares only `tool connectrpc.com/connect/cmd/protoc-gen-connect-go` and pins `connectrpc.com/connect v1.20.0`, with its own committed `go.sum`
+- [ ] Root `go.mod` and `go.sum` contain no tool declaration, tool-only dependency, or tool-only checksum
 - [ ] Frontend runtime is exactly `@wailsio/runtime` `3.0.0-beta.8`, including the Vite plugin subpath
 - [ ] Go/npm locks and CI/release pins agree; no Wails `latest`, caret, tilde, or unbounded range exists
 
@@ -18,17 +22,17 @@ Prerequisites: macOS 13+ Apple Silicon, Go 1.26.x, Node.js 20.19+, Xcode command
 ```sh
 git clone <repository-url>
 cd Fallout-Terminal
-go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8
 go mod download
+go tool -modfile=tools/wails/go.mod wails3 version
 npm ci --prefix client
 npm ci --prefix frontend
 npm ci --prefix tests/browser
 scripts/proto-check.sh
-wails3 generate bindings -clean ./...
+go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 ```
 
 - [ ] Setup completed from a clean checkout
-- [ ] `wails3 version` identified beta.8
+- [ ] `go tool -modfile=tools/wails/go.mod wails3 version` identified beta.8
 - [ ] Locked installs made no unexplained manifest/lock changes
 - [ ] Protobuf check and clean binding generation succeeded
 
@@ -37,7 +41,7 @@ wails3 generate bindings -clean ./...
 From the repository root, run exactly one development command:
 
 ```sh
-wails3 dev
+go tool -modfile=tools/wails/go.mod wails3 dev
 ```
 
 - [ ] Exactly one master window opened with title `Fallout Terminal — Master Control`
@@ -70,7 +74,7 @@ go test -race ./...
 scripts/proto-check.sh
 scripts/proto-drift-test.sh
 scripts/proto-breaking.sh --all-fixtures
-wails3 generate bindings -clean ./...
+go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 ```
 
 Run clean Wails binding generation a second time and compare the complete generated tree/inventory using the repository-provided deterministic-binding check introduced by implementation.
@@ -88,7 +92,7 @@ Run clean Wails binding generation a second time and compare the complete genera
 npm ci --prefix client
 npm run build --prefix client
 npm ci --prefix frontend
-wails3 generate bindings -clean ./...
+go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 npm run build --prefix frontend
 ```
 
@@ -136,8 +140,8 @@ Record representative create/open/edit/copy/save behavior using safety-copy data
 ## Personal-Use macOS Package
 
 ```sh
-wails3 build
-wails3 package GOOS=darwin GOARCH=arm64
+go tool -modfile=tools/wails/go.mod wails3 build
+go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64
 ```
 
 Expected application:
@@ -160,9 +164,12 @@ Inspect the final, already signed bundle. Use the repository's implementation-ti
 
 ## Local Mode and Soak
 
-- [ ] Run a representative long-lived local master/player session
-- [ ] Include 4–7 players, at least 25 mixed operations, saves, reconnects, hacking, navigation, and sound
-- [ ] Confirm newest durable revision, convergence, responsive clients, bounded memory/process behavior, and clean quit
+- [ ] Run a local master/player session for at least 60 minutes
+- [ ] Include 4–7 concurrent players and at least 25 mixed operations
+- [ ] Include at least three reconnects and two save/reopen cycles plus navigation, hacking, coordination, and sound
+- [ ] Confirm convergence and expected revision after each operation, newest durable revision, and responsive clients
+- [ ] Record application RSS at 15, 30, and 60 minutes; treat sustained unexplained growth above 25% from the 15-minute steady-state sample as `FAIL` pending investigation
+- [ ] Confirm exactly one listener during operation and zero owned listener/tunnel resources within five seconds after quit
 - Result: `________`
   Duration/environment/evidence: `________________________________`
 
@@ -172,7 +179,7 @@ Run only with real ngrok credentials/connectivity. If unavailable, write `NOT RU
 
 - [ ] / [ ] `NOT RUN` — authenticated public tunnel started only after local readiness
 - [ ] / [ ] `NOT RUN` — credentials and traffic policy stayed out of UI/log/session/public schemas
-- [ ] / [ ] `NOT RUN` — public 4–7-player soak retained authorization, privacy, convergence, and local fallback
+- [ ] / [ ] `NOT RUN` — public 4–7-player soak ran for at least 30 minutes and retained authorization, privacy, convergence, and local fallback
 - Result/reason: `________________________________`
 
 ## Conditional Developer ID Release
@@ -199,7 +206,7 @@ Run the implementation-provided source/generated/dependency/bundle/documentation
 - [ ] No v2 CLI command, `wails.json`, post-build hook, generated assumption, or runtime global remains active
 - [ ] No permanent v2/v3 feature flag or dual desktop implementation remains
 - [ ] No forbidden lifecycle/generic/native/player method appears in generated bindings
-- [ ] Active README, CI, scripts, and rollback instructions use exact wails3 commands
+- [ ] Active README, CI, scripts, and rollback instructions use the exact isolated `go tool -modfile=tools/wails/go.mod wails3 ...` commands
 - [ ] Historical completed specs and `docs/wails-migration-rollback.md` remain intact and labeled as history
 - [ ] Full required matrix and personal-use package gates passed against final cutover source
 

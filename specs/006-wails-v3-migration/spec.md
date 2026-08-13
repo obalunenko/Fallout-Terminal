@@ -5,6 +5,8 @@
 **Status**: Draft
 **Baseline**: `main` at `f1084b3df8b5630862bdf7a0f347b599156653ef`
 
+**Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Aligned active Wails commands with constitution 3.3.1, reaffirmed the unchanged feature-005 runtime-status contract, and made soak acceptance measurable.
+
 ## Source of Truth and Scope
 
 This feature replaces the accepted Wails v2 desktop host with Wails v3 without intentionally changing the Fallout Terminal product. The current constitution, current baseline code, and completed specifications 001–005 are the evidence set. For the private desktop bridge and public player behavior, the post-ConnectRPC contracts in feature 005 and the current code take precedence. Completed Electron behavior is historical migration evidence only and is not a current compatibility oracle.
@@ -22,6 +24,11 @@ The migration starts now against one concrete, verified-compatible set of exact 
 - Q: Which release profile is required for acceptance? → A: macOS 13+ Apple Silicon personal use with a local or ad-hoc-signed app; public Developer ID, notarized DMG, and related checks remain conditional and require real evidence.
 - Q: What is the Wails v2 rollback authority? → A: The actual pre-migration `main` commit is the source rollback; preserve the Electron rollback document as history and create a separate Wails v3 migration rollback record, with no permanent v2/v3 switch.
 - Q: How must application-owned startup failures behave? → A: Publish them through runtime status and actionable master UI state, preserve local mode after tunnel failure, unwind partial acquisition, and never reduce them to unexplained framework exits.
+
+### Session 2026-08-14
+
+- Q: Does startup observability require a new serialized lifecycle phase? → A: No. Internal phase remains host-owned and test-observable; the master derives starting, ready-local, ready-public, and failed presentation from the existing feature-005 runtime-status fields and renders the existing `startupError` without a protobuf or native-shape change.
+- Q: How are repository-owned Go development tools invoked? → A: Each tool has one isolated `tools/<tool>/` module, repository commands use `go tool -modfile=tools/<tool>/go.mod <command>`, and the root application module contains no tool declaration or tool-only dependency.
 
 ## User Scenarios & Testing
 
@@ -109,7 +116,7 @@ A developer installs documented pinned prerequisites and uses one repository-roo
 
 **Acceptance Scenarios**:
 
-1. **Given** the documented exact prerequisites and Wails v3 Taskfile/configuration, **When** a developer runs `wails3 dev` from the repository root, **Then** the master Vite application, player Vite application, explicit generated bindings, embedded assets, native host, player listener, generated player service, and optional configured tunnel are prepared or started without another manual process.
+1. **Given** the documented exact prerequisites and Wails v3 Taskfile/configuration, **When** a developer runs `go tool -modfile=tools/wails/go.mod wails3 dev` from the repository root, **Then** the master Vite application, player Vite application, explicit generated bindings, embedded assets, native host, player listener, generated player service, and optional configured tunnel are prepared or started without another manual process.
 2. **Given** a clean checkout, **When** Wails bindings and protobuf outputs are generated twice, **Then** the second generation is byte-stable and leaves no unexplained tracked diff.
 3. **Given** two consecutive clean builds, **When** their inputs and selected profile are identical, **Then** both complete from the root without an undeclared development server, manually prebuilt asset, or floating `latest` resolution.
 4. **Given** the repository verification suite, **When** it is adapted for Wails v3, **Then** existing assertions are preserved or strengthened rather than removed or weakened to obtain a pass.
@@ -192,7 +199,7 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **FR-006**: Player-config persistence MUST preserve version 1, strict unknown-field and trailing-data rejection, identity validation, relative session references, complete-file atomic saves, and publication only after durable success.
 - **FR-007**: macOS storage MUST preserve the Documents session default, Application Support metadata location, user-selected autosave target, and read-only bundled demonstration behavior until explicit copy.
 - **FR-008**: One application process MUST compose, start, own, and stop the player listener, generated player service, optional owned ngrok process, session-storage worker, and desktop adapter exactly once.
-- **FR-009**: Startup MUST remain bounded and MUST represent current phase, local server information, and every application-owned actionable redacted startup failure in runtime status and actionable master UI state rather than only as a framework exit.
+- **FR-009**: Startup MUST remain bounded. Without changing the accepted runtime-status or event contracts, every application-owned actionable redacted startup failure MUST be recorded through existing runtime-status fields and rendered as actionable master UI state. Local server information MUST remain observable, optional tunnel failure MUST preserve local mode, partial acquisition MUST unwind, and internal lifecycle phase MUST remain host-owned and test-observable rather than serialized.
 - **FR-010**: Local player access MUST remain enabled by default, while public tunneling MUST remain opt-in, authenticated, credential-redacted, and fail-closed before player capabilities when configuration is absent or invalid.
 - **FR-011**: Failure of optional public tunneling MUST preserve usable local play and publish a non-secret failure status.
 - **FR-012**: Player-listener startup failure MUST unwind partially acquired resources and remain observable to the master rather than appearing only as an unexplained process exit.
@@ -213,7 +220,7 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **FR-027**: The generated Wails v3 desktop binding inventory MUST contain every required private operation and zero lifecycle methods, generic dispatchers, arbitrary filesystem, process, environment, or browser primitives, or public player procedures.
 - **FR-028**: `Start` and `Shutdown` MUST remain internal lifecycle operations and MUST NOT appear in generated desktop bindings, while `CopyDemo` MUST remain a private operation with its accepted explicit-copy semantics and no newly introduced UI control.
 - **FR-029**: Planning MUST select one concrete, mutually compatible, verified Wails v3 beta set for the Go module, CLI, frontend runtime, and frontend plugin, record every exact version in source and lockfiles, proceed without waiting for general availability, and permit no active source or CI command to name or resolve `@latest`.
-- **FR-030**: A developer with the documented pinned prerequisites MUST be able to run `wails3 dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor.
+- **FR-030**: A developer with the documented pinned prerequisites MUST be able to run `go tool -modfile=tools/wails/go.mod wails3 dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor.
 - **FR-031**: The repository MUST adopt the Wails v3 configuration, explicit binding generation, Taskfile, and build-asset model so a clean checkout deterministically generates Wails bindings and protobuf code, builds both the `frontend/` and `client/` Vite applications and embedded resources, runs applicable tests, builds the native application, and packages the supported target without an undeclared manual prerequisite.
 - **FR-032**: Clean binding and protobuf generation MUST be reproducible across two consecutive runs and MUST leave no unexplained tracked diff or manually edited generated file.
 - **FR-033**: Two consecutive clean native builds with identical inputs MUST complete successfully without relying on stale generated output, a development server, a network-time package lookup, or a separately started process.
@@ -229,7 +236,7 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **FR-043**: Rollback triggers MUST include session corruption or loss, bridge capability or payload drift, master or player parity loss, startup or shutdown leaks, public-access regression, missing packaged assets, unhandled beta-runtime crashes, and package or signature failure.
 - **FR-044**: Wails v2 MUST remain the accepted production fallback until every required parity, security, persistence, lifecycle, generation, build, package, soak, and rollback gate for the selected profile passes.
 - **FR-045**: Final cutover MUST remove every active Wails v2 import, CLI installation path, v2 command, generated binding dependency, runtime global, obsolete configuration, and permanent dual-runtime implementation while preserving historical completed specifications as history.
-- **FR-046**: Final acceptance MUST include one representative long-running local master/player soak, and the authenticated-ngrok soak MUST run only when credentials and connectivity exist or otherwise be recorded as `NOT RUN` without serving as passing public-mode evidence.
+- **FR-046**: Final acceptance MUST include a local master/player soak lasting at least 60 minutes with four to seven concurrent players, at least 25 mixed operations, at least three reconnects, at least two save/reopen cycles, navigation, hacking, coordination, and sound. The run MUST record convergence and revision correctness after each operation, exactly one active listener during operation, application RSS at 15, 30, and 60 minutes, and release of the listener and any owned tunnel within five seconds after quit; sustained unexplained RSS growth above 25% from the 15-minute steady-state sample is a failure pending investigation. The authenticated-ngrok soak MUST last at least 30 minutes when real credentials and connectivity exist or otherwise be recorded as `NOT RUN` without serving as passing public-mode evidence.
 - **FR-047**: Multi-window, mobile, system tray, updater, new desktop capabilities, persistence-format migration, public RPC redesign, ConnectRPC replacement, Wails-driven protobuf changes, new platforms, and mandatory public distribution MUST remain outside this migration.
 
 ## Key Entities
@@ -260,12 +267,12 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **SC-011**: Two consecutive clean Wails-binding and protobuf generations are byte-stable and leave zero unexplained tracked diff.
 - **SC-012**: Two consecutive clean builds driven by the Wails v3 Taskfile/configuration complete from the repository root, build both Vite applications and embedded resources, and require zero manually started frontend, player listener, development server, or network-time `latest` resolution; source and CI scans find zero `@latest` token in active commands.
 - **SC-013**: The existing Go, race, frontend, player, Playwright, Buf formatting, lint, generation-drift, breaking, and relevant platform suites pass with zero deliberately weakened assertion.
-- **SC-014**: One repository-root `wails3 dev` launch starts the complete development system and a handled stop leaves zero owned player listeners, ngrok processes, or temporary credential-policy artifacts after the shutdown timeout.
+- **SC-014**: One repository-root `go tool -modfile=tools/wails/go.mod wails3 dev` launch starts the complete development system and a handled stop leaves zero owned player listeners, ngrok processes, or temporary credential-policy artifacts after the shutdown timeout.
 - **SC-015**: The packaged `.app` exists at `build/bin/Fallout Terminal.app` unless one approved, consistently propagated path change is recorded, reports arm64 architecture, passes the selected signature and integrity checks, and launches offline on macOS 13+ with zero installed Go, Node, npm, Vite, Wails, or development-server dependency.
 - **SC-016**: Package inspection finds every required master asset, generated binding, generated player asset, font, sound, and bundled demonstration resource, with zero required CDN or network-time asset.
 - **SC-017**: Packaged smoke tests observe exactly one player listener during the application lifetime and zero listener or owned ngrok process after normal quit and handled partial startup.
 - **SC-018**: The feature-006 Wails v3 migration rollback record identifies exactly one canonical Wails v2 source commit and, if a baseline executable is accepted, exactly one matching executable SHA-256 and acceptance status with zero conflicting digest, while the Electron rollback document remains unchanged historical evidence.
-- **SC-019**: A representative long-running local master/player soak completes before cutover; authenticated-ngrok soak evidence is either a real credentialed run or explicitly `NOT RUN`, never a synthetic pass.
+- **SC-019**: The required 60-minute local master/player soak completes before cutover with its workload and cleanup thresholds satisfied; authenticated-ngrok soak evidence is either a real credentialed run lasting at least 30 minutes or explicitly `NOT RUN`, never a synthetic pass.
 - **SC-020**: Final source, dependency, binding, configuration, command, bundle, test, and active-documentation scans find zero active `github.com/wailsapp/wails/v2` import, v2 CLI installation, v2 `wails` command where `wails3` is required, v2 `frontend/wailsjs` dependency, v2 runtime global, obsolete v2 configuration, or permanent dual-runtime code.
 - **SC-021**: Final public-listener inspection finds exactly one generated `fallout.terminal.player.v1.PlayerService` surface and zero Wails, private desktop, legacy WebSocket, health, reflection, or generic capability-discovery exposure.
 - **SC-022**: Any candidate exhibiting session corruption, bridge drift, master or player parity loss, lifecycle leakage, public-access regression, missing package assets, an unhandled beta-runtime crash, or package/signature failure is recorded as failed and does not replace the Wails v2 fallback.
@@ -293,10 +300,10 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - Master minimum dimensions: `900×600`.
 - Supported operating system: `macOS 13+`.
 - Supported architecture: `arm64`.
-- Required development command: `wails3 dev`.
-- Required clean binding command: `wails3 generate bindings -clean ./...`.
-- Required build command: `wails3 build`.
-- Required package command: `wails3 package GOOS=darwin GOARCH=arm64`.
+- Required development command: `go tool -modfile=tools/wails/go.mod wails3 dev`.
+- Required clean binding command: `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...`.
+- Required build command: `go tool -modfile=tools/wails/go.mod wails3 build`.
+- Required package command: `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`.
 - Required personal-use application location: `build/bin/Fallout Terminal.app`.
 - Wails v3 Go module: `github.com/wailsapp/wails/v3`.
 - Wails v3 frontend runtime: `@wailsio/runtime`.

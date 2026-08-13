@@ -7,13 +7,17 @@
 | Go | repository-governed 1.26 toolchain | developer/CI preflight |
 | Node.js | 20.19+ governed baseline | package engines/CI preflight |
 | Wails Go module | `github.com/wailsapp/wails/v3 v3.0.0-beta.8` | `go.mod`/`go.sum` and pin scan |
-| Wails CLI | `github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8` | same install target in setup, CI, and release automation |
+| Wails CLI | `tool github.com/wailsapp/wails/v3/cmd/wails3` plus `require github.com/wailsapp/wails/v3 v3.0.0-beta.8` in `tools/wails/go.mod` | same isolated tool declaration, module pin, committed sum, and `go tool -modfile` invocation in setup, CI, and release automation |
 | Wails frontend runtime | `@wailsio/runtime` `3.0.0-beta.8` | exact `frontend/package.json` and lock resolution |
 | Wails Vite plugin | `@wailsio/runtime/plugins/vite` from the same `3.0.0-beta.8` package | `frontend/vite.config.js` import and lock verification |
 | Vite | retain exact repository-approved version unless compatibility evidence requires an atomic update | exact manifests/locks |
-| protobuf/Buf/Connect tools | feature-005 exact pins | existing revision/generation checks |
+| Buf CLI | `tool github.com/bufbuild/buf/cmd/buf` plus `require github.com/bufbuild/buf v1.72.0` in `tools/buf/go.mod` | isolated committed sum, root-module-drift check, and repository-root `go tool -modfile` invocation |
+| protoc-gen-go | `tool google.golang.org/protobuf/cmd/protoc-gen-go` plus `require google.golang.org/protobuf v1.36.11` in `tools/protoc-gen-go/go.mod` | isolated committed sum, deterministic generated provenance, and repository-root invocation through Buf |
+| protoc-gen-connect-go | `tool connectrpc.com/connect/cmd/protoc-gen-connect-go` plus `require connectrpc.com/connect v1.20.0` in `tools/protoc-gen-connect-go/go.mod` | isolated committed sum, deterministic generated provenance, and repository-root invocation through Buf |
 
 No reproducible configuration or command uses Go/npm `latest`, `@latest`, caret, tilde, wildcard, or unbounded range for Wails. Lockfile changes are committed with source pins.
+
+Each `tools/<tool>/go.mod` declares exactly one direct tool command and an explicit Go language version. Tool resolution, tidying, generation, CI, Taskfiles, release automation, and documentation must not add a tool directive or tool-only dependency/checksum to the root application module.
 
 ## Visible Wails v3 Build Model
 
@@ -32,7 +36,7 @@ build/
 └── appicon.png
 ```
 
-Exact paths may follow the beta.8 build-asset generator, but responsibility must remain explicit. Generated/updatable Wails assets record their beta.8 provenance; project-owned custom tasks/config are reviewed and protected by source assertions. Running `wails3 update build-assets` is a code change that must not silently replace output path, deployment target, resource copy, signing, or frontend ordering.
+Exact paths may follow the beta.8 build-asset generator, but responsibility must remain explicit. Generated/updatable Wails assets record their beta.8 provenance; project-owned custom tasks/config are reviewed and protected by source assertions. Running `go tool -modfile=tools/wails/go.mod wails3 update build-assets` is a code change that must not silently replace output path, deployment target, resource copy, signing, or frontend ordering.
 
 The v2 `wails.json` and `postBuildHooks` become inactive and are removed only at final cutover after the v3 graph is proven.
 
@@ -40,10 +44,10 @@ The v2 `wails.json` and `postBuildHooks` become inactive and are removed only at
 
 | Purpose | Repository-root command | Requirement |
 |---|---|---|
-| full development | `wails3 dev` | sole root dev command; prepares bindings, both frontends, native host, listener, and optional configured tunnel |
-| clean bindings | `wails3 generate bindings -clean ./...` (with configured `frontend/bindings` output) | exact 25-method deterministic surface before master build |
-| native build | `wails3 build` | runs governed dependency graph, not stale prebuilt assets |
-| macOS package | `wails3 package GOOS=darwin GOARCH=arm64` | produces the required app at the preserved path |
+| full development | `go tool -modfile=tools/wails/go.mod wails3 dev` | sole root dev command; prepares bindings, both frontends, native host, listener, and optional configured tunnel |
+| clean bindings | `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` (with configured `frontend/bindings` output) | exact 25-method deterministic surface before master build |
+| native build | `go tool -modfile=tools/wails/go.mod wails3 build` | runs governed dependency graph, not stale prebuilt assets |
+| macOS package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64` | produces the required app at the preserved path |
 
 Developer docs may provide focused verification commands, but they do not create a second root development workflow.
 
@@ -84,7 +88,7 @@ final signature → inspection → digest/artifact
 
 | Output/resource | Producer | Consumer / final location |
 |---|---|---|
-| private Wails service bindings | exact beta.8 `wails3 generate bindings` | `frontend/bindings`, then master Vite bundle |
+| private Wails service bindings | exact beta.8 `go tool -modfile=tools/wails/go.mod wails3 generate bindings` | `frontend/bindings`, then master Vite bundle |
 | protobuf Go | existing pinned Buf/protoc flow | application/private/public adapters |
 | public player ECMAScript | existing pinned generation | `client/gen`, then player Vite bundle |
 | master Vite output | `frontend/` build | embedded master assets configured on the Wails application/window |

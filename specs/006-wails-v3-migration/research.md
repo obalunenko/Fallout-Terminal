@@ -34,9 +34,20 @@ Pin this exact matrix everywhere:
 | Component | Exact version / immutable identity | Reproducible configuration |
 |---|---|---|
 | Wails v3 Go module | `github.com/wailsapp/wails/v3 v3.0.0-beta.8` | Exact `go.mod` requirement and committed `go.sum` |
-| Wails v3 CLI | `github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.8` | Same exact install command in developer docs, CI, and release automation |
+| Wails v3 CLI | `tool github.com/wailsapp/wails/v3/cmd/wails3` plus `require github.com/wailsapp/wails/v3 v3.0.0-beta.8` in `tools/wails/go.mod` | Same exact isolated tool declaration, module pin, committed tool sum, and `go tool -modfile` invocation in developer docs, CI, and release automation |
 | Frontend runtime | `@wailsio/runtime` `3.0.0-beta.8` | Exact package version, with no caret, tilde, tag, or range; committed `frontend/package-lock.json` |
 | Official Vite plugin | `@wailsio/runtime/plugins/vite` from `@wailsio/runtime` `3.0.0-beta.8` | Import the plugin subpath from that exact package; it is not a separately versioned package |
+
+The repository-owned Go development tools use one independent module per executable:
+
+| Tool module | Sole direct `tool` declaration | Exact parent-module `require` pin |
+|---|---|---|
+| `tools/wails` | `github.com/wailsapp/wails/v3/cmd/wails3` | `github.com/wailsapp/wails/v3 v3.0.0-beta.8` |
+| `tools/buf` | `github.com/bufbuild/buf/cmd/buf` | `github.com/bufbuild/buf v1.72.0` |
+| `tools/protoc-gen-go` | `google.golang.org/protobuf/cmd/protoc-gen-go` | `google.golang.org/protobuf v1.36.11` |
+| `tools/protoc-gen-connect-go` | `connectrpc.com/connect/cmd/protoc-gen-connect-go` | `connectrpc.com/connect v1.20.0` |
+
+Each tool module declares an explicit Go version, commits its own `go.sum`, resolves independently, and leaves the root `go.mod` and `go.sum` unchanged. The root application module retains only dependencies required to compile or run the product; a module shared with a tool is pinned independently in each owning module.
 
 The selected GitHub tag is annotated object `474778141796f74c34912db81a5b3d10e4a7d7c2`, targeting commit `81a149919f91f2149d3fe9be5a27472ae7617b8e`. The published npm `3.0.0-beta.8` artifact records git commit `86b39da5354f3c1a35a8d370f55013f334808dd0`, SHA-1 `44fe17929f1667702ce2cd0d1965418728c099a9`, and registry integrity `sha512-c9PZJcOR9z1a6cxtBS2q5cygNajlxDE8Oxv/vvcTFYRbZSoOGBszq4uzlkPTOd0Bot1xkM81jnpaBgKWRpBh2g==`.
 
@@ -52,7 +63,7 @@ The selected Wails source declares Go `1.25.0`; this repository's governed Go `1
 
 - No source, Taskfile, workflow, release script, quickstart, or acceptance command may use Go `@latest`, npm `latest`, a caret, a tilde, or an unbounded range for the selected Wails components.
 - Commit `go.mod`, `go.sum`, `frontend/package.json`, and `frontend/package-lock.json` together.
-- Pin the same CLI install string in CI and `scripts/build-macos.sh` documentation or preflight.
+- Pin the CLI in `tools/wails/go.mod` and invoke that owning module consistently from CI, Taskfiles, documentation, and `scripts/build-macos.sh`; do not install or select a global executable.
 - Run npm with `npm ci` in clean and CI paths. Do not copy the upstream template's floating `latest` dependency or caret-based Vite defaults.
 - If implementation changes the selected version, update this file, every pin, both lock systems, CI, release automation, generated bindings, package evidence, and acceptance records as one atomic compatibility decision.
 
@@ -179,7 +190,7 @@ Use injected fakes to test defaults, cancel, errors, alias flags, creation polic
 
 ### Decision
 
-Adopt the visible Wails v3 [build system](https://v3.wails.io/concepts/build-system/), root `Taskfile.yml`, `build/config.yml`, common task assets, and Darwin task assets. Do not translate the v2 `wails.json` shape. Pin the imported/generated build-asset provenance to beta.8, place project-owned customization in deliberate Taskfile/config layers, and test update behavior so `wails3 update build-assets` cannot silently erase local requirements.
+Adopt the visible Wails v3 [build system](https://v3.wails.io/concepts/build-system/), root `Taskfile.yml`, `build/config.yml`, common task assets, and Darwin task assets. Do not translate the v2 `wails.json` shape. Pin the imported/generated build-asset provenance to beta.8, place project-owned customization in deliberate Taskfile/config layers, and test update behavior so `go tool -modfile=tools/wails/go.mod wails3 update build-assets` cannot silently erase local requirements.
 
 The canonical nonrecursive graph is:
 
@@ -191,7 +202,7 @@ The canonical nonrecursive graph is:
 6. copy non-embedded resources into the unsigned bundle;
 7. perform the final signature and inspection.
 
-`wails3 dev` remains the sole repository-root development command. Direct documented clean checks for `client/` and `frontend/` remain valid. Avoid Taskfile→npm→Taskfile recursion, duplicate protobuf generation, and concurrent generation into shared paths. Use run-once/dependency semantics where multiple build nodes converge.
+`go tool -modfile=tools/wails/go.mod wails3 dev` remains the sole repository-root development command. Direct documented clean checks for `client/` and `frontend/` remain valid. Avoid Taskfile→npm→Taskfile recursion, duplicate protobuf generation, and concurrent generation into shared paths. Use run-once/dependency semantics where multiple build nodes converge.
 
 The official beta.8 template defaults to `bin/`; this project will set `BIN_DIR`/equivalent output to `build/bin` and preserve `build/bin/Fallout Terminal.app`. The project-specific path is already consumed by scripts, CI, README, acceptance evidence, and rollback instructions; the default offers no compensating value.
 
@@ -233,7 +244,7 @@ Final bundle inspection covers:
 - final ad-hoc signature for the required personal-use profile;
 - one offline launch, one player listener, and clean quit.
 
-Adapt `scripts/build-macos.sh` to the pinned `wails3` package/build commands while preserving its preflight, arm64 verification, Developer ID replacement signing, hardened runtime, notarization, stapling, DMG, Gatekeeper, credential redaction, and SHA-256 steps. Public release gates run only with real credentials and evidence; otherwise record `NOT RUN`.
+Adapt `scripts/build-macos.sh` to `go tool -modfile=tools/wails/go.mod wails3 package` and the corresponding isolated build command while preserving its preflight, arm64 verification, Developer ID replacement signing, hardened runtime, notarization, stapling, DMG, Gatekeeper, credential redaction, and SHA-256 steps. Public release gates run only with real credentials and evidence; otherwise record `NOT RUN`.
 
 ## 9. Binding-Generation Resource Workaround
 
@@ -249,7 +260,7 @@ The file exists to accommodate v2 binding generation before final assets and dem
 
 ### Decision
 
-Update `.github/workflows/wails-macos.yml` to install the exact beta.8 CLI, generate bindings before any standalone master build, preserve all existing Go/frontend/player/Buf/Playwright/startup gates, add deterministic binding and forbidden-surface scans, package arm64 with v3, inspect the final bundle, and upload the established artifact.
+Update `.github/workflows/wails-macos.yml` to resolve the exact beta.8 CLI through `tools/wails/go.mod`, generate bindings before any standalone master build, preserve all existing Go/frontend/player/Buf/Playwright/startup gates, add deterministic binding and forbidden-surface scans, package arm64 with v3, inspect the final bundle, and upload the established artifact.
 
 Replace v2-specific active assertions and instructions without rewriting completed historical specifications. Mark the old active Wails v2 migration guide as historical/superseded wherever it would otherwise direct users to current v2 commands. Preserve `docs/wails-migration-rollback.md` as the Electron→Wails v2 historical record. Create `docs/wails-v3-migration-rollback.md` for this migration and record:
 

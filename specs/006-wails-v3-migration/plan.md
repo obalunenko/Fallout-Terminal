@@ -1,5 +1,7 @@
 # Implementation Plan: Wails v3 Runtime Migration
 
+**Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Updated the design for isolated Go tool modules, the unchanged runtime-status schema, measurable soak gates, and dependency-ordered P1 acceptance.
+
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
 **Planning baseline**: fetched `main` / `origin/main` at `f1084b3df8b5630862bdf7a0f347b599156653ef`
@@ -35,7 +37,7 @@ The implementation is a checkpointed brownfield migration rather than a one-comm
 | V. Safe/reproducible schemas | No schema delta; existing deterministic generation, compatibility, negative, and graph-isolation gates remain | PASS |
 | VI. Portable session JSON v1 | No persistence change; paths, references, extras, strict player-config decode, saves, and demo-copy behavior preserved | PASS |
 | VII. Complete cutover | Immutable v2 rollback, branch-bounded coexistence, explicit removal gate, no permanent switch | PASS |
-| Dependency rules | Exact beta.8 module/CLI/npm matrix; Wails imports limited to allowed boundaries | PASS |
+| Dependency and tool-module rules | Exact beta.8 runtime/npm pins; every Go development tool has one isolated `tools/<tool>/` module; repository commands use `go tool -modfile`; root `go.mod` remains application-only; Wails imports stay within allowed boundaries | PASS |
 | Testing conventions | Testify, tables, `t.Context()`, protobuf comparison, gofmt/vet/test/race and full browser/package gates planned | PASS |
 | Evidence integrity | Required and conditional profiles are separated; unavailable gates record `NOT RUN` | PASS |
 
@@ -65,6 +67,12 @@ main.go                             # Wails v3 application, assets, service/even
 app.go                              # transport-neutral core lifecycle and accepted operations
 app_contract.go                     # unchanged private protobuf ↔ native DTO adapters
 go.mod / go.sum                     # exact Wails v3 module; remove v2 at cutover
+tools/                              # isolated Go development-tool modules; never imported by the root app
+├── wails/go.mod / go.sum           # only wails3; exact v3.0.0-beta.8 parent-module pin
+├── buf/go.mod / go.sum             # only buf; exact v1.72.0 parent-module pin
+├── protoc-gen-go/go.mod / go.sum   # only protoc-gen-go; exact v1.36.11 parent-module pin
+└── protoc-gen-connect-go/          # only protoc-gen-connect-go; exact v1.20.0 parent-module pin
+    └── go.mod / go.sum
 Taskfile.yml                        # sole root v3 development/build entry
 build/
 ├── config.yml                      # Wails v3 application/build configuration
@@ -87,7 +95,7 @@ frontend/
 client/                             # unchanged generated ConnectRPC player app; still clean-built
 proto/ and internal/gen/            # unchanged contracts/generated Go; existing gates retained
 tests/browser/                      # unchanged or deliberately adapted player parity journeys
-scripts/build-macos.sh              # pinned wails3 release flow, existing trust controls retained
+scripts/build-macos.sh              # isolated pinned wails3 release flow, existing trust controls retained
 .github/workflows/wails-macos.yml   # exact pins, generations, scans, package inspection
 README.md                           # active v3 setup/dev/build/package instructions
 docs/
@@ -158,7 +166,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 ### Checkpoint 0 — Rollback, pins, and build skeleton
 
 - Capture/verify the immutable v2 source rollback in the new migration rollback record before removing active v2 paths.
-- Add the exact beta.8 Go/CLI/npm pins and committed lock changes; add automated pin consistency and no-floating-version scans.
+- Add the exact beta.8 Go/npm application pins and the independently pinned beta.8 CLI under `tools/wails/`; commit every application and tool lock change; add automated pin consistency, root-module-drift, and no-floating/global-tool scans.
 - Introduce beta.8-derived `Taskfile.yml`, `build/config.yml`, common/Darwin build assets, ownership comments/tests, and preserved `build/bin` output.
 - Establish one nonrecursive graph and direct locked frontend checks while v2 remains the production fallback.
 - Checkpoint gate: exact pins, clean tool preflight, Taskfile/config source assertions, no unexplained lock drift; rollback source verified.
@@ -192,11 +200,11 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 ### Checkpoint 4 — CI, release automation, active docs, soak, and rollback drill
 
-- Adapt `.github/workflows/wails-macos.yml` to exact wails3 generation/build/package and all current gates.
+- Adapt `.github/workflows/wails-macos.yml` to isolated exact-pinned Wails generation/build/package and all current gates.
 - Adapt the proven macOS release script without weakening signing/notary/DMG/Gatekeeper controls.
 - Update active README/quickstart commands; label v2 operating guidance historical while preserving completed specs and Electron rollback record.
 - Create new v3 rollback record, perform safety-copy/source rollback drill, and record only real evidence.
-- Run representative long local soak; run authenticated-ngrok/public-release gates only when real access exists, otherwise record `NOT RUN`.
+- Run the required 60-minute local soak with four to seven players, at least 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, bounded-resource observations, and five-second post-quit cleanup. Run the 30-minute authenticated-ngrok/public-release soak only when real access exists; otherwise record `NOT RUN`.
 - Checkpoint gate: CI graph and scripts pass applicable profile; soak and rollback evidence tied to exact candidate.
 
 ### Checkpoint 5 — Parity decision and irreversible source cutover
@@ -223,17 +231,17 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 |---|---|---|---|
 | Go formatting/quality | `gofmt -l .`; `go vet ./...`; `go test ./...`; `go test -race ./...` | N/A | no formatted paths; all commands pass with governed test conventions |
 | Protobuf/contracts | existing Buf format/lint, `scripts/proto-check.sh`, two-generation drift, compatibility baseline, all negative fixtures, public/private graph isolation | inspect any intentional adapter update | no schema drift/unclassified fields; feature-005 contracts unchanged |
-| Wails bindings | two clean `wails3 generate bindings` runs and content/inventory diff; service reflection/source scans | inspect generated service module | all 25 required; zero lifecycle/generic/native/player methods; second generation identical |
+| Wails bindings | two clean `go tool -modfile=tools/wails/go.mod wails3 generate bindings` runs and content/inventory diff; service reflection/source scans | inspect generated service module | all 25 required; zero lifecycle/generic/native/player methods; second generation identical |
 | Private bridge | table-driven Go adapter/service tests; direct JS facade call/result/error/cancel tests | representative file/session/URL journeys | exact native semantics, redaction, CopyDemo trust boundary, startup status visible |
 | Events/readiness | Go payload/detachment tests; JS four-listener/snapshot/race/unsubscribe/disposal tests | launch timing/failure presentation | exact four names/shapes; no stale overwrite, duplicate effect, false readiness, or late callback |
 | Dialog/browser | injected platform matrix for titles, filters, directories, filenames, aliases, create policy, cancel/errors, URL schemes | native open/save/cancel/HTTP(S) smoke | baseline semantics or explicitly recorded unavoidable difference |
 | Frontends | `npm ci` and production build for both `frontend/` and `client/`; bundle scans | visual master/player parity | only v3 master binding path; no CDN/runtime download; player independent of Wails |
 | Player | all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
 | Startup/shutdown | lifecycle unit/host integration, occupied port, adapter/event failure, tunnel fallback/invalid URL, partial/repeat/timeout triggers | close, Cmd+Q, dev interrupt | failure actionable; local fallback; reverse cleanup within 5s; no leaks |
-| Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
-| Personal package | `wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path |
+| Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go tool -modfile=tools/wails/go.mod wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
+| Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
-| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | representative long local play; rollback drill using safety copies | actual results tied to candidate; no simulated pass |
+| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | required 60-minute local workload and conditional 30-minute authenticated-ngrok workload; rollback drill using safety copies | thresholds and actual results tied to candidate; no simulated pass |
 | Cutover | source/generated/dependency/bundle/CI/script/docs scans plus full rebuild | owner parity review | zero active v2 runtime/dual switch; historical records intact |
 
 ## Acceptance Evidence Discipline
@@ -246,7 +254,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 ## Post-Design Constitution Recheck
 
-PASS. The contracts keep Wails at governed boundaries, preserve protobuf/ConnectRPC/session authority, define public/private exposure, use exact dependency pins, keep runtime state out of persistence, provide bounded coexistence/removal, and retain all required quality gates. No complexity exception is introduced.
+PASS after the 2026-08-14 reconciliation. The contracts keep Wails at governed boundaries, preserve protobuf/ConnectRPC/session authority, define public/private exposure, use isolated exactly pinned tool modules without polluting the root application module, keep runtime state out of persistence, provide bounded coexistence/removal, and retain all required quality gates. No complexity exception is introduced.
 
 ## Complexity Tracking
 
