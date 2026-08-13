@@ -4,17 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	controlservice "github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	liveservice "github.com/obalunenko/Fallout-Terminal/internal/live"
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
@@ -32,17 +34,23 @@ func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
 		Events:  events,
 		Desktop: desktop,
 	})
+	{
 
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v", err)
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v", err)
 	}
-	if got, want := recorder.Calls(), []string{"player:start", "event:server-info", "desktop:ready"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("startup calls = %v, want %v", got, want)
+	{
+
+		got, want := recorder.Calls(), []string{"player:start", "event:server-info", "desktop:ready"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"startup calls = %v, want %v", got, want)
 	}
+
 	status := app.GetRuntimeStatus()
-	if status.ServerInfo == nil || status.ServerInfo.Port != 3690 || status.StartupError != "" {
-		t.Fatalf("runtime status = %#v", status)
-	}
+	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.Port != 3690 || status.StartupError != "",
+		"runtime status = %#v", status)
+
 }
 
 func TestPlayerConfigCommandsAssociateBeforeInstallingRoster(t *testing.T) {
@@ -57,15 +65,21 @@ func TestPlayerConfigCommandsAssociateBeforeInstallingRoster(t *testing.T) {
 	app := NewAppWithDependencies(AppDependencies{Sessions: sessions, PlayerConfigs: configs, Coordination: coordination})
 
 	result := app.OpenPlayerConfig()
-	if !result.OK || result.Config == nil || result.State == nil || len(result.State.Roster) != 1 {
-		t.Fatalf("OpenPlayerConfig() = %#v", result)
+	require.Falsef(t, !result.OK || result.Config == nil || result.State == nil || len(result.State.Roster) != 1,
+		"OpenPlayerConfig() = %#v", result)
+	{
+
+		got, want := sessions.associations, []string{"/Campaigns/players/shared.json"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"session associations = %#v, want %#v", got, want)
 	}
-	if got, want := sessions.associations, []string{"/Campaigns/players/shared.json"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("session associations = %#v, want %#v", got, want)
+	{
+
+		got, want := coordination.installs, []string{"Shared:mara"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"coordinator installs = %#v, want %#v", got, want)
 	}
-	if got, want := coordination.installs, []string{"Shared:mara"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("coordinator installs = %#v, want %#v", got, want)
-	}
+
 }
 
 func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.T) {
@@ -94,28 +108,25 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	})
 
 	created := app.NewPlayerConfig()
-	if !created.OK || created.Error != "" || created.Config == nil || created.Session == nil || created.State == nil {
-		t.Fatalf("NewPlayerConfig() = %#v", created)
-	}
-	if created.Config.FilePath != target || created.Session.PlayerConfig == "" || created.State.PlayerConfig == nil || len(created.State.Roster) != 0 {
-		t.Fatalf("new empty player config was not associated and installed: %#v", created)
-	}
+	require.Falsef(t, !created.OK || created.Error != "" || created.Config == nil || created.Session == nil || created.State == nil,
+		"NewPlayerConfig() = %#v", created)
+	require.Falsef(t, created.Config.FilePath != target || created.Session.PlayerConfig == "" || created.State.PlayerConfig == nil || len(created.State.Roster) != 0,
+		"new empty player config was not associated and installed: %#v", created)
 
 	added := app.AddCharacter("Mara")
-	if !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara" {
-		t.Fatalf("AddCharacter() after empty config = %#v", added)
-	}
+	require.Falsef(t, !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara",
+		"AddCharacter() after empty config = %#v", added)
+
 	stored, ok := fileSystem.File(target)
-	if !ok {
-		t.Fatalf("player config was not written to %q", target)
-	}
+	require.Falsef(t, !ok,
+		"player config was not written to %q", target)
+
 	persisted, err := domain.DecodePlayerConfig(stored)
-	if err != nil {
-		t.Fatalf("DecodePlayerConfig() after first add: %v", err)
-	}
-	if len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara" {
-		t.Fatalf("persisted roster after first add = %#v", persisted.Roster)
-	}
+	require.Falsef(t, err != nil,
+		"DecodePlayerConfig() after first add: %v", err)
+	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara",
+		"persisted roster after first add = %#v", persisted.Roster)
+
 }
 
 func TestApplicationStartsProtectedTunnelAfterLocalReadinessAndPublishesBothAddresses(t *testing.T) {
@@ -137,39 +148,49 @@ func TestApplicationStartsProtectedTunnelAfterLocalReadinessAndPublishesBothAddr
 		Events:        events,
 		Desktop:       &recordingDesktop{recorder: recorder},
 	})
+	{
 
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v", err)
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v", err)
 	}
-	if got, want := recorder.Calls(), []string{
-		"player:start", "event:server-info", "desktop:ready", "tunnel:start", "event:server-info",
-	}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("public startup calls = %v, want %v", got, want)
+	{
+
+		got, want := recorder.Calls(), []string{
+			"player:start", "event:server-info", "desktop:ready", "tunnel:start", "event:server-info",
+		}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"public startup calls = %v, want %v", got, want)
 	}
+
 	status := app.GetRuntimeStatus()
-	if status.ServerInfo == nil || status.ServerInfo.URL != "https://players.example.test" || status.ServerInfo.LocalURL != local.URL || !status.ServerInfo.Tunnel {
-		t.Fatalf("public runtime status = %#v, want protected public and trusted local addresses", status)
-	}
-	if status.StartupError != "" || status.ServerInfo.TunnelError != "" {
-		t.Fatalf("successful public runtime status retained an error: %#v", status)
-	}
+	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != "https://players.example.test" || status.ServerInfo.LocalURL != local.URL || !status.ServerInfo.Tunnel,
+		"public runtime status = %#v, want protected public and trusted local addresses", status)
+	require.Falsef(t, status.StartupError != "" || status.ServerInfo.TunnelError != "",
+		"successful public runtime status retained an error: %#v", status)
+
 	records := events.Records()
-	if len(records) != 2 {
-		t.Fatalf("server-info events = %#v, want local then public", records)
-	}
+	require.Falsef(t, len(records) != 2,
+		"server-info events = %#v, want local then public", records)
+
 	first, firstOK := records[0].Payload.(domain.ServerInfo)
 	second, secondOK := records[1].Payload.(domain.ServerInfo)
-	if !firstOK || first.URL != local.URL || first.Tunnel || !secondOK || second.URL != "https://players.example.test" || second.LocalURL != local.URL || !second.Tunnel {
-		t.Fatalf("server-info transition = %#v, want local then protected public", records)
-	}
+	require.Falsef(t, !firstOK || first.URL != local.URL || first.Tunnel || !secondOK || second.URL != "https://players.example.test" || second.LocalURL != local.URL || !second.Tunnel,
+		"server-info transition = %#v, want local then protected public", records)
 
 	recorder.Reset()
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() error = %v", err)
+	{
+		err := app.Shutdown(t.Context())
+		require.Falsef(t, err != nil,
+			"Shutdown() error = %v", err)
 	}
-	if got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "desktop:close"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("public shutdown calls = %v, want %v", got, want)
+	{
+
+		got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "desktop:close"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"public shutdown calls = %v, want %v", got, want)
 	}
+
 }
 
 func TestApplicationRejectsUnsafeTunnelAddressAndStopsAcquiredTunnel(t *testing.T) {
@@ -191,22 +212,27 @@ func TestApplicationRejectsUnsafeTunnelAddressAndStopsAcquiredTunnel(t *testing.
 				Events:        &recordingEventSink{recorder: recorder},
 				Desktop:       &recordingDesktop{recorder: recorder},
 			})
+			{
 
-			if err := app.Start(context.Background()); err != nil {
-				t.Fatalf("Start() error = %v, want safe local fallback", err)
+				err := app.Start(t.Context())
+				require.Falsef(t, err != nil,
+					"Start() error = %v, want safe local fallback", err)
 			}
-			if got, want := recorder.Calls(), []string{
-				"player:start", "event:server-info", "desktop:ready", "tunnel:start", "tunnel:stop", "event:server-info",
-			}; !reflect.DeepEqual(got, want) {
-				t.Fatalf("unsafe-public startup calls = %v, want %v", got, want)
+			{
+
+				got, want := recorder.Calls(), []string{
+					"player:start", "event:server-info", "desktop:ready", "tunnel:start", "tunnel:stop", "event:server-info",
+				}
+				require.Falsef(t, !cmp.Equal(got, want),
+					"unsafe-public startup calls = %v, want %v", got, want)
 			}
+
 			status := app.GetRuntimeStatus()
-			if status.ServerInfo == nil || status.ServerInfo.URL != local.URL || status.ServerInfo.Tunnel || status.ServerInfo.TunnelError != tunnelAddressFailureMessage {
-				t.Fatalf("unsafe-public status = %#v, want local fallback", status)
-			}
-			if strings.Contains(status.StartupError, unsafeURL) || strings.Contains(status.ServerInfo.TunnelError, unsafeURL) {
-				t.Fatalf("unsafe public address leaked into status: %#v", status)
-			}
+			require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != local.URL || status.ServerInfo.Tunnel || status.ServerInfo.TunnelError != tunnelAddressFailureMessage,
+				"unsafe-public status = %#v, want local fallback", status)
+			require.Falsef(t, strings.Contains(status.StartupError, unsafeURL) || strings.Contains(status.ServerInfo.TunnelError, unsafeURL),
+				"unsafe public address leaked into status: %#v", status)
+
 		})
 	}
 }
@@ -225,17 +251,20 @@ func TestApplicationUnwindsPartialStartup(t *testing.T) {
 		},
 	})
 
-	err := app.Start(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "bridge") {
-		t.Fatalf("Start() error = %v, want actionable bridge error", err)
+	err := app.Start(t.Context())
+	require.Falsef(t, err == nil || !strings.Contains(err.Error(), "bridge"),
+		"Start() error = %v, want actionable bridge error", err)
+	{
+
+		got, want := recorder.Calls(), []string{"player:start", "event:server-info", "player:stop"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"partial-start calls = %v, want %v", got, want)
 	}
-	if got, want := recorder.Calls(), []string{"player:start", "event:server-info", "player:stop"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("partial-start calls = %v, want %v", got, want)
-	}
+
 	status := app.GetRuntimeStatus()
-	if status.ServerInfo != nil || !strings.Contains(status.StartupError, "bridge") {
-		t.Fatalf("failure status = %#v", status)
-	}
+	require.Falsef(t, status.ServerInfo != nil || !strings.Contains(status.StartupError, "bridge"),
+		"failure status = %#v", status)
+
 }
 
 func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
@@ -251,20 +280,31 @@ func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
 		Events:        &recordingEventSink{recorder: recorder},
 		Desktop:       &recordingDesktop{recorder: recorder},
 	})
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v", err)
+	{
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v", err)
 	}
 
 	recorder.Reset()
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() error = %v", err)
+	{
+		err := app.Shutdown(t.Context())
+		require.Falsef(t, err != nil,
+			"Shutdown() error = %v", err)
 	}
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("second Shutdown() error = %v", err)
+	{
+
+		err := app.Shutdown(t.Context())
+		require.Falsef(t, err != nil,
+			"second Shutdown() error = %v", err)
 	}
-	if got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "session:shutdown", "desktop:close"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("shutdown calls = %v, want %v", got, want)
+	{
+
+		got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "session:shutdown", "desktop:close"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"shutdown calls = %v, want %v", got, want)
 	}
+
 }
 
 func TestInvalidPublicConfigurationStartsZeroTunnelProcesses(t *testing.T) {
@@ -283,21 +323,25 @@ func TestInvalidPublicConfigurationStartsZeroTunnelProcesses(t *testing.T) {
 		Events:        &recordingEventSink{recorder: recorder},
 		Desktop:       &recordingDesktop{recorder: recorder},
 	})
+	{
 
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v, want local readiness despite invalid public configuration", err)
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v, want local readiness despite invalid public configuration", err)
 	}
-	if tunnel.validationCalls != 1 {
-		t.Fatalf("tunnel validation calls = %d, want 1", tunnel.validationCalls)
+	require.Falsef(t, tunnel.validationCalls != 1,
+		"tunnel validation calls = %d, want 1", tunnel.validationCalls)
+	require.Falsef(t, tunnel.processStarts != 0,
+		"tunnel process starts = %d, want 0 for invalid credentials", tunnel.processStarts)
+	{
+
+		got, want := recorder.Calls(), []string{
+			"player:start", "event:server-info", "desktop:ready", "tunnel:validate", "event:server-info",
+		}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"invalid-public startup calls = %v, want %v", got, want)
 	}
-	if tunnel.processStarts != 0 {
-		t.Fatalf("tunnel process starts = %d, want 0 for invalid credentials", tunnel.processStarts)
-	}
-	if got, want := recorder.Calls(), []string{
-		"player:start", "event:server-info", "desktop:ready", "tunnel:validate", "event:server-info",
-	}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("invalid-public startup calls = %v, want %v", got, want)
-	}
+
 }
 
 func TestInvalidPublicConfigurationPreservesLocalReadinessAndNonSecretStatus(t *testing.T) {
@@ -324,48 +368,54 @@ func TestInvalidPublicConfigurationPreservesLocalReadinessAndNonSecretStatus(t *
 		Events:        events,
 		Desktop:       &recordingDesktop{recorder: recorder},
 	})
+	{
 
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v, want usable local mode", err)
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v, want usable local mode", err)
 	}
+
 	status := app.GetRuntimeStatus()
-	if status.ServerInfo == nil || status.ServerInfo.URL != localURL || status.ServerInfo.Tunnel {
-		t.Fatalf("runtime server info = %#v, want unchanged local readiness", status.ServerInfo)
-	}
-	if status.ServerInfo.TunnelError == "" || status.StartupError == "" {
-		t.Fatalf("runtime status = %#v, want actionable public-access failure", status)
-	}
+	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != localURL || status.ServerInfo.Tunnel,
+		"runtime server info = %#v, want unchanged local readiness", status.ServerInfo)
+	require.Falsef(t, status.ServerInfo.TunnelError == "" || status.StartupError == "",
+		"runtime status = %#v, want actionable public-access failure", status)
+
 	combinedStatus := status.StartupError + " " + status.ServerInfo.TunnelError
 	for _, expected := range []string{"public", "credential", "executable", "network"} {
-		if !strings.Contains(strings.ToLower(combinedStatus), expected) {
-			t.Errorf("public failure status %q is missing actionable term %q", combinedStatus, expected)
-		}
+		assert.Falsef(t, !strings.Contains(strings.ToLower(combinedStatus), expected),
+			"public failure status %q is missing actionable term %q", combinedStatus, expected)
+
 	}
 	for _, secret := range []string{secretUsername, secretPassword} {
-		if strings.Contains(combinedStatus, secret) {
-			t.Errorf("public failure status disclosed secret %q", secret)
-		}
+		assert.Falsef(t, strings.Contains(combinedStatus, secret),
+			"public failure status disclosed secret %q", secret)
+
 	}
 
 	records := events.Records()
-	if len(records) < 2 {
-		t.Fatalf("server-info event records = %#v, want local and failure status", records)
-	}
+	require.Falsef(t, len(records) < 2,
+		"server-info event records = %#v, want local and failure status", records)
+
 	lastInfo, ok := records[len(records)-1].Payload.(domain.ServerInfo)
-	if !ok || lastInfo.URL != localURL || lastInfo.Tunnel || lastInfo.TunnelError == "" {
-		t.Fatalf("last server-info event = %#v, want usable local URL plus tunnel error", records[len(records)-1])
-	}
+	require.Falsef(t, !ok || lastInfo.URL != localURL || lastInfo.Tunnel || lastInfo.TunnelError == "",
+		"last server-info event = %#v, want usable local URL plus tunnel error", records[len(records)-1])
 
 	recorder.Reset()
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() error = %v", err)
+	{
+		err := app.Shutdown(t.Context())
+		require.Falsef(t, err != nil,
+			"Shutdown() error = %v", err)
 	}
-	if got, want := recorder.Calls(), []string{"player:stop", "desktop:close"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("invalid-public shutdown calls = %v, want %v", got, want)
+	{
+
+		got, want := recorder.Calls(), []string{"player:stop", "desktop:close"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"invalid-public shutdown calls = %v, want %v", got, want)
 	}
-	if tunnel.stopCalls != 0 {
-		t.Fatalf("tunnel stop calls = %d, want 0 because no process was acquired", tunnel.stopCalls)
-	}
+	require.Falsef(t, tunnel.stopCalls != 0,
+		"tunnel stop calls = %d, want 0 because no process was acquired", tunnel.stopCalls)
+
 }
 
 func TestApplicationPlayerStartFailureNeverReportsReady(t *testing.T) {
@@ -376,16 +426,22 @@ func TestApplicationPlayerStartFailureNeverReportsReady(t *testing.T) {
 		Desktop: &recordingDesktop{recorder: recorder},
 	})
 
-	err := app.Start(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "3690") {
-		t.Fatalf("Start() error = %v, want port detail", err)
+	err := app.Start(t.Context())
+	require.Falsef(t, err == nil || !strings.Contains(err.Error(), "3690"),
+		"Start() error = %v, want port detail", err)
+	{
+
+		got, want := recorder.Calls(), []string{"player:start"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"failed startup calls = %v, want %v", got, want)
 	}
-	if got, want := recorder.Calls(), []string{"player:start"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("failed startup calls = %v, want %v", got, want)
+	{
+
+		status := app.GetRuntimeStatus()
+		require.Falsef(t, status.ServerInfo != nil || !strings.Contains(status.StartupError, "3690"),
+			"failure status = %#v", status)
 	}
-	if status := app.GetRuntimeStatus(); status.ServerInfo != nil || !strings.Contains(status.StartupError, "3690") {
-		t.Fatalf("failure status = %#v", status)
-	}
+
 }
 
 func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
@@ -404,19 +460,17 @@ func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
 		},
 		HackLevel: 1,
 	})
-	if activationResult.OK || activationResult.Error == "" {
-		t.Fatalf("RequestTerminalActivation(invalid) = %#v, want structured validation error", activationResult)
-	}
+	require.Falsef(t, activationResult.OK || activationResult.Error == "",
+		"RequestTerminalActivation(invalid) = %#v, want structured validation error", activationResult)
 
 	updateResult := app.UpdateLiveTerminal(LiveUpdatePayload{
 		Tree: domain.ContentNode{ID: "root", Type: "script", Name: "unsupported"},
 	})
-	if updateResult.OK || updateResult.Error == "" {
-		t.Fatalf("UpdateLiveTerminal(invalid) = %#v, want structured validation error", updateResult)
-	}
-	if len(coordination.targets) != 0 || coordination.updateCalls != 0 {
-		t.Fatalf("invalid live payloads reached coordinator: activations=%d updates=%d", len(coordination.targets), coordination.updateCalls)
-	}
+	require.Falsef(t, updateResult.OK || updateResult.Error == "",
+		"UpdateLiveTerminal(invalid) = %#v, want structured validation error", updateResult)
+	require.Falsef(t, len(coordination.targets) != 0 || coordination.updateCalls != 0,
+		"invalid live payloads reached coordinator: activations=%d updates=%d", len(coordination.targets), coordination.updateCalls)
+
 }
 
 func TestRuntimeStatusReturnsCompleteDetachedSnapshot(t *testing.T) {
@@ -434,23 +488,20 @@ func TestRuntimeStatusReturnsCompleteDetachedSnapshot(t *testing.T) {
 	app.savedRevision = 7
 
 	status := app.GetRuntimeStatus()
-	if status.ServerInfo == nil || status.ServerInfo.URL != "http://192.0.2.10:3690" {
-		t.Fatalf("RuntimeStatus.ServerInfo = %#v", status.ServerInfo)
-	}
-	if status.ClientCount != 4 || status.HackState == nil || status.HackState.AttemptsLeft != 3 {
-		t.Fatalf("RuntimeStatus bridge state = %#v", status)
-	}
-	if status.SaveState != "saving" || status.RequestedRevision != 8 || status.SavedRevision != 7 {
-		t.Fatalf("RuntimeStatus save state = %#v", status)
-	}
+	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != "http://192.0.2.10:3690",
+		"RuntimeStatus.ServerInfo = %#v", status.ServerInfo)
+	require.Falsef(t, status.ClientCount != 4 || status.HackState == nil || status.HackState.AttemptsLeft != 3,
+		"RuntimeStatus bridge state = %#v", status)
+	require.Falsef(t, status.SaveState != "saving" || status.RequestedRevision != 8 || status.SavedRevision != 7,
+		"RuntimeStatus save state = %#v", status)
 
 	status.ServerInfo.URL = "mutated"
 	status.HackState.Log[0] = "mutated"
 	status.HackState.Columns[0].Addresses[0] = "mutated"
 	again := app.GetRuntimeStatus()
-	if again.ServerInfo.URL == "mutated" || again.HackState.Log[0] == "mutated" || again.HackState.Columns[0].Addresses[0] == "mutated" {
-		t.Fatalf("GetRuntimeStatus returned aliases into canonical state: %#v", again)
-	}
+	require.Falsef(t, again.ServerInfo.URL == "mutated" || again.HackState.Log[0] == "mutated" || again.HackState.Columns[0].Addresses[0] == "mutated",
+		"GetRuntimeStatus returned aliases into canonical state: %#v", again)
+
 }
 
 func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t *testing.T) {
@@ -473,41 +524,46 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 	app := NewAppWithDependencies(AppDependencies{Coordination: service, Events: events})
 
 	initial := app.GetRuntimeStatus()
-	if initial.CoordinationState == nil || initial.CoordinationState.Revision != 4 {
-		t.Fatalf("initial coordination status = %#v, want replayable revision 4", initial.CoordinationState)
-	}
+	require.Falsef(t, initial.CoordinationState == nil || initial.CoordinationState.Revision != 4,
+		"initial coordination status = %#v, want replayable revision 4", initial.CoordinationState)
 
 	added := app.AddCharacter("  Mara  ")
-	if !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5 {
-		t.Fatalf("AddCharacter() = %#v, want accepted revision 5", added)
+	require.Falsef(t, !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5,
+		"AddCharacter() = %#v, want accepted revision 5", added)
+	{
+
+		got, want := service.addNames, []string{"Mara"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"coordinator AddCharacter calls = %v, want %v", got, want)
 	}
-	if got, want := service.addNames, []string{"Mara"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("coordinator AddCharacter calls = %v, want %v", got, want)
-	}
+
 	added.State.Roster[0].Name = "mutated result"
 
 	started := app.StartBroadcast()
-	if !started.OK || started.Error != "" || started.State == nil || started.State.Broadcast == nil || started.State.Broadcast.ID != "broadcast-1" {
-		t.Fatalf("StartBroadcast() = %#v, want accepted broadcast", started)
-	}
+	require.Falsef(t, !started.OK || started.Error != "" || started.State == nil || started.State.Broadcast == nil || started.State.Broadcast.ID != "broadcast-1",
+		"StartBroadcast() = %#v, want accepted broadcast", started)
+
 	started.State.Roster[0].Name = "mutated start result"
 
 	status := app.GetRuntimeStatus()
-	if status.CoordinationState == nil || status.CoordinationState.Revision != 6 || status.CoordinationState.Roster[0].Name != "Mara" {
-		t.Fatalf("detached coordination status = %#v", status.CoordinationState)
-	}
+	require.Falsef(t, status.CoordinationState == nil || status.CoordinationState.Revision != 6 || status.CoordinationState.Roster[0].Name != "Mara",
+		"detached coordination status = %#v", status.CoordinationState)
+
 	records := events.Records()
-	if len(records) != 2 || records[0].Name != "coordination-state" || records[1].Name != "coordination-state" {
-		t.Fatalf("coordination events = %#v, want add then start snapshots", records)
-	}
+	require.Falsef(t, len(records) != 2 || records[0].Name != "coordination-state" || records[1].Name != "coordination-state",
+		"coordination events = %#v, want add then start snapshots", records)
+
 	last, ok := records[1].Payload.(*domain.MasterCoordinationState)
-	if !ok || last == nil || last.Broadcast == nil || last.Broadcast.ID != "broadcast-1" {
-		t.Fatalf("last coordination event = %#v", records[1])
-	}
+	require.Falsef(t, !ok || last == nil || last.Broadcast == nil || last.Broadcast.ID != "broadcast-1",
+		"last coordination event = %#v", records[1])
+
 	last.Roster[0].Name = "mutated event"
-	if replay := app.GetRuntimeStatus().CoordinationState; replay == nil || replay.Roster[0].Name != "Mara" {
-		t.Fatalf("event payload aliased runtime status: %#v", replay)
+	{
+		replay := app.GetRuntimeStatus().CoordinationState
+		require.Falsef(t, replay == nil || replay.Roster[0].Name != "Mara",
+			"event payload aliased runtime status: %#v", replay)
 	}
+
 }
 
 func TestCoordinationBridgeRejectsInvalidOrFailedCommandsWithoutPartialState(t *testing.T) {
@@ -523,25 +579,27 @@ func TestCoordinationBridgeRejectsInvalidOrFailedCommandsWithoutPartialState(t *
 	})
 
 	invalid := app.AddCharacter("   ")
-	if invalid.OK || invalid.Error == "" || len(service.addNames) != 0 {
-		t.Fatalf("AddCharacter(blank) = %#v, calls = %v", invalid, service.addNames)
-	}
+	require.Falsef(t, invalid.OK || invalid.Error == "" || len(service.addNames) != 0,
+		"AddCharacter(blank) = %#v, calls = %v", invalid, service.addNames)
+
 	failedAdd := app.AddCharacter("Boone")
-	if failedAdd.OK || !strings.Contains(failedAdd.Error, "roster") {
-		t.Fatalf("AddCharacter(failed) = %#v", failedAdd)
-	}
+	require.Falsef(t, failedAdd.OK || !strings.Contains(failedAdd.Error, "roster"),
+		"AddCharacter(failed) = %#v", failedAdd)
+
 	failedStart := app.StartBroadcast()
-	if failedStart.OK || !strings.Contains(failedStart.Error, "already") {
-		t.Fatalf("StartBroadcast(failed) = %#v", failedStart)
-	}
+	require.Falsef(t, failedStart.OK || !strings.Contains(failedStart.Error, "already"),
+		"StartBroadcast(failed) = %#v", failedStart)
 
 	status := app.GetRuntimeStatus()
-	if status.CoordinationState == nil || status.CoordinationState.Revision != 9 || len(status.CoordinationState.Roster) != 1 {
-		t.Fatalf("failed commands partially changed status: %#v", status.CoordinationState)
+	require.Falsef(t, status.CoordinationState == nil || status.CoordinationState.Revision != 9 || len(status.CoordinationState.Roster) != 1,
+		"failed commands partially changed status: %#v", status.CoordinationState)
+	{
+
+		records := recorder.Calls()
+		require.Falsef(t, len(records) != 0,
+			"failed commands emitted coordination events: %v", records)
 	}
-	if records := recorder.Calls(); len(records) != 0 {
-		t.Fatalf("failed commands emitted coordination events: %v", records)
-	}
+
 }
 
 func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMutation(t *testing.T) {
@@ -564,29 +622,31 @@ func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMut
 	})
 
 	ended := app.EndBroadcast()
-	if !ended.OK || ended.Error != "" || ended.State == nil || ended.State.Broadcast != nil || ended.State.Revision != 81 {
-		t.Fatalf("EndBroadcast() = %#v", ended)
-	}
-	restarted := app.StartBroadcast()
-	if !restarted.OK || restarted.State == nil || restarted.State.Broadcast == nil || restarted.State.Broadcast.ID != "broadcast-2" {
-		t.Fatalf("second StartBroadcast() = %#v", restarted)
-	}
-	if status := app.GetRuntimeStatus(); status.CoordinationState == nil || status.CoordinationState.Broadcast == nil || status.CoordinationState.Broadcast.ID != "broadcast-2" {
-		t.Fatalf("broadcast lifecycle replay status = %#v", status)
-	}
-	if coordination.endCalls != 1 || coordination.startCalls != 1 {
-		t.Fatalf("lifecycle calls end/start = %d/%d", coordination.endCalls, coordination.startCalls)
-	}
+	require.Falsef(t, !ended.OK || ended.Error != "" || ended.State == nil || ended.State.Broadcast != nil || ended.State.Revision != 81,
+		"EndBroadcast() = %#v", ended)
 
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatal(err)
+	restarted := app.StartBroadcast()
+	require.Falsef(t, !restarted.OK || restarted.State == nil || restarted.State.Broadcast == nil || restarted.State.Broadcast.ID != "broadcast-2",
+		"second StartBroadcast() = %#v", restarted)
+	{
+
+		status := app.GetRuntimeStatus()
+		require.Falsef(t, status.CoordinationState == nil || status.CoordinationState.Broadcast == nil || status.CoordinationState.Broadcast.ID != "broadcast-2",
+			"broadcast lifecycle replay status = %#v", status)
 	}
-	if coordination.shutdownCalls != 1 {
-		t.Fatalf("coordination shutdown calls = %d, want 1", coordination.shutdownCalls)
+	require.Falsef(t, coordination.endCalls != 1 || coordination.startCalls != 1,
+		"lifecycle calls end/start = %d/%d", coordination.endCalls, coordination.startCalls)
+	{
+
+		err := app.Shutdown(t.Context())
+		require.False(t, err != nil,
+			err)
 	}
-	if durable.shutdownCalls != 1 {
-		t.Fatalf("durable session shutdown calls = %d, want 1 without mutation commands", durable.shutdownCalls)
-	}
+	require.Falsef(t, coordination.shutdownCalls != 1,
+		"coordination shutdown calls = %d, want 1", coordination.shutdownCalls)
+	require.Falsef(t, durable.shutdownCalls != 1,
+		"durable session shutdown calls = %d, want 1 without mutation commands", durable.shutdownCalls)
+
 }
 
 func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *testing.T) {
@@ -635,13 +695,16 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 	for _, command := range commands {
 		service.nextRevision++
 		result := command.run()
-		if !result.OK || result.Error != "" || result.State == nil || result.State.Revision != uint64(20+service.nextRevision) {
-			t.Fatalf("%s result = %#v", command.name, result)
-		}
+		require.Falsef(t, !result.OK || result.Error != "" || result.State == nil || result.State.Revision != uint64(20+service.nextRevision),
+			"%s result = %#v", command.name, result)
+
 		result.State.Roster[0].Name = "mutated result"
-		if got := app.GetRuntimeStatus().CoordinationState.Roster[0].Name; got == "mutated result" {
-			t.Fatalf("%s returned an aliased coordination state", command.name)
+		{
+			got := app.GetRuntimeStatus().CoordinationState.Roster[0].Name
+			require.Falsef(t, got == "mutated result",
+				"%s returned an aliased coordination state", command.name)
 		}
+
 	}
 
 	wantCalls := []string{
@@ -652,37 +715,40 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 		"release-character:session-1",
 		"move-character:character-1:session-2",
 	}
-	if !reflect.DeepEqual(service.calls, wantCalls) {
-		t.Fatalf("coordination correction calls = %v, want %v", service.calls, wantCalls)
+	require.Falsef(t, !cmp.Equal(service.calls, wantCalls),
+		"coordination correction calls = %v, want %v", service.calls, wantCalls)
+	{
+
+		got := recorder.Calls()
+		require.Falsef(t, len(got) != len(commands),
+			"coordination event/save calls = %v, want only %d coordination events", got, len(commands))
 	}
-	if got := recorder.Calls(); len(got) != len(commands) {
-		t.Fatalf("coordination event/save calls = %v, want only %d coordination events", got, len(commands))
-	}
+
 	for _, call := range recorder.Calls() {
-		if call != "event:coordination-state" {
-			t.Fatalf("coordination correction touched durable session path: %v", recorder.Calls())
-		}
+		require.Falsef(t, call != "event:coordination-state",
+			"coordination correction touched durable session path: %v", recorder.Calls())
+
 	}
 
 	eventState, ok := events.Records()[0].Payload.(*domain.MasterCoordinationState)
-	if !ok || eventState == nil {
-		t.Fatalf("first correction event payload = %#v", events.Records()[0].Payload)
-	}
+	require.Falsef(t, !ok || eventState == nil,
+		"first correction event payload = %#v", events.Records()[0].Payload)
+
 	eventState.Roster[0].Name = "mutated event"
-	if got := app.GetRuntimeStatus().CoordinationState.Roster[0].Name; got == "mutated event" {
-		t.Fatal("coordination event payload aliases replayable runtime status")
+	{
+		got := app.GetRuntimeStatus().CoordinationState.Roster[0].Name
+		require.False(t, got == "mutated event",
+			"coordination event payload aliases replayable runtime status")
 	}
 
 	before := app.GetRuntimeStatus().CoordinationState
 	service.failCommand = "move-character"
 	service.commandErr = errors.New("destination session already has a character")
 	rejected := app.MoveCharacter(MoveCharacterPayload{CharacterID: "character-1", ToSessionID: "session-2"})
-	if rejected.OK || !strings.Contains(rejected.Error, "already") || !reflect.DeepEqual(rejected.State, before) {
-		t.Fatalf("conflicting MoveCharacter() = %#v, want unchanged authoritative snapshot", rejected)
-	}
-	if !reflect.DeepEqual(app.GetRuntimeStatus().CoordinationState, before) {
-		t.Fatal("conflicting correction changed replayable coordination state")
-	}
+	require.Falsef(t, rejected.OK || !strings.Contains(rejected.Error, "already") || !cmp.Equal(rejected.State, before),
+		"conflicting MoveCharacter() = %#v, want unchanged authoritative snapshot", rejected)
+	require.False(t, !cmp.Equal(app.GetRuntimeStatus().CoordinationState, before),
+		"conflicting correction changed replayable coordination state")
 
 	invalidCalls := len(service.calls)
 	invalid := []CoordinationCommandResult{
@@ -693,13 +759,13 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 		app.MoveCharacter(MoveCharacterPayload{CharacterID: "character-1", ToSessionID: ""}),
 	}
 	for index, result := range invalid {
-		if result.OK || result.Error == "" {
-			t.Fatalf("invalid correction %d = %#v, want validation refusal", index, result)
-		}
+		require.Falsef(t, result.OK || result.Error == "",
+			"invalid correction %d = %#v, want validation refusal", index, result)
+
 	}
-	if len(service.calls) != invalidCalls {
-		t.Fatalf("invalid payloads reached coordinator: %v", service.calls[invalidCalls:])
-	}
+	require.Falsef(t, len(service.calls) != invalidCalls,
+		"invalid payloads reached coordinator: %v", service.calls[invalidCalls:])
+
 }
 
 func TestCoordinationBridgeValidatesAndPublishesActiveControllerReassignment(t *testing.T) {
@@ -721,49 +787,53 @@ func TestCoordinationBridgeValidatesAndPublishesActiveControllerReassignment(t *
 	app := NewAppWithDependencies(AppDependencies{Coordination: service, Events: events})
 
 	result := app.SetActiveController(string(secondID))
-	if !result.OK || result.Error != "" || result.State == nil || result.State.Revision != 31 {
-		t.Fatalf("SetActiveController(second) = %#v", result)
+	require.Falsef(t, !result.OK || result.Error != "" || result.State == nil || result.State.Revision != 31,
+		"SetActiveController(second) = %#v", result)
+	require.Falsef(t, result.State.Broadcast == nil || result.State.Broadcast.ControllerSessionID == nil || *result.State.Broadcast.ControllerSessionID != secondID,
+		"reassigned broadcast = %#v, want controller %q", result.State.Broadcast, secondID)
+	{
+
+		got := masterSessionEntryForAppTest(t, result.State, firstID).Role
+		require.Falsef(t, got != domain.PlayerRoleObserver,
+			"former controller role = %q, want observer", got)
 	}
-	if result.State.Broadcast == nil || result.State.Broadcast.ControllerSessionID == nil || *result.State.Broadcast.ControllerSessionID != secondID {
-		t.Fatalf("reassigned broadcast = %#v, want controller %q", result.State.Broadcast, secondID)
+	{
+
+		got := masterSessionEntryForAppTest(t, result.State, secondID).Role
+		require.Falsef(t, got != domain.PlayerRoleActive,
+			"new controller role = %q, want active", got)
 	}
-	if got := masterSessionEntryForAppTest(t, result.State, firstID).Role; got != domain.PlayerRoleObserver {
-		t.Fatalf("former controller role = %q, want observer", got)
-	}
-	if got := masterSessionEntryForAppTest(t, result.State, secondID).Role; got != domain.PlayerRoleActive {
-		t.Fatalf("new controller role = %q, want active", got)
-	}
-	if got, want := order.Calls(), []string{"coordinator:set-controller:session-2", "event:coordination-state"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("reassignment order = %v, want %v", got, want)
+	{
+
+		got, want := order.Calls(), []string{"coordinator:set-controller:session-2", "event:coordination-state"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"reassignment order = %v, want %v", got, want)
 	}
 
 	result.State.Sessions[0].FallbackName = "mutated result"
 	eventState, ok := events.Records()[0].Payload.(*domain.MasterCoordinationState)
-	if !ok || eventState == nil {
-		t.Fatalf("controller event = %#v", events.Records())
-	}
+	require.Falsef(t, !ok || eventState == nil,
+		"controller event = %#v", events.Records())
+
 	eventState.Sessions[1].FallbackName = "mutated event"
 	status := app.GetRuntimeStatus().CoordinationState
-	if status.Sessions[0].FallbackName == "mutated result" || status.Sessions[1].FallbackName == "mutated event" {
-		t.Fatalf("controller result/event alias replay status: %#v", status)
-	}
+	require.Falsef(t, status.Sessions[0].FallbackName == "mutated result" || status.Sessions[1].FallbackName == "mutated event",
+		"controller result/event alias replay status: %#v", status)
 
 	before := app.GetRuntimeStatus().CoordinationState
 	service.failCommand = "set-active-controller"
 	service.commandErr = errors.New("controller must be connected and assigned")
 	rejected := app.SetActiveController(string(firstID))
-	if rejected.OK || !strings.Contains(rejected.Error, "connected") || !reflect.DeepEqual(rejected.State, before) {
-		t.Fatalf("ineligible SetActiveController() = %#v", rejected)
-	}
-	if len(events.Records()) != 1 || !reflect.DeepEqual(app.GetRuntimeStatus().CoordinationState, before) {
-		t.Fatal("ineligible reassignment published or changed the authoritative snapshot")
-	}
+	require.Falsef(t, rejected.OK || !strings.Contains(rejected.Error, "connected") || !cmp.Equal(rejected.State, before),
+		"ineligible SetActiveController() = %#v", rejected)
+	require.False(t, len(events.Records()) != 1 || !cmp.Equal(app.GetRuntimeStatus().CoordinationState, before),
+		"ineligible reassignment published or changed the authoritative snapshot")
 
 	callsBeforeBlank := len(service.calls)
 	blank := app.SetActiveController("   ")
-	if blank.OK || blank.Error == "" || len(service.calls) != callsBeforeBlank {
-		t.Fatalf("blank SetActiveController() = %#v calls=%v", blank, service.calls)
-	}
+	require.Falsef(t, blank.OK || blank.Error == "" || len(service.calls) != callsBeforeBlank,
+		"blank SetActiveController() = %#v calls=%v", blank, service.calls)
+
 }
 
 func TestCoordinationStatusReplaysDisconnectedControllerWithoutChangingClaimOrRole(t *testing.T) {
@@ -788,13 +858,13 @@ func TestCoordinationStatusReplaysDisconnectedControllerWithoutChangingClaimOrRo
 	replay := app.GetRuntimeStatus().CoordinationState
 	assertDisconnectedControllerSnapshot(t, replay, controllerID, characterID)
 	records := events.Records()
-	if len(records) != 1 {
-		t.Fatalf("presence events = %#v, want one coordination snapshot", records)
-	}
+	require.Falsef(t, len(records) != 1,
+		"presence events = %#v, want one coordination snapshot", records)
+
 	published, ok := records[0].Payload.(*domain.MasterCoordinationState)
-	if !ok {
-		t.Fatalf("presence payload = %#v", records[0].Payload)
-	}
+	require.Falsef(t, !ok,
+		"presence payload = %#v", records[0].Payload)
+
 	assertDisconnectedControllerSnapshot(t, published, controllerID, characterID)
 	published.Sessions[0].Connected = true
 	published.Roster[0].Name = "mutated"
@@ -803,16 +873,15 @@ func TestCoordinationStatusReplaysDisconnectedControllerWithoutChangingClaimOrRo
 
 func assertDisconnectedControllerSnapshot(t *testing.T, state *domain.MasterCoordinationState, sessionID domain.LogicalSessionID, characterID domain.CharacterID) {
 	t.Helper()
-	if state == nil || state.Broadcast == nil || state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != sessionID {
-		t.Fatalf("disconnected controller broadcast = %#v", state)
-	}
+	require.Falsef(t, state == nil || state.Broadcast == nil || state.Broadcast.ControllerSessionID == nil || *state.Broadcast.ControllerSessionID != sessionID,
+		"disconnected controller broadcast = %#v", state)
+
 	session := masterSessionEntryForAppTest(t, state, sessionID)
-	if session.Connected || session.Role != domain.PlayerRoleActive || session.Character == nil || session.Character.ID != characterID {
-		t.Fatalf("disconnected controller session = %#v", session)
-	}
-	if len(state.Roster) != 1 || state.Roster[0].ClaimedBySessionID == nil || *state.Roster[0].ClaimedBySessionID != sessionID {
-		t.Fatalf("disconnected controller claim = %#v", state.Roster)
-	}
+	require.Falsef(t, session.Connected || session.Role != domain.PlayerRoleActive || session.Character == nil || session.Character.ID != characterID,
+		"disconnected controller session = %#v", session)
+	require.Falsef(t, len(state.Roster) != 1 || state.Roster[0].ClaimedBySessionID == nil || *state.Roster[0].ClaimedBySessionID != sessionID,
+		"disconnected controller claim = %#v", state.Roster)
+
 }
 
 func masterSessionEntryForAppTest(t *testing.T, state *domain.MasterCoordinationState, sessionID domain.LogicalSessionID) domain.MasterSessionEntry {
@@ -822,7 +891,7 @@ func masterSessionEntryForAppTest(t *testing.T, state *domain.MasterCoordination
 			return session
 		}
 	}
-	t.Fatalf("coordination state has no session %q", sessionID)
+	assert.Fail(t, "assertion failed", "coordination state has no session %q", sessionID)
 	return domain.MasterSessionEntry{}
 }
 
@@ -849,52 +918,47 @@ func TestCoordinationBridgeOrdersTerminalActivationClearAndUpdateWithoutLegacyMu
 	activated := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID: "  terminal-1  ", TerminalName: "  Overseer  ", Tree: tree, HackLevel: 2, IntroText: "WELCOME",
 	})
-	if !activated.OK || activated.Error != "" || activated.Status != "activated" || activated.SwitchID != "" || activated.State == nil || activated.State.Revision != 41 {
-		t.Fatalf("RequestTerminalActivation() = %#v", activated)
-	}
-	if activated.State.Broadcast == nil || activated.State.Broadcast.ActiveTerminalID == nil || *activated.State.Broadcast.ActiveTerminalID != "terminal-1" {
-		t.Fatalf("activation authoritative state = %#v", activated.State)
-	}
-	if len(coordination.targets) != 1 || coordination.targets[0].TerminalID != "terminal-1" || coordination.targets[0].TerminalName != "Overseer" {
-		t.Fatalf("activation payload was not trimmed before coordinator: %#v", coordination.targets)
-	}
+	require.Falsef(t, !activated.OK || activated.Error != "" || activated.Status != "activated" || activated.SwitchID != "" || activated.State == nil || activated.State.Revision != 41,
+		"RequestTerminalActivation() = %#v", activated)
+	require.Falsef(t, activated.State.Broadcast == nil || activated.State.Broadcast.ActiveTerminalID == nil || *activated.State.Broadcast.ActiveTerminalID != "terminal-1",
+		"activation authoritative state = %#v", activated.State)
+	require.Falsef(t, len(coordination.targets) != 1 || coordination.targets[0].TerminalID != "terminal-1" || coordination.targets[0].TerminalName != "Overseer",
+		"activation payload was not trimmed before coordinator: %#v", coordination.targets)
 
 	intro := "UPDATED INTRO"
 	updated := app.UpdateLiveTerminal(LiveUpdatePayload{Tree: tree, IntroText: &intro})
-	if !updated.OK || updated.Error != "" || updated.State == nil || updated.State.Revision != 42 {
-		t.Fatalf("UpdateLiveTerminal() = %#v, want authoritative revision 42", updated)
-	}
-	if coordination.updateCalls != 1 || coordination.updateIntro == nil || *coordination.updateIntro != intro || !reflect.DeepEqual(coordination.updateTree, tree) {
-		t.Fatalf("ordered update payload = calls %d tree %#v intro %#v", coordination.updateCalls, coordination.updateTree, coordination.updateIntro)
-	}
+	require.Falsef(t, !updated.OK || updated.Error != "" || updated.State == nil || updated.State.Revision != 42,
+		"UpdateLiveTerminal() = %#v, want authoritative revision 42", updated)
+	require.Falsef(t, coordination.updateCalls != 1 || coordination.updateIntro == nil || *coordination.updateIntro != intro || !cmp.Equal(coordination.updateTree, tree),
+		"ordered update payload = calls %d tree %#v intro %#v", coordination.updateCalls, coordination.updateTree, coordination.updateIntro)
 
 	cleared := app.RequestTerminalClear()
-	if !cleared.OK || cleared.Error != "" || cleared.Status != "cleared" || cleared.SwitchID != "" || cleared.State == nil || cleared.State.Revision != 43 {
-		t.Fatalf("RequestTerminalClear() = %#v", cleared)
-	}
-	if cleared.State.Broadcast == nil || cleared.State.Broadcast.ActiveTerminalID != nil {
-		t.Fatalf("clear authoritative state = %#v", cleared.State)
-	}
+	require.Falsef(t, !cleared.OK || cleared.Error != "" || cleared.Status != "cleared" || cleared.SwitchID != "" || cleared.State == nil || cleared.State.Revision != 43,
+		"RequestTerminalClear() = %#v", cleared)
+	require.Falsef(t, cleared.State.Broadcast == nil || cleared.State.Broadcast.ActiveTerminalID != nil,
+		"clear authoritative state = %#v", cleared.State)
 
 	wantOrder := []string{
 		"coordinator:request-terminal-activation:terminal-1", "event:coordination-state",
 		"coordinator:update-live-terminal:terminal-1", "event:coordination-state",
 		"coordinator:request-terminal-clear", "event:coordination-state",
 	}
-	if got := recorder.Calls(); !reflect.DeepEqual(got, wantOrder) {
-		t.Fatalf("terminal coordination order = %v, want %v", got, wantOrder)
+	{
+		got := recorder.Calls()
+		require.Falsef(t, !cmp.Equal(got, wantOrder),
+			"terminal coordination order = %v, want %v", got, wantOrder)
 	}
-	if legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0 {
-		t.Fatalf("coordinated commands mutated legacy live state: set/update/clear=%d/%d/%d", legacy.setCalls, legacy.updateCalls, legacy.clearCalls)
-	}
+	require.Falsef(t, legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0,
+		"coordinated commands mutated legacy live state: set/update/clear=%d/%d/%d", legacy.setCalls, legacy.updateCalls, legacy.clearCalls)
+
 	status := app.GetRuntimeStatus()
-	if status.CoordinationState == nil || status.CoordinationState.Revision != 43 || status.HackState == nil || status.HackState.AttemptsLeft != 2 {
-		t.Fatalf("terminal runtime status = %#v, want revision 43 and unchanged hack mirror", status)
-	}
+	require.Falsef(t, status.CoordinationState == nil || status.CoordinationState.Revision != 43 || status.HackState == nil || status.HackState.AttemptsLeft != 2,
+		"terminal runtime status = %#v, want revision 43 and unchanged hack mirror", status)
+
 	cleared.State.Revision = 999
-	if app.GetRuntimeStatus().CoordinationState.Revision != 43 {
-		t.Fatal("terminal command result aliases replayable coordination state")
-	}
+	require.False(t, app.GetRuntimeStatus().CoordinationState.Revision != 43,
+		"terminal command result aliases replayable coordination state")
+
 }
 
 func TestCoordinationBridgeRejectsInvalidOrFailedTerminalRequestsWithoutOptimisticState(t *testing.T) {
@@ -916,31 +980,35 @@ func TestCoordinationBridgeRejectsInvalidOrFailedTerminalRequestsWithoutOptimist
 		app.RequestTerminalActivation(LiveTerminalPayload{TerminalID: "terminal-1", TerminalName: "Overseer", Tree: invalidTree}),
 	}
 	for index, result := range invalid {
-		if result.OK || result.Error == "" || result.State == nil || result.State.Revision != 50 {
-			t.Fatalf("invalid terminal activation %d = %#v", index, result)
-		}
+		require.Falsef(t, result.OK || result.Error == "" || result.State == nil || result.State.Revision != 50,
+			"invalid terminal activation %d = %#v", index, result)
+
 	}
-	if len(coordination.targets) != 0 || len(recorder.Calls()) != 0 {
-		t.Fatalf("invalid payload reached coordinator/publication: targets=%#v calls=%v", coordination.targets, recorder.Calls())
-	}
+	require.Falsef(t, len(coordination.targets) != 0 || len(recorder.Calls()) != 0,
+		"invalid payload reached coordinator/publication: targets=%#v calls=%v", coordination.targets, recorder.Calls())
 
 	coordination.commandErr = errors.New("active terminal has an unfinished puzzle")
 	validTree := domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}}
 	rejected := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID: "terminal-2", TerminalName: "Overseer 2", Tree: validTree, HackLevel: 1,
 	})
-	if rejected.OK || !strings.Contains(rejected.Error, "unfinished") || rejected.Status != "" || rejected.State == nil || rejected.State.Revision != 50 {
-		t.Fatalf("failed terminal activation = %#v", rejected)
+	require.Falsef(t, rejected.OK || !strings.Contains(rejected.Error, "unfinished") || rejected.Status != "" || rejected.State == nil || rejected.State.Revision != 50,
+		"failed terminal activation = %#v", rejected)
+	{
+
+		status := app.GetRuntimeStatus().CoordinationState
+		require.Falsef(t, !cmp.Equal(status, initial),
+			"failed activation changed replay state: %#v", status)
 	}
-	if status := app.GetRuntimeStatus().CoordinationState; !reflect.DeepEqual(status, initial) {
-		t.Fatalf("failed activation changed replay state: %#v", status)
+	{
+
+		got := recorder.Calls()
+		require.Falsef(t, !cmp.Equal(got, []string{"coordinator:request-terminal-activation:terminal-2"}),
+			"failed activation publications = %v", got)
 	}
-	if got := recorder.Calls(); !reflect.DeepEqual(got, []string{"coordinator:request-terminal-activation:terminal-2"}) {
-		t.Fatalf("failed activation publications = %v", got)
-	}
-	if legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0 {
-		t.Fatalf("failed request touched legacy live: set/update/clear=%d/%d/%d", legacy.setCalls, legacy.updateCalls, legacy.clearCalls)
-	}
+	require.Falsef(t, legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0,
+		"failed request touched legacy live: set/update/clear=%d/%d/%d", legacy.setCalls, legacy.updateCalls, legacy.clearCalls)
+
 }
 
 func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *testing.T) {
@@ -959,33 +1027,32 @@ func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *t
 	tree := domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}}
 
 	invalid := app.ResetFailedHack(LiveTerminalPayload{TerminalID: " ", TerminalName: "Overseer", Tree: tree, HackLevel: 2})
-	if invalid.OK || invalid.Error == "" || invalid.State == nil || invalid.State.Revision != 70 || len(coordination.resetTargets) != 0 {
-		t.Fatalf("invalid ResetFailedHack() = %#v targets=%#v", invalid, coordination.resetTargets)
-	}
+	require.Falsef(t, invalid.OK || invalid.Error == "" || invalid.State == nil || invalid.State.Revision != 70 || len(coordination.resetTargets) != 0,
+		"invalid ResetFailedHack() = %#v targets=%#v", invalid, coordination.resetTargets)
 
 	result := app.ResetFailedHack(LiveTerminalPayload{
 		TerminalID: "  terminal-1 ", TerminalName: " Overseer Latest ", Tree: tree, HackLevel: 2, IntroText: "LATEST",
 	})
-	if !result.OK || result.Error != "" || result.State == nil || result.State.Revision != 71 {
-		t.Fatalf("ResetFailedHack() = %#v", result)
+	require.Falsef(t, !result.OK || result.Error != "" || result.State == nil || result.State.Revision != 71,
+		"ResetFailedHack() = %#v", result)
+	require.Falsef(t, len(coordination.resetTargets) != 1 || coordination.resetTargets[0].TerminalID != "terminal-1" || coordination.resetTargets[0].TerminalName != "Overseer Latest" || coordination.resetTargets[0].HackLevel != 2,
+		"validated reset payloads = %#v", coordination.resetTargets)
+	{
+
+		got := recorder.Calls()
+		require.Falsef(t, !cmp.Equal(got, []string{"coordinator:reset-failed-hack:terminal-1", "event:coordination-state"}),
+			"reset order = %v", got)
 	}
-	if len(coordination.resetTargets) != 1 || coordination.resetTargets[0].TerminalID != "terminal-1" || coordination.resetTargets[0].TerminalName != "Overseer Latest" || coordination.resetTargets[0].HackLevel != 2 {
-		t.Fatalf("validated reset payloads = %#v", coordination.resetTargets)
-	}
-	if got := recorder.Calls(); !reflect.DeepEqual(got, []string{"coordinator:reset-failed-hack:terminal-1", "event:coordination-state"}) {
-		t.Fatalf("reset order = %v", got)
-	}
-	if legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0 || legacy.forceCalls != 0 {
-		t.Fatalf("reset bypassed coordinator through legacy live service: %#v", legacy)
-	}
+	require.Falsef(t, legacy.setCalls != 0 || legacy.updateCalls != 0 || legacy.clearCalls != 0 || legacy.forceCalls != 0,
+		"reset bypassed coordinator through legacy live service: %#v", legacy)
 
 	coordination.commandErr = errors.New("active hacking puzzle is not failed")
 	rejected := app.ResetFailedHack(LiveTerminalPayload{
 		TerminalID: "terminal-1", TerminalName: "Overseer Latest", Tree: tree, HackLevel: 2, IntroText: "LATEST",
 	})
-	if rejected.OK || !strings.Contains(rejected.Error, "not failed") || rejected.State == nil || rejected.State.Revision != 71 || app.GetRuntimeStatus().CoordinationState.Revision != 71 {
-		t.Fatalf("ineligible ResetFailedHack() = %#v", rejected)
-	}
+	require.Falsef(t, rejected.OK || !strings.Contains(rejected.Error, "not failed") || rejected.State == nil || rejected.State.Revision != 71 || app.GetRuntimeStatus().CoordinationState.Revision != 71,
+		"ineligible ResetFailedHack() = %#v", rejected)
+
 }
 
 func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *testing.T) {
@@ -1006,44 +1073,47 @@ func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *
 	pending := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID: "terminal-2", TerminalName: "Archive", Tree: tree, HackLevel: 2,
 	})
-	if !pending.OK || pending.Error != "" || pending.Status != "decision-required" || pending.SwitchID != "opaque-switch-1" || pending.State == nil {
-		t.Fatalf("decision-required activation = %#v", pending)
-	}
-	if pending.State.PendingSwitch == nil || pending.State.PendingSwitch.SwitchID != pending.SwitchID || pending.State.Broadcast.ActiveTerminalID == nil || *pending.State.Broadcast.ActiveTerminalID != "terminal-1" {
-		t.Fatalf("pending activation changed source or omitted switch metadata: %#v", pending.State)
-	}
+	require.Falsef(t, !pending.OK || pending.Error != "" || pending.Status != "decision-required" || pending.SwitchID != "opaque-switch-1" || pending.State == nil,
+		"decision-required activation = %#v", pending)
+	require.Falsef(t, pending.State.PendingSwitch == nil || pending.State.PendingSwitch.SwitchID != pending.SwitchID || pending.State.Broadcast.ActiveTerminalID == nil || *pending.State.Broadcast.ActiveTerminalID != "terminal-1",
+		"pending activation changed source or omitted switch metadata: %#v", pending.State)
 
 	resolved := app.ResolveTerminalSwitch(TerminalSwitchDecisionPayload{
 		SwitchID: pending.SwitchID, Decision: domain.TerminalSwitchPreserve,
 	})
-	if !resolved.OK || resolved.Error != "" || resolved.Status != "activated" || resolved.SwitchID != "" || resolved.State == nil || resolved.State.PendingSwitch != nil {
-		t.Fatalf("preserve resolution = %#v", resolved)
+	require.Falsef(t, !resolved.OK || resolved.Error != "" || resolved.Status != "activated" || resolved.SwitchID != "" || resolved.State == nil || resolved.State.PendingSwitch != nil,
+		"preserve resolution = %#v", resolved)
+	{
+
+		got := coordination.decisions
+		require.Falsef(t, !cmp.Equal(got, []recordedTerminalDecision{{SwitchID: "opaque-switch-1", Decision: domain.TerminalSwitchPreserve}}),
+			"coordinator decisions = %#v", got)
 	}
-	if got := coordination.decisions; !reflect.DeepEqual(got, []recordedTerminalDecision{{SwitchID: "opaque-switch-1", Decision: domain.TerminalSwitchPreserve}}) {
-		t.Fatalf("coordinator decisions = %#v", got)
-	}
-	if got := recorder.Calls(); !reflect.DeepEqual(got, []string{
-		"coordinator:request-terminal-activation:terminal-2", "event:coordination-state",
-		"coordinator:resolve-terminal-switch:opaque-switch-1:preserve", "event:coordination-state",
-	}) {
-		t.Fatalf("decision bridge ordering = %v", got)
+	{
+
+		got := recorder.Calls()
+		require.Falsef(t, !cmp.Equal(got, []string{
+			"coordinator:request-terminal-activation:terminal-2", "event:coordination-state",
+			"coordinator:resolve-terminal-switch:opaque-switch-1:preserve", "event:coordination-state",
+		}),
+			"decision bridge ordering = %v", got)
 	}
 
 	for _, decision := range []domain.TerminalSwitchChoice{domain.TerminalSwitchDiscard, domain.TerminalSwitchCancel} {
 		coordination.decisionRequired = true
 		coordination.nextSwitchID = domain.SwitchID("opaque-" + string(decision))
 		request := app.RequestTerminalClear()
-		if request.Status != "decision-required" || request.SwitchID == "" {
-			t.Fatalf("clear %s decision request = %#v", decision, request)
-		}
+		require.Falsef(t, request.Status != "decision-required" || request.SwitchID == "",
+			"clear %s decision request = %#v", decision, request)
+
 		result := app.ResolveTerminalSwitch(TerminalSwitchDecisionPayload{SwitchID: request.SwitchID, Decision: decision})
 		wantStatus := "cleared"
 		if decision == domain.TerminalSwitchCancel {
 			wantStatus = "cancelled"
 		}
-		if !result.OK || result.Status != wantStatus || result.SwitchID != "" {
-			t.Fatalf("resolve %s = %#v, want status %q", decision, result, wantStatus)
-		}
+		require.Falsef(t, !result.OK || result.Status != wantStatus || result.SwitchID != "",
+			"resolve %s = %#v, want status %q", decision, result, wantStatus)
+
 		if decision != domain.TerminalSwitchCancel {
 			active := "terminal-1"
 			coordination.state.Broadcast.ActiveTerminalID = &active
@@ -1073,27 +1143,25 @@ func TestTerminalSwitchBridgeRejectsInvalidAndStaleDecisionButKeepsTrustedForceS
 	}
 	for index, payload := range invalid {
 		result := app.ResolveTerminalSwitch(payload)
-		if result.OK || result.Error == "" || result.State == nil || result.State.Revision != 70 {
-			t.Fatalf("invalid decision %d = %#v", index, result)
-		}
+		require.Falsef(t, result.OK || result.Error == "" || result.State == nil || result.State.Revision != 70,
+			"invalid decision %d = %#v", index, result)
+
 	}
-	if len(coordination.decisions) != 0 {
-		t.Fatalf("invalid decisions reached coordinator: %#v", coordination.decisions)
-	}
+	require.Falsef(t, len(coordination.decisions) != 0,
+		"invalid decisions reached coordinator: %#v", coordination.decisions)
 
 	stale := app.ResolveTerminalSwitch(TerminalSwitchDecisionPayload{SwitchID: "switch-old", Decision: domain.TerminalSwitchDiscard})
-	if stale.OK || !strings.Contains(stale.Error, "stale") || stale.Status != "" || stale.SwitchID != "" || stale.State == nil || !reflect.DeepEqual(stale.State, initial) {
-		t.Fatalf("stale decision = %#v", stale)
-	}
+	require.Falsef(t, stale.OK || !strings.Contains(stale.Error, "stale") || stale.Status != "" || stale.SwitchID != "" || stale.State == nil || !cmp.Equal(stale.State, initial),
+		"stale decision = %#v", stale)
+
 	stale.State.Revision = 999
-	if app.GetRuntimeStatus().CoordinationState.Revision != 70 {
-		t.Fatal("stale switch result aliases replay state")
-	}
+	require.False(t, app.GetRuntimeStatus().CoordinationState.Revision != 70,
+		"stale switch result aliases replay state")
 
 	forced := app.ForceHackSuccess()
-	if !forced.OK || coordination.forceCalls != 1 {
-		t.Fatalf("ForceHackSuccess() while decision pending = %#v, calls %d", forced, coordination.forceCalls)
-	}
+	require.Falsef(t, !forced.OK || coordination.forceCalls != 1,
+		"ForceHackSuccess() while decision pending = %#v, calls %d", forced, coordination.forceCalls)
+
 }
 
 func appStringPointer(value string) *string { return &value }
@@ -1106,25 +1174,37 @@ func TestDOMReadyReplaysCurrentBridgeEvents(t *testing.T) {
 	app.clientCount = 5
 	app.hackState = &domain.PublicHackState{Level: 3, AttemptsMax: 4, AttemptsLeft: 2}
 
-	app.domReady(context.Background())
+	app.domReady(t.Context())
+	{
 
-	if got, want := recorder.Calls(), []string{"event:server-info", "event:client-count", "event:hack-state", "event:coordination-state"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("DOM-ready events = %v, want %v", got, want)
+		got, want := recorder.Calls(), []string{"event:server-info", "event:client-count", "event:hack-state", "event:coordination-state"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"DOM-ready events = %v, want %v", got, want)
 	}
+
 	records := events.Records()
-	if info, ok := records[0].Payload.(domain.ServerInfo); !ok || info.Port != 3690 {
-		t.Fatalf("server-info payload = %#v", records[0].Payload)
+	{
+		info, ok := records[0].Payload.(domain.ServerInfo)
+		require.Falsef(t, !ok || info.Port != 3690,
+			"server-info payload = %#v", records[0].Payload)
 	}
-	if count, ok := records[1].Payload.(int); !ok || count != 5 {
-		t.Fatalf("client-count payload = %#v", records[1].Payload)
+	{
+
+		count, ok := records[1].Payload.(int)
+		require.Falsef(t, !ok || count != 5,
+			"client-count payload = %#v", records[1].Payload)
 	}
-	if hackState, ok := records[2].Payload.(*domain.PublicHackState); !ok || hackState == nil || hackState.AttemptsLeft != 2 {
-		t.Fatalf("hack-state payload = %#v", records[2].Payload)
+	{
+
+		hackState, ok := records[2].Payload.(*domain.PublicHackState)
+		require.Falsef(t, !ok || hackState == nil || hackState.AttemptsLeft != 2,
+			"hack-state payload = %#v", records[2].Payload)
 	}
+
 	coordinationState, ok := records[3].Payload.(*domain.MasterCoordinationState)
-	if records[3].Name != coordinationStateEvent || !ok || coordinationState != nil {
-		t.Fatalf("coordination-state payload = %#v, want nil replay without coordinator", records[3].Payload)
-	}
+	require.Falsef(t, records[3].Name != coordinationStateEvent || !ok || coordinationState != nil,
+		"coordination-state payload = %#v, want nil replay without coordinator", records[3].Payload)
+
 }
 
 func TestOpenURLAllowsOnlyHTTPAndHTTPS(t *testing.T) {
@@ -1139,25 +1219,31 @@ func TestOpenURLAllowsOnlyHTTPAndHTTPS(t *testing.T) {
 		"http://[::1",
 	} {
 		result := app.OpenURL(rawURL)
-		if result.OK || result.Error == "" {
-			t.Errorf("OpenURL(%q) = %#v, want structured rejection", rawURL, result)
-		}
+		assert.Falsef(t, result.OK || result.Error == "",
+			"OpenURL(%q) = %#v, want structured rejection", rawURL, result)
+
 	}
 
 	for _, rawURL := range []string{
 		"http://127.0.0.1:3690/",
 		"https://players.example.test/session",
 	} {
-		if result := app.OpenURL(rawURL); !result.OK || result.Error != "" {
-			t.Errorf("OpenURL(%q) = %#v, want success", rawURL, result)
+		{
+			result := app.OpenURL(rawURL)
+			assert.Falsef(t, !result.OK || result.Error != "",
+				"OpenURL(%q) = %#v, want success", rawURL, result)
 		}
+
 	}
-	if got, want := browser.URLs(), []string{
-		"http://127.0.0.1:3690/",
-		"https://players.example.test/session",
-	}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("browser URLs = %v, want %v", got, want)
+	{
+		got, want := browser.URLs(), []string{
+			"http://127.0.0.1:3690/",
+			"https://players.example.test/session",
+		}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"browser URLs = %v, want %v", got, want)
 	}
+
 }
 
 func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
@@ -1181,8 +1267,10 @@ func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 		Live:         live,
 		Coordination: coordination,
 	})
-	if err := app.Start(context.Background()); err != nil {
-		t.Fatalf("Start() error = %v", err)
+	{
+		err := app.Start(t.Context())
+		require.Falsef(t, err != nil,
+			"Start() error = %v", err)
 	}
 
 	result := app.RequestTerminalActivation(LiveTerminalPayload{
@@ -1194,25 +1282,26 @@ func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 		HackLevel: 1,
 		IntroText: "ROBCO INDUSTRIES UNIFIED OPERATING SYSTEM",
 	})
-	if !result.OK || result.Error != "" {
-		t.Fatalf("RequestTerminalActivation(valid) = %#v", result)
-	}
+	require.Falsef(t, !result.OK || result.Error != "",
+		"RequestTerminalActivation(valid) = %#v", result)
+
 	records := events.Records()
 	last := records[len(records)-1]
-	if last.Name != coordinationStateEvent {
-		t.Fatalf("last bridge event = %#v, want coordination-state", last)
-	}
-	coordinationState, ok := last.Payload.(*domain.MasterCoordinationState)
-	if !ok || coordinationState == nil || coordinationState.Broadcast == nil || coordinationState.Broadcast.ActiveTerminalID == nil || *coordinationState.Broadcast.ActiveTerminalID != "terminal-1" {
-		t.Fatalf("coordination-state payload = %#v", last.Payload)
-	}
+	require.Falsef(t, last.Name != coordinationStateEvent,
+		"last bridge event = %#v, want coordination-state", last)
 
-	if err := app.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() error = %v", err)
+	coordinationState, ok := last.Payload.(*domain.MasterCoordinationState)
+	require.Falsef(t, !ok || coordinationState == nil || coordinationState.Broadcast == nil || coordinationState.Broadcast.ActiveTerminalID == nil || *coordinationState.Broadcast.ActiveTerminalID != "terminal-1",
+		"coordination-state payload = %#v", last.Payload)
+	{
+
+		err := app.Shutdown(t.Context())
+		require.Falsef(t, err != nil,
+			"Shutdown() error = %v", err)
 	}
-	if live.clearCalls != 1 {
-		t.Fatalf("live Clear calls after shutdown = %d, want 1", live.clearCalls)
-	}
+	require.Falsef(t, live.clearCalls != 1,
+		"live Clear calls after shutdown = %d, want 1", live.clearCalls)
+
 }
 
 func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T) {
@@ -1227,21 +1316,23 @@ func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T
 	app := NewAppWithDependencies(AppDependencies{
 		Live: live, Player: &recordingPlayerServer{recorder: recorder}, Events: events,
 	})
+	{
 
-	if result := app.ForceHackSuccess(); !result.OK {
-		t.Fatalf("ForceHackSuccess() = %#v", result)
+		result := app.ForceHackSuccess()
+		require.Falsef(t, !result.OK,
+			"ForceHackSuccess() = %#v", result)
 	}
-	if live.forceCalls != 1 {
-		t.Fatalf("ForceHackSuccess calls = %d, want 1", live.forceCalls)
-	}
+	require.Falsef(t, live.forceCalls != 1,
+		"ForceHackSuccess calls = %d, want 1", live.forceCalls)
+
 	records := events.Records()
-	if len(records) != 1 {
-		t.Fatalf("hack-state event count = %d, want 1", len(records))
-	}
+	require.Falsef(t, len(records) != 1,
+		"hack-state event count = %d, want 1", len(records))
+
 	state, ok := records[0].Payload.(*domain.PublicHackState)
-	if !ok || state == nil || !state.Solved || state.AttemptsLeft != 2 || len(state.Patterns) != 1 {
-		t.Fatalf("forced public state = %#v", records[0].Payload)
-	}
+	require.Falsef(t, !ok || state == nil || !state.Solved || state.AttemptsLeft != 2 || len(state.Patterns) != 1,
+		"forced public state = %#v", records[0].Payload)
+
 }
 
 func TestForceHackSuccessRejectsIneligiblePuzzleWithoutPublication(t *testing.T) {
@@ -1252,12 +1343,11 @@ func TestForceHackSuccessRejectsIneligiblePuzzleWithoutPublication(t *testing.T)
 	})
 
 	result := app.ForceHackSuccess()
-	if result.OK || result.Error == "" {
-		t.Fatalf("ForceHackSuccess() = %#v, want structured ineligible rejection", result)
-	}
-	if live.forceCalls != 1 || len(recorder.Calls()) != 0 {
-		t.Fatalf("ineligible force calls=%d publications=%v, want one validation and no publication", live.forceCalls, recorder.Calls())
-	}
+	require.Falsef(t, result.OK || result.Error == "",
+		"ForceHackSuccess() = %#v, want structured ineligible rejection", result)
+	require.Falsef(t, live.forceCalls != 1 || len(recorder.Calls()) != 0,
+		"ineligible force calls=%d publications=%v, want one validation and no publication", live.forceCalls, recorder.Calls())
+
 }
 
 func TestForceHackSuccessPrefersOrderedCoordinatorAndPublishesHackStatus(t *testing.T) {
@@ -1275,21 +1365,23 @@ func TestForceHackSuccessPrefersOrderedCoordinatorAndPublishesHackStatus(t *test
 		Live:         legacy,
 		Events:       &recordingEventSink{recorder: recorder},
 	})
+	{
 
-	if result := app.ForceHackSuccess(); !result.OK || result.Error != "" {
-		t.Fatalf("ForceHackSuccess() = %#v, want ordered success", result)
+		result := app.ForceHackSuccess()
+		require.Falsef(t, !result.OK || result.Error != "",
+			"ForceHackSuccess() = %#v, want ordered success", result)
 	}
-	if coordination.forceCalls != 1 || legacy.forceCalls != 0 {
-		t.Fatalf("force calls coordinator=%d legacy=%d, want 1/0", coordination.forceCalls, legacy.forceCalls)
-	}
+	require.Falsef(t, coordination.forceCalls != 1 || legacy.forceCalls != 0,
+		"force calls coordinator=%d legacy=%d, want 1/0", coordination.forceCalls, legacy.forceCalls)
+
 	status := app.GetRuntimeStatus()
-	if status.HackState == nil || !status.HackState.Solved || status.HackState.AttemptsLeft != 2 {
-		t.Fatalf("ordered force status = %#v", status.HackState)
-	}
+	require.Falsef(t, status.HackState == nil || !status.HackState.Solved || status.HackState.AttemptsLeft != 2,
+		"ordered force status = %#v", status.HackState)
+
 	records := recorder.Calls()
-	if !reflect.DeepEqual(records, []string{"event:hack-state"}) {
-		t.Fatalf("ordered force publications = %v, want one hack-state event", records)
-	}
+	require.Falsef(t, !cmp.Equal(records, []string{"event:hack-state"}),
+		"ordered force publications = %v, want one hack-state event", records)
+
 }
 
 func TestForceHackSuccessDoesNotBypassCoordinatorRejection(t *testing.T) {
@@ -1305,12 +1397,11 @@ func TestForceHackSuccessDoesNotBypassCoordinatorRejection(t *testing.T) {
 	})
 
 	result := app.ForceHackSuccess()
-	if result.OK || result.Error == "" {
-		t.Fatalf("ForceHackSuccess() = %#v, want coordinator rejection", result)
-	}
-	if coordination.forceCalls != 1 || legacy.forceCalls != 0 || len(recorder.Calls()) != 0 {
-		t.Fatalf("rejected ordered force calls coordinator=%d legacy=%d events=%v", coordination.forceCalls, legacy.forceCalls, recorder.Calls())
-	}
+	require.Falsef(t, result.OK || result.Error == "",
+		"ForceHackSuccess() = %#v, want coordinator rejection", result)
+	require.Falsef(t, coordination.forceCalls != 1 || legacy.forceCalls != 0 || len(recorder.Calls()) != 0,
+		"rejected ordered force calls coordinator=%d legacy=%d events=%v", coordination.forceCalls, legacy.forceCalls, recorder.Calls())
+
 }
 
 func TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime(t *testing.T) {
@@ -1320,50 +1411,67 @@ func TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime(t *testing.T) {
 		Runtime: liveService, Terminals: liveService, TrustedHack: liveService,
 		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
 	})
-	if _, err := coordination.StartBroadcast(); err != nil {
-		t.Fatal(err)
+	{
+		_, err := coordination.StartBroadcast()
+		require.False(t, err != nil,
+			err)
 	}
-	if _, err := coordination.RequestTerminalActivation(domain.TerminalTarget{
-		TerminalID: "terminal-force-app", TerminalName: "Force App", HackLevel: 1, IntroText: "WELCOME",
-		Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT"},
-	}); err != nil {
-		t.Fatal(err)
+	{
+
+		_, err := coordination.RequestTerminalActivation(domain.TerminalTarget{
+			TerminalID: "terminal-force-app", TerminalName: "Force App", HackLevel: 1, IntroText: "WELCOME",
+			Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT"},
+		})
+		require.False(t, err != nil,
+			err)
 	}
-	if legacy := liveService.Snapshot(); legacy != nil {
-		t.Fatalf("legacy live slot unexpectedly owns production runtime: %#v", legacy)
+	{
+
+		legacy := liveService.Snapshot()
+		require.Falsef(t, legacy != nil,
+			"legacy live slot unexpectedly owns production runtime: %#v", legacy)
 	}
+
 	beforeRevision := coordination.Revision()
 	app := NewAppWithDependencies(AppDependencies{
 		Coordination: coordination,
 		Live:         liveService,
 		Events:       &recordingEventSink{recorder: &callRecorder{}},
 	})
+	{
 
-	if result := app.ForceHackSuccess(); !result.OK || result.Error != "" {
-		t.Fatalf("ForceHackSuccess() = %#v", result)
+		result := app.ForceHackSuccess()
+		require.Falsef(t, !result.OK || result.Error != "",
+			"ForceHackSuccess() = %#v", result)
 	}
-	if coordination.Revision() != beforeRevision+1 {
-		t.Fatalf("force revision = %d, want %d", coordination.Revision(), beforeRevision+1)
-	}
+	require.Falsef(t, coordination.Revision() != beforeRevision+1,
+		"force revision = %d, want %d", coordination.Revision(), beforeRevision+1)
+
 	status := app.GetRuntimeStatus()
-	if status.HackState == nil || !status.HackState.Solved || status.HackState.Failed {
-		t.Fatalf("app hack status = %#v", status.HackState)
-	}
+	require.Falsef(t, status.HackState == nil || !status.HackState.Solved || status.HackState.Failed,
+		"app hack status = %#v", status.HackState)
+
 	var published *domain.PublicLiveState
 	for _, effect := range effects {
 		if effect.Revision == coordination.Revision() && effect.Live != nil {
 			published = effect.Live
 		}
 	}
-	if published == nil || published.TerminalID != "terminal-force-app" || published.Hack == nil || !published.Hack.Solved {
-		t.Fatalf("coordinator publication = %#v", published)
+	require.Falsef(t, published == nil || published.TerminalID != "terminal-force-app" || published.Hack == nil || !published.Hack.Solved,
+		"coordinator publication = %#v", published)
+	{
+
+		legacy := liveService.Snapshot()
+		require.Falsef(t, legacy != nil,
+			"trusted app force populated legacy live slot: %#v", legacy)
 	}
-	if legacy := liveService.Snapshot(); legacy != nil {
-		t.Fatalf("trusted app force populated legacy live slot: %#v", legacy)
+	{
+
+		result := app.ForceHackSuccess()
+		require.Falsef(t, result.OK || result.Error == "" || coordination.Revision() != beforeRevision+1,
+			"repeated ForceHackSuccess() = %#v revision=%d", result, coordination.Revision())
 	}
-	if result := app.ForceHackSuccess(); result.OK || result.Error == "" || coordination.Revision() != beforeRevision+1 {
-		t.Fatalf("repeated ForceHackSuccess() = %#v revision=%d", result, coordination.Revision())
-	}
+
 }
 
 func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
@@ -1383,14 +1491,17 @@ func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
 	hackState.Patterns[0].ID = "mutated"
 	hackState.Patterns[0].Row = 99
 	hackState.Patterns[0].Used = true
+	{
 
-	if got, want := recorder.Calls(), []string{"event:client-count", "event:hack-state"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("player callback events = %v, want %v", got, want)
+		got, want := recorder.Calls(), []string{"event:client-count", "event:hack-state"}
+		require.Falsef(t, !cmp.Equal(got, want),
+			"player callback events = %v, want %v", got, want)
 	}
+
 	status := app.GetRuntimeStatus()
-	if status.ClientCount != 6 || status.HackState == nil || status.HackState.AttemptsLeft != 2 || status.HackState.Log[0] != "ENTRY DENIED" || status.HackState.Patterns[0].ID != "opaque-generation-pattern" || status.HackState.Patterns[0].Row != 0 || status.HackState.Patterns[0].Used {
-		t.Fatalf("detached player callback status = %#v", status)
-	}
+	require.Falsef(t, status.ClientCount != 6 || status.HackState == nil || status.HackState.AttemptsLeft != 2 || status.HackState.Log[0] != "ENTRY DENIED" || status.HackState.Patterns[0].ID != "opaque-generation-pattern" || status.HackState.Patterns[0].Row != 0 || status.HackState.Patterns[0].Used,
+		"detached player callback status = %#v", status)
+
 }
 
 type callRecorder struct {

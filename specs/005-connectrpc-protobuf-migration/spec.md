@@ -5,6 +5,8 @@
 **Status**: Draft  
 **Baseline**: `develop` at `8f306ce42e55b199ada4761d165461e2ebedc8ae`
 
+**Bugfix**: 2026-08-13 — BUG-001 Clarified that all protobuf generation flows through the pinned Buf CLI and checked-in Buf v2 templates, without a standalone `protoc` requirement.
+
 ## Clarifications
 
 ### Session 2026-08-13
@@ -204,6 +206,7 @@ A developer updates versioned schemas first, regenerates type-safe Go and ECMASc
 2. **Given** a committed compatibility baseline, **When** a field number, field type, enum, package, or service is changed incompatibly, **Then** the contract check rejects it.
 3. **Given** a public schema or generated player input, **When** its transitive dependencies are inspected, **Then** no private desktop, persistence, native-path, resolved-configuration, tunnel, credential, or private hacking contract is present.
 4. **Given** generated files, **When** repository verification runs, **Then** manual edits and schema/code revision mismatches are detected.
+5. **Given** a clean generation run, **When** Go and ECMAScript artifacts are produced, **Then** both generations execute through the pinned Buf CLI with `proto/buf.gen.go.yaml` and `proto/buf.gen.es.yaml`, no standalone Google `protoc` distribution is downloaded or invoked, and Buf-generated Go headers reporting `protoc unknown` are accepted.
 
 ---
 
@@ -440,11 +443,11 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 
 - **FR-131**: The same public schemas MUST generate type-safe Go public handlers and values plus ECMAScript player values and clients.
 - **FR-132**: Private schemas MUST generate the types required by explicit Wails and persistence adapters without entering the player bundle.
-- **FR-133**: The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned.
-- **FR-134**: Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited.
+- **FR-133**: ~~The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned.~~ **Superseded by BUG-001** because the wording incorrectly implied a separate Google `protoc` installation. The Buf CLI, protobuf and ConnectRPC code-generation plugins, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned; the pinned Buf CLI owns the protobuf compiler implementation used by generation.
+- **FR-134**: Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited. Every checked-in Go and ECMAScript generated output MUST be produced through the pinned Buf CLI with the applicable checked-in Buf v2 template.
 - **FR-135**: The packaged application MUST contain all required generated and bundled player code.
 - **FR-136**: Clean development startup MUST remain one root `wails dev` command.
-- **FR-137**: Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping.
+- **FR-137**: Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping. Every generation pass MUST run through the pinned Buf CLI with the checked-in `proto/buf.gen.go.yaml` and `proto/buf.gen.es.yaml` templates; verification MUST NOT require a standalone `protoc` version and MUST accept Buf-generated `protoc unknown` header provenance while still validating generated markers, plugin pins, schema revision, hashes, and output isolation.
 - **FR-138**: Breaking-change checks MUST reject incompatible field-number, field-type, enum, package, and service changes against the committed baseline once it exists.
 - **FR-139**: Compatible unknown protobuf fields MUST follow standard forward-compatible protobuf behavior while known request fields remain authoritatively validated.
 - **FR-140**: Removed protobuf fields, mutually exclusive variants, and enum values MUST reserve their former names and numbers as applicable.
@@ -536,10 +539,10 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 ### Measurable Outcomes
 
 - **SC-001**: The completed contract inventory reports zero unclassified application-owned DTOs and zero unclassified serializable configuration fields.
-- **SC-002**: Buf formatting and lint checks complete with zero findings.
-- **SC-003**: Two consecutive clean generations produce byte-identical Go and ECMAScript artifacts and leave zero repository diff after the second generation.
+- **SC-002**: Formatting and lint checks executed by the pinned Buf CLI complete with zero findings.
+- **SC-003**: Two consecutive clean generations through the pinned Buf CLI and checked-in Buf v2 templates produce byte-identical Go and ECMAScript artifacts and leave zero repository diff after the second generation, with no standalone `protoc` download or invocation.
 - **SC-004**: Once a compatibility baseline exists, representative incompatible field-number, field-type, enum, package, and service edits are each rejected by automated breaking-change checks.
-- **SC-005**: Generated public Go and ECMAScript outputs identify the same source schema revision in every clean generation.
+- **SC-005**: Generated public Go and ECMAScript outputs identify the same source schema revision in every clean generation; Buf-generated Go headers reporting `protoc unknown` are valid provenance when generated markers, plugin pins, schema revision, and deterministic hashes pass verification.
 - **SC-006**: Every new or reconnecting stream in automated journeys begins with exactly one complete personalized snapshot and no earlier application value.
 - **SC-007**: Snapshot creation tests and 100 reconnect trials record zero additional puzzle generations.
 - **SC-008**: Concurrent first-time tabs in one browser profile converge on one accepted handle and one logical session in every trial.
@@ -567,7 +570,7 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - **SC-030**: Local-network and authenticated-ngrok journeys cover page loading, first snapshot, all five unary responsibilities, compound updates, multi-tab behavior, reconnect, HTTP `401`, sound discovery, and sound playback.
 - **SC-031**: Before final cutover, a manual or scheduled soak representative of a three-to-four-hour game proves an idle local and authenticated-ngrok stream either remains usable or reconnects after interruption and receives a complete current snapshot.
 - **SC-032**: A packaged offline run loads all generated player code and embedded assets without a CDN, external development server, or network-time package download.
-- **SC-033**: `gofmt`, `go vet`, `go test`, `go test -race`, schema checks, frontend and player builds, browser journeys, and the affected macOS package smoke test all pass.
+- **SC-033**: `gofmt`, `go vet`, `go test`, `go test -race`, pinned-Buf-only schema and generation checks, frontend and player builds, browser journeys, and the affected macOS package smoke test all pass.
 - **SC-034**: Final scans of source, dependencies, routes, built assets, fixtures, CSP, and active documentation find zero active WebSocket implementation, browser constructor, handwritten JSON player envelope, direct legacy dependency, active legacy fixture, or permanent dual stack.
 
 ## Assumptions

@@ -1,5 +1,10 @@
 # Research: Phase 1 Generation-Bound Hacking Patterns
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Bugfix**: 2026-08-11 — BUG-001 superseded inert-delimiter input and inclusive-span hit testing with individual delimiter selection and opening-symbol-only pattern activation.
 
 This document supersedes the older coordinate-only and intended-count decisions. It records the corrective choices needed to bring the current implementation into alignment with `spec.md` and `planning-handoff.md` without adding any Non-Goal.

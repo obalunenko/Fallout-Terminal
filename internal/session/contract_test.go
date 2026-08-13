@@ -2,11 +2,12 @@ package session
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestSessionContractMapsEveryKnownFieldAndPreservesRecursiveJSONExtras(t *testing.T) {
@@ -36,7 +37,10 @@ func TestSessionContractMapsEveryKnownFieldAndPreservesRecursiveJSONExtras(t *te
 
 	roundTrip, err := SessionFromProto(semantic, value)
 	require.NoError(t, err)
-	require.True(t, reflect.DeepEqual(value, roundTrip), "round trip\nwant: %#v\ngot: %#v", value, roundTrip)
+	require.Equal(t, value, roundTrip)
+	roundTripSemantic, err := SessionToProto(roundTrip)
+	require.NoError(t, err)
+	require.Empty(t, cmp.Diff(semantic, roundTripSemantic, protocmp.Transform()))
 }
 
 func TestSessionContractRejectsMissingOneofAndInvalidReference(t *testing.T) {

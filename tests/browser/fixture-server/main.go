@@ -40,13 +40,19 @@ func run() error {
 		return fmt.Errorf("open built player assets: %w", err)
 	}
 	liveService := live.New(nil, nil)
+	var connectPlayer *player.ConnectService
 	service := control.New(control.Config{
 		IDs:         &ids{},
 		Runtime:     liveService,
 		Terminals:   liveService,
 		TrustedHack: liveService,
+		Enqueue: func(effect control.Effect) {
+			if connectPlayer != nil {
+				connectPlayer.PublishEffect(effect)
+			}
+		},
 	})
-	connectPlayer, err := player.NewConnectService(player.ConnectServiceConfig{Coordinator: service, Assets: playerAssets})
+	connectPlayer, err = player.NewConnectService(player.ConnectServiceConfig{Coordinator: service, Assets: playerAssets})
 	if err != nil {
 		return fmt.Errorf("construct fixture Connect service: %w", err)
 	}

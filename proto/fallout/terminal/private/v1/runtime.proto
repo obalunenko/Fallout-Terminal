@@ -11,6 +11,10 @@ message ServerInformation {
   string local_url = 1;
   optional string public_url = 2;
   bool tunnel_enabled = 3;
+  string ip = 4;
+  int32 port = 5;
+  optional string tunnel_error = 6;
+  string url = 7;
 }
 
 message RuntimeStatus {

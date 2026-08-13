@@ -378,8 +378,7 @@ func (app *App) GetRuntimeStatus() RuntimeStatus {
 		SavedRevision:     app.savedRevision,
 		CoordinationState: domain.CloneMasterCoordinationState(app.coordinationState),
 	}
-	_ = runtimeStatusToPrivate(status)
-	return status
+	return routeRuntimeStatus(status)
 }
 
 // NewSession opens the native destination dialog and creates a validated
@@ -585,6 +584,7 @@ func (app *App) resetPlayerConfigForSession(result sessionservice.SessionResult)
 // AddCharacter validates the game-master display name before entering the
 // coordinator and publishes only its detached authoritative projection.
 func (app *App) AddCharacter(name string) CoordinationCommandResult {
+	name = routeAddCharacterRequest(name)
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return app.coordinationFailure("character name must not be blank")
@@ -609,6 +609,7 @@ func (app *App) AddCharacter(name string) CoordinationCommandResult {
 // RenameCharacter validates the stable roster ID and display name before
 // entering the coordinator transaction.
 func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
+	payload = routeRenameCharacterRequest(payload)
 	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
@@ -626,6 +627,7 @@ func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationComm
 
 // DeleteCharacter removes only an existing unclaimed roster identity.
 func (app *App) DeleteCharacter(characterID string) CoordinationCommandResult {
+	characterID = routeDeleteCharacterRequest(characterID)
 	if strings.TrimSpace(characterID) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
@@ -640,6 +642,7 @@ func (app *App) DeleteCharacter(characterID string) CoordinationCommandResult {
 // RenameLogicalSession validates and trims the private fallback label without
 // exposing it to durable session persistence.
 func (app *App) RenameLogicalSession(payload LogicalSessionRenamePayload) CoordinationCommandResult {
+	payload = routeRenameLogicalSessionRequest(payload)
 	if strings.TrimSpace(string(payload.SessionID)) == "" {
 		return app.coordinationFailure("session ID must not be blank")
 	}
@@ -657,6 +660,7 @@ func (app *App) RenameLogicalSession(payload LogicalSessionRenamePayload) Coordi
 
 // AssignCharacter installs one authoritative current-broadcast claim.
 func (app *App) AssignCharacter(payload AssignmentPayload) CoordinationCommandResult {
+	payload = routeAssignCharacterRequest(payload)
 	if strings.TrimSpace(string(payload.SessionID)) == "" {
 		return app.coordinationFailure("session ID must not be blank")
 	}
@@ -674,6 +678,7 @@ func (app *App) AssignCharacter(payload AssignmentPayload) CoordinationCommandRe
 // ReleaseCharacter removes one claim and leaves controller selection to an
 // explicit trusted command.
 func (app *App) ReleaseCharacter(sessionID string) CoordinationCommandResult {
+	sessionID = routeReleaseCharacterRequest(sessionID)
 	if strings.TrimSpace(sessionID) == "" {
 		return app.coordinationFailure("session ID must not be blank")
 	}
@@ -688,6 +693,7 @@ func (app *App) ReleaseCharacter(sessionID string) CoordinationCommandResult {
 // MoveCharacter transfers a stable roster identity to one unassigned logical
 // session in the coordinator's single authoritative order.
 func (app *App) MoveCharacter(payload MoveCharacterPayload) CoordinationCommandResult {
+	payload = routeMoveCharacterRequest(payload)
 	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
@@ -705,6 +711,7 @@ func (app *App) MoveCharacter(payload MoveCharacterPayload) CoordinationCommandR
 // SetActiveController atomically designates one connected assigned logical
 // session as the sole controller for the current broadcast.
 func (app *App) SetActiveController(sessionID string) CoordinationCommandResult {
+	sessionID = routeSetActiveControllerRequest(sessionID)
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
 		return app.coordinationFailure("session ID must not be blank")
@@ -754,6 +761,10 @@ func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalS
 	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.terminalSwitchFailure(err.Error(), nil)
 	}
+	payload, err := routeTerminalActivationRequest(payload, false)
+	if err != nil {
+		return app.terminalSwitchFailure("terminal request could not be represented by the private contract", nil)
+	}
 	coordination, ok := app.deps.Coordination.(coordinationTerminalService)
 	if !ok {
 		return app.terminalSwitchFailure("coordination service is unavailable", nil)
@@ -785,6 +796,10 @@ func (app *App) ResolveTerminalSwitch(payload TerminalSwitchDecisionPayload) Ter
 	if payload.Decision != domain.TerminalSwitchPreserve && payload.Decision != domain.TerminalSwitchDiscard && payload.Decision != domain.TerminalSwitchCancel {
 		return app.terminalSwitchFailure("terminal switch decision must be preserve, discard, or cancel", nil)
 	}
+	payload, err := routeTerminalSwitchDecisionRequest(payload)
+	if err != nil {
+		return app.terminalSwitchFailure("terminal switch decision could not be represented by the private contract", nil)
+	}
 	coordination, ok := app.deps.Coordination.(coordinationTerminalDecisionService)
 	if !ok {
 		return app.terminalSwitchFailure("coordination service is unavailable", nil)
@@ -812,6 +827,10 @@ func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationComman
 	}
 	if err := validateLiveTerminal("live-terminal", "Live Terminal", payload.Tree, 0, intro); err != nil {
 		return app.coordinationFailure(err.Error())
+	}
+	payload, err := routeLiveTerminalUpdateRequest(payload)
+	if err != nil {
+		return app.coordinationFailure("live terminal update could not be represented by the private contract")
 	}
 	if coordination, ok := app.deps.Coordination.(coordinationTerminalService); ok {
 		state, err := coordination.UpdateLiveTerminal(payload.Tree, payload.IntroText)
@@ -842,6 +861,10 @@ func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommand
 	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
 	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.coordinationFailure(err.Error())
+	}
+	payload, err := routeTerminalActivationRequest(payload, true)
+	if err != nil {
+		return app.coordinationFailure("failed hacking reset could not be represented by the private contract")
 	}
 	coordination, ok := app.deps.Coordination.(coordinationTerminalService)
 	if !ok {
@@ -884,6 +907,7 @@ func (app *App) ForceHackSuccess() CommandResult {
 
 // OpenURL validates immediately before crossing the system-browser boundary.
 func (app *App) OpenURL(rawURL string) CommandResult {
+	rawURL = routeOpenURLRequest(rawURL)
 	parsed, err := url.ParseRequestURI(strings.TrimSpace(rawURL))
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return commandFailure("external URL must be an absolute HTTP or HTTPS URL")

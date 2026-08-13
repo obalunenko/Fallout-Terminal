@@ -21,8 +21,14 @@ import (
 )
 
 func TestConnectSubscribeBeginsWithCompleteSnapshotAndSelectsCharacter(t *testing.T) {
-	coordinator := newConnectTestCoordinator(t)
-	service, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator})
+	var service *ConnectService
+	coordinator := newConnectTestCoordinator(t, func(effect control.Effect) {
+		if service != nil {
+			service.PublishEffect(effect)
+		}
+	})
+	var err error
+	service, err = NewConnectService(ConnectServiceConfig{Coordinator: coordinator})
 	require.NoError(t, err)
 
 	path, handler := playerv1connect.NewPlayerServiceHandler(service)
@@ -69,6 +75,11 @@ func TestConnectSubscribeBeginsWithCompleteSnapshotAndSelectsCharacter(t *testin
 	require.True(t, response.Msg.GetAccepted())
 	require.Equal(t, playerv1.ActionReason_ACTION_REASON_ACCEPTED, response.Msg.GetReason())
 	require.Greater(t, response.Msg.GetRevision(), snapshot.GetRevision())
+	require.True(t, stream.Receive())
+	update := stream.Msg().GetUpdate()
+	require.NotNil(t, update)
+	require.Equal(t, response.Msg.GetRevision(), update.GetRevision())
+	require.NotNil(t, update.GetPlayerState())
 }
 
 func TestConnectSubscribeHandleMatrixRejectsInvalidWithoutCanonicalEffects(t *testing.T) {
@@ -266,10 +277,14 @@ func TestPublicDescriptorAndProceduresExcludeEveryPrivateDesktopCapability(t *te
 	}
 }
 
-func newConnectTestCoordinator(t *testing.T) *control.Service {
+func newConnectTestCoordinator(t *testing.T, publish ...func(control.Effect)) *control.Service {
 	t.Helper()
 	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
-	coordinator := control.New(control.Config{IDs: ids})
+	var enqueue func(control.Effect)
+	if len(publish) > 0 {
+		enqueue = publish[0]
+	}
+	coordinator := control.New(control.Config{IDs: ids, Enqueue: enqueue})
 	_, err := coordinator.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/player.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
 	require.NoError(t, err)
 	_, err = coordinator.StartBroadcast()

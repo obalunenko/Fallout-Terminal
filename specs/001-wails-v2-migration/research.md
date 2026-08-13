@@ -1,5 +1,10 @@
 # Research: Wails v2 Runtime Migration
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 ## Decision 1: Target the stable Wails v2 line
 
 **Decision**: Pin `github.com/wailsapp/wails/v2` and the CLI to v2.13.0.

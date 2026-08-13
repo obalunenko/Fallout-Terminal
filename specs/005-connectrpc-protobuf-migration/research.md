@@ -1,5 +1,7 @@
 # Research: Protobuf-First ConnectRPC Migration
 
+**Bugfix**: 2026-08-13 — BUG-001 Updated the generation-toolchain decision to make pinned Buf the sole protobuf compiler entry point.
+
 ## Decision 1: Use the Connect protocol with explicit binary protobuf in the browser
 
 **Decision**: Use `createConnectTransport` from `@connectrpc/connect-web` and explicitly set binary protobuf for all generated browser calls. Serve the generated Connect-Go handlers through the existing same-origin `net/http` listener over HTTP/1.1 or HTTP/2 as available; do not introduce gRPC-Web, CORS, a second backend, or a client development server.
@@ -14,9 +16,9 @@
 
 ## Decision 2: Pin a local, reproducible Buf and generator toolchain
 
-**Decision**: Pin Buf CLI `v1.72.0`, Protocol Buffers compiler/toolchain `v35.0`, `protoc-gen-go` and `google.golang.org/protobuf` `v1.36.11`, Connect-Go and `protoc-gen-connect-go` `v1.20.0`, `@bufbuild/protobuf` and `@bufbuild/protoc-gen-es` `2.13.0`, and `@connectrpc/connect` plus `@connectrpc/connect-web` `2.1.2`. Use Go 1.26 tool directives for Buf and Go plugins, an exact client npm lockfile for ECMAScript tooling/runtime, Buf v2 generation templates, checked-in generated outputs, and clean second-generation diff checks.
+**Decision**: Pin Buf CLI `v1.72.0`, ~~Protocol Buffers compiler/toolchain `v35.0`,~~ `protoc-gen-go` and `google.golang.org/protobuf` `v1.36.11`, Connect-Go and `protoc-gen-connect-go` `v1.20.0`, `@bufbuild/protobuf` and `@bufbuild/protoc-gen-es` `2.13.0`, and `@connectrpc/connect` plus `@connectrpc/connect-web` `2.1.2`. **BUG-001 correction**: Buf CLI `v1.72.0` is the sole protobuf compiler entry point, using its in-process compiler rather than a separately downloaded or invoked Google `protoc`. Use Go 1.26 tool directives for Buf and Go plugins, an exact client npm lockfile for ECMAScript tooling/runtime, the checked-in Buf v2 generation templates, checked-in generated outputs, and clean second-generation diff checks. A Buf-generated Go header may report `protoc unknown`; verification accepts that provenance while checking generated markers, plugin pins, schema revision, deterministic hashes, and output isolation.
 
-**Rationale**: The current official releases support generated Go and ECMAScript from one schema while keeping every version reviewable in repository metadata. Connect-ES v2 consumes service descriptors produced by Protobuf-ES, so a separate deprecated `protoc-gen-connect-es` is unnecessary. Local pinned plugins avoid an unpinned latest BSR lookup, while checked-in output makes clean Wails development and packaged builds independent of generation-time network access. Official references: [Buf generation](https://buf.build/docs/generate/), [Buf v2 generation configuration](https://buf.build/docs/configuration/v2/buf-gen-yaml/), [Protobuf-ES manual](https://github.com/bufbuild/protobuf-es/blob/main/MANUAL.md), and [protobuf-go releases](https://github.com/protocolbuffers/protobuf-go/releases).
+**Rationale**: The current official releases support generated Go and ECMAScript from one schema while keeping every version reviewable in repository metadata. Buf compiles protobuf sources in process and does not shell out to Google `protoc`, so pinning Buf pins the compiler implementation used by `buf generate`. Connect-ES v2 consumes service descriptors produced by Protobuf-ES, so a separate deprecated `protoc-gen-connect-es` is unnecessary. Local pinned plugins avoid an unpinned latest BSR lookup, while checked-in output makes clean Wails development and packaged builds independent of generation-time network access. Official references: [Buf's New Compiler](https://buf.build/blog/bufs-new-compiler), [Buf generation](https://buf.build/docs/generate/), [Buf v2 generation configuration](https://buf.build/docs/configuration/v2/buf-gen-yaml/), [Protobuf-ES manual](https://github.com/bufbuild/protobuf-es/blob/main/MANUAL.md), and [protobuf-go releases](https://github.com/protocolbuffers/protobuf-go/releases).
 
 **Alternatives considered**:
 
@@ -119,4 +121,3 @@
 - Big-bang replacement before a packaged proof: rejected because generation/bundling and public ngrok behavior would be discovered too late.
 - Permanent fallback WebSocket: rejected because the constitution and feature require exactly one public protocol.
 - Separate Connect listener: rejected because it would complicate same-origin, Basic Auth, port, tunnel, and shutdown behavior.
-

@@ -219,15 +219,16 @@ func (x *SaveSessionResult) GetSavedRevision() uint64 {
 }
 
 type PlayerConfigOperationResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
-	Canceled      bool                   `protobuf:"varint,2,opt,name=canceled,proto3" json:"canceled,omitempty"`
-	Error         *string                `protobuf:"bytes,3,opt,name=error,proto3,oneof" json:"error,omitempty"`
-	PlayerConfig  *v1.PlayerConfig       `protobuf:"bytes,4,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
-	Session       *v1.Session            `protobuf:"bytes,5,opt,name=session,proto3" json:"session,omitempty"`
-	State         *CoordinationState     `protobuf:"bytes,6,opt,name=state,proto3" json:"state,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Ok                   bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Canceled             bool                   `protobuf:"varint,2,opt,name=canceled,proto3" json:"canceled,omitempty"`
+	Error                *string                `protobuf:"bytes,3,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	PlayerConfig         *v1.PlayerConfig       `protobuf:"bytes,4,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
+	Session              *v1.Session            `protobuf:"bytes,5,opt,name=session,proto3" json:"session,omitempty"`
+	State                *CoordinationState     `protobuf:"bytes,6,opt,name=state,proto3" json:"state,omitempty"`
+	PlayerConfigMetadata *PlayerConfigMetadata  `protobuf:"bytes,7,opt,name=player_config_metadata,json=playerConfigMetadata,proto3" json:"player_config_metadata,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *PlayerConfigOperationResult) Reset() {
@@ -298,6 +299,13 @@ func (x *PlayerConfigOperationResult) GetSession() *v1.Session {
 func (x *PlayerConfigOperationResult) GetState() *CoordinationState {
 	if x != nil {
 		return x.State
+	}
+	return nil
+}
+
+func (x *PlayerConfigOperationResult) GetPlayerConfigMetadata() *PlayerConfigMetadata {
+	if x != nil {
+		return x.PlayerConfigMetadata
 	}
 	return nil
 }
@@ -621,6 +629,10 @@ func (x *TerminalSwitchDecisionRequest) GetChoice() TerminalSwitchChoice {
 type ResetFailedHackRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TerminalId    string                 `protobuf:"bytes,1,opt,name=terminal_id,json=terminalId,proto3" json:"terminal_id,omitempty"`
+	TerminalName  string                 `protobuf:"bytes,2,opt,name=terminal_name,json=terminalName,proto3" json:"terminal_name,omitempty"`
+	Tree          *v1.ContentNode        `protobuf:"bytes,3,opt,name=tree,proto3" json:"tree,omitempty"`
+	HackLevel     int32                  `protobuf:"varint,4,opt,name=hack_level,json=hackLevel,proto3" json:"hack_level,omitempty"`
+	IntroText     string                 `protobuf:"bytes,5,opt,name=intro_text,json=introText,proto3" json:"intro_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -658,6 +670,34 @@ func (*ResetFailedHackRequest) Descriptor() ([]byte, []int) {
 func (x *ResetFailedHackRequest) GetTerminalId() string {
 	if x != nil {
 		return x.TerminalId
+	}
+	return ""
+}
+
+func (x *ResetFailedHackRequest) GetTerminalName() string {
+	if x != nil {
+		return x.TerminalName
+	}
+	return ""
+}
+
+func (x *ResetFailedHackRequest) GetTree() *v1.ContentNode {
+	if x != nil {
+		return x.Tree
+	}
+	return nil
+}
+
+func (x *ResetFailedHackRequest) GetHackLevel() int32 {
+	if x != nil {
+		return x.HackLevel
+	}
+	return 0
+}
+
+func (x *ResetFailedHackRequest) GetIntroText() string {
+	if x != nil {
+		return x.IntroText
 	}
 	return ""
 }
@@ -1114,14 +1154,15 @@ const file_fallout_terminal_private_v1_desktop_proto_rawDesc = "" +
 	"\x12requested_revision\x18\x03 \x01(\x04R\x11requestedRevision\x12*\n" +
 	"\x0esaved_revision\x18\x04 \x01(\x04H\x01R\rsavedRevision\x88\x01\x01B\b\n" +
 	"\x06_errorB\x11\n" +
-	"\x0f_saved_revision\"\xcc\x02\n" +
+	"\x0f_saved_revision\"\xb5\x03\n" +
 	"\x1bPlayerConfigOperationResult\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x1a\n" +
 	"\bcanceled\x18\x02 \x01(\bR\bcanceled\x12\x19\n" +
 	"\x05error\x18\x03 \x01(\tH\x00R\x05error\x88\x01\x01\x12R\n" +
 	"\rplayer_config\x18\x04 \x01(\v2-.fallout.terminal.persistence.v1.PlayerConfigR\fplayerConfig\x12B\n" +
 	"\asession\x18\x05 \x01(\v2(.fallout.terminal.persistence.v1.SessionR\asession\x12D\n" +
-	"\x05state\x18\x06 \x01(\v2..fallout.terminal.private.v1.CoordinationStateR\x05stateB\b\n" +
+	"\x05state\x18\x06 \x01(\v2..fallout.terminal.private.v1.CoordinationStateR\x05state\x12g\n" +
+	"\x16player_config_metadata\x18\a \x01(\v21.fallout.terminal.private.v1.PlayerConfigMetadataR\x14playerConfigMetadataB\b\n" +
 	"\x06_error\"\x8f\x01\n" +
 	"\x12CoordinationResult\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x19\n" +
@@ -1153,10 +1194,16 @@ const file_fallout_terminal_private_v1_desktop_proto_rawDesc = "" +
 	"\v_intro_text\"\x87\x01\n" +
 	"\x1dTerminalSwitchDecisionRequest\x12\x1b\n" +
 	"\tswitch_id\x18\x01 \x01(\tR\bswitchId\x12I\n" +
-	"\x06choice\x18\x02 \x01(\x0e21.fallout.terminal.private.v1.TerminalSwitchChoiceR\x06choice\"9\n" +
+	"\x06choice\x18\x02 \x01(\x0e21.fallout.terminal.private.v1.TerminalSwitchChoiceR\x06choice\"\xde\x01\n" +
 	"\x16ResetFailedHackRequest\x12\x1f\n" +
 	"\vterminal_id\x18\x01 \x01(\tR\n" +
-	"terminalId\"8\n" +
+	"terminalId\x12#\n" +
+	"\rterminal_name\x18\x02 \x01(\tR\fterminalName\x12@\n" +
+	"\x04tree\x18\x03 \x01(\v2,.fallout.terminal.persistence.v1.ContentNodeR\x04tree\x12\x1d\n" +
+	"\n" +
+	"hack_level\x18\x04 \x01(\x05R\thackLevel\x12\x1d\n" +
+	"\n" +
+	"intro_text\x18\x05 \x01(\tR\tintroText\"8\n" +
 	"\x13AddCharacterRequest\x12!\n" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\"^\n" +
 	"\x16RenameCharacterRequest\x12!\n" +
@@ -1216,26 +1263,29 @@ var file_fallout_terminal_private_v1_desktop_proto_goTypes = []any{
 	(*v1.Session)(nil),                    // 19: fallout.terminal.persistence.v1.Session
 	(*v1.PlayerConfig)(nil),               // 20: fallout.terminal.persistence.v1.PlayerConfig
 	(*CoordinationState)(nil),             // 21: fallout.terminal.private.v1.CoordinationState
-	(TerminalSwitchStatus)(0),             // 22: fallout.terminal.private.v1.TerminalSwitchStatus
-	(*v1.ContentNode)(nil),                // 23: fallout.terminal.persistence.v1.ContentNode
-	(TerminalSwitchChoice)(0),             // 24: fallout.terminal.private.v1.TerminalSwitchChoice
+	(*PlayerConfigMetadata)(nil),          // 22: fallout.terminal.private.v1.PlayerConfigMetadata
+	(TerminalSwitchStatus)(0),             // 23: fallout.terminal.private.v1.TerminalSwitchStatus
+	(*v1.ContentNode)(nil),                // 24: fallout.terminal.persistence.v1.ContentNode
+	(TerminalSwitchChoice)(0),             // 25: fallout.terminal.private.v1.TerminalSwitchChoice
 }
 var file_fallout_terminal_private_v1_desktop_proto_depIdxs = []int32{
 	19, // 0: fallout.terminal.private.v1.SessionOperationResult.session:type_name -> fallout.terminal.persistence.v1.Session
 	20, // 1: fallout.terminal.private.v1.PlayerConfigOperationResult.player_config:type_name -> fallout.terminal.persistence.v1.PlayerConfig
 	19, // 2: fallout.terminal.private.v1.PlayerConfigOperationResult.session:type_name -> fallout.terminal.persistence.v1.Session
 	21, // 3: fallout.terminal.private.v1.PlayerConfigOperationResult.state:type_name -> fallout.terminal.private.v1.CoordinationState
-	21, // 4: fallout.terminal.private.v1.CoordinationResult.state:type_name -> fallout.terminal.private.v1.CoordinationState
-	22, // 5: fallout.terminal.private.v1.TerminalSwitchResult.status:type_name -> fallout.terminal.private.v1.TerminalSwitchStatus
-	21, // 6: fallout.terminal.private.v1.TerminalSwitchResult.state:type_name -> fallout.terminal.private.v1.CoordinationState
-	23, // 7: fallout.terminal.private.v1.TerminalActivationRequest.tree:type_name -> fallout.terminal.persistence.v1.ContentNode
-	23, // 8: fallout.terminal.private.v1.LiveTerminalUpdateRequest.tree:type_name -> fallout.terminal.persistence.v1.ContentNode
-	24, // 9: fallout.terminal.private.v1.TerminalSwitchDecisionRequest.choice:type_name -> fallout.terminal.private.v1.TerminalSwitchChoice
-	10, // [10:10] is the sub-list for method output_type
-	10, // [10:10] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	22, // 4: fallout.terminal.private.v1.PlayerConfigOperationResult.player_config_metadata:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
+	21, // 5: fallout.terminal.private.v1.CoordinationResult.state:type_name -> fallout.terminal.private.v1.CoordinationState
+	23, // 6: fallout.terminal.private.v1.TerminalSwitchResult.status:type_name -> fallout.terminal.private.v1.TerminalSwitchStatus
+	21, // 7: fallout.terminal.private.v1.TerminalSwitchResult.state:type_name -> fallout.terminal.private.v1.CoordinationState
+	24, // 8: fallout.terminal.private.v1.TerminalActivationRequest.tree:type_name -> fallout.terminal.persistence.v1.ContentNode
+	24, // 9: fallout.terminal.private.v1.LiveTerminalUpdateRequest.tree:type_name -> fallout.terminal.persistence.v1.ContentNode
+	25, // 10: fallout.terminal.private.v1.TerminalSwitchDecisionRequest.choice:type_name -> fallout.terminal.private.v1.TerminalSwitchChoice
+	24, // 11: fallout.terminal.private.v1.ResetFailedHackRequest.tree:type_name -> fallout.terminal.persistence.v1.ContentNode
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_private_v1_desktop_proto_init() }

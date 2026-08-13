@@ -36,8 +36,19 @@ soak, protected forwarding journey, tunnel-policy tests, or reconnect tests.
 | Packaged runtime smoke | launch `build/bin/Fallout Terminal.app/Contents/MacOS/Fallout Terminal` with `NGROK_ENABLED=0`, then request `/` and `SoundManifest` | PASS; HTTP 200, typed manifest, embedded assets, CSP without `ws:`/`wss:` |
 | Patch hygiene | `git diff --check` | PASS |
 
+## Convergence revalidation
+
+The post-analysis convergence work was revalidated after closing T123–T129.
+The full Go suite and race suite pass with the gap-free subscription boundary,
+transaction-owned personalized updates, exhaustive private adapters, and
+Connect-native HTTP errors. `scripts/proto-check.sh` passes with the pinned,
+in-process compiler owned by Buf v1.72.0; all 11 generated Go protobuf files
+record pinned `protoc-gen-go v1.36.11` provenance and the valid Buf-generated
+`protoc (unknown)` compiler line. The five breaking fixtures, all 17 browser
+journeys, the production Wails build, and a packaged-app launch smoke also pass.
+
 The packaged executable SHA-256 observed in this validation run was
-`310bbf2440a3ecd2fb2430ff73c14e8dc9a006f6b610a3dceddcb74be5389d92`.
+`fe0252b7237e41f1d4b03841b35f2c02491b07dbd1bdfa1aabc63e62e8103c24`.
 The smoke concerns the affected unsigned offline development package; signing
 and notarization are outside this feature's acceptance scope.
 
@@ -49,7 +60,7 @@ and notarization are outside this feature's acceptance scope.
 | SC-002 | `scripts/proto-check.sh` ran Buf format and lint with no findings. | PASS |
 | SC-003 | The schema check generated twice from clean staging directories, compared byte-for-byte, and detected no second-pass repository drift. | PASS |
 | SC-004 | `scripts/proto-breaking.sh --all-fixtures` rejected all five representative incompatibility classes. | PASS |
-| SC-005 | Generated Go and ECMAScript outputs matched `proto/schema-revision.txt` (`ca24e…507b`). | PASS |
+| SC-005 | Generated Go and ECMAScript outputs matched `proto/schema-revision.txt` (`66679f…3ba3`). | PASS |
 | SC-006 | First-value and reconnect tests require exactly one complete personalized snapshot before updates. | PASS |
 | SC-007 | Snapshot/reconnect generation guards, including 100 reconnect trials, observed no puzzle regeneration. | PASS |
 | SC-008 | Concurrent clean-tab browser and coordinator trials converged on one recognized handle and logical session. | PASS |

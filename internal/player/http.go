@@ -2,12 +2,17 @@ package player
 
 import (
 	"bytes"
+	"errors"
+	"io"
 	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+
+	"connectrpc.com/connect"
+	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
 )
 
 const playerContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
@@ -34,9 +39,9 @@ func NewHTTPHandler(assets fs.FS) http.Handler {
 // page, generated client, sound, and RPC traffic remains same-origin.
 func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler) http.Handler {
 	staticHandler := NewHTTPHandler(assets)
-	boundedRPC := http.MaxBytesHandler(rpcHandler, MaxEncodedBodyBytes)
+	errorWriter := connect.NewErrorWriter()
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if rpcHandler != nil && rpcPath != "" && rpcRequestPath(request.URL.Path, rpcPath) {
+		if supportedRPCRequestPath(request.URL.Path, rpcPath) {
 			response.Header().Set("X-Content-Type-Options", "nosniff")
 			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
 			if !validRequestHost(request.Host) || !sameHostOrigin(request) {
@@ -44,19 +49,74 @@ func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler
 				return
 			}
 			if request.ContentLength > MaxEncodedBodyBytes {
-				http.Error(response, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeResourceExhausted, "public player request exceeds the encoded-body limit")
 				return
 			}
-			boundedRPC.ServeHTTP(response, request)
+			if err := bufferBoundedRequestBody(request); err != nil {
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeResourceExhausted, "public player request exceeds the encoded-body limit")
+				return
+			}
+			if rpcHandler == nil {
+				writeConnectBoundaryError(errorWriter, response, request, connect.CodeUnimplemented, "public player procedure is not implemented")
+				return
+			}
+			rpcHandler.ServeHTTP(response, request)
+			return
+		}
+		if publicRPCRequestPath(request.URL.Path, rpcPath) {
+			response.Header().Set("X-Content-Type-Options", "nosniff")
+			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
+			writeConnectBoundaryError(errorWriter, response, request, connect.CodeUnimplemented, "public player procedure is not implemented")
 			return
 		}
 		staticHandler.ServeHTTP(response, request)
 	})
 }
 
-func rpcRequestPath(requestPath, servicePath string) bool {
+func supportedRPCRequestPath(requestPath, servicePath string) bool {
+	if servicePath == "" {
+		return false
+	}
+	_, supported := map[string]struct{}{
+		playerv1connect.PlayerServiceSubscribeProcedure:       {},
+		playerv1connect.PlayerServiceSelectCharacterProcedure: {},
+		playerv1connect.PlayerServiceNavigateProcedure:        {},
+		playerv1connect.PlayerServiceGuessProcedure:           {},
+		playerv1connect.PlayerServiceActivatePatternProcedure: {},
+		playerv1connect.PlayerServiceSoundManifestProcedure:   {},
+	}[requestPath]
+	return supported
+}
+
+func publicRPCRequestPath(requestPath, servicePath string) bool {
 	servicePath = strings.TrimSuffix(servicePath, "/")
-	return requestPath == servicePath || strings.HasPrefix(requestPath, servicePath+"/")
+	if requestPath == servicePath || strings.HasPrefix(requestPath, servicePath+"/") {
+		return true
+	}
+	return strings.HasPrefix(requestPath, "/fallout.terminal.player.v1.")
+}
+
+func bufferBoundedRequestBody(request *http.Request) error {
+	if request == nil || request.Body == nil {
+		return nil
+	}
+	defer request.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(request.Body, MaxEncodedBodyBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(body) > MaxEncodedBodyBytes {
+		return errors.New("encoded request body exceeds limit")
+	}
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	request.ContentLength = int64(len(body))
+	return nil
+}
+
+func writeConnectBoundaryError(writer *connect.ErrorWriter, response http.ResponseWriter, request *http.Request, code connect.Code, message string) {
+	if err := writer.Write(response, request, connect.NewError(code, errors.New(message))); err != nil {
+		http.Error(response, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	}
 }
 
 func validRequestHost(host string) bool {

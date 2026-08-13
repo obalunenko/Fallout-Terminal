@@ -27,6 +27,10 @@ type ServerInformation struct {
 	LocalUrl      string                 `protobuf:"bytes,1,opt,name=local_url,json=localUrl,proto3" json:"local_url,omitempty"`
 	PublicUrl     *string                `protobuf:"bytes,2,opt,name=public_url,json=publicUrl,proto3,oneof" json:"public_url,omitempty"`
 	TunnelEnabled bool                   `protobuf:"varint,3,opt,name=tunnel_enabled,json=tunnelEnabled,proto3" json:"tunnel_enabled,omitempty"`
+	Ip            string                 `protobuf:"bytes,4,opt,name=ip,proto3" json:"ip,omitempty"`
+	Port          int32                  `protobuf:"varint,5,opt,name=port,proto3" json:"port,omitempty"`
+	TunnelError   *string                `protobuf:"bytes,6,opt,name=tunnel_error,json=tunnelError,proto3,oneof" json:"tunnel_error,omitempty"`
+	Url           string                 `protobuf:"bytes,7,opt,name=url,proto3" json:"url,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,6 +84,34 @@ func (x *ServerInformation) GetTunnelEnabled() bool {
 		return x.TunnelEnabled
 	}
 	return false
+}
+
+func (x *ServerInformation) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *ServerInformation) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *ServerInformation) GetTunnelError() string {
+	if x != nil && x.TunnelError != nil {
+		return *x.TunnelError
+	}
+	return ""
+}
+
+func (x *ServerInformation) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
 }
 
 type RuntimeStatus struct {
@@ -362,13 +394,18 @@ var File_fallout_terminal_private_v1_runtime_proto protoreflect.FileDescriptor
 
 const file_fallout_terminal_private_v1_runtime_proto_rawDesc = "" +
 	"\n" +
-	")fallout/terminal/private/v1/runtime.proto\x12\x1bfallout.terminal.private.v1\x1a(fallout/terminal/player/v1/hacking.proto\x1a.fallout/terminal/private/v1/coordination.proto\"\x8a\x01\n" +
+	")fallout/terminal/private/v1/runtime.proto\x12\x1bfallout.terminal.private.v1\x1a(fallout/terminal/player/v1/hacking.proto\x1a.fallout/terminal/private/v1/coordination.proto\"\xf9\x01\n" +
 	"\x11ServerInformation\x12\x1b\n" +
 	"\tlocal_url\x18\x01 \x01(\tR\blocalUrl\x12\"\n" +
 	"\n" +
 	"public_url\x18\x02 \x01(\tH\x00R\tpublicUrl\x88\x01\x01\x12%\n" +
-	"\x0etunnel_enabled\x18\x03 \x01(\bR\rtunnelEnabledB\r\n" +
-	"\v_public_url\"\xf7\x03\n" +
+	"\x0etunnel_enabled\x18\x03 \x01(\bR\rtunnelEnabled\x12\x0e\n" +
+	"\x02ip\x18\x04 \x01(\tR\x02ip\x12\x12\n" +
+	"\x04port\x18\x05 \x01(\x05R\x04port\x12&\n" +
+	"\ftunnel_error\x18\x06 \x01(\tH\x01R\vtunnelError\x88\x01\x01\x12\x10\n" +
+	"\x03url\x18\a \x01(\tR\x03urlB\r\n" +
+	"\v_public_urlB\x0f\n" +
+	"\r_tunnel_error\"\xf7\x03\n" +
 	"\rRuntimeStatus\x12O\n" +
 	"\vserver_info\x18\x01 \x01(\v2..fallout.terminal.private.v1.ServerInformationR\n" +
 	"serverInfo\x12!\n" +

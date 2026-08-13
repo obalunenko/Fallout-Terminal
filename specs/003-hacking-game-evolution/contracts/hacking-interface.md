@@ -1,5 +1,10 @@
 # Hacking Interface Contract: Phase 1 Generation-Bound Patterns
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Bugfix**: 2026-08-11 — BUG-001 retained the `HACK_GUESS` wire shape while extending filler eligibility to delimiters and restricting pattern interaction to `start`.
 
 ## Scope

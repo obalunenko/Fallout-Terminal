@@ -1,5 +1,10 @@
 # Contract: Player WebSocket Protocol
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 > **SUPERSEDED HISTORICAL RECORD — NON-AUTHORITATIVE.** This completed
 > feature-001 contract documents the removed pre-Connect implementation. The
 > application exposes no supported WebSocket/JSON player route. The current

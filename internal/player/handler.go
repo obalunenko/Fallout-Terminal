@@ -21,13 +21,10 @@ import (
 // ConnectCoordinator is the narrow canonical seam used by the generated
 // public service. Recognition never authorizes a mutation by itself.
 type ConnectCoordinator interface {
-	AttachSubscription(domain.ConnectionID, *domain.RecognitionHandle) (*domain.PersonalizedSnapshot, error)
+	AttachSubscriptionAndRegister(domain.ConnectionID, *domain.RecognitionHandle, func(*domain.PersonalizedSnapshot)) (*domain.PersonalizedSnapshot, error)
 	DetachConnection(domain.ConnectionID)
-	ResolveRecognition(domain.RecognitionHandle) (domain.LogicalSessionID, bool)
-	PlayerSnapshot(domain.LogicalSessionID) (*domain.PlayerState, bool)
 	SelectCharacterForRecognition(domain.RecognitionHandle, domain.RequestID, domain.BroadcastID, domain.CharacterID) domain.ActionResult
 	DispatchPlayerActionForRecognition(domain.RecognitionHandle, domain.RuntimeCommand) domain.ActionResult
-	CompoundUpdates(uint64) map[domain.LogicalSessionID]*domain.CompoundUpdate
 }
 
 // ConnectServiceConfig supplies only transport-independent application
@@ -97,18 +94,25 @@ func (service *ConnectService) Subscribe(ctx context.Context, request *connect.R
 		return publicConnectError(err)
 	}
 	connectionID := domain.ConnectionID(fmt.Sprintf("connect-%d", service.sequence.Add(1)))
-	snapshot, err := service.coordinator.AttachSubscription(connectionID, handle)
+	var physical *Subscription
+	var conversionErr error
+	snapshot, err := service.coordinator.AttachSubscriptionAndRegister(connectionID, handle, func(attached *domain.PersonalizedSnapshot) {
+		generatedSnapshot, adapterErr := SnapshotToProto(attached)
+		if adapterErr != nil {
+			conversionErr = adapterErr
+			return
+		}
+		first := &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: generatedSnapshot}}
+		physical = NewSubscription(ctx, connectionID, attached.PlayerState.SessionID, first, service.queueSize)
+		service.hub.Register(physical)
+	})
 	if err != nil {
 		return connect.NewError(connect.CodeUnavailable, errors.New("player subscription is temporarily unavailable"))
 	}
-	generatedSnapshot, err := SnapshotToProto(snapshot)
-	if err != nil {
+	if conversionErr != nil || snapshot == nil || physical == nil {
 		service.coordinator.DetachConnection(connectionID)
 		return connect.NewError(connect.CodeInternal, errors.New("could not build player snapshot"))
 	}
-	first := &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: generatedSnapshot}}
-	physical := NewSubscription(ctx, connectionID, snapshot.PlayerState.SessionID, first, service.queueSize)
-	service.hub.Register(physical)
 	service.emitClientCount()
 	defer func() {
 		service.hub.Unregister(connectionID)
@@ -169,9 +173,6 @@ func (service *ConnectService) SelectCharacter(_ context.Context, request *conne
 		mutation.Selection.BroadcastID,
 		mutation.Selection.CharacterID,
 	)
-	if result.Accepted {
-		service.offerCompoundUpdates(result.Revision)
-	}
 	return connect.NewResponse(ActionResultToProto(result)), nil
 }
 
@@ -251,37 +252,7 @@ func (service *ConnectService) SoundManifest(ctx context.Context, request *conne
 
 func (service *ConnectService) dispatchRuntimeMutation(mutation RuntimeMutation) *connect.Response[playerv1.ActionResult] {
 	result := service.coordinator.DispatchPlayerActionForRecognition(mutation.RecognitionHandle, mutation.Command)
-	if result.Accepted {
-		service.offerCompoundUpdates(result.Revision)
-	}
 	return connect.NewResponse(ActionResultToProto(result))
-}
-
-func (service *ConnectService) offerCompoundUpdates(revision uint64) {
-	for sessionID, update := range service.coordinator.CompoundUpdates(revision) {
-		generated, err := CompoundUpdateToProto(update)
-		if err != nil {
-			continue
-		}
-		service.hub.Offer(sessionID, &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Update{Update: generated}})
-	}
-}
-
-func (service *ConnectService) offerCurrentPlayerState(handle domain.RecognitionHandle, revision uint64) {
-	sessionID, ok := service.coordinator.ResolveRecognition(handle)
-	if !ok {
-		return
-	}
-	state, ok := service.coordinator.PlayerSnapshot(sessionID)
-	if !ok {
-		return
-	}
-	state.Revision = revision
-	generated, err := CompoundUpdateToProto(&domain.CompoundUpdate{Revision: revision, Player: state})
-	if err != nil {
-		return
-	}
-	service.hub.Offer(sessionID, &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Update{Update: generated}})
 }
 
 func publicConnectError(err error) error {

@@ -13,6 +13,7 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +43,7 @@ func TestSubscriptionQueueIsBoundedNonblockingAndRecoversOnlyFromANewSnapshot(t 
 	select {
 	case <-recovered.Done():
 	case <-time.After(time.Second):
-		t.Fatal("stale increment did not terminate the physical recovery stream")
+		assert.FailNow(t, "stale increment did not terminate the physical recovery stream")
 	}
 	fresh := NewSubscription(t.Context(), "physical-3", "logical-1", subscriptionSnapshot(50), 2)
 	require.True(t, fresh.Offer(subscriptionUpdate(51)))
@@ -62,7 +63,7 @@ func TestSubscriptionHubIsolatesOverflowingAndCanceledPhysicalSiblings(t *testin
 	select {
 	case <-canceled.Done():
 	case <-time.After(time.Second):
-		t.Fatal("canceled physical stream remained active")
+		assert.FailNow(t, "canceled physical stream remained active")
 	}
 
 	hub.Offer("logical-1", subscriptionUpdate(2))
@@ -72,7 +73,7 @@ func TestSubscriptionHubIsolatesOverflowingAndCanceledPhysicalSiblings(t *testin
 	select {
 	case <-blocked.Done():
 	case <-time.After(time.Second):
-		t.Fatal("overflowing sibling was not isolated")
+		assert.FailNow(t, "overflowing sibling was not isolated")
 	}
 
 	hub.mu.Lock()
@@ -108,7 +109,7 @@ func TestRepresentativeThreeHourStreamReconnectSoak(t *testing.T) {
 		case update := <-stream.Updates():
 			require.Equal(t, currentRevision, update.GetUpdate().GetRevision())
 		case <-time.After(time.Second):
-			t.Fatalf("simulated second %d did not deliver revision %d", second, currentRevision)
+			assert.FailNowf(t, "assertion failed", "simulated second %d did not deliver revision %d", second, currentRevision)
 		}
 
 		// Interrupt and recover every five simulated minutes. Recovery begins
@@ -167,7 +168,7 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 		return len(hub.byID) == 1
 	}, time.Second, time.Millisecond)
 
-	shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownContext, cancelShutdown := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancelShutdown()
 	started := time.Now()
 	require.NoError(t, server.Stop(shutdownContext))

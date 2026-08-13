@@ -25,13 +25,14 @@ const (
 type TerminalSwitchStatus int32
 
 const (
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_UNSPECIFIED TerminalSwitchStatus = 0
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_ACTIVATED   TerminalSwitchStatus = 1
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_CLEARED     TerminalSwitchStatus = 2
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_PENDING     TerminalSwitchStatus = 3
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_PRESERVED   TerminalSwitchStatus = 4
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_DISCARDED   TerminalSwitchStatus = 5
-	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_CANCELED    TerminalSwitchStatus = 6
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_UNSPECIFIED       TerminalSwitchStatus = 0
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_ACTIVATED         TerminalSwitchStatus = 1
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_CLEARED           TerminalSwitchStatus = 2
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_PENDING           TerminalSwitchStatus = 3
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_PRESERVED         TerminalSwitchStatus = 4
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_DISCARDED         TerminalSwitchStatus = 5
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_CANCELED          TerminalSwitchStatus = 6
+	TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_DECISION_REQUIRED TerminalSwitchStatus = 7
 )
 
 // Enum value maps for TerminalSwitchStatus.
@@ -44,15 +45,17 @@ var (
 		4: "TERMINAL_SWITCH_STATUS_PRESERVED",
 		5: "TERMINAL_SWITCH_STATUS_DISCARDED",
 		6: "TERMINAL_SWITCH_STATUS_CANCELED",
+		7: "TERMINAL_SWITCH_STATUS_DECISION_REQUIRED",
 	}
 	TerminalSwitchStatus_value = map[string]int32{
-		"TERMINAL_SWITCH_STATUS_UNSPECIFIED": 0,
-		"TERMINAL_SWITCH_STATUS_ACTIVATED":   1,
-		"TERMINAL_SWITCH_STATUS_CLEARED":     2,
-		"TERMINAL_SWITCH_STATUS_PENDING":     3,
-		"TERMINAL_SWITCH_STATUS_PRESERVED":   4,
-		"TERMINAL_SWITCH_STATUS_DISCARDED":   5,
-		"TERMINAL_SWITCH_STATUS_CANCELED":    6,
+		"TERMINAL_SWITCH_STATUS_UNSPECIFIED":       0,
+		"TERMINAL_SWITCH_STATUS_ACTIVATED":         1,
+		"TERMINAL_SWITCH_STATUS_CLEARED":           2,
+		"TERMINAL_SWITCH_STATUS_PENDING":           3,
+		"TERMINAL_SWITCH_STATUS_PRESERVED":         4,
+		"TERMINAL_SWITCH_STATUS_DISCARDED":         5,
+		"TERMINAL_SWITCH_STATUS_CANCELED":          6,
+		"TERMINAL_SWITCH_STATUS_DECISION_REQUIRED": 7,
 	}
 )
 
@@ -202,6 +205,7 @@ type LogicalSessionState struct {
 	Connected        bool                   `protobuf:"varint,3,opt,name=connected,proto3" json:"connected,omitempty"`
 	ActiveStreams    uint32                 `protobuf:"varint,4,opt,name=active_streams,json=activeStreams,proto3" json:"active_streams,omitempty"`
 	CharacterId      *string                `protobuf:"bytes,5,opt,name=character_id,json=characterId,proto3,oneof" json:"character_id,omitempty"`
+	Role             v1.PlayerRole          `protobuf:"varint,6,opt,name=role,proto3,enum=fallout.terminal.player.v1.PlayerRole" json:"role,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -269,6 +273,13 @@ func (x *LogicalSessionState) GetCharacterId() string {
 		return *x.CharacterId
 	}
 	return ""
+}
+
+func (x *LogicalSessionState) GetRole() v1.PlayerRole {
+	if x != nil {
+		return x.Role
+	}
+	return v1.PlayerRole(0)
 }
 
 type BroadcastState struct {
@@ -345,6 +356,9 @@ type PendingTerminalSwitch struct {
 	TerminalId        string                 `protobuf:"bytes,2,opt,name=terminal_id,json=terminalId,proto3" json:"terminal_id,omitempty"`
 	TerminalName      string                 `protobuf:"bytes,3,opt,name=terminal_name,json=terminalName,proto3" json:"terminal_name,omitempty"`
 	RequestedTerminal *v1.LiveTerminal       `protobuf:"bytes,4,opt,name=requested_terminal,json=requestedTerminal,proto3" json:"requested_terminal,omitempty"`
+	BroadcastId       string                 `protobuf:"bytes,5,opt,name=broadcast_id,json=broadcastId,proto3" json:"broadcast_id,omitempty"`
+	SourceTerminalId  string                 `protobuf:"bytes,6,opt,name=source_terminal_id,json=sourceTerminalId,proto3" json:"source_terminal_id,omitempty"`
+	TargetTerminalId  *string                `protobuf:"bytes,7,opt,name=target_terminal_id,json=targetTerminalId,proto3,oneof" json:"target_terminal_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -407,19 +421,110 @@ func (x *PendingTerminalSwitch) GetRequestedTerminal() *v1.LiveTerminal {
 	return nil
 }
 
+func (x *PendingTerminalSwitch) GetBroadcastId() string {
+	if x != nil {
+		return x.BroadcastId
+	}
+	return ""
+}
+
+func (x *PendingTerminalSwitch) GetSourceTerminalId() string {
+	if x != nil {
+		return x.SourceTerminalId
+	}
+	return ""
+}
+
+func (x *PendingTerminalSwitch) GetTargetTerminalId() string {
+	if x != nil && x.TargetTerminalId != nil {
+		return *x.TargetTerminalId
+	}
+	return ""
+}
+
+type PlayerConfigMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	FilePath      string                 `protobuf:"bytes,2,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	Version       int32                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlayerConfigMetadata) Reset() {
+	*x = PlayerConfigMetadata{}
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlayerConfigMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerConfigMetadata) ProtoMessage() {}
+
+func (x *PlayerConfigMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerConfigMetadata.ProtoReflect.Descriptor instead.
+func (*PlayerConfigMetadata) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *PlayerConfigMetadata) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *PlayerConfigMetadata) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *PlayerConfigMetadata) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *PlayerConfigMetadata) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type CoordinationState struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	Roster                []*CharacterState      `protobuf:"bytes,1,rep,name=roster,proto3" json:"roster,omitempty"`
 	LogicalSessions       []*LogicalSessionState `protobuf:"bytes,2,rep,name=logical_sessions,json=logicalSessions,proto3" json:"logical_sessions,omitempty"`
 	Broadcast             *BroadcastState        `protobuf:"bytes,3,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
 	PendingTerminalSwitch *PendingTerminalSwitch `protobuf:"bytes,4,opt,name=pending_terminal_switch,json=pendingTerminalSwitch,proto3" json:"pending_terminal_switch,omitempty"`
+	Revision              uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	PlayerConfig          *PlayerConfigMetadata  `protobuf:"bytes,6,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CoordinationState) Reset() {
 	*x = CoordinationState{}
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[4]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -431,7 +536,7 @@ func (x *CoordinationState) String() string {
 func (*CoordinationState) ProtoMessage() {}
 
 func (x *CoordinationState) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[4]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -444,7 +549,7 @@ func (x *CoordinationState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CoordinationState.ProtoReflect.Descriptor instead.
 func (*CoordinationState) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{4}
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CoordinationState) GetRoster() []*CharacterState {
@@ -475,22 +580,37 @@ func (x *CoordinationState) GetPendingTerminalSwitch() *PendingTerminalSwitch {
 	return nil
 }
 
+func (x *CoordinationState) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *CoordinationState) GetPlayerConfig() *PlayerConfigMetadata {
+	if x != nil {
+		return x.PlayerConfig
+	}
+	return nil
+}
+
 var File_fallout_terminal_private_v1_coordination_proto protoreflect.FileDescriptor
 
 const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\n" +
-	".fallout/terminal/private/v1/coordination.proto\x12\x1bfallout.terminal.private.v1\x1a)fallout/terminal/player/v1/terminal.proto\"\xa0\x01\n" +
+	".fallout/terminal/private/v1/coordination.proto\x12\x1bfallout.terminal.private.v1\x1a'fallout/terminal/player/v1/player.proto\x1a)fallout/terminal/player/v1/terminal.proto\"\xa0\x01\n" +
 	"\x0eCharacterState\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x121\n" +
 	"\x12logical_session_id\x18\x03 \x01(\tH\x00R\x10logicalSessionId\x88\x01\x01B\x15\n" +
-	"\x13_logical_session_id\"\xe6\x01\n" +
+	"\x13_logical_session_id\"\xa2\x02\n" +
 	"\x13LogicalSessionState\x12,\n" +
 	"\x12logical_session_id\x18\x01 \x01(\tR\x10logicalSessionId\x12#\n" +
 	"\rfallback_name\x18\x02 \x01(\tR\ffallbackName\x12\x1c\n" +
 	"\tconnected\x18\x03 \x01(\bR\tconnected\x12%\n" +
 	"\x0eactive_streams\x18\x04 \x01(\rR\ractiveStreams\x12&\n" +
-	"\fcharacter_id\x18\x05 \x01(\tH\x00R\vcharacterId\x88\x01\x01B\x0f\n" +
+	"\fcharacter_id\x18\x05 \x01(\tH\x00R\vcharacterId\x88\x01\x01\x12:\n" +
+	"\x04role\x18\x06 \x01(\x0e2&.fallout.terminal.player.v1.PlayerRoleR\x04roleB\x0f\n" +
 	"\r_character_id\"\x80\x02\n" +
 	"\x0eBroadcastState\x12!\n" +
 	"\fbroadcast_id\x18\x01 \x01(\tR\vbroadcastId\x12D\n" +
@@ -498,18 +618,29 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x12active_terminal_id\x18\x03 \x01(\tH\x01R\x10activeTerminalId\x88\x01\x01\x12\x1a\n" +
 	"\brevision\x18\x04 \x01(\x04R\brevisionB\x1f\n" +
 	"\x1d_active_controller_session_idB\x15\n" +
-	"\x13_active_terminal_id\"\xd3\x01\n" +
+	"\x13_active_terminal_id\"\xee\x02\n" +
 	"\x15PendingTerminalSwitch\x12\x1b\n" +
 	"\tswitch_id\x18\x01 \x01(\tR\bswitchId\x12\x1f\n" +
 	"\vterminal_id\x18\x02 \x01(\tR\n" +
 	"terminalId\x12#\n" +
 	"\rterminal_name\x18\x03 \x01(\tR\fterminalName\x12W\n" +
-	"\x12requested_terminal\x18\x04 \x01(\v2(.fallout.terminal.player.v1.LiveTerminalR\x11requestedTerminal\"\xec\x02\n" +
+	"\x12requested_terminal\x18\x04 \x01(\v2(.fallout.terminal.player.v1.LiveTerminalR\x11requestedTerminal\x12!\n" +
+	"\fbroadcast_id\x18\x05 \x01(\tR\vbroadcastId\x12,\n" +
+	"\x12source_terminal_id\x18\x06 \x01(\tR\x10sourceTerminalId\x121\n" +
+	"\x12target_terminal_id\x18\a \x01(\tH\x00R\x10targetTerminalId\x88\x01\x01B\x15\n" +
+	"\x13_target_terminal_id\"y\n" +
+	"\x14PlayerConfigMetadata\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1b\n" +
+	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x05R\aversion\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"\xe0\x03\n" +
 	"\x11CoordinationState\x12C\n" +
 	"\x06roster\x18\x01 \x03(\v2+.fallout.terminal.private.v1.CharacterStateR\x06roster\x12[\n" +
 	"\x10logical_sessions\x18\x02 \x03(\v20.fallout.terminal.private.v1.LogicalSessionStateR\x0flogicalSessions\x12I\n" +
 	"\tbroadcast\x18\x03 \x01(\v2+.fallout.terminal.private.v1.BroadcastStateR\tbroadcast\x12j\n" +
-	"\x17pending_terminal_switch\x18\x04 \x01(\v22.fallout.terminal.private.v1.PendingTerminalSwitchR\x15pendingTerminalSwitch*\x9d\x02\n" +
+	"\x17pending_terminal_switch\x18\x04 \x01(\v22.fallout.terminal.private.v1.PendingTerminalSwitchR\x15pendingTerminalSwitch\x12\x1a\n" +
+	"\brevision\x18\x05 \x01(\x04R\brevision\x12V\n" +
+	"\rplayer_config\x18\x06 \x01(\v21.fallout.terminal.private.v1.PlayerConfigMetadataR\fplayerConfig*\xcb\x02\n" +
 	"\x14TerminalSwitchStatus\x12&\n" +
 	"\"TERMINAL_SWITCH_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" TERMINAL_SWITCH_STATUS_ACTIVATED\x10\x01\x12\"\n" +
@@ -517,7 +648,8 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x1eTERMINAL_SWITCH_STATUS_PENDING\x10\x03\x12$\n" +
 	" TERMINAL_SWITCH_STATUS_PRESERVED\x10\x04\x12$\n" +
 	" TERMINAL_SWITCH_STATUS_DISCARDED\x10\x05\x12#\n" +
-	"\x1fTERMINAL_SWITCH_STATUS_CANCELED\x10\x06*\xaa\x01\n" +
+	"\x1fTERMINAL_SWITCH_STATUS_CANCELED\x10\x06\x12,\n" +
+	"(TERMINAL_SWITCH_STATUS_DECISION_REQUIRED\x10\a*\xaa\x01\n" +
 	"\x14TerminalSwitchChoice\x12&\n" +
 	"\"TERMINAL_SWITCH_CHOICE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fTERMINAL_SWITCH_CHOICE_PRESERVE\x10\x01\x12\"\n" +
@@ -537,7 +669,7 @@ func file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP() []byte {
 }
 
 var file_fallout_terminal_private_v1_coordination_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_fallout_terminal_private_v1_coordination_proto_goTypes = []any{
 	(TerminalSwitchStatus)(0),     // 0: fallout.terminal.private.v1.TerminalSwitchStatus
 	(TerminalSwitchChoice)(0),     // 1: fallout.terminal.private.v1.TerminalSwitchChoice
@@ -545,20 +677,24 @@ var file_fallout_terminal_private_v1_coordination_proto_goTypes = []any{
 	(*LogicalSessionState)(nil),   // 3: fallout.terminal.private.v1.LogicalSessionState
 	(*BroadcastState)(nil),        // 4: fallout.terminal.private.v1.BroadcastState
 	(*PendingTerminalSwitch)(nil), // 5: fallout.terminal.private.v1.PendingTerminalSwitch
-	(*CoordinationState)(nil),     // 6: fallout.terminal.private.v1.CoordinationState
-	(*v1.LiveTerminal)(nil),       // 7: fallout.terminal.player.v1.LiveTerminal
+	(*PlayerConfigMetadata)(nil),  // 6: fallout.terminal.private.v1.PlayerConfigMetadata
+	(*CoordinationState)(nil),     // 7: fallout.terminal.private.v1.CoordinationState
+	(v1.PlayerRole)(0),            // 8: fallout.terminal.player.v1.PlayerRole
+	(*v1.LiveTerminal)(nil),       // 9: fallout.terminal.player.v1.LiveTerminal
 }
 var file_fallout_terminal_private_v1_coordination_proto_depIdxs = []int32{
-	7, // 0: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
-	2, // 1: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
-	3, // 2: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
-	4, // 3: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
-	5, // 4: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	8, // 0: fallout.terminal.private.v1.LogicalSessionState.role:type_name -> fallout.terminal.player.v1.PlayerRole
+	9, // 1: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
+	2, // 2: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
+	3, // 3: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
+	4, // 4: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
+	5, // 5: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
+	6, // 6: fallout.terminal.private.v1.CoordinationState.player_config:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_private_v1_coordination_proto_init() }
@@ -569,13 +705,14 @@ func file_fallout_terminal_private_v1_coordination_proto_init() {
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[0].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[1].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[2].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_coordination_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_private_v1_coordination_proto_rawDesc), len(file_fallout_terminal_private_v1_coordination_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

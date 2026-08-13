@@ -1057,9 +1057,237 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-13T13:13:13.960Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T14:06:02.189Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:11:58.699Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:11:58.808Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:18:47.344Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T126",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:23:14.055Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T127",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:24:36.261Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T128",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:26:13.535Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:34:05.380Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T14:48:52.413Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:49:54.046Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:50:57.740Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:51:23.298Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T14:54:54.879Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T15:00:32.414Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:01:11.977Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:01:38.844Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:01:53.112Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:03:15.900Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T15:14:17.960Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T130",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:15:37.675Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T132",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:17:19.224Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T131",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:23:39.700Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T15:32:29.509Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:33:32.941Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:33:54.448Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:34:30.244Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T15:36:00.791Z",
+      "reopened": true
     }
   ],
-  "last_action": "all 122 tasks done — schema, Go/race, browser, soak, security, builds, and macOS package smoke pass",
+  "last_action": "all 132 tasks done — BUG-001 Buf-only generation and full acceptance gates pass",
   "coverage": {
     "FR-001": {
       "title": "The feature MUST preserve the Go 1.26 modular-monolith architecture on Wails v2.13.0 and all behavior compatible with `develop` commit `8f306ce42e55b199ada4761d165461e2ebedc8ae`, including feature-003 hacking behavior and feature-004 player-session and control behavior.",
@@ -1429,6 +1657,10 @@
         "T048",
         "T051",
         "T073"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestAttachSubscriptionRegistrationIsOrderedBeforeConcurrentMutation",
+        "internal/player/handler_test.go::TestConnectSubscribeBeginsWithCompleteSnapshotAndSelectsCharacter"
       ]
     },
     "FR-044": {
@@ -1713,6 +1945,10 @@
         "T061",
         "T095",
         "T099"
+      ],
+      "tests": [
+        "internal/player/http_test.go::TestConnectHTTPRejectsDecodedCompressedUnknownAndMalformedBodiesBeforeCanonicalMutation",
+        "internal/player/http_test.go::TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBeforeRPC"
       ]
     },
     "FR-075": {
@@ -1725,6 +1961,9 @@
         "T061",
         "T095",
         "T099"
+      ],
+      "tests": [
+        "internal/player/http_test.go::TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBeforeRPC"
       ]
     },
     "FR-076": {
@@ -2470,45 +2709,29 @@
     "FR-133": {
       "title": "The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned.",
       "tasks": [
-        "T002",
-        "T003",
-        "T004",
-        "T005",
-        "T006",
-        "T009",
-        "T014",
-        "T017",
-        "T019",
-        "T020",
-        "T021",
-        "T089",
-        "T090",
         "T091",
         "T092",
-        "T093",
-        "T094"
+        "T094",
+        "T129"
+      ],
+      "tests": [
+        "scripts/proto-generate.sh",
+        "scripts/proto-check.sh"
       ]
     },
     "FR-134": {
       "title": "Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited.",
       "tasks": [
-        "T002",
-        "T003",
-        "T004",
-        "T005",
-        "T006",
-        "T009",
-        "T014",
-        "T017",
-        "T019",
-        "T020",
-        "T021",
-        "T089",
-        "T090",
         "T091",
         "T092",
-        "T093",
-        "T094"
+        "T094",
+        "T129",
+        "T130"
+      ],
+      "tests": [
+        "scripts/proto-check.sh",
+        "scripts/proto-drift-test.sh",
+        ".github/workflows/wails-macos.yml"
       ]
     },
     "FR-135": {
@@ -2558,23 +2781,19 @@
     "FR-137": {
       "title": "Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping.",
       "tasks": [
-        "T002",
-        "T003",
-        "T004",
-        "T005",
-        "T006",
-        "T009",
-        "T014",
-        "T017",
-        "T019",
-        "T020",
-        "T021",
         "T089",
         "T090",
         "T091",
         "T092",
         "T093",
-        "T094"
+        "T094",
+        "T129",
+        "T130"
+      ],
+      "tests": [
+        "scripts/proto-check.sh",
+        "scripts/proto-breaking.sh",
+        ".github/workflows/wails-macos.yml"
       ]
     },
     "FR-138": {
@@ -2715,6 +2934,10 @@
         "T048",
         "T051",
         "T055"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "internal/player/handler_test.go"
       ]
     },
     "FR-145": {
@@ -2859,6 +3082,56 @@
       "decision": "Keep compound client/frontend install and build commands in named frontend npm scripts invoked by Wails",
       "why": "Wails forwards shell operators from configuration as frontend CLI arguments; named scripts package reliably and remain contract-testable",
       "rejected": "Embedding && compound commands directly in wails.json"
+    },
+    {
+      "decision": "Run stream registration inside the coordinator attach transaction after capturing the committed snapshot revision.",
+      "why": "This makes snapshot capture, physical-stream registration, and the first later update a single gap-free ordered boundary.",
+      "rejected": "Registering the physical stream after AttachSubscription returns, which leaves a mutation gap."
+    },
+    {
+      "decision": "Build and enqueue one personalized compound update per affected logical session inside coordinator commit.",
+      "why": "The transaction owns the authoritative revision and can guarantee exactly-once offers before the unary response.",
+      "rejected": "Recomputing updates in individual handlers after commit."
+    },
+    {
+      "decision": "Represent every structured desktop request, result, status, event, and coordination value in private protobuf and explicit adapters.",
+      "why": "Descriptor-driven exhaustiveness tests can then fail on unmapped fields while preserving Wails compatibility shapes.",
+      "rejected": "Discarded or partial semantic conversions around compatibility DTOs."
+    },
+    {
+      "decision": "Emit Connect protocol errors with connect.ErrorWriter at the HTTP boundary.",
+      "why": "Oversized and unsupported requests must carry standard Connect resource_exhausted or unimplemented codes before invoking application logic.",
+      "rejected": "Bare HTTP status responses from generic body-limit middleware."
+    },
+    {
+      "decision": "Download checksummed official protoc 35.0 archives into a cache and invoke the verified binary directly.",
+      "why": "Generation and CI now share an exact compiler pin and generated files expose auditable v7.35.0 provenance.",
+      "rejected": "Using whichever protoc happens to be installed on PATH."
+    },
+    {
+      "decision": "Use pinned Buf v1.72.0 as the sole protobuf compiler entry point and validate plugin versions plus Buf-generated protoc (unknown) provenance",
+      "why": "Buf compiles schemas in process, so a second downloaded Google protoc distribution duplicated compiler ownership and bypassed the checked-in Buf v2 templates",
+      "rejected": "Standalone protoc v35.0 download, checksum matrix, direct invocation, and exact protoc v7.35.0 header enforcement"
+    },
+    {
+      "decision": "Use pinned Buf CLI as the sole protobuf compiler entry point and validate plugin provenance while accepting protoc unknown headers",
+      "why": "Buf compiles schemas in process and the checked-in Buf v2 templates are the intended reproducible generation boundary",
+      "rejected": "Downloading or invoking a separately pinned Google protoc distribution"
+    },
+    {
+      "decision": "Compare generated-tree hashes before the first regeneration and keep a deliberate drift regression in CI",
+      "why": "Verification must reject stale or manually edited checked-in artifacts instead of silently overwriting them before comparison",
+      "rejected": "Hash only after regeneration, which cannot distinguish a clean checkout from repaired drift"
+    },
+    {
+      "decision": "Enforce test conventions with AST inspection across the exact artifact-named feature scope",
+      "why": "AST inspection catches aliased imports and renamed testing parameters without imposing feature-specific cleanup on unrelated legacy packages",
+      "rejected": "Text-only grep or repository-wide migration beyond the specified scope"
+    },
+    {
+      "decision": "Remove the unused partial player-state offer seam and narrow ConnectCoordinator",
+      "why": "All authoritative stream publications must remain coordinator-assembled compound updates inside the transaction boundary",
+      "rejected": "Retaining an unused compatibility path that could reintroduce out-of-transaction partial publication"
     }
   ],
   "step_summaries": {
@@ -2870,10 +3143,10 @@
       "summary": "122 tasks across Setup, blocking Foundational infrastructure, 13 user-story phases, and Polish; explicit dependency waves and test-first story increments."
     },
     "implement": {
-      "summary": "Migrated the player boundary to generated ConnectRPC/protobuf contracts, preserved private desktop and persistence compatibility, removed the active WebSocket stack, and passed all repository-controlled acceptance gates."
+      "summary": "Revalidated and completed BUG-001 with pinned Buf-only generation, accepted protoc unknown provenance, CI enforcement, and all repository gates passing."
     }
   },
-  "currentTask": "T122",
+  "currentTask": "T129",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -3539,15 +3812,16 @@
     },
     "T091": {
       "status": "DONE",
-      "did": "Added pinned clean Go and ECMAScript generation with isolated output roots and a shared source-derived schema revision.",
+      "did": "Verified pinned Buf-only Go and ECMAScript generation through both checked-in Buf v2 templates with no standalone protoc path",
       "files": [
         "scripts/proto-generate.sh",
-        "proto/schema-revision.txt"
+        "proto/buf.gen.go.yaml",
+        "proto/buf.gen.es.yaml"
       ]
     },
     "T092": {
       "status": "DONE",
-      "did": "Added format, lint, descriptor, two-pass determinism, header, graph isolation, adapter compilation, and browser bundle gates.",
+      "did": "Passed Buf formatting/lint, checked-in drift, two-pass determinism, pinned plugin and protoc unknown provenance, isolation, adapter, and player-build checks",
       "files": [
         "scripts/proto-check.sh"
       ]
@@ -3563,7 +3837,7 @@
     },
     "T094": {
       "status": "DONE",
-      "did": "Expanded CI to gate race-tested Go, both frontend builds, deterministic schema checks, breaking fixtures, browser journeys, and packaged output.",
+      "did": "Validated CI preserves deterministic Buf generation, drift, compatibility, Go race/vet, browser, startup, and package gates without standalone protoc setup",
       "files": [
         ".github/workflows/wails-macos.yml"
       ]
@@ -3795,6 +4069,125 @@
         "wails.json",
         "internal/platform/startup_test.go"
       ]
+    },
+    "T123": {
+      "status": "DONE",
+      "did": "Made canonical attachment, complete snapshot capture, physical registration, and post-snapshot publication one ordered coordinator boundary with a concurrent regression",
+      "files": [
+        "internal/control/service.go",
+        "internal/control/service_test.go",
+        "internal/player/handler.go",
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T124": {
+      "status": "DONE",
+      "did": "Moved personalized compound-update assembly into commit and removed handler-side post-commit recomputation and duplicate offers",
+      "files": [
+        "internal/control/service.go",
+        "internal/control/service_test.go",
+        "internal/player/handler.go",
+        "internal/player/handler_test.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T125": {
+      "status": "DONE",
+      "did": "Made private Wails request/result/status/event adapters lossless and descriptor-exhaustive, extending the private graph for previously missing native semantics",
+      "files": [
+        "app_contract.go",
+        "app.go",
+        "app_contract_test.go",
+        "proto/fallout/terminal/private/v1/coordination.proto",
+        "proto/fallout/terminal/private/v1/desktop.proto",
+        "proto/fallout/terminal/private/v1/runtime.proto",
+        "internal/gen/fallout/terminal/private/v1",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T126": {
+      "status": "DONE",
+      "did": "Standardized feature-scoped Go tests on Testify, t.Context, protocmp/prototest, and added an enforceable AST convention gate",
+      "files": [
+        "app_contract_test.go",
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "internal/platform/assets_test.go",
+        "internal/platform/startup_test.go",
+        "internal/platform/test_conventions_test.go",
+        "internal/player/adapter_test.go",
+        "internal/player/handler_test.go",
+        "internal/player/http_test.go",
+        "internal/player/stream_test.go",
+        "internal/playerconfig/contract_test.go",
+        "internal/playerconfig/service_test.go",
+        "internal/session/contract_test.go",
+        "internal/tunnel/service_test.go"
+      ]
+    },
+    "T127": {
+      "status": "DONE",
+      "did": "Labeled every retained feature-001/003/004 legacy player-transport document as historical and linked the current Connect contract, with a cross-feature scan",
+      "files": [
+        "specs/001-wails-v2-migration",
+        "specs/003-hacking-game-evolution",
+        "specs/004-player-sessions-control",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T128": {
+      "status": "DONE",
+      "did": "Returned protocol-correct Connect resource_exhausted and unimplemented errors for bounded bodies and unsupported public RPC paths before application invocation",
+      "files": [
+        "internal/player/http.go",
+        "internal/player/http_test.go"
+      ]
+    },
+    "T129": {
+      "status": "DONE",
+      "did": "Confirmed standalone protoc paths are absent, regenerated through Buf, and passed compatibility, formatting, vet, Go/race, frontend, browser, and arm64 package gates",
+      "files": [
+        "scripts/proto-generate.sh",
+        "scripts/proto-check.sh",
+        ".github/workflows/wails-macos.yml",
+        "internal/gen",
+        "client/gen",
+        "frontend/dist",
+        "client/dist",
+        "build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T130": {
+      "status": "DONE",
+      "did": "Added first-pass generated drift rejection, a deliberate drift regression, and CI dirty-generation enforcement",
+      "files": [
+        "scripts/proto-check.sh",
+        "scripts/proto-drift-test.sh",
+        ".github/workflows/wails-macos.yml"
+      ]
+    },
+    "T132": {
+      "status": "DONE",
+      "did": "Removed the unused partial player-state publication helper and narrowed the public coordinator seam to transaction-owned publication",
+      "files": [
+        "internal/player/handler.go"
+      ]
+    },
+    "T131": {
+      "status": "DONE",
+      "did": "Migrated feature-scoped Go tests to governed Testify/context/protobuf conventions and strengthened enforcement",
+      "files": [
+        "app_test.go",
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "internal/platform/assets_test.go",
+        "internal/platform/startup_test.go",
+        "internal/platform/test_conventions_test.go",
+        "internal/player/http_test.go",
+        "internal/player/stream_test.go",
+        "internal/playerconfig/service_test.go",
+        "internal/tunnel/service_test.go"
+      ]
     }
   },
   "verified": [
@@ -3875,6 +4268,208 @@
       "warnings": [
         "development package is unsigned; signing and notarization are outside feature scope"
       ]
+    },
+    {
+      "what": "Pinned protobuf generation and generated provenance",
+      "command": "scripts/proto-check.sh",
+      "result": "PASS: two deterministic generations, 11/11 Go protobuf files record protoc v7.35.0, builds pass",
+      "warnings": [
+        "Node emitted a benign experimental localStorage warning"
+      ]
+    },
+    {
+      "what": "Go formatting and static analysis",
+      "command": "gofmt -l .; go vet ./...",
+      "result": "PASS: no formatting output and vet reported no findings",
+      "warnings": []
+    },
+    {
+      "what": "Complete Go test suite",
+      "command": "go test ./... -count=1",
+      "result": "PASS: every package passed",
+      "warnings": []
+    },
+    {
+      "what": "Race-enabled Go test suite",
+      "command": "go test -race ./... -count=1",
+      "result": "PASS: every package passed with race detection",
+      "warnings": []
+    },
+    {
+      "what": "Protobuf compatibility fixtures",
+      "command": "scripts/proto-breaking.sh --all-fixtures",
+      "result": "PASS: field-number, field-type, enum, package, and service-method changes were rejected",
+      "warnings": []
+    },
+    {
+      "what": "Browser parity journeys",
+      "command": "npm test --prefix tests/browser",
+      "result": "PASS: 17/17 Playwright journeys",
+      "warnings": [
+        "NO_COLOR was ignored because FORCE_COLOR was set"
+      ]
+    },
+    {
+      "what": "Production macOS package and launch smoke",
+      "command": "wails build; launch packaged Fallout Terminal application",
+      "result": "PASS: production arm64 bundle built and remained running after launch",
+      "warnings": []
+    },
+    {
+      "what": "Buf-only deterministic contract generation",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache scripts/proto-check.sh",
+      "result": "PASS: two generations were byte-identical; 11/11 Go protobuf files record pinned protoc-gen-go v1.36.11 and protoc (unknown); isolation and player build passed",
+      "warnings": [
+        "Node emitted a benign experimental localStorage warning while invoking the pinned ECMAScript plugin"
+      ]
+    },
+    {
+      "what": "Schema compatibility fixtures",
+      "command": "scripts/proto-breaking.sh --all-fixtures",
+      "result": "PASS: field-number, field-type, enum-value, package-name, and service-method breaks were rejected",
+      "warnings": []
+    },
+    {
+      "what": "Go normal and race suites",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./... -count=1 && GOCACHE=/private/tmp/fallout-go-cache go test -race ./... -count=1",
+      "result": "PASS: all packages passed both suites",
+      "warnings": [
+        "Initial sandboxed normal-suite attempt could not bind loopback listeners; the authorized local-listener rerun passed"
+      ]
+    },
+    {
+      "what": "Frontend and browser gates",
+      "command": "npm run build --prefix frontend && npm test --prefix tests/browser",
+      "result": "PASS: frontend built and 17/17 Playwright journeys passed",
+      "warnings": [
+        "Playwright emitted benign NO_COLOR/FORCE_COLOR warnings"
+      ]
+    },
+    {
+      "what": "macOS package and packaged runtime smoke",
+      "command": "wails build -clean -platform darwin/arm64; launch with NGROK_ENABLED=0; curl http://127.0.0.1:3690/",
+      "result": "PASS: arm64 app built, served HTTP 200 with expected CSP and embedded assets, then shut down cleanly",
+      "warnings": []
+    },
+    {
+      "what": "Standalone compiler removal and patch hygiene",
+      "command": "source scan, file absence checks, provenance count, git diff --check",
+      "result": "PASS: obsolete files absent, active generation and CI contain no standalone protoc path, provenance 11/11, diff clean",
+      "warnings": []
+    },
+    {
+      "what": "Pinned Buf-only deterministic generation and provenance checks",
+      "command": "scripts/proto-check.sh",
+      "result": "passed; two generations were identical and all isolation/provenance checks succeeded",
+      "warnings": [
+        "Node emitted a benign experimental localStorage warning during protoc-gen-es execution"
+      ]
+    },
+    {
+      "what": "Protobuf compatibility baseline and negative fixtures",
+      "command": "scripts/proto-breaking.sh --all-fixtures",
+      "result": "passed; all five incompatible fixture classes were rejected",
+      "warnings": []
+    },
+    {
+      "what": "Go unit and integration suite",
+      "command": "go test ./... -count=1",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Go race suite",
+      "command": "go test -race ./... -count=1",
+      "result": "passed across all packages",
+      "warnings": []
+    },
+    {
+      "what": "Go static analysis",
+      "command": "go vet ./...",
+      "result": "passed with no findings",
+      "warnings": []
+    },
+    {
+      "what": "Frontend and generated player production builds",
+      "command": "npm run build --prefix frontend; npm run build --prefix client",
+      "result": "both Vite production builds passed",
+      "warnings": []
+    },
+    {
+      "what": "Generated Connect browser journeys",
+      "command": "npm test --prefix tests/browser",
+      "result": "17 of 17 Playwright tests passed",
+      "warnings": [
+        "Playwright web server reported a benign NO_COLOR/FORCE_COLOR warning"
+      ]
+    },
+    {
+      "what": "Repository-root startup contract",
+      "command": "go test ./internal/platform -run startup-contract cases -count=1",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Clean macOS arm64 package gate",
+      "command": "wails build -clean -platform darwin/arm64; lipo and codesign inspection",
+      "result": "passed; arm64 executable produced with ad-hoc signature",
+      "warnings": []
+    },
+    {
+      "what": "Generated contract drift and reproducibility",
+      "command": "scripts/proto-drift-test.sh && scripts/proto-check.sh",
+      "result": "PASS: deliberate checked-in drift rejected; clean two-pass generation deterministic",
+      "warnings": [
+        "Node emitted a benign experimental localStorage warning during protoc-gen-es execution"
+      ]
+    },
+    {
+      "what": "Go formatting, static analysis, normal and race suites",
+      "command": "gofmt -l .; go vet ./...; go test ./... -count=1; go test -race ./... -count=1",
+      "result": "PASS",
+      "warnings": [
+        "Sandboxed runs could not bind local httptest listeners; identical suites passed with loopback permission"
+      ]
+    },
+    {
+      "what": "Frontend, player, and browser verification",
+      "command": "npm run build --prefix frontend; npm run build --prefix client; npm test --prefix tests/browser",
+      "result": "PASS: both builds and 17/17 browser journeys",
+      "warnings": []
+    },
+    {
+      "what": "Compatibility and patch hygiene",
+      "command": "scripts/proto-breaking.sh --all-fixtures; git diff --check; governed convention scan",
+      "result": "PASS: five breaking fixtures rejected and no scoped convention violations",
+      "warnings": []
+    },
+    {
+      "what": "BUG-001 Buf-only generation rerun",
+      "command": "scripts/proto-generate.sh; scripts/proto-check.sh",
+      "result": "PASS: both checked-in Buf v2 templates generated deterministic Go and ECMAScript outputs; pinned plugin and protoc (unknown) provenance passed",
+      "warnings": [
+        "Node emitted a benign experimental localStorage warning during protoc-gen-es execution"
+      ]
+    },
+    {
+      "what": "BUG-001 repository acceptance rerun",
+      "command": "scripts/proto-breaking.sh --all-fixtures; gofmt -l .; go vet ./...; go test ./... -count=1; go test -race ./... -count=1; npm production builds; npm test --prefix tests/browser",
+      "result": "PASS: five breaking fixtures rejected, Go gates clean, both frontends built, 17/17 browser journeys passed",
+      "warnings": [
+        "Playwright reported benign NO_COLOR/FORCE_COLOR warnings"
+      ]
+    },
+    {
+      "what": "BUG-001 macOS package rerun",
+      "command": "wails build -clean -platform darwin/arm64; file; codesign --verify --deep --strict",
+      "result": "PASS: signed arm64 application package built and verified",
+      "warnings": []
+    },
+    {
+      "what": "BUG-001 post-implementation artifact consistency",
+      "command": "speckit-bugfix-verify audit of bug status, spec, plan, research, tasks, IDs, waves, DAG, and Companion reopened-completion history",
+      "result": "PASS: BUG-001 patched; FR-133/FR-134/FR-137 and SC-002/SC-003/SC-005/SC-033 trace through plan and completed T091/T092/T094/T129; T001-T132 unique with no gaps or dependency cycles",
+      "warnings": []
     }
   ],
   "concerns": [
@@ -3884,6 +4479,10 @@
     },
     {
       "note": "A literal three-to-four-hour authenticated public-ngrok observation depends on operator account, fixed domain, credentials, and public network; scheduled accelerated soak and protected forwarding gates pass and remain authoritative repository evidence.",
+      "step": "implement"
+    },
+    {
+      "note": "The managed sandbox blocks loopback listeners used by HTTP and tunnel integration tests; validation required the approved local-listener execution profile, where normal and race suites passed.",
       "step": "implement"
     }
   ]

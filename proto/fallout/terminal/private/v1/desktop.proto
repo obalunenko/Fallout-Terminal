@@ -35,6 +35,7 @@ message PlayerConfigOperationResult {
   fallout.terminal.persistence.v1.PlayerConfig player_config = 4;
   fallout.terminal.persistence.v1.Session session = 5;
   CoordinationState state = 6;
+  PlayerConfigMetadata player_config_metadata = 7;
 }
 
 message CoordinationResult {
@@ -71,6 +72,10 @@ message TerminalSwitchDecisionRequest {
 
 message ResetFailedHackRequest {
   string terminal_id = 1;
+  string terminal_name = 2;
+  fallout.terminal.persistence.v1.ContentNode tree = 3;
+  int32 hack_level = 4;
+  string intro_text = 5;
 }
 
 message AddCharacterRequest {

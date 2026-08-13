@@ -1,5 +1,10 @@
 # Desktop Coordination Contract: Roster, Sessions, Broadcast, and Terminal Switching
 
+> **SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE.**
+> Any WebSocket or handwritten JSON player-transport description in this retained
+> completed feature document has been replaced by the generated ConnectRPC contract in
+> [`specs/005-connectrpc-protobuf-migration/contracts/public-player.md`](../../005-connectrpc-protobuf-migration/contracts/public-player.md).
+
 **Bugfix**: 2026-08-12 — BUG-001 adds the durable player-config selection, association, and roster-save boundary.
 
 ## Boundary

@@ -4,6 +4,8 @@
 **Required**: `spec.md`, `plan.md`
 **Supporting**: `research.md`, `data-model.md`, `contracts/`
 
+**Bugfix**: 2026-08-13 — BUG-001 Updated from bugfix patch
+
 Tests are required by the specification and constitution. In every user-story phase, write the listed tests first and confirm they fail for the intended missing behavior before implementation. Go tests must use Testify, table-driven cases where flows repeat, `t.Context()` for test-scoped contexts, and `protocmp`/`prototest` for protobuf values and descriptors.
 
 ## Phase 1: Setup
@@ -410,13 +412,13 @@ Tests are required by the specification and constitution. In every user-story ph
 
 **Wave 2 — independent tooling commands:**
 
-- [x] **T091** [P] [US11] Add a pinned clean generation command that writes only isolated checked-in Go/ECMAScript trees and verifies a shared schema revision · `scripts/proto-generate.sh`
-- [x] **T092** [P] [US11] Add Buf format/lint, two-pass zero-diff generation, generated-header, descriptor import, bundle graph, and adapter exhaustiveness checks · `scripts/proto-check.sh`
+- [x] **T091** [P] [US11] ⚠️ Reopened (reopened — BUG-001): ~~Add a pinned clean generation command that writes only isolated checked-in Go/ECMAScript trees and verifies a shared schema revision.~~ Restore both language generations to the pinned `buf generate` entry point using `proto/buf.gen.go.yaml` and `proto/buf.gen.es.yaml`, with no direct `protoc` invocation · `scripts/proto-generate.sh`
+- [x] **T092** [P] [US11] ⚠️ Reopened (reopened — BUG-001): ~~Add Buf format/lint, two-pass zero-diff generation, generated-header, descriptor import, bundle graph, and adapter exhaustiveness checks.~~ Retain those checks while accepting Buf-generated `protoc unknown` headers and validating generated markers, plugin pins, schema revision, deterministic hashes, output isolation, and absence of a standalone compiler path · `scripts/proto-check.sh`
 - [x] **T093** [P] [US11] Add breaking-change checks against the committed compatibility baseline with representative negative-edit support · `scripts/proto-breaking.sh`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [x] **T094** [US11] Enforce schema checks, deterministic generation, compilation, tests, race checks, browser builds, and package gates in CI · `.github/workflows/wails-macos.yml`
+- [x] **T094** [US11] ⚠️ Reopened (reopened — BUG-001): ~~Enforce schema checks, deterministic generation, compilation, tests, race checks, browser builds, and package gates in CI.~~ Preserve those gates while removing standalone `protoc` installation/version checks and enforcing generation exclusively through the pinned Buf CLI and checked-in Buf v2 templates · `.github/workflows/wails-macos.yml`
 
 **Checkpoint**: User Story 11 is independently functional and testable from a clean checkout.
 
@@ -548,7 +550,7 @@ Tests are required by the specification and constitution. In every user-story ph
 - **Phase 10 / US8**: failing stream/server tests → nonblocking publication and stream lifecycle → bounded server shutdown.
 - **Phase 11 / US9**: failing adapter/App/public-surface scans → private adapters → Wails composition.
 - **Phase 12 / US10**: failing session/player-config/save tests → independent persistence adapters → independent service integration.
-- **Phase 13 / US11**: failing descriptor/breaking fixtures → independent generation/check/breaking scripts → CI enforcement.
+- **Phase 13 / US11**: failing descriptor/breaking fixtures → BUG-001 restoration of pinned Buf-only generation and compatible provenance checks → CI removal of standalone `protoc` setup → Buf regeneration and full gate rerun.
 - **Phase 14 / US12**: failing HTTP/tunnel/browser/package tests → independent boundary/security/sound work → application config → package build.
 - **Phase 15 / US13**: failing cutover scans → independent production removals (fixture migration completed as the Phase 6 browser prerequisite) → dependency/test cleanup → documentation cutover.
 - **Phase 16**: independent inventory/quickstart/soak evidence → single full Success Criteria validation → remediation closeout.
@@ -556,3 +558,19 @@ Tests are required by the specification and constitution. In every user-story ph
 ### Parallel Opportunities
 
 Only tasks tagged `[P]` within the same wave are independent. They touch different files and have no incomplete dependency in that phase. Do not parallelize tasks across a join, tasks that edit the same file, generated-output writers, coordinator changes that depend on a live-service contract, or the final validation/remediation pair.
+
+## Phase 17: Convergence
+
+- [x] T123 CRITICAL make subscription attachment, complete snapshot capture, physical-stream registration, and post-snapshot update delivery one gap-free ordered boundary, with a deterministic concurrent attach/mutation regression in `internal/control/service.go`, `internal/player/handler.go`, and `internal/player/handler_test.go` per FR-043 (contradicts)
+- [x] T124 CRITICAL assemble every accepted mutation's complete personalized compound updates from the committed revision and offer each affected logical session exactly once inside the coordinator transaction before the unary response, removing post-commit recomputation and duplicate offers in `internal/control/service.go`, `internal/player/handler.go`, and their tests per FR-144 (contradicts)
+- [x] T125 CRITICAL implement and exercise exhaustive structured private request, result, status, and event adapters across Wails compatibility DTOs, generated private protobuf values, and transport-independent values, replacing discarded semantic conversions and making descriptor field/enum/`oneof` additions fail verification in `app_contract.go`, `app.go`, and `app_contract_test.go` per Constitution IV (missing)
+- [x] T126 CRITICAL update all feature-scoped Go tests to use Testify assertions, table-driven cases for repeated flows, `t.Context()` roots, and `protocmp`/`prototest` for protobuf values and descriptors, then add an enforceable convention scan per Constitution: Testing and Quality Gates (contradicts)
+- [x] T127 CRITICAL label every retained completed WebSocket/JSON feature document as superseded historical non-authoritative context, link the current Connect contract where applicable, and extend the final documentation scan beyond the feature-001 contract per Constitution VII (contradicts)
+- [x] T128 return Connect `resource_exhausted` for encoded-body/decompression/message limit breaches and Connect `unimplemented` for unsupported public services or procedures before any adapter or canonical-service invocation, with raw framing/code and zero-side-effect tests in `internal/player/http.go` and `internal/player/http_test.go` per FR-074–FR-075 (contradicts)
+- [x] T129 [US11] ⚠️ Reopened (reopened — BUG-001): ~~pin Protocol Buffers compiler/toolchain v35.0 in the reproducible generation path, verify its version and generated provenance, and fail generation drift when the compiler pin is absent or mismatched in `scripts/proto-generate.sh`, `scripts/proto-check.sh`, and CI per FR-133 (partial)~~ Remove `proto/toolchain.env`, `scripts/ensure-protoc.sh`, direct compiler invocation, checksum/download handling, and standalone compiler CI setup; after T091, T092, and T094, regenerate all checked-in outputs through Buf and rerun deterministic generation, compatibility, Go, browser, and package gates per corrected FR-133/FR-137 (replaced — BUG-001)
+
+## Phase 18: Convergence
+
+- [x] T130 CRITICAL make `scripts/proto-check.sh` capture the checked-in `internal/gen` and `client/gen` state before regeneration and fail on first-pass generation drift or manual edits, preserve the two-pass determinism check, and enforce the same failure in `.github/workflows/wails-macos.yml` with regression coverage per Constitution V and FR-134/FR-137 (contradicts)
+- [x] T131 CRITICAL replace handwritten conditional assertions using `require.Fail*`, `reflect.DeepEqual`, direct `testing.T` failures, and non-exempt `context.Background()` roots across every feature-scoped Go test named by the plan or tasks with Testify helpers, table-driven cases, `t.Context()`, and `cmp`/`protocmp`/`prototest` as applicable, then extend `internal/platform/test_conventions_test.go` to detect those evasions per Constitution: Testing and Quality Gates (contradicts)
+- [x] T132 remove the unused out-of-transaction `offerCurrentPlayerState` compatibility helper from `internal/player/handler.go` and keep authoritative stream publication exclusively on coordinator-assembled complete compound updates per plan: atomic compound publication and FR-144 (unrequested)

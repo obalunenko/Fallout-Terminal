@@ -93,8 +93,13 @@ jobs:
       - name: Install locked schema dependencies
         run: npm ci --prefix client
 
+      - name: Verify checked-in generated drift is rejected
+        run: scripts/proto-drift-test.sh
+
       - name: Verify deterministic generated contracts
-        run: scripts/proto-check.sh
+        run: |
+          scripts/proto-check.sh
+          git diff --exit-code -- internal/gen client/gen
 
       - name: Verify compatibility baseline and negative fixtures
         run: scripts/proto-breaking.sh --all-fixtures

@@ -3,8 +3,10 @@ package playerconfig
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestPlayerConfigContractMapsEveryKnownField(t *testing.T) {
@@ -18,6 +20,9 @@ func TestPlayerConfigContractMapsEveryKnownField(t *testing.T) {
 	roundTrip, err := PlayerConfigFromProto(semantic)
 	require.NoError(t, err)
 	require.Equal(t, value, roundTrip)
+	roundTripSemantic, err := PlayerConfigToProto(roundTrip)
+	require.NoError(t, err)
+	require.Empty(t, cmp.Diff(semantic, roundTripSemantic, protocmp.Transform()))
 }
 
 func TestPlayerConfigContractRetainsStrictVersionIdentityAndDuplicateValidation(t *testing.T) {

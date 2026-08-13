@@ -3,21 +3,22 @@ package player
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
 
 	"connectrpc.com/connect"
+	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 )
@@ -39,7 +40,7 @@ func TestConnectHTTPRejectsDecodedCompressedUnknownAndMalformedBodiesBeforeCanon
 	coordinator := &countingConnectCoordinator{ConnectCoordinator: base}
 	service, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	rpcPath, rpcHandler := NewConnectHandler(service)
 	handler := NewApplicationHandler(playerAssets(), rpcPath, rpcHandler)
@@ -52,26 +53,24 @@ func TestConnectHTTPRejectsDecodedCompressedUnknownAndMalformedBodiesBeforeCanon
 	request.ProtoReflect().SetUnknown(unknown)
 	oversized, err := proto.Marshal(request)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if len(oversized) <= MaxUncompressedMessageBytes || len(oversized) >= MaxEncodedBodyBytes {
-		t.Fatalf("unknown-field fixture size = %d, want between decoded and encoded limits", len(oversized))
-	}
+	require.Falsef(t, len(oversized) <= MaxUncompressedMessageBytes || len(oversized) >= MaxEncodedBodyBytes,
+		"unknown-field fixture size = %d, want between decoded and encoded limits", len(oversized))
 
 	var compressed bytes.Buffer
 	zipper, err := gzip.NewWriterLevel(&compressed, gzip.BestCompression)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if _, err := zipper.Write(oversized); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if err := zipper.Close(); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if compressed.Len() >= MaxUncompressedMessageBytes {
-		t.Fatalf("compressed fixture size = %d, want below decoded limit", compressed.Len())
-	}
+	require.Falsef(t, compressed.Len() >= MaxUncompressedMessageBytes,
+		"compressed fixture size = %d, want below decoded limit", compressed.Len())
 
 	tests := []struct {
 		name            string
@@ -93,17 +92,19 @@ func TestConnectHTTPRejectsDecodedCompressedUnknownAndMalformedBodiesBeforeCanon
 			}
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, httpRequest)
-			if recorder.Code != test.wantStatus || !strings.Contains(recorder.Body.String(), test.wantCode) {
-				t.Fatalf("status/body = %d %q, want %d containing %q", recorder.Code, recorder.Body.String(), test.wantStatus, test.wantCode)
-			}
+			require.Falsef(t, recorder.Code != test.wantStatus || !strings.Contains(recorder.Body.String(), test.wantCode),
+				"status/body = %d %q, want %d containing %q", recorder.Code, recorder.Body.String(), test.wantStatus, test.wantCode)
+
 		})
 	}
-	if got := coordinator.mutations.Load(); got != 0 {
-		t.Fatalf("canonical mutation calls = %d, want zero", got)
+	{
+		got := coordinator.mutations.Load()
+		require.Falsef(t, got != 0,
+			"canonical mutation calls = %d, want zero", got)
 	}
-	if base.Revision() != 2 {
-		t.Fatalf("canonical revision changed after boundary rejection: %d", base.Revision())
-	}
+	require.Falsef(t, base.Revision() != 2,
+		"canonical revision changed after boundary rejection: %d", base.Revision())
+
 }
 
 func TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBeforeRPC(t *testing.T) {
@@ -117,38 +118,48 @@ func TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBefo
 	handler := NewApplicationHandler(playerAssets(), "/fallout.terminal.player.v1.PlayerService/", rpc)
 
 	tests := []struct {
-		name   string
-		host   string
-		origin string
-		body   []byte
-		path   string
-		status int
-		calls  int
+		name    string
+		host    string
+		origin  string
+		body    []byte
+		path    string
+		status  int
+		calls   int
+		code    string
+		chunked bool
 	}{
 		{name: "same origin", host: "player.test", origin: "https://player.test", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusNoContent, calls: 1},
 		{name: "foreign origin", host: "player.test", origin: "https://evil.example", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusForbidden, calls: 1},
 		{name: "malformed host", host: "player.test bad", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusForbidden, calls: 1},
-		{name: "encoded body over eight KiB", host: "player.test", body: bytes.Repeat([]byte{'x'}, MaxEncodedBodyBytes+1), path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusRequestEntityTooLarge, calls: 1},
-		{name: "lookalike service path", host: "player.test", path: "/fallout.terminal.player.v1.PlayerServiceEvil/Navigate", status: http.StatusMethodNotAllowed, calls: 1},
+		{name: "encoded body over eight KiB", host: "player.test", body: bytes.Repeat([]byte{'x'}, MaxEncodedBodyBytes+1), path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusTooManyRequests, calls: 1, code: "resource_exhausted"},
+		{name: "chunked encoded body over eight KiB", host: "player.test", body: bytes.Repeat([]byte{'x'}, MaxEncodedBodyBytes+1), path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusTooManyRequests, calls: 1, code: "resource_exhausted", chunked: true},
+		{name: "unsupported player procedure", host: "player.test", path: "/fallout.terminal.player.v1.PlayerService/PrivateDiagnostics", status: http.StatusNotImplemented, calls: 1, code: "unimplemented"},
+		{name: "unsupported public service", host: "player.test", path: "/fallout.terminal.player.v1.AdminService/Inspect", status: http.StatusNotImplemented, calls: 1, code: "unimplemented"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "http://player.test"+test.path, bytes.NewReader(test.body))
 			request.Host = test.host
+			request.Header.Set("Content-Type", "application/proto")
+			if test.chunked {
+				request.ContentLength = -1
+			}
 			if test.origin != "" {
 				request.Header.Set("Origin", test.origin)
 			}
 			recorder := httptest.NewRecorder()
 			handler.ServeHTTP(recorder, request)
-			if recorder.Code != test.status {
-				t.Fatalf("status = %d, want %d; body=%q", recorder.Code, test.status, recorder.Body.String())
+			require.Falsef(t, recorder.Code != test.status,
+				"status = %d, want %d; body=%q", recorder.Code, test.status, recorder.Body.String())
+			require.Falsef(t, calls != test.calls,
+				"RPC calls = %d, want %d", calls, test.calls)
+
+			if test.code != "" {
+				require.Contains(t, recorder.Body.String(), test.code)
 			}
-			if calls != test.calls {
-				t.Fatalf("RPC calls = %d, want %d", calls, test.calls)
-			}
-			if recorder.Header().Get("Access-Control-Allow-Origin") == "*" {
-				t.Fatal("public handler emitted wildcard CORS")
-			}
+			require.False(t, recorder.Header().Get("Access-Control-Allow-Origin") == "*",
+				"public handler emitted wildcard CORS")
+
 		})
 	}
 }
@@ -158,7 +169,7 @@ func TestTypedSoundManifestAllowsOnlyEightCategoriesAndSafeSortedAssets(t *testi
 
 	service, err := NewConnectService(ConnectServiceConfig{Coordinator: newConnectTestCoordinator(t), Assets: playerAssets()})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	tests := []struct {
 		category playerv1.SoundCategory
@@ -174,29 +185,28 @@ func TestTypedSoundManifestAllowsOnlyEightCategoriesAndSafeSortedAssets(t *testi
 		{playerv1.SoundCategory_SOUND_CATEGORY_CHARSCROLL, []string{"sounds/charscroll/scroll.wav"}},
 	}
 	for _, test := range tests {
-		response, err := service.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: test.category}))
-		if err != nil {
-			t.Fatalf("SoundManifest(%s): %v", test.category, err)
-		}
-		if !reflect.DeepEqual(response.Msg.Assets, test.want) {
-			t.Errorf("SoundManifest(%s) assets = %#v, want %#v", test.category, response.Msg.Assets, test.want)
-		}
+		response, err := service.SoundManifest(t.Context(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: test.category}))
+		require.Falsef(t, err != nil,
+			"SoundManifest(%s): %v", test.category, err)
+		assert.Falsef(t, !cmp.Equal(response.Msg.Assets, test.want),
+			"SoundManifest(%s) assets = %#v, want %#v", test.category, response.Msg.Assets, test.want)
+
 	}
 	for _, invalid := range []playerv1.SoundCategory{playerv1.SoundCategory_SOUND_CATEGORY_UNSPECIFIED, 999} {
-		_, err := service.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: invalid}))
-		if connect.CodeOf(err) != connect.CodeInvalidArgument {
-			t.Errorf("SoundManifest(%d) code = %s, want invalid_argument", invalid, connect.CodeOf(err))
-		}
+		_, err := service.SoundManifest(t.Context(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: invalid}))
+		assert.Falsef(t, connect.CodeOf(err) != connect.CodeInvalidArgument,
+			"SoundManifest(%d) code = %s, want invalid_argument", invalid, connect.CodeOf(err))
+
 	}
 
 	empty, err := NewConnectService(ConnectServiceConfig{Coordinator: newConnectTestCoordinator(t), Assets: fstest.MapFS{}})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	response, err := empty.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: playerv1.SoundCategory_SOUND_CATEGORY_AMBIENT}))
-	if err != nil || len(response.Msg.Assets) != 0 {
-		t.Fatalf("missing sound category = %#v, %v; want empty success", response, err)
-	}
+	response, err := empty.SoundManifest(t.Context(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: playerv1.SoundCategory_SOUND_CATEGORY_AMBIENT}))
+	require.Falsef(t, err != nil || len(response.Msg.Assets) != 0,
+		"missing sound category = %#v, %v; want empty success", response, err)
+
 }
 
 func TestHTTPHandlerServesStaticAssetsAndIndexFallback(t *testing.T) {
@@ -255,15 +265,13 @@ func TestHTTPHandlerServesStaticAssetsAndIndexFallback(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := serveRequest(t, handler, test.path)
-			if recorder.Code != test.status {
-				t.Fatalf("GET %s status = %d, want %d; body = %q", test.path, recorder.Code, test.status, recorder.Body.String())
-			}
-			if test.contentType != "" && !strings.Contains(recorder.Header().Get("Content-Type"), test.contentType) {
-				t.Errorf("GET %s Content-Type = %q, want it to contain %q", test.path, recorder.Header().Get("Content-Type"), test.contentType)
-			}
-			if test.body != "" && !strings.Contains(recorder.Body.String(), test.body) {
-				t.Errorf("GET %s body = %q, want it to contain %q", test.path, recorder.Body.String(), test.body)
-			}
+			require.Falsef(t, recorder.Code != test.status,
+				"GET %s status = %d, want %d; body = %q", test.path, recorder.Code, test.status, recorder.Body.String())
+			assert.Falsef(t, test.contentType != "" && !strings.Contains(recorder.Header().Get("Content-Type"), test.contentType),
+				"GET %s Content-Type = %q, want it to contain %q", test.path, recorder.Header().Get("Content-Type"), test.contentType)
+			assert.Falsef(t, test.body != "" && !strings.Contains(recorder.Body.String(), test.body),
+				"GET %s body = %q, want it to contain %q", test.path, recorder.Body.String(), test.body)
+
 		})
 	}
 }
@@ -280,12 +288,11 @@ func TestHTTPHandlerRejectsTraversalWithoutNormalizingItIntoAnAsset(t *testing.T
 	} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
-			if recorder.Code != http.StatusNotFound {
-				t.Fatalf("GET %s status = %d, want 404; body = %q", requestPath, recorder.Code, recorder.Body.String())
-			}
-			if strings.Contains(recorder.Body.String(), "outside-client-root") {
-				t.Fatalf("GET %s exposed a normalized asset: %q", requestPath, recorder.Body.String())
-			}
+			require.Falsef(t, recorder.Code != http.StatusNotFound,
+				"GET %s status = %d, want 404; body = %q", requestPath, recorder.Code, recorder.Body.String())
+			require.Falsef(t, strings.Contains(recorder.Body.String(), "outside-client-root"),
+				"GET %s exposed a normalized asset: %q", requestPath, recorder.Body.String())
+
 		})
 	}
 }
@@ -297,17 +304,20 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 	for _, requestPath := range []string{"/", "/terminal/root", "/sounds/ambient/hum.wav"} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
-			if recorder.Code != http.StatusOK {
-				t.Fatalf("GET %s status = %d, want 200", requestPath, recorder.Code)
+			require.Falsef(t, recorder.Code != http.StatusOK,
+				"GET %s status = %d, want 200", requestPath, recorder.Code)
+			{
+
+				got := recorder.Header().Get("X-Content-Type-Options")
+				assert.Falsef(t, got != "nosniff",
+					"X-Content-Type-Options = %q, want nosniff", got)
 			}
-			if got := recorder.Header().Get("X-Content-Type-Options"); got != "nosniff" {
-				t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
-			}
+
 			policy := recorder.Header().Get("Content-Security-Policy")
 			for _, directive := range []string{"default-src 'self'", "connect-src 'self'", "media-src 'self'", "object-src 'none'"} {
-				if !strings.Contains(policy, directive) {
-					t.Errorf("Content-Security-Policy = %q, want directive %q", policy, directive)
-				}
+				assert.Falsef(t, !strings.Contains(policy, directive),
+					"Content-Security-Policy = %q, want directive %q", policy, directive)
+
 			}
 		})
 	}
@@ -326,9 +336,9 @@ func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing
 		"/api/identity",
 	} {
 		recorder := serveRequest(t, handler, requestPath)
-		if recorder.Code != http.StatusNotFound {
-			t.Errorf("GET %s status = %d, want no recognition endpoint", requestPath, recorder.Code)
-		}
+		assert.Falsef(t, recorder.Code != http.StatusNotFound,
+			"GET %s status = %d, want no recognition endpoint", requestPath, recorder.Code)
+
 	}
 
 	for _, requestPath := range []string{
@@ -338,15 +348,17 @@ func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing
 	} {
 		recorder := serveRequest(t, handler, requestPath)
 		serialized := recorder.Body.String() + recorder.Header().Get("Location") + recorder.Header().Get("Set-Cookie")
-		if strings.Contains(serialized, secretToken) {
-			t.Errorf("GET %s reflected recognition material in an HTTP response", requestPath)
+		assert.Falsef(t, strings.Contains(serialized, secretToken),
+			"GET %s reflected recognition material in an HTTP response", requestPath)
+		assert.Falsef(t, recorder.Header().Get("X-Content-Type-Options") != "nosniff",
+			"GET %s lost nosniff", requestPath)
+		{
+
+			policy := recorder.Header().Get("Content-Security-Policy")
+			assert.Falsef(t, policy != playerContentSecurityPolicy,
+				"GET %s CSP changed: %q", requestPath, policy)
 		}
-		if recorder.Header().Get("X-Content-Type-Options") != "nosniff" {
-			t.Errorf("GET %s lost nosniff", requestPath)
-		}
-		if policy := recorder.Header().Get("Content-Security-Policy"); policy != playerContentSecurityPolicy {
-			t.Errorf("GET %s CSP changed: %q", requestPath, policy)
-		}
+
 	}
 
 	for _, test := range []struct {
@@ -363,26 +375,29 @@ func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing
 		if test.origin != "" {
 			request.Header.Set("Origin", test.origin)
 		}
-		if got := sameHostOrigin(request); got != test.want {
-			t.Errorf("sameHostOrigin(%q) = %t, want %t", test.origin, got, test.want)
+		{
+			got := sameHostOrigin(request)
+			assert.Falsef(t, got != test.want,
+				"sameHostOrigin(%q) = %t, want %t", test.origin, got, test.want)
 		}
+
 	}
 
 	clientScript, err := os.ReadFile(filepath.Join("..", "..", "client", "client.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	js := string(clientScript)
 	start := strings.Index(js, "const playerTransport = createConnectTransport(")
 	end := strings.Index(js, "const playerRPC = createClient(")
-	if start < 0 || end <= start {
-		t.Fatal("player script is missing the same-origin Connect transport boundary")
-	}
+	require.False(t, start < 0 || end <= start,
+		"player script is missing the same-origin Connect transport boundary")
+
 	urlBoundary := js[start:end]
 	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "searchParams", "?token", "?session"} {
-		if strings.Contains(urlBoundary, forbidden) {
-			t.Errorf("Connect base URL construction exposes recognition material through %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(urlBoundary, forbidden),
+			"Connect base URL construction exposes recognition material through %q", forbidden)
+
 	}
 }
 
@@ -393,9 +408,9 @@ func TestHTTPHandlerReturnsNotFoundWhenRequiredAssetsAreMissing(t *testing.T) {
 	for _, requestPath := range []string{"/", "/terminal/root", "/client.js"} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
-			if recorder.Code != http.StatusNotFound {
-				t.Fatalf("GET %s status = %d, want 404; body = %q", requestPath, recorder.Code, recorder.Body.String())
-			}
+			require.Falsef(t, recorder.Code != http.StatusNotFound,
+				"GET %s status = %d, want 404; body = %q", requestPath, recorder.Code, recorder.Body.String())
+
 		})
 	}
 }

@@ -17,33 +17,42 @@ import (
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/testing/prototest"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	t.Parallel()
 
 	service := playerv1.File_fallout_terminal_player_v1_player_proto.Services().ByName("PlayerService")
-	if service == nil {
-		t.Fatal("public descriptor is missing PlayerService")
-	}
+	require.False(t, service == nil,
+		"public descriptor is missing PlayerService")
+
 	wantMethods := []string{"Subscribe", "SelectCharacter", "Navigate", "Guess", "ActivatePattern", "SoundManifest"}
-	if service.Methods().Len() != len(wantMethods) {
-		t.Fatalf("PlayerService methods = %d, want %d", service.Methods().Len(), len(wantMethods))
-	}
+	require.Falsef(t, service.Methods().Len() != len(wantMethods),
+		"PlayerService methods = %d, want %d", service.Methods().Len(), len(wantMethods))
+
 	for index, want := range wantMethods {
 		method := service.Methods().Get(index)
-		if got := string(method.Name()); got != want {
-			t.Errorf("PlayerService method %d = %q, want %q", index, got, want)
+		{
+			got := string(method.Name())
+			assert.Falsef(t, got != want,
+				"PlayerService method %d = %q, want %q", index, got, want)
 		}
+
 		if want == "Subscribe" {
-			if method.IsStreamingClient() || !method.IsStreamingServer() {
-				t.Errorf("Subscribe must be server-streaming only")
-			}
-		} else if method.IsStreamingClient() || method.IsStreamingServer() {
-			t.Errorf("%s must be unary", want)
+			assert.Falsef(t, method.IsStreamingClient() || !method.IsStreamingServer(),
+				"Subscribe must be server-streaming only")
+
+		} else {
+			assert.Falsef(t, method.IsStreamingClient() || method.IsStreamingServer(),
+				"%s must be unary", want)
 		}
+
 	}
 
 	var publicFiles []protoreflect.FileDescriptor
@@ -53,16 +62,16 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 		}
 		return true
 	})
-	if len(publicFiles) == 0 {
-		t.Fatal("generated public descriptor graph is empty")
-	}
+	require.False(t, len(publicFiles) == 0,
+		"generated public descriptor graph is empty")
+
 	for _, file := range publicFiles {
 		imports := file.Imports()
 		for index := 0; index < imports.Len(); index++ {
 			imported := imports.Get(index)
-			if !strings.HasPrefix(imported.Path(), "fallout/terminal/player/v1/") {
-				t.Errorf("public descriptor %s imports non-public schema %s", file.Path(), imported.Path())
-			}
+			assert.Falsef(t, !strings.HasPrefix(imported.Path(), "fallout/terminal/player/v1/"),
+				"public descriptor %s imports non-public schema %s", file.Path(), imported.Path())
+
 		}
 	}
 
@@ -91,13 +100,13 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	for name := range optionalFields {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
-			t.Errorf("semantic optional field %s missing: %v", name, err)
+			assert.Failf(t, "assertion failed", "semantic optional field %s missing: %v", name, err)
 			continue
 		}
 		field, ok := descriptor.(protoreflect.FieldDescriptor)
-		if !ok || !field.HasOptionalKeyword() {
-			t.Errorf("%s must use proto3 optional presence", name)
-		}
+		assert.Falsef(t, !ok || !field.HasOptionalKeyword(),
+			"%s must use proto3 optional presence", name)
+
 	}
 
 	for _, name := range []protoreflect.FullName{
@@ -110,12 +119,15 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	} {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
-			t.Errorf("required oneof %s missing: %v", name, err)
+			assert.Failf(t, "assertion failed", "required oneof %s missing: %v", name, err)
 			continue
 		}
-		if _, ok := descriptor.(protoreflect.OneofDescriptor); !ok {
-			t.Errorf("%s is not a oneof descriptor", name)
+		{
+			_, ok := descriptor.(protoreflect.OneofDescriptor)
+			assert.Falsef(t, !ok,
+				"%s is not a oneof descriptor", name)
 		}
+
 	}
 }
 
@@ -125,38 +137,41 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	paths, err := filepath.Glob(filepath.Join(root, "proto", "fallout", "terminal", "*", "v1", "*.proto"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	sort.Strings(paths)
 	outer := sha256.New()
 	for _, path := range paths {
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		inner := sha256.Sum256(raw)
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		outer.Write([]byte(hex.EncodeToString(inner[:]) + "  " + filepath.ToSlash(relative) + "\n"))
 	}
 	wantRaw, err := os.ReadFile(filepath.Join(root, "proto", "schema-revision.txt"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if got, want := hex.EncodeToString(outer.Sum(nil)), strings.TrimSpace(string(wantRaw)); got != want {
-		t.Fatalf("schema revision = %s, want %s; run scripts/proto-generate.sh after schema edits", got, want)
+	{
+		got, want := hex.EncodeToString(outer.Sum(nil)), strings.TrimSpace(string(wantRaw))
+		require.Falsef(t, got != want,
+			"schema revision = %s, want %s; run scripts/proto-generate.sh after schema edits", got, want)
 	}
+
 }
 
 func checkEnumZeroValues(t *testing.T, enums protoreflect.EnumDescriptors) {
 	t.Helper()
 	for index := 0; index < enums.Len(); index++ {
 		enum := enums.Get(index)
-		if enum.Values().Len() == 0 || enum.Values().Get(0).Number() != 0 || !strings.HasSuffix(string(enum.Values().Get(0).Name()), "_UNSPECIFIED") {
-			t.Errorf("enum %s must define an UNSPECIFIED zero value", enum.FullName())
-		}
+		assert.Falsef(t, enum.Values().Len() == 0 || enum.Values().Get(0).Number() != 0 || !strings.HasSuffix(string(enum.Values().Get(0).Name()), "_UNSPECIFIED"),
+			"enum %s must define an UNSPECIFIED zero value", enum.FullName())
+
 	}
 }
 
@@ -164,14 +179,15 @@ func checkMessageContractShape(t *testing.T, messages protoreflect.MessageDescri
 	t.Helper()
 	for index := 0; index < messages.Len(); index++ {
 		message := messages.Get(index)
+		prototest.Message{}.Test(t, dynamicpb.NewMessageType(message))
 		checkEnumZeroValues(t, message.Enums())
 		checkMessageContractShape(t, message.Messages())
 		fields := message.Fields()
 		for fieldIndex := 0; fieldIndex < fields.Len(); fieldIndex++ {
 			field := fields.Get(fieldIndex)
-			if message.ReservedNames().Has(field.Name()) || message.ReservedRanges().Has(field.Number()) {
-				t.Errorf("active field %s collides with a reserved identifier", field.FullName())
-			}
+			assert.Falsef(t, message.ReservedNames().Has(field.Name()) || message.ReservedRanges().Has(field.Number()),
+				"active field %s collides with a reserved identifier", field.FullName())
+
 		}
 	}
 }
@@ -189,8 +205,10 @@ func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 	})
 
 	distRoot := filepath.Join(root, "frontend", "dist")
-	if info, err := os.Stat(filepath.Join(distRoot, ".keep")); err != nil || info.IsDir() {
-		t.Fatalf("frontend/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
+	{
+		info, err := os.Stat(filepath.Join(distRoot, ".keep"))
+		require.Falsef(t, err != nil || info.IsDir(),
+			"frontend/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
 	}
 
 	builtFiles := make([]string, 0)
@@ -209,7 +227,7 @@ func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	if len(builtFiles) == 0 {
 		return
@@ -221,9 +239,9 @@ func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 		".css": "stylesheet bundle",
 		".ttf": "Fixedsys font bundle",
 	} {
-		if !containsExtension(builtFiles, extension) {
-			t.Errorf("built master output is missing a %s (%s); files: %v", description, extension, builtFiles)
-		}
+		assert.Falsef(t, !containsExtension(builtFiles, extension),
+			"built master output is missing a %s (%s); files: %v", description, extension, builtFiles)
+
 	}
 }
 
@@ -257,9 +275,9 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 		t.Run(category, func(t *testing.T) {
 			directory := filepath.Join(root, "client", "sounds", category)
 			entries, err := os.ReadDir(directory)
-			if err != nil {
-				t.Fatalf("read required sound category %q: %v", category, err)
-			}
+			require.Falsef(t, err != nil,
+				"read required sound category %q: %v", category, err)
+
 			files := make([]string, 0)
 			for _, entry := range entries {
 				if entry.IsDir() {
@@ -270,16 +288,16 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 				}
 				info, err := entry.Info()
 				if err != nil {
-					t.Fatal(err)
+					require.NoError(t, err)
 				}
 				if info.Size() > 0 {
 					files = append(files, entry.Name())
 				}
 			}
 			sort.Strings(files)
-			if len(files) == 0 {
-				t.Fatalf("required sound category %q has no non-empty supported audio asset", category)
-			}
+			require.Falsef(t, len(files) == 0,
+				"required sound category %q has no non-empty supported audio asset", category)
+
 		})
 	}
 }
@@ -292,7 +310,7 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -320,20 +338,20 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		"playFirst('hack-bad', 0.7)",
 		"playFromFolder('charscroll', 0.4)",
 	} {
-		if !strings.Contains(soundScript, required) {
-			t.Errorf("player sound adapter is missing outcome-audio contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(soundScript, required),
+			"player sound adapter is missing outcome-audio contract %q", required)
+
 	}
 
 	playerScript := read("client/client.js")
 	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack, revision = appliedSharedRevision) {")
-	if outcomeStart < 0 {
-		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
-	}
+	require.False(t, outcomeStart < 0,
+		"player script is missing the common authoritative hacking-outcome boundary")
+
 	outcomeEnd := strings.Index(playerScript[outcomeStart:], "function scheduleHackSolvedNavigation() {")
-	if outcomeEnd < 0 {
-		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
-	}
+	require.False(t, outcomeEnd < 0,
+		"player script is missing the common authoritative hacking-outcome boundary")
+
 	outcomeBoundary := playerScript[outcomeStart : outcomeStart+outcomeEnd]
 	for _, required := range []string{
 		"nextHack.attemptsLeft < previousHack.attemptsLeft",
@@ -341,9 +359,9 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		"nextHack.solved && !previousHack.solved",
 		"playHackGood();",
 	} {
-		if !strings.Contains(outcomeBoundary, required) {
-			t.Errorf("common authoritative outcome handler is missing transition guard %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(outcomeBoundary, required),
+			"common authoritative outcome handler is missing transition guard %q", required)
+
 	}
 	for _, required := range []string{
 		"let terminalLiveBaselinePending = true;",
@@ -352,42 +370,40 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		"terminalLiveBaselinePending = false;",
 		"playHackOutcomeTransition(previousHack, hack);",
 	} {
-		if !strings.Contains(playerScript, required) {
-			t.Errorf("player script is missing revisioned live/hack outcome guard %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(playerScript, required),
+			"player script is missing revisioned live/hack outcome guard %q", required)
+
 	}
 
 	actionResultStart := strings.Index(playerScript, "async function applyMutationResult(operation) {")
-	if actionResultStart < 0 {
-		t.Fatal("player script is missing typed mutation-result boundary")
-	}
+	require.False(t, actionResultStart < 0,
+		"player script is missing typed mutation-result boundary")
+
 	actionResultEnd := strings.Index(playerScript[actionResultStart:], "function actionReasonName(reason) {")
-	if actionResultEnd < 0 {
-		t.Fatal("player script is missing typed mutation-result boundary")
-	}
-	if strings.Contains(playerScript[actionResultStart:actionResultStart+actionResultEnd], "playHack") {
-		t.Error("ACTION_RESULT must not optimistically play hacking outcome audio")
-	}
+	require.False(t, actionResultEnd < 0,
+		"player script is missing typed mutation-result boundary")
+	assert.False(t, strings.Contains(playerScript[actionResultStart:actionResultStart+actionResultEnd], "playHack"),
+		"ACTION_RESULT must not optimistically play hacking outcome audio")
 
 	beginActionStart := strings.Index(playerScript, "function beginSharedMutation(procedure, invoke) {")
-	if beginActionStart < 0 {
-		t.Fatal("player script is missing the shared-action presentation boundary")
-	}
+	require.False(t, beginActionStart < 0,
+		"player script is missing the shared-action presentation boundary")
+
 	beginActionEnd := strings.Index(playerScript[beginActionStart:], "function selectCharacter(characterID) {")
-	if beginActionEnd < 0 {
-		t.Fatal("player script is missing the shared-action presentation boundary")
-	}
+	require.False(t, beginActionEnd < 0,
+		"player script is missing the shared-action presentation boundary")
+
 	beginAction := playerScript[beginActionStart : beginActionStart+beginActionEnd]
-	if !strings.Contains(beginAction, "renderPlayerContext();") || strings.Contains(beginAction, "render();") {
-		t.Error("beginSharedAction must update pending presentation without rebuilding the hacking board")
-	}
+	assert.False(t, !strings.Contains(beginAction, "renderPlayerContext();") || strings.Contains(beginAction, "render();"),
+		"beginSharedAction must update pending presentation without rebuilding the hacking board")
+
 	for _, required := range []string{
 		"pattern.id !== hackHoverKey",
 		"setHackHover(hoveredCells.length ? hackHoverKey : null, true);",
 	} {
-		if !strings.Contains(playerScript, required) {
-			t.Errorf("player script is missing preview-audio replay guard %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(playerScript, required),
+			"player script is missing preview-audio replay guard %q", required)
+
 	}
 }
 
@@ -399,28 +415,28 @@ func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
 	functionBoundary := func(script, start, end string) string {
 		t.Helper()
 		startIndex := strings.Index(script, start)
-		if startIndex < 0 {
-			t.Fatalf("missing JavaScript boundary %q", start)
-		}
+		require.Falsef(t, startIndex < 0,
+			"missing JavaScript boundary %q", start)
+
 		endIndex := strings.Index(script[startIndex+len(start):], end)
-		if endIndex < 0 {
-			t.Fatalf("missing JavaScript boundary %q after %q", end, start)
-		}
+		require.Falsef(t, endIndex < 0,
+			"missing JavaScript boundary %q after %q", end, start)
+
 		return script[startIndex : startIndex+len(start)+endIndex]
 	}
 
 	soundScript := read("client/sound.js")
 	for _, state := range []string{"ambientRequested", "ambientPlayAttempt", "webAudioEligible", "webAudioReady"} {
-		if !strings.Contains(soundScript, state) {
-			t.Errorf("player sound adapter is missing explicit audio state %q", state)
-		}
+		assert.Falsef(t, !strings.Contains(soundScript, state),
+			"player sound adapter is missing explicit audio state %q", state)
+
 	}
 	activation := functionBoundary(soundScript, "function enableWebAudio()", "async function prefetch")
 	for _, boundary := range []string{
@@ -429,14 +445,14 @@ func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
 		"webAudioReady = attempt",
 		"webAudioReady = null",
 	} {
-		if !strings.Contains(activation, boundary) {
-			t.Errorf("Web Audio activation is missing retry boundary %q", boundary)
-		}
+		assert.Falsef(t, !strings.Contains(activation, boundary),
+			"Web Audio activation is missing retry boundary %q", boundary)
+
 	}
 	for _, event := range []string{"'pointerdown'", "'keydown'"} {
-		if strings.Count(soundScript, "document.addEventListener("+event+", handleAudioGesture)") != 1 {
-			t.Errorf("player sound adapter must observe qualifying gesture %s exactly once", event)
-		}
+		assert.Falsef(t, strings.Count(soundScript, "document.addEventListener("+event+", handleAudioGesture)") != 1,
+			"player sound adapter must observe qualifying gesture %s exactly once", event)
+
 	}
 
 	reconcile := functionBoundary(soundScript, "function reconcileAmbient()", "function setAmbientActive(active)")
@@ -449,28 +465,27 @@ func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
 		".catch(",
 		".finally(",
 	} {
-		if !strings.Contains(reconcile, boundary) {
-			t.Errorf("ambient reconciliation is missing state boundary %q", boundary)
-		}
+		assert.Falsef(t, !strings.Contains(reconcile, boundary),
+			"ambient reconciliation is missing state boundary %q", boundary)
+
 	}
 	ambientState := functionBoundary(soundScript, "function setAmbientActive(active)", "function stopAmbient()")
 	for _, boundary := range []string{"Boolean(active)", "ambientRequested = requested", "reconcileAmbient()", "stopAmbient()"} {
-		if !strings.Contains(ambientState, boundary) {
-			t.Errorf("ambient state API is missing transition boundary %q", boundary)
-		}
+		assert.Falsef(t, !strings.Contains(ambientState, boundary),
+			"ambient state API is missing transition boundary %q", boundary)
+
 	}
 
 	playerScript := read("client/client.js")
-	if strings.Count(playerScript, "setAmbientActive(true);") != 1 {
-		t.Error("accepted terminal-live dispatch must be the sole ambient activation boundary")
-	}
-	if strings.Count(playerScript, "setAmbientActive(false);") < 3 {
-		t.Error("player lifecycle must revoke ambient state across clear, reset, and reconnect boundaries")
-	}
+	assert.False(t, strings.Count(playerScript, "setAmbientActive(true);") != 1,
+		"accepted terminal-live dispatch must be the sole ambient activation boundary")
+	assert.False(t, strings.Count(playerScript, "setAmbientActive(false);") < 3,
+		"player lifecycle must revoke ambient state across clear, reset, and reconnect boundaries")
+
 	for _, obsolete := range []string{"tryStartAmbient", "stopAmbient"} {
-		if strings.Contains(playerScript, obsolete) {
-			t.Errorf("player lifecycle must use the explicit ambient state API, found %q", obsolete)
-		}
+		assert.Falsef(t, strings.Contains(playerScript, obsolete),
+			"player lifecycle must use the explicit ambient state API, found %q", obsolete)
+
 	}
 }
 
@@ -487,11 +502,11 @@ func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 	for _, relative := range paths {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
-		if strings.ContainsRune(string(raw), '\t') {
-			t.Errorf("%s contains a tab; browser JavaScript uses two-space indentation", relative)
-		}
+		assert.Falsef(t, strings.ContainsRune(string(raw), '\t'),
+			"%s contains a tab; browser JavaScript uses two-space indentation", relative)
+
 	}
 }
 
@@ -503,7 +518,7 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -516,14 +531,14 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 		"updateLiveTerminal: 'UpdateLiveTerminal'",
 		"forceHackSuccess: 'ForceHackSuccess'",
 	} {
-		if !strings.Contains(facade, required) {
-			t.Errorf("master desktop facade is missing coordinator-owned command %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(facade, required),
+			"master desktop facade is missing coordinator-owned command %q", required)
+
 	}
 	for _, forbidden := range []string{"SetLiveTerminal", "ClearLiveTerminal", "setLiveTerminal", "clearLiveTerminal"} {
-		if strings.Contains(facade, forbidden) {
-			t.Errorf("master desktop facade exposes legacy terminal command %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(facade, forbidden),
+			"master desktop facade exposes legacy terminal command %q", forbidden)
+
 	}
 	for _, required := range []string{
 		"func (app *App) RequestTerminalActivation(",
@@ -531,17 +546,17 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 		"func (app *App) UpdateLiveTerminal(",
 		"func (app *App) ForceHackSuccess(",
 	} {
-		if !strings.Contains(app, required) {
-			t.Errorf("Wails App is missing required terminal command %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(app, required),
+			"Wails App is missing required terminal command %q", required)
+
 	}
 	for _, forbidden := range []string{
 		"func (app *App) SetLiveTerminal(",
 		"func (app *App) ClearLiveTerminal(",
 	} {
-		if strings.Contains(app, forbidden) {
-			t.Errorf("Wails App still binds legacy terminal command %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(app, forbidden),
+			"Wails App still binds legacy terminal command %q", forbidden)
+
 	}
 }
 
@@ -553,7 +568,7 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -565,9 +580,9 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 		`class="hack-board" id="hackBoard" hidden`,
 		`class="hack-blocked" id="hackBlocked" hidden`,
 	} {
-		if !strings.Contains(html, fragment) {
-			t.Errorf("player markup is missing visibility fixture %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(html, fragment),
+			"player markup is missing visibility fixture %q", fragment)
+
 	}
 
 	css := read("client/client.css")
@@ -579,13 +594,13 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 		".hack-board{height:100%;display:flex;",
 		".hack-blocked{height:100%;display:flex;",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet no longer exercises the hidden-layout regression fixture %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"player stylesheet no longer exercises the hidden-layout regression fixture %q", fragment)
+
 	}
-	if !strings.Contains(compactCSS, "[hidden]{display:none!important;}") {
-		t.Error("player stylesheet must make the hidden attribute authoritative so inactive state containers occupy no layout space")
-	}
+	assert.False(t, !strings.Contains(compactCSS, "[hidden]{display:none!important;}"),
+		"player stylesheet must make the hidden attribute authoritative so inactive state containers occupy no layout space")
+
 }
 
 func TestPlayerSessionSelectionAssetContract(t *testing.T) {
@@ -596,7 +611,7 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -609,14 +624,14 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		`class="assigned-waiting" id="assignedWaiting" hidden`,
 		`class="player-notice" id="playerNotice"`,
 	} {
-		if !strings.Contains(html, fragment) {
-			t.Errorf("player markup is missing session-selection region %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(html, fragment),
+			"player markup is missing session-selection region %q", fragment)
+
 	}
 	for _, forbidden := range []string{"browserToken", "ForceHackSuccess", "forceHackSuccess", "HACK_ADMIN"} {
-		if strings.Contains(html, forbidden) {
-			t.Errorf("player markup exposes private/session capability %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(html, forbidden),
+			"player markup exposes private/session capability %q", forbidden)
+
 	}
 
 	css := read("client/client.css")
@@ -628,14 +643,14 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		".assigned-waiting{height:100%;display:flex;",
 		"[hidden]{display:none!important;}",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet is missing bounded selection contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"player stylesheet is missing bounded selection contract %q", fragment)
+
 	}
 	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
-		if strings.Contains(compactCSS, forbidden) {
-			t.Errorf("session selection must remain within the no-scroll player layout; found %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(compactCSS, forbidden),
+			"session selection must remain within the no-scroll player layout; found %q", forbidden)
+
 	}
 
 	js := read("client/client.js")
@@ -647,9 +662,9 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		"playerRPC.subscribe(request",
 		"playerRPC.selectCharacter({",
 	} {
-		if !strings.Contains(js, fragment) {
-			t.Errorf("player script is missing safe selection/identity contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(js, fragment),
+			"player script is missing safe selection/identity contract %q", fragment)
+
 	}
 	for _, forbidden := range []string{
 		"searchParams.set('browserToken'",
@@ -659,9 +674,9 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		"forceHackSuccess",
 		"HACK_ADMIN",
 	} {
-		if strings.Contains(js, forbidden) {
-			t.Errorf("player script exposes unsafe session/privileged path %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(js, forbidden),
+			"player script exposes unsafe session/privileged path %q", forbidden)
+
 	}
 }
 
@@ -673,18 +688,17 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
 
 	html := read("client/index.html")
-	if !strings.Contains(html, `content="width=device-width, initial-scale=1.0"`) {
-		t.Error("player viewport must follow the browser width at the default zoom")
-	}
-	if strings.Contains(html, "maximum-scale") {
-		t.Error("player viewport must not prevent accessibility zoom")
-	}
+	assert.False(t, !strings.Contains(html, `content="width=device-width, initial-scale=1.0"`),
+		"player viewport must follow the browser width at the default zoom")
+	assert.False(t, strings.Contains(html, "maximum-scale"),
+		"player viewport must not prevent accessibility zoom")
+
 	for _, fragment := range []string{
 		`class="term-header" id="normalHeader"`,
 		`class="term-body" id="termBody"`,
@@ -695,9 +709,9 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		`class="page-btn" id="pageNext"`,
 		`class="term-prompt" id="termPrompt"`,
 	} {
-		if !strings.Contains(html, fragment) {
-			t.Errorf("player markup is missing persistent responsive region %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(html, fragment),
+			"player markup is missing persistent responsive region %q", fragment)
+
 	}
 
 	css := read("client/client.css")
@@ -718,15 +732,15 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		".hack-board.hack-compact.hack-stacked{",
 		".hack-board.hack-stacked{flex-direction:column;",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet is missing responsive layout contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"player stylesheet is missing responsive layout contract %q", fragment)
+
 	}
 
 	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
-		if strings.Contains(compactCSS, forbidden) {
-			t.Errorf("player stylesheet must not expose browser or localized scrolling; found %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(compactCSS, forbidden),
+			"player stylesheet must not expose browser or localized scrolling; found %q", forbidden)
+
 	}
 
 	js := read("client/client.js")
@@ -750,13 +764,13 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"function renderHackScreen() {\n  deactivatePagination();",
 		"renderHackInputPreview();\n  scheduleHackFit();",
 	} {
-		if !strings.Contains(js, fragment) {
-			t.Errorf("player script is missing pagination contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(js, fragment),
+			"player script is missing pagination contract %q", fragment)
+
 	}
-	if strings.Contains(js, ".scrollTop") || strings.Contains(js, ".scrollTo(") {
-		t.Error("player script must not navigate terminal content through scrolling")
-	}
+	assert.False(t, strings.Contains(js, ".scrollTop") || strings.Contains(js, ".scrollTo("),
+		"player script must not navigate terminal content through scrolling")
+
 }
 
 func TestPlayerHackingSingleScreenContract(t *testing.T) {
@@ -767,7 +781,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -781,9 +795,9 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 		`class="hack-input-line"`,
 		`class="page-nav" id="pageNav" aria-label="Навигация по страницам" hidden`,
 	} {
-		if !strings.Contains(html, fragment) {
-			t.Errorf("player markup is missing single-screen hacking region %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(html, fragment),
+			"player markup is missing single-screen hacking region %q", fragment)
+
 	}
 
 	css := read("client/client.css")
@@ -798,29 +812,28 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 		".hack-board.hack-tight.hack-stacked.hack-columns{flex-shrink:0;}",
 		".hack-board.hack-tight.hack-stacked.hack-log-panel{min-height:0;row-gap:0;padding-top:0;}",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet is missing single-screen hacking contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"player stylesheet is missing single-screen hacking contract %q", fragment)
+
 	}
 	for _, forbidden := range []string{"overflow:auto", "overflow-y:auto", "overflow:scroll", "overflow-y:scroll", "scrollbar"} {
-		if strings.Contains(compactCSS, forbidden) {
-			t.Errorf("hacking layout must not rely on scrolling; found %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(compactCSS, forbidden),
+			"hacking layout must not rely on scrolling; found %q", forbidden)
+
 	}
 
 	js := read("client/client.js")
 	start := strings.Index(js, "function renderHackScreen()")
 	end := strings.Index(js, "function buildColumnHtml")
-	if start < 0 || end <= start {
-		t.Fatal("player script is missing the hacking render boundary")
-	}
+	require.False(t, start < 0 || end <= start,
+		"player script is missing the hacking render boundary")
+
 	hackingRender := js[start:end]
-	if !strings.Contains(hackingRender, "deactivatePagination();") {
-		t.Error("hacking render must disable information-view pagination")
-	}
-	if strings.Contains(hackingRender, "\n  activatePagination(") || strings.Contains(hackingRender, "\n  paginateText(") {
-		t.Error("hacking render must not paginate the board or activity log")
-	}
+	assert.False(t, !strings.Contains(hackingRender, "deactivatePagination();"),
+		"hacking render must disable information-view pagination")
+	assert.False(t, strings.Contains(hackingRender, "\n  activatePagination(") || strings.Contains(hackingRender, "\n  paginateText("),
+		"hacking render must not paginate the board or activity log")
+
 	for _, fragment := range []string{
 		"function regionContains(parent, child)",
 		"hackColumns.querySelectorAll('.hack-row')",
@@ -829,9 +842,9 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 		"containedRegions.some(([parent, child]) => !regionContains(parent, child))",
 		"hackBoard.classList.add('hack-tight')",
 	} {
-		if !strings.Contains(js, fragment) {
-			t.Errorf("player script is missing rendered hacking geometry contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(js, fragment),
+			"player script is missing rendered hacking geometry contract %q", fragment)
+
 	}
 }
 
@@ -841,7 +854,7 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	for _, forbidden := range []string{
 		"HACK_ADMIN",
@@ -852,13 +865,13 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 		"forceHackSuccess",
 		"ForceHackSuccess",
 	} {
-		if strings.Contains(string(playerScript), forbidden) {
-			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(string(playerScript), forbidden),
+			"bundled player still exposes removed hacking shortcut %q", forbidden)
+
 	}
-	if !strings.Contains(string(playerScript), "beginGuess(cell.dataset.target)") {
-		t.Error("ordinary candidate and filler cells must continue through the typed Guess procedure")
-	}
+	assert.False(t, !strings.Contains(string(playerScript), "beginGuess(cell.dataset.target)"),
+		"ordinary candidate and filler cells must continue through the typed Guess procedure")
+
 }
 
 func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
@@ -867,7 +880,7 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	js := string(playerScript)
 
@@ -887,9 +900,9 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 		"activateRow(kids[selIndex])",
 		"goBack()",
 	} {
-		if !strings.Contains(js, required) {
-			t.Errorf("player script is missing shared-action gate %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(js, required),
+			"player script is missing shared-action gate %q", required)
+
 	}
 	for _, forbidden := range []string{
 		"send({ type: 'NAV_ACTION'",
@@ -899,14 +912,14 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 		"forceHackSuccess",
 		"HACK_ADMIN",
 	} {
-		if strings.Contains(js, forbidden) {
-			t.Errorf("player script bypasses authority or exposes a privileged path %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(js, forbidden),
+			"player script bypasses authority or exposes a privileged path %q", forbidden)
+
 	}
 
 	stylesheet, err := os.ReadFile(filepath.Join(root, "client", "client.css"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(string(stylesheet))
 	for _, forbidden := range []string{
@@ -915,28 +928,28 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 		"#screen.observer-read-only.hcell{pointer-events:none",
 		"#screen.shared-input-pending.hcell{pointer-events:none",
 	} {
-		if strings.Contains(compactCSS, forbidden) {
-			t.Errorf("read-only/pending presentation disables target hit-testing through %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(compactCSS, forbidden),
+			"read-only/pending presentation disables target hit-testing through %q", forbidden)
+
 	}
 	for _, required := range []string{
 		`class="hcell word" data-target="${esc(wid)}" tabindex="0"`,
 		`class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0"`,
 		"const lines = Array.isArray(hack.log) ? hack.log : []",
 	} {
-		if !strings.Contains(js, required) {
-			t.Errorf("active hacking target is not rendered as a focusable hit target %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(js, required),
+			"active hacking target is not rendered as a focusable hit target %q", required)
+
 	}
 
 	protocol, err := os.ReadFile(filepath.Join(root, "internal", "player", "handler.go"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	for _, forbidden := range []string{"ForceHackSuccess", "forceHackSuccess", "HACK_ADMIN"} {
-		if strings.Contains(string(protocol), forbidden) {
-			t.Errorf("player protocol exposes trusted hacking capability %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(string(protocol), forbidden),
+			"player protocol exposes trusted hacking capability %q", forbidden)
+
 	}
 }
 
@@ -946,7 +959,7 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	playerScript := string(raw)
 	for _, required := range []string{
@@ -961,9 +974,9 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 		"beginPattern(pattern.id)",
 		"beginGuess(cell.dataset.target)",
 	} {
-		if !strings.Contains(playerScript, required) {
-			t.Errorf("bundled player is missing pattern interaction contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(playerScript, required),
+			"bundled player is missing pattern interaction contract %q", required)
+
 	}
 	for _, forbidden := range []string{
 		"offset >= pattern.start && offset <= pattern.end\n  )",
@@ -974,9 +987,9 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 		"column.text.slice(pattern.start",
 		"data-column=\"${pattern.column}",
 	} {
-		if strings.Contains(playerScript, forbidden) {
-			t.Errorf("bundled player depends on private pattern metadata %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerScript, forbidden),
+			"bundled player depends on private pattern metadata %q", forbidden)
+
 	}
 }
 
@@ -988,7 +1001,7 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1004,9 +1017,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"class=\"hcell word\"",
 		"class=\"hcell filler\"",
 	} {
-		if !strings.Contains(playerScript, required) {
-			t.Errorf("bundled player is missing camouflage interaction contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(playerScript, required),
+			"bundled player is missing camouflage interaction contract %q", required)
+
 	}
 	for _, forbidden := range []string{
 		"function isDelimiterCell(cell)",
@@ -1019,9 +1032,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"data-pattern-valid",
 		"data-delimiter-decoy",
 	} {
-		if strings.Contains(playerScript, forbidden) {
-			t.Errorf("bundled player exposes persistent pattern validity through %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerScript, forbidden),
+			"bundled player exposes persistent pattern validity through %q", forbidden)
+
 	}
 
 	stylesheet := read("client/client.css")
@@ -1031,14 +1044,14 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		".hcell.filler{opacity:.8;}",
 		".hcell.hi{background:#57ff6e;color:#021002;text-shadow:none;}",
 	} {
-		if !strings.Contains(compactCSS, required) {
-			t.Errorf("player stylesheet is missing static/transient cell styling contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, required),
+			"player stylesheet is missing static/transient cell styling contract %q", required)
+
 	}
 	for _, forbidden := range []string{".pattern{", ".valid-pattern{", ".delimiter-decoy{", ".decoy{"} {
-		if strings.Contains(compactCSS, forbidden) {
-			t.Errorf("player stylesheet exposes persistent delimiter validity through %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(compactCSS, forbidden),
+			"player stylesheet exposes persistent delimiter validity through %q", forbidden)
+
 	}
 }
 
@@ -1050,7 +1063,7 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(append([]string{root}, parts...)...))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1068,9 +1081,9 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		"forceHackSuccess: 'ForceHackSuccess'",
 		"func (app *App) ForceHackSuccess() CommandResult",
 	} {
-		if !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required) {
-			t.Errorf("game-master bundle is missing solve-control contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required),
+			"game-master bundle is missing solve-control contract %q", required)
+
 	}
 	playerSurface := playerJS + playerHTML + playerProtocol
 	for _, forbidden := range []string{
@@ -1081,9 +1094,9 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		"URLSearchParams",
 		"location.search",
 	} {
-		if strings.Contains(playerSurface, forbidden) {
-			t.Errorf("player surface gained game-master solve authority %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
+			"player surface gained game-master solve authority %q", forbidden)
+
 	}
 }
 
@@ -1095,7 +1108,7 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1113,18 +1126,18 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		`func (app *App) ResetFailedHack(`,
 		`ResetFailedHack`,
 	} {
-		if !strings.Contains(masterHTML+masterCSS+masterJS+desktopAPI+appBoundary+contract, required) {
-			t.Errorf("game-master bundle is missing failed-hack reset contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML+masterCSS+masterJS+desktopAPI+appBoundary+contract, required),
+			"game-master bundle is missing failed-hack reset contract %q", required)
+
 	}
 	playerSurface := strings.Join([]string{
 		read("client/index.html"), read("client/client.css"), read("client/client.js"),
 		read("internal/player/handler.go"), read("internal/player/server.go"),
 	}, "\n")
 	for _, forbidden := range []string{"ResetFailedHack", "resetFailedHack", "btnResetFailedHack", "HACK_RESET", "URLSearchParams", "location.search"} {
-		if strings.Contains(playerSurface, forbidden) {
-			t.Errorf("player surface gained failed-hack reset authority %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
+			"player surface gained failed-hack reset authority %q", forbidden)
+
 	}
 }
 
@@ -1136,7 +1149,7 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1165,9 +1178,9 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		`aria-describedby="terminalSwitchDialogDescription terminalSwitchStatus terminalSwitchError"`,
 		"hidden",
 	} {
-		if !strings.Contains(dialogTag, fragment) {
-			t.Errorf("terminal-switch dialog opening tag is missing %q; got %q", fragment, dialogTag)
-		}
+		assert.Falsef(t, !strings.Contains(dialogTag, fragment),
+			"terminal-switch dialog opening tag is missing %q; got %q", fragment, dialogTag)
+
 	}
 	for _, fragment := range []string{
 		`id="terminalSwitchDialogTitle"`,
@@ -1175,12 +1188,14 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		`id="terminalSwitchStatus" role="status" aria-live="polite"`,
 		`id="terminalSwitchError" role="alert" aria-live="assertive"`,
 	} {
-		if !strings.Contains(masterHTML, fragment) {
-			t.Errorf("terminal-switch dialog is missing accessible feedback contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML, fragment),
+			"terminal-switch dialog is missing accessible feedback contract %q", fragment)
+
 	}
-	if errorTag := openingTag(masterHTML, "terminalSwitchError"); !strings.Contains(errorTag, "hidden") {
-		t.Errorf("terminal-switch error must be hidden until populated; got %q", errorTag)
+	{
+		errorTag := openingTag(masterHTML, "terminalSwitchError")
+		assert.Falsef(t, !strings.Contains(errorTag, "hidden"),
+			"terminal-switch error must be hidden until populated; got %q", errorTag)
 	}
 
 	for id, decision := range map[string]string{
@@ -1194,16 +1209,16 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 			`type="button"`,
 			`data-switch-decision="` + decision + `"`,
 		} {
-			if !strings.Contains(tag, fragment) {
-				t.Errorf("terminal-switch %s control is missing %q; got %q", decision, fragment, tag)
-			}
+			assert.Falsef(t, !strings.Contains(tag, fragment),
+				"terminal-switch %s control is missing %q; got %q", decision, fragment, tag)
+
 		}
 	}
 	discardTag := openingTag(masterHTML, "btnDiscardTerminalSwitch")
 	for _, className := range []string{"btn-danger", "terminal-switch-discard"} {
-		if !strings.Contains(discardTag, className) {
-			t.Errorf("discard must carry destructive emphasis class %q; got %q", className, discardTag)
-		}
+		assert.Falsef(t, !strings.Contains(discardTag, className),
+			"discard must carry destructive emphasis class %q; got %q", className, discardTag)
+
 	}
 
 	masterCSS := read("frontend/src/master.css")
@@ -1213,9 +1228,9 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		".terminal-switch-dialog[hidden]{display:none;}",
 		".terminal-switch-discard{",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("master stylesheet is missing terminal-switch visibility/destructive contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"master stylesheet is missing terminal-switch visibility/destructive contract %q", fragment)
+
 	}
 
 	playerSurface := strings.Join([]string{
@@ -1236,9 +1251,9 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		"ForceHackSuccess",
 		"forceHackSuccess",
 	} {
-		if strings.Contains(playerSurface, forbidden) {
-			t.Errorf("player surface exposes game-master switch/private-puzzle capability %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
+			"player surface exposes game-master switch/private-puzzle capability %q", forbidden)
+
 	}
 }
 
@@ -1250,7 +1265,7 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1281,19 +1296,22 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 		`aria-describedby="endBroadcastDialogDescription"`,
 		"hidden",
 	} {
-		if !strings.Contains(dialogTag, fragment) {
-			t.Errorf("end-broadcast dialog opening tag is missing %q; got %q", fragment, dialogTag)
-		}
+		assert.Falsef(t, !strings.Contains(dialogTag, fragment),
+			"end-broadcast dialog opening tag is missing %q; got %q", fragment, dialogTag)
+
 	}
 	for _, id := range []string{"endBroadcastDialogTitle", "endBroadcastDialogDescription", "btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
-		if !strings.Contains(masterHTML, `id="`+id+`"`) {
-			t.Errorf("end-broadcast dialog is missing %q", id)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML, `id="`+id+`"`),
+			"end-broadcast dialog is missing %q", id)
+
 	}
 	for _, id := range []string{"btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
-		if tag := openingTag(masterHTML, id); !strings.Contains(tag, `type="button"`) {
-			t.Errorf("end-broadcast control %q must be an explicit button; got %q", id, tag)
+		{
+			tag := openingTag(masterHTML, id)
+			assert.Falsef(t, !strings.Contains(tag, `type="button"`),
+				"end-broadcast control %q must be an explicit button; got %q", id, tag)
 		}
+
 	}
 	for _, fragment := range []string{
 		"showEndBroadcastConfirmation()",
@@ -1301,17 +1319,17 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 		"!result.state || result.state.broadcast",
 		"btnConfirmEndBroadcast.disabled = true",
 	} {
-		if !strings.Contains(masterJS, fragment) {
-			t.Errorf("master script is missing end-broadcast contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterJS, fragment),
+			"master script is missing end-broadcast contract %q", fragment)
+
 	}
-	if strings.Contains(masterJS, "window.confirm('Завершить текущую трансляцию") {
-		t.Error("end-broadcast action still depends on the native window.confirm gate")
-	}
+	assert.False(t, strings.Contains(masterJS, "window.confirm('Завершить текущую трансляцию"),
+		"end-broadcast action still depends on the native window.confirm gate")
+
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
-	if !strings.Contains(compactCSS, ".end-broadcast-actions{") {
-		t.Error("master stylesheet is missing end-broadcast confirmation layout")
-	}
+	assert.False(t, !strings.Contains(compactCSS, ".end-broadcast-actions{"),
+		"master stylesheet is missing end-broadcast confirmation layout")
+
 }
 
 func TestPlayerHackingColumnFontFitContract(t *testing.T) {
@@ -1322,7 +1340,7 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1334,13 +1352,12 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 		"--hack-row-font:var(--font-hack);",
 		".hack-row{display:flex;gap:clamp(4px,.8vw,12px);font-size:var(--hack-row-font);",
 	} {
-		if !strings.Contains(compactCSS, fragment) {
-			t.Errorf("player stylesheet is missing shared hacking-row fit contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
+			"player stylesheet is missing shared hacking-row fit contract %q", fragment)
+
 	}
-	if !strings.Contains(css, "'Fixedsys', 'Consolas', monospace") {
-		t.Error("hacking-row fit must retain the production fallback font stack for metric remeasurement")
-	}
+	assert.False(t, !strings.Contains(css, "'Fixedsys', 'Consolas', monospace"),
+		"hacking-row fit must retain the production fallback font stack for metric remeasurement")
 
 	js := read("client/client.js")
 	for _, fragment := range []string{
@@ -1361,13 +1378,13 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 		"document.fonts.ready.then(scheduleHackFit)",
 		"if (hackFitFrame !== null) cancelAnimationFrame(hackFitFrame)",
 	} {
-		if !strings.Contains(js, fragment) {
-			t.Errorf("player script is missing column-aware hacking-row fit contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(js, fragment),
+			"player script is missing column-aware hacking-row fit contract %q", fragment)
+
 	}
-	if strings.Contains(js, "hackFitObserver.observe(hackBoard)") || strings.Contains(js, "hackFitObserver.observe(hackColumns)") {
-		t.Error("hacking-row fit must not observe its own font-sized descendants and create a resize feedback loop")
-	}
+	assert.False(t, strings.Contains(js, "hackFitObserver.observe(hackBoard)") || strings.Contains(js, "hackFitObserver.observe(hackColumns)"),
+		"hacking-row fit must not observe its own font-sized descendants and create a resize feedback loop")
+
 }
 
 func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
@@ -1376,24 +1393,24 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	adapter, err := os.ReadFile(filepath.Join(root, "frontend", "src", "desktop-api.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	master, err := os.ReadFile(filepath.Join(root, "frontend", "src", "master.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 
 	activeSource := string(adapter) + "\n" + string(master)
-	if strings.Contains(activeSource, "window.electronAPI") || strings.Contains(activeSource, "'electronAPI'") || strings.Contains(activeSource, `"electronAPI"`) {
-		t.Error("active production frontend still defines or consumes the transitional Electron-specific bridge global")
-	}
+	assert.False(t, strings.Contains(activeSource, "window.electronAPI") || strings.Contains(activeSource, "'electronAPI'") || strings.Contains(activeSource, `"electronAPI"`),
+		"active production frontend still defines or consumes the transitional Electron-specific bridge global")
+
 	for _, required := range []string{
 		"window.desktopAPI",
 		"Object.defineProperty(window, 'desktopAPI'",
 	} {
-		if !strings.Contains(activeSource, required) {
-			t.Errorf("active production frontend is missing runtime-neutral facade contract %q", required)
-		}
+		assert.Falsef(t, !strings.Contains(activeSource, required),
+			"active production frontend is missing runtime-neutral facade contract %q", required)
+
 	}
 }
 
@@ -1404,23 +1421,21 @@ func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 	demoPath := filepath.Join(root, "sessions", "demo.json")
 	raw, err := os.ReadFile(demoPath)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	session, err := domain.DecodeSession(raw)
-	if err != nil {
-		t.Fatalf("bundled demo is not a valid version-1 session: %v", err)
-	}
-	if session.Version != 1 || len(session.Terminals) == 0 {
-		t.Fatalf("bundled demo = version %d with %d terminals, want version 1 with content", session.Version, len(session.Terminals))
-	}
+	require.Falsef(t, err != nil,
+		"bundled demo is not a valid version-1 session: %v", err)
+	require.Falsef(t, session.Version != 1 || len(session.Terminals) == 0,
+		"bundled demo = version %d with %d terminals, want version 1 with content", session.Version, len(session.Terminals))
 
 	locations, err := NewSessionLocations(filepath.Join(root, ".manifest-home"), root)
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if locations.BundledDemo != demoPath {
-		t.Fatalf("BundledDemo = %q, want manifest path %q", locations.BundledDemo, demoPath)
-	}
+	require.Falsef(t, locations.BundledDemo != demoPath,
+		"BundledDemo = %q, want manifest path %q", locations.BundledDemo, demoPath)
+
 }
 
 func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
@@ -1429,7 +1444,7 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	raw, err := os.ReadFile(filepath.Join(root, "main.go"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	source := string(raw)
 	requiredFragments := []string{
@@ -1442,22 +1457,21 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 		"Assets:  playerAssets",
 	}
 	for _, fragment := range requiredFragments {
-		if !strings.Contains(source, fragment) {
-			t.Errorf("main.go is missing production asset wiring %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(source, fragment),
+			"main.go is missing production asset wiring %q", fragment)
+
 	}
-	if strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
-		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist") {
-		t.Error("master and remote-player assets share one embed directive; their serving boundaries must remain separate")
-	}
+	assert.False(t, strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
+		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist"),
+		"master and remote-player assets share one embed directive; their serving boundaries must remain separate")
 
 	viteConfig, err := os.ReadFile(filepath.Join(root, "frontend", "vite.config.js"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if !strings.Contains(string(viteConfig), `./dist/.keep`) {
-		t.Error("Vite build does not restore frontend/dist/.keep after emptyOutDir")
-	}
+	assert.False(t, !strings.Contains(string(viteConfig), `./dist/.keep`),
+		"Vite build does not restore frontend/dist/.keep after emptyOutDir")
+
 }
 
 func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
@@ -1466,9 +1480,9 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	dist := filepath.Join(root, "client", "dist")
 	entries, err := os.ReadDir(dist)
-	if err != nil {
-		t.Fatalf("client/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
-	}
+	require.Falsef(t, err != nil,
+		"client/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
+
 	if len(entries) == 1 && entries[0].Name() == ".keep" {
 		return
 	}
@@ -1493,35 +1507,35 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 				return err
 			}
 			for _, forbidden := range []string{"https://cdn.", "http://localhost:", "http://127.0.0.1:5173", "@vite/client"} {
-				if strings.Contains(string(raw), forbidden) {
-					t.Errorf("packaged player asset %s depends on %q", relative, forbidden)
-				}
+				assert.Falsef(t, strings.Contains(string(raw), forbidden),
+					"packaged player asset %s depends on %q", relative, forbidden)
+
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 	for extension, description := range map[string]string{".js": "generated player bundle", ".css": "player stylesheet", ".ttf": "Fixedsys font"} {
-		if !containsExtension(bundleFiles, extension) {
-			t.Errorf("packaged player is missing %s", description)
-		}
+		assert.Falsef(t, !containsExtension(bundleFiles, extension),
+			"packaged player is missing %s", description)
+
 	}
 	for _, category := range []string{"ambient", "charscroll", "enter", "hack-bad", "hack-good", "menu-focus", "multiple", "single"} {
 		entries, err := os.ReadDir(filepath.Join(dist, "sounds", category))
-		if err != nil || len(entries) == 0 {
-			t.Errorf("packaged player sound category %s is missing: %v", category, err)
-		}
+		assert.Falsef(t, err != nil || len(entries) == 0,
+			"packaged player sound category %s is missing: %v", category, err)
+
 	}
 
 	mainSource, err := os.ReadFile(filepath.Join(root, "main.go"))
 	if err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
-	if !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`) {
-		t.Error("production does not embed only the complete built player application")
-	}
+	assert.False(t, !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`),
+		"production does not embed only the complete built player application")
+
 }
 
 func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
@@ -1532,7 +1546,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		t.Helper()
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		return string(raw)
 	}
@@ -1553,9 +1567,9 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`base-uri 'none'`,
 		`form-action 'none'`,
 	} {
-		if !strings.Contains(masterHTML, directive) {
-			t.Errorf("master CSP is missing restrictive directive %q", directive)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML, directive),
+			"master CSP is missing restrictive directive %q", directive)
+
 	}
 	for _, fragment := range []string{
 		`response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)`,
@@ -1565,9 +1579,9 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`base-uri 'none'`,
 		`frame-ancestors 'none'`,
 	} {
-		if !strings.Contains(playerHTTP, fragment) {
-			t.Errorf("player HTTP boundary is missing CSP contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerHTTP, fragment),
+			"player HTTP boundary is missing CSP contract %q", fragment)
+
 	}
 
 	for _, fragment := range []string{
@@ -1576,18 +1590,18 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`row.querySelector('.session-character-name').textContent = assigned`,
 		`row.querySelector('.session-fallback-label').textContent = `,
 	} {
-		if !strings.Contains(masterJS, fragment) {
-			t.Errorf("master asset is missing text-only name rendering %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterJS, fragment),
+			"master asset is missing text-only name rendering %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		`option.textContent = entry.name`,
 		`playerCharacterName.textContent = playerState.character.name`,
 		`playerFallbackName.textContent = playerState.fallbackName`,
 	} {
-		if !strings.Contains(playerJS, fragment) {
-			t.Errorf("player asset is missing text-only name rendering %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerJS, fragment),
+			"player asset is missing text-only name rendering %q", fragment)
+
 	}
 	for _, forbidden := range []string{
 		"innerHTML = character.name",
@@ -1595,16 +1609,16 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"innerHTML = entry.name",
 		"innerHTML = playerState.fallbackName",
 	} {
-		if strings.Contains(masterJS, forbidden) || strings.Contains(playerJS, forbidden) {
-			t.Errorf("coordination assets interpolate an unescaped name through %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(masterJS, forbidden) || strings.Contains(playerJS, forbidden),
+			"coordination assets interpolate an unescaped name through %q", forbidden)
+
 	}
 
 	masterSurface := masterHTML + "\n" + masterJS + "\n" + masterCSS
 	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "fallout-terminal.player-token"} {
-		if strings.Contains(masterSurface, forbidden) {
-			t.Errorf("master assets expose player resume-token detail %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(masterSurface, forbidden),
+			"master assets expose player resume-token detail %q", forbidden)
+
 	}
 	for _, fragment := range []string{
 		"const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token'",
@@ -1612,19 +1626,19 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"localStorage.setItem(PLAYER_TOKEN_KEY",
 		"playerRPC.subscribe(request",
 	} {
-		if !strings.Contains(playerJS, fragment) {
-			t.Errorf("player token is not confined to the private handshake/storage path %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerJS, fragment),
+			"player token is not confined to the private handshake/storage path %q", fragment)
+
 	}
 	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "?token", "?session"} {
-		if strings.Contains(playerHTML+"\n"+playerCSS, forbidden) {
-			t.Errorf("player document/style surface leaks token detail %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerHTML+"\n"+playerCSS, forbidden),
+			"player document/style surface leaks token detail %q", forbidden)
+
 	}
 	for _, forbidden := range []string{"URLSearchParams", "location.search", "searchParams.set('browserToken'", `searchParams.set("browserToken"`} {
-		if strings.Contains(playerJS, forbidden) {
-			t.Errorf("player script exposes resume tokens through the URL via %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerJS, forbidden),
+			"player script exposes resume tokens through the URL via %q", forbidden)
+
 	}
 
 	for _, fragment := range []string{
@@ -1635,17 +1649,17 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"playerState.role === 'active'",
 		"pendingSharedAction === null",
 	} {
-		if !strings.Contains(playerJS, fragment) {
-			t.Errorf("player asset is missing observer/local-only action gate %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerJS, fragment),
+			"player asset is missing observer/local-only action gate %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		"#screen.observer-read-only :is(.term-row, .back-btn, .hcell)",
 		"#screen.shared-input-pending :is(.term-row, .back-btn, .hcell)",
 	} {
-		if !strings.Contains(playerCSS, fragment) {
-			t.Errorf("player stylesheet is missing read-only/pending presentation %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerCSS, fragment),
+			"player stylesheet is missing read-only/pending presentation %q", fragment)
+
 	}
 
 	for _, fragment := range []string{
@@ -1653,18 +1667,18 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"if (appliedSharedRevision < pendingSharedAction.acceptedRevision) return",
 		"playerState.revision >= pendingSelection.acceptedRevision",
 	} {
-		if !strings.Contains(playerJS, fragment) {
-			t.Errorf("player asset clears pending input without authoritative revision evidence %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(playerJS, fragment),
+			"player asset clears pending input without authoritative revision evidence %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		"pendingTerminalSwitch = result?.switchId || null",
 		"desktopAPI.resolveTerminalSwitch({ switchId: pendingTerminalSwitch, decision })",
 		"if (!pendingTerminalSwitch || coordinationCommandPending) return",
 	} {
-		if !strings.Contains(masterJS, fragment) {
-			t.Errorf("master asset is missing terminal-switch resolution contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterJS, fragment),
+			"master asset is missing terminal-switch resolution contract %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		`id="playerConfigStatus"`,
@@ -1672,17 +1686,17 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`id="btnNewPlayerConfig"`,
 		`id="playerConfigError"`,
 	} {
-		if !strings.Contains(masterHTML, fragment) {
-			t.Errorf("master asset is missing player-config recovery control %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterHTML, fragment),
+			"master asset is missing player-config recovery control %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		`.coord-panel[data-player-config-active="false"] .roster-management`,
 		`.player-config-error[hidden]`,
 	} {
-		if !strings.Contains(masterCSS, fragment) {
-			t.Errorf("master stylesheet is missing player-config gating contract %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(masterCSS, fragment),
+			"master stylesheet is missing player-config gating contract %q", fragment)
+
 	}
 
 	compactPlayerCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(playerCSS)
@@ -1693,9 +1707,9 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"@media(max-width:760px){",
 		"@media(max-height:720px){",
 	} {
-		if !strings.Contains(compactPlayerCSS, fragment) {
-			t.Errorf("player stylesheet is missing responsive layout boundary %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactPlayerCSS, fragment),
+			"player stylesheet is missing responsive layout boundary %q", fragment)
+
 	}
 	for _, fragment := range []string{
 		"@media(max-width:1050px){",
@@ -1703,9 +1717,9 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"@media(max-width:620px),(max-height:560px){",
 		".terminal-switch-dialog{width:calc(100vw-20px);max-height:calc(100dvh-20px);",
 	} {
-		if !strings.Contains(compactMasterCSS, fragment) {
-			t.Errorf("master stylesheet is missing responsive layout boundary %q", fragment)
-		}
+		assert.Falsef(t, !strings.Contains(compactMasterCSS, fragment),
+			"master stylesheet is missing responsive layout boundary %q", fragment)
+
 	}
 
 	playerSurface := strings.Join([]string{playerHTML, playerCSS, playerJS, playerProtocol}, "\n")
@@ -1717,9 +1731,9 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"resolveTerminalSwitch",
 		"ResolveTerminalSwitch",
 	} {
-		if strings.Contains(playerSurface, forbidden) {
-			t.Errorf("player surface exposes private game-master capability %q", forbidden)
-		}
+		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
+			"player surface exposes private game-master capability %q", forbidden)
+
 	}
 }
 
@@ -1729,16 +1743,16 @@ func TestPlayerBundleImportsOnlyPublicGeneratedContractsAndNoGenericPrivateCarri
 	for _, relative := range []string{"client/client.js", "client/sound.js", "client/index.html"} {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		source := strings.ToLower(string(raw))
 		for _, forbidden := range []string{
 			"fallout/terminal/private", "fallout/terminal/persistence", "protojson", "base64",
 			"genericdispatch", "generic-dispatch", "forcehacksuccess", "resetfailedhack",
 		} {
-			if strings.Contains(source, forbidden) {
-				t.Errorf("%s imports or carries private desktop semantic %q", relative, forbidden)
-			}
+			assert.Falsef(t, strings.Contains(source, forbidden),
+				"%s imports or carries private desktop semantic %q", relative, forbidden)
+
 		}
 	}
 }
@@ -1761,7 +1775,7 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 		path := filepath.Join(root, filepath.FromSlash(relative))
 		info, err := os.Stat(path)
 		if err != nil {
-			t.Fatal(err)
+			require.NoError(t, err)
 		}
 		var files []string
 		if info.IsDir() {
@@ -1775,7 +1789,7 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 				return nil
 			})
 			if err != nil {
-				t.Fatal(err)
+				require.NoError(t, err)
 			}
 		} else {
 			files = []string{path}
@@ -1783,32 +1797,73 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 		for _, candidate := range files {
 			raw, err := os.ReadFile(candidate)
 			if err != nil {
-				t.Fatal(err)
+				require.NoError(t, err)
 			}
 			content := string(raw)
 			lower := strings.ToLower(content)
 			for _, forbidden := range []string{"github.com/coder/websocket", "new websocket", "fakewebsocket", "/api/sounds/", "connect-src 'self' ws:", "connect-src 'self' wss:"} {
-				if strings.Contains(lower, forbidden) {
-					t.Errorf("active cutover surface %s contains %q", candidate, forbidden)
-				}
+				assert.Falsef(t, strings.Contains(lower, forbidden),
+					"active cutover surface %s contains %q", candidate, forbidden)
+
 			}
 			for _, forbidden := range legacyIdentifiers {
-				if strings.Contains(content, forbidden) {
-					t.Errorf("active cutover surface %s contains legacy identifier %q", candidate, forbidden)
-				}
+				assert.Falsef(t, strings.Contains(content, forbidden),
+					"active cutover surface %s contains legacy identifier %q", candidate, forbidden)
+
 			}
-			if strings.Contains(content, "dispatch(msg") || strings.Contains(content, "send({ type:") {
-				t.Errorf("active player surface %s retains a generic message dispatcher", candidate)
-			}
+			assert.Falsef(t, strings.Contains(content, "dispatch(msg") || strings.Contains(content, "send({ type:"),
+				"active player surface %s retains a generic message dispatcher", candidate)
+
 		}
 	}
+	{
 
-	if _, err := os.Stat(filepath.Join(root, "internal", "player", "protocol.go")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("legacy handwritten protocol implementation still exists: %v", err)
+		_, err := os.Stat(filepath.Join(root, "internal", "player", "protocol.go"))
+		assert.Falsef(t, !errors.Is(err, os.ErrNotExist),
+			"legacy handwritten protocol implementation still exists: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "internal", "testutil", "testdata", "protocol")); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("legacy JSON protocol fixture directory still exists: %v", err)
+	{
+
+		_, err := os.Stat(filepath.Join(root, "internal", "testutil", "testdata", "protocol"))
+		assert.Falsef(t, !errors.Is(err, os.ErrNotExist),
+			"legacy JSON protocol fixture directory still exists: %v", err)
 	}
+
+}
+
+func TestRetainedLegacyPlayerDocumentsAreExplicitlyHistoricalAndLinkCurrentContract(t *testing.T) {
+	t.Parallel()
+	root := assetRepositoryRoot(t)
+	directories := []string{
+		"specs/001-wails-v2-migration",
+		"specs/003-hacking-game-evolution",
+		"specs/004-player-sessions-control",
+	}
+	legacyDocuments := 0
+	for _, relative := range directories {
+		err := filepath.WalkDir(filepath.Join(root, filepath.FromSlash(relative)), func(path string, entry fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || filepath.Ext(path) != ".md" {
+				return nil
+			}
+			raw, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			lower := strings.ToLower(string(raw))
+			if !strings.Contains(lower, "websocket") && !strings.Contains(lower, "ws:") && !strings.Contains(lower, "wss:") && !strings.Contains(lower, "handwritten json player") {
+				return nil
+			}
+			legacyDocuments++
+			require.Contains(t, string(raw), "SUPERSEDED LEGACY PLAYER TRANSPORT — HISTORICAL, NON-AUTHORITATIVE", path)
+			require.Contains(t, string(raw), "005-connectrpc-protobuf-migration/contracts/public-player.md", path)
+			return nil
+		})
+		require.NoError(t, err)
+	}
+	require.Greater(t, legacyDocuments, 1, "the scan must cover retained documents beyond feature 001")
 }
 
 func assertNonEmptyFiles(t *testing.T, root string, paths []string) {
@@ -1816,12 +1871,12 @@ func assertNonEmptyFiles(t *testing.T, root string, paths []string) {
 	for _, path := range paths {
 		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(path)))
 		if err != nil {
-			t.Errorf("required asset %q: %v", path, err)
+			assert.Failf(t, "assertion failed", "required asset %q: %v", path, err)
 			continue
 		}
-		if !info.Mode().IsRegular() || info.Size() == 0 {
-			t.Errorf("required asset %q is not a non-empty regular file", path)
-		}
+		assert.Falsef(t, !info.Mode().IsRegular() || info.Size() == 0,
+			"required asset %q is not a non-empty regular file", path)
+
 	}
 }
 
@@ -1837,8 +1892,8 @@ func containsExtension(paths []string, extension string) bool {
 func assetRepositoryRoot(t *testing.T) string {
 	t.Helper()
 	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot resolve asset-manifest test location")
-	}
+	require.False(t, !ok,
+		"cannot resolve asset-manifest test location")
+
 	return filepath.Clean(filepath.Join(filepath.Dir(filename), "..", ".."))
 }

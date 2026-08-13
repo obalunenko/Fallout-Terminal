@@ -2,6 +2,8 @@
 
 **Branch**: `005-connectrpc-protobuf-migration` | **Date**: 2026-08-13 | **Spec**: `specs/005-connectrpc-protobuf-migration/spec.md`
 
+**Bugfix**: 2026-08-13 — BUG-001 Updated from bugfix patch
+
 ## Summary
 
 Replace the handwritten public WebSocket/JSON player protocol with a protobuf-first ConnectRPC boundary while preserving the current Wails desktop surface, portable JSON files, server-authoritative coordination, gameplay, sound, ngrok, and packaged-offline behavior. Versioned public, private-desktop, persistence, and configuration schemas will generate detached Go boundary values; the public package alone will also generate ECMAScript descriptors consumed by a bundled same-origin Connect browser client. The migration starts with a thin generated subscription/snapshot and unary-selection proof, then moves every responsibility to typed procedures and compound revisioned publications before removing the WebSocket route, dependency, fixtures, CSP allowances, and active legacy documentation.
@@ -135,11 +137,11 @@ The pre-research gate passes, and the post-design re-check passes against the co
 
 ### 1. Freeze the inventory and toolchain
 
-Treat `contracts/inventory.md` as the blocking migration ledger. Add Buf v2 configuration and pin Buf CLI `v1.72.0`, Protocol Buffers compiler/toolchain `v35.0`, `protoc-gen-go`/Go runtime `v1.36.11`, Connect-Go/generator `v1.20.0`, Protobuf-ES/generator `2.13.0`, and Connect-ES browser packages `2.1.2`. Go 1.26 tool directives own the Go generators and Buf CLI; `client/package-lock.json` owns the ECMAScript generator, runtime, Connect transport, and Vite bundle. Generation writes only to the isolated generated trees, and a second clean generation must produce zero diff.
+Treat `contracts/inventory.md` as the blocking migration ledger. Add Buf v2 configuration and pin Buf CLI `v1.72.0`, ~~Protocol Buffers compiler/toolchain `v35.0`,~~ `protoc-gen-go`/Go runtime `v1.36.11`, Connect-Go/generator `v1.20.0`, Protobuf-ES/generator `2.13.0`, and Connect-ES browser packages `2.1.2`. **BUG-001 correction**: the standalone compiler pin is superseded because the pinned Buf CLI owns the in-process protobuf compiler used by `buf generate`; generation MUST NOT download or invoke Google `protoc`. Go 1.26 tool directives own the Go generators and Buf CLI; `client/package-lock.json` owns the ECMAScript generator, runtime, Connect transport, and Vite bundle. Generation writes only to the isolated generated trees through the checked-in `proto/buf.gen.go.yaml` and `proto/buf.gen.es.yaml` templates, and a second clean generation must produce zero diff. Buf-generated Go headers reporting `protoc unknown` are acceptable when generated markers, plugin pins, schema revision, deterministic hashes, and output isolation all verify.
 
 ### 2. Define public and private schema graphs
 
-Create `fallout.terminal.player.v1` as the only player-bundle input. It exposes `PlayerService` with `Subscribe`, `SelectCharacter`, `Navigate`, `Guess`, `ActivatePattern`, and `SoundManifest`; it imports no private, persistence, configuration, native-path, tunnel, credential, or secret-hacking package. Define `fallout.terminal.private.v1`, `fallout.terminal.persistence.v1`, and `fallout.terminal.config.v1` as separate private graphs. Generate Go for all four graphs and ECMAScript only for the public graph, then verify descriptors and transitive imports.
+Create `fallout.terminal.player.v1` as the only player-bundle input. It exposes `PlayerService` with `Subscribe`, `SelectCharacter`, `Navigate`, `Guess`, `ActivatePattern`, and `SoundManifest`; it imports no private, persistence, configuration, native-path, tunnel, credential, or secret-hacking package. Define `fallout.terminal.private.v1`, `fallout.terminal.persistence.v1`, and `fallout.terminal.config.v1` as separate private graphs. Generate Go for all four graphs with `buf generate --template proto/buf.gen.go.yaml` and ECMAScript only for the public graph with `buf generate --template proto/buf.gen.es.yaml`, then verify descriptors and transitive imports.
 
 ### 3. Build the thin vertical proof before bulk migration
 
@@ -174,7 +176,7 @@ After all Go, browser, local, ngrok, sound, reconnect, concurrency, and packaged
 | Surface | Automated evidence | Expected result |
 |---|---|---|
 | Inventory and schema shape | Inventory classifier; `buf format --diff --exit-code`; `buf lint`; descriptor assertions | Zero unclassified items, zero lint/format findings, exact packages/procedures/variants |
-| Reproducible generation | Two clean `buf generate` passes; generated-header/hash check; `git diff --exit-code` | Byte-identical Go/ECMAScript output and one schema revision |
+| Reproducible generation | Two clean pinned-Buf generation passes through `proto/buf.gen.go.yaml` and `proto/buf.gen.es.yaml`; generated-marker/plugin/schema-revision/hash checks compatible with `protoc unknown`; `git diff --exit-code`; scan for standalone `protoc` download or invocation | Byte-identical Go/ECMAScript output, one schema revision, and no standalone compiler path |
 | Compatibility | `buf breaking` against the established git baseline; negative fixture edits | Field-number/type, enum, package, and service breaks are rejected once a baseline exists |
 | Public/private separation | Descriptor import walk, generated-client dependency walk, bundled-source scan | No private/native/persistence/tunnel/credential/secret contract reaches the player |
 | Go adapters and domain | `gofmt -l .`; `go vet ./...`; `go test ./...` | No formatting paths; all generated, adapter, domain, persistence, and transport tests pass |
@@ -186,4 +188,3 @@ After all Go, browser, local, ngrok, sound, reconnect, concurrency, and packaged
 | Long-lived operation | Three-to-four-hour local and authenticated-ngrok soak | Idle stream stays usable or reconnects to a complete current snapshot |
 | Packaging | `wails build -clean -platform darwin/arm64`; packaged `.app` smoke with networking disabled | Generated player code and all static/sound assets load without CDN or development server |
 | Final cutover | Source, dependency, route, CSP, fixture, built-bundle, and docs scans | Zero active WebSocket implementation, dependency, envelope, fixture, allowance, or permanent dual stack |
-

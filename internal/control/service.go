@@ -131,6 +131,7 @@ type transition struct {
 	accepted bool
 	persist  bool
 	effects  []Effect
+	boundary func(uint64)
 }
 
 type transitionResult struct {
@@ -287,27 +288,6 @@ func (service *Service) ActiveStreamCount() int {
 		}
 	}
 	return count
-}
-
-// CompoundUpdates returns one complete personalized authoritative value per
-// currently recognized session for revision. This is a detached post-commit
-// projection used by the generated public stream boundary.
-func (service *Service) CompoundUpdates(revision uint64) map[domain.LogicalSessionID]*domain.CompoundUpdate {
-	updates := make(map[domain.LogicalSessionID]*domain.CompoundUpdate)
-	if service == nil {
-		return updates
-	}
-	service.mu.RLock()
-	defer service.mu.RUnlock()
-	if revision == 0 || revision > service.runtime.Revision {
-		return updates
-	}
-	for _, sessionID := range sortedSessionIDs(&service.runtime) {
-		if update := service.compoundUpdateLocked(&service.runtime, sessionID, revision); update != nil {
-			updates[sessionID] = update
-		}
-	}
-	return updates
 }
 
 func (service *Service) compoundUpdateLocked(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, revision uint64) *domain.CompoundUpdate {
@@ -1089,6 +1069,16 @@ func (service *Service) AttachConnection(connectionID domain.ConnectionID, brows
 // active terminal projection is read under the same coordinator order and
 // never creates or regenerates a puzzle.
 func (service *Service) AttachSubscription(connectionID domain.ConnectionID, recognitionHandle *domain.RecognitionHandle) (*domain.PersonalizedSnapshot, error) {
+	return service.AttachSubscriptionAndRegister(connectionID, recognitionHandle, nil)
+}
+
+// AttachSubscriptionAndRegister makes canonical attachment, complete snapshot
+// capture, and transport registration one ordered boundary. register runs with
+// the committed revision while the coordinator lock is still held and before
+// any revision-R effects are published, so a later mutation can neither pass
+// the snapshot nor publish before the physical stream is ready to receive it.
+// The callback must not call back into Service.
+func (service *Service) AttachSubscriptionAndRegister(connectionID domain.ConnectionID, recognitionHandle *domain.RecognitionHandle, register func(*domain.PersonalizedSnapshot)) (*domain.PersonalizedSnapshot, error) {
 	if service == nil {
 		return nil, fmt.Errorf("coordinator is not configured")
 	}
@@ -1121,7 +1111,7 @@ func (service *Service) AttachSubscription(connectionID domain.ConnectionID, rec
 			runtime.SessionsByID[sessionID] = session
 			runtime.SessionIDByBrowserToken[returnedToken] = sessionID
 			snapshot = service.subscriptionSnapshot(runtime, sessionID, returnedToken)
-			return transition{accepted: true, effects: presenceEffects(runtime)}
+			return transition{accepted: true, effects: presenceEffects(runtime), boundary: subscriptionBoundary(&snapshot, register)}
 		}
 
 		returnedToken = browserToken
@@ -1130,7 +1120,7 @@ func (service *Service) AttachSubscription(connectionID domain.ConnectionID, rec
 		}
 		if _, alreadyAttached := session.ConnectionIDs[connectionID]; alreadyAttached {
 			snapshot = service.subscriptionSnapshot(runtime, sessionID, returnedToken)
-			return transition{}
+			return transition{boundary: subscriptionBoundary(&snapshot, register)}
 		}
 		wasConnected := len(session.ConnectionIDs) > 0
 		otherPresenceChanged := removeConnectionFromOtherSessions(runtime, connectionID, sessionID)
@@ -1140,7 +1130,7 @@ func (service *Service) AttachSubscription(connectionID domain.ConnectionID, rec
 		if !wasConnected || otherPresenceChanged {
 			effects = presenceEffects(runtime)
 		}
-		return transition{accepted: true, effects: effects}
+		return transition{accepted: true, effects: effects, boundary: subscriptionBoundary(&snapshot, register)}
 	})
 	if snapshot == nil {
 		return nil, fmt.Errorf("could not capture subscription snapshot")
@@ -1148,6 +1138,21 @@ func (service *Service) AttachSubscription(connectionID domain.ConnectionID, rec
 	snapshot.Revision = result.revision
 	snapshot.PlayerState.Revision = result.revision
 	return domain.ClonePersonalizedSnapshot(snapshot), nil
+}
+
+func subscriptionBoundary(snapshot **domain.PersonalizedSnapshot, register func(*domain.PersonalizedSnapshot)) func(uint64) {
+	return func(revision uint64) {
+		if snapshot == nil || *snapshot == nil {
+			return
+		}
+		(*snapshot).Revision = revision
+		if (*snapshot).PlayerState != nil {
+			(*snapshot).PlayerState.Revision = revision
+		}
+		if register != nil {
+			register(domain.ClonePersonalizedSnapshot(*snapshot))
+		}
+	}
 }
 
 func (service *Service) subscriptionSnapshot(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, handle domain.BrowserToken) *domain.PersonalizedSnapshot {
@@ -1443,9 +1448,10 @@ func (service *Service) nextID() string {
 
 // commit is the sole canonical transaction boundary. The mutation runs on a
 // private deep copy, so rejection cannot leak partial state. Accepted changes,
-// effect revision stamping, detachment, and synchronous enqueueing all occur
-// before the mutex is released, preventing later transitions from publishing
-// ahead of an earlier one.
+// boundary registration, complete compound-update assembly, effect revision
+// stamping, detachment, and synchronous enqueueing all occur before the mutex
+// is released, preventing later transitions from publishing ahead of an
+// earlier one.
 func (service *Service) commit(apply func(*domain.ProcessRuntime) transition) transitionResult {
 	service.mu.Lock()
 	defer service.mu.Unlock()
@@ -1460,15 +1466,19 @@ func (service *Service) commit(apply func(*domain.ProcessRuntime) transition) tr
 		service.runtime = *working
 	}
 	revision := service.runtime.Revision
-	updatedSessions := make(map[domain.LogicalSessionID]struct{})
+	if result.boundary != nil {
+		result.boundary(revision)
+	}
 	for _, effect := range result.effects {
-		if result.accepted && effect.SessionID != "" {
-			if _, exists := updatedSessions[effect.SessionID]; !exists {
-				effect.Update = service.compoundUpdateLocked(&service.runtime, effect.SessionID, revision)
-				updatedSessions[effect.SessionID] = struct{}{}
+		service.enqueue(detachEffect(effect, revision))
+	}
+	if result.accepted {
+		for _, sessionID := range sortedSessionIDs(&service.runtime) {
+			update := service.compoundUpdateLocked(&service.runtime, sessionID, revision)
+			if update != nil {
+				service.enqueue(detachEffect(Effect{SessionID: sessionID, Update: update}, revision))
 			}
 		}
-		service.enqueue(detachEffect(effect, revision))
 	}
 	return transitionResult{accepted: result.accepted, revision: revision}
 }
