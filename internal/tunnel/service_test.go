@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -274,6 +275,23 @@ func TestServiceSuccessReturnsPublicInfoWithoutCredentialsAndRemovesPolicy(t *te
 	}
 	if strings.Contains(strings.Join(runner.spec.Args, " "), config.Credentials.Password) {
 		t.Fatalf("process arguments disclosed password: %#v", runner.spec.Args)
+	}
+	wantArgs := []string{
+		"http", "3690",
+		"--url", "https://fallout-terminal.ngrok.app",
+		"--traffic-policy-file", runner.spec.Args[5],
+		"--log", "stdout",
+		"--log-format", "json",
+	}
+	if !reflect.DeepEqual(runner.spec.Args, wantArgs) {
+		t.Fatalf("protected forwarding args = %#v, want %#v", runner.spec.Args, wantArgs)
+	}
+	policyRaw, err := os.ReadFile(runner.spec.Args[5])
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("inspect short-lived auth policy: %v", err)
+	}
+	if len(policyRaw) > 0 && (!bytes.Contains(policyRaw, []byte(`"type":"basic-auth"`)) || !bytes.Contains(policyRaw, []byte(`"enforce":true`))) {
+		t.Fatalf("ngrok policy is not fail-closed Basic Auth: %s", policyRaw)
 	}
 	assertNoPolicyDirectories(t, config.PolicyParent)
 

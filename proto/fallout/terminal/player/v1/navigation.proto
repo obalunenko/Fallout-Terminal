@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package fallout.terminal.player.v1;
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
+
+enum NavigationMode {
+  NAVIGATION_MODE_UNSPECIFIED = 0;
+  NAVIGATION_MODE_LIST = 1;
+  NAVIGATION_MODE_ENTRY = 2;
+}
+
+message NavigationState {
+  repeated string path = 1;
+  NavigationMode mode = 2;
+  optional string view_entry_id = 3;
+  optional string command_node_id = 4;
+}
+
+message NavigateBack {}
+
+message NavigateEnter {
+  string node_id = 1;
+}
+
+message NavigateCommand {
+  string node_id = 1;
+}
+
+message NavigateEntry {
+  string node_id = 1;
+}
+
+message NavigateRequest {
+  string recognition_handle = 1;
+  string request_id = 2;
+  string broadcast_id = 3;
+  string terminal_id = 4;
+  oneof action {
+    NavigateBack back = 5;
+    NavigateEnter enter = 6;
+    NavigateCommand command = 7;
+    NavigateEntry entry = 8;
+  }
+}

@@ -1,6 +1,9 @@
 package platform
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,7 +13,168 @@ import (
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1"
+	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
+	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
+	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 )
+
+func TestProtobufContractShapeAndSeparation(t *testing.T) {
+	t.Parallel()
+
+	service := playerv1.File_fallout_terminal_player_v1_player_proto.Services().ByName("PlayerService")
+	if service == nil {
+		t.Fatal("public descriptor is missing PlayerService")
+	}
+	wantMethods := []string{"Subscribe", "SelectCharacter", "Navigate", "Guess", "ActivatePattern", "SoundManifest"}
+	if service.Methods().Len() != len(wantMethods) {
+		t.Fatalf("PlayerService methods = %d, want %d", service.Methods().Len(), len(wantMethods))
+	}
+	for index, want := range wantMethods {
+		method := service.Methods().Get(index)
+		if got := string(method.Name()); got != want {
+			t.Errorf("PlayerService method %d = %q, want %q", index, got, want)
+		}
+		if want == "Subscribe" {
+			if method.IsStreamingClient() || !method.IsStreamingServer() {
+				t.Errorf("Subscribe must be server-streaming only")
+			}
+		} else if method.IsStreamingClient() || method.IsStreamingServer() {
+			t.Errorf("%s must be unary", want)
+		}
+	}
+
+	var publicFiles []protoreflect.FileDescriptor
+	protoregistry.GlobalFiles.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		if strings.HasPrefix(string(file.Package()), "fallout.terminal.player.v1") {
+			publicFiles = append(publicFiles, file)
+		}
+		return true
+	})
+	if len(publicFiles) == 0 {
+		t.Fatal("generated public descriptor graph is empty")
+	}
+	for _, file := range publicFiles {
+		imports := file.Imports()
+		for index := 0; index < imports.Len(); index++ {
+			imported := imports.Get(index)
+			if !strings.HasPrefix(imported.Path(), "fallout/terminal/player/v1/") {
+				t.Errorf("public descriptor %s imports non-public schema %s", file.Path(), imported.Path())
+			}
+		}
+	}
+
+	protoregistry.GlobalFiles.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		if !strings.HasPrefix(string(file.Package()), "fallout.terminal.") {
+			return true
+		}
+		checkEnumZeroValues(t, file.Enums())
+		checkMessageContractShape(t, file.Messages())
+		return true
+	})
+
+	optionalFields := map[protoreflect.FullName]bool{
+		"fallout.terminal.player.v1.PlayerState.broadcast_id":                     true,
+		"fallout.terminal.player.v1.PlayerState.active_terminal_id":               true,
+		"fallout.terminal.player.v1.SubscribeRequest.recognition_handle":          true,
+		"fallout.terminal.player.v1.NavigationState.view_entry_id":                true,
+		"fallout.terminal.player.v1.NavigationState.command_node_id":              true,
+		"fallout.terminal.persistence.v1.Session.player_config":                   true,
+		"fallout.terminal.config.v1.TunnelConfig.policy_parent":                   true,
+		"fallout.terminal.private.v1.CharacterState.logical_session_id":           true,
+		"fallout.terminal.private.v1.LogicalSessionState.character_id":            true,
+		"fallout.terminal.private.v1.BroadcastState.active_controller_session_id": true,
+		"fallout.terminal.private.v1.BroadcastState.active_terminal_id":           true,
+	}
+	for name := range optionalFields {
+		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
+		if err != nil {
+			t.Errorf("semantic optional field %s missing: %v", name, err)
+			continue
+		}
+		field, ok := descriptor.(protoreflect.FieldDescriptor)
+		if !ok || !field.HasOptionalKeyword() {
+			t.Errorf("%s must use proto3 optional presence", name)
+		}
+	}
+
+	for _, name := range []protoreflect.FullName{
+		"fallout.terminal.player.v1.SubscriptionMessage.payload",
+		"fallout.terminal.player.v1.NavigateRequest.action",
+		"fallout.terminal.player.v1.GuessRequest.target",
+		"fallout.terminal.player.v1.ContentNode.content",
+		"fallout.terminal.player.v1.TerminalPresentation.presentation",
+		"fallout.terminal.persistence.v1.ContentNode.content",
+	} {
+		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
+		if err != nil {
+			t.Errorf("required oneof %s missing: %v", name, err)
+			continue
+		}
+		if _, ok := descriptor.(protoreflect.OneofDescriptor); !ok {
+			t.Errorf("%s is not a oneof descriptor", name)
+		}
+	}
+}
+
+func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	paths, err := filepath.Glob(filepath.Join(root, "proto", "fallout", "terminal", "*", "v1", "*.proto"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(paths)
+	outer := sha256.New()
+	for _, path := range paths {
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inner := sha256.Sum256(raw)
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		outer.Write([]byte(hex.EncodeToString(inner[:]) + "  " + filepath.ToSlash(relative) + "\n"))
+	}
+	wantRaw, err := os.ReadFile(filepath.Join(root, "proto", "schema-revision.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := hex.EncodeToString(outer.Sum(nil)), strings.TrimSpace(string(wantRaw)); got != want {
+		t.Fatalf("schema revision = %s, want %s; run scripts/proto-generate.sh after schema edits", got, want)
+	}
+}
+
+func checkEnumZeroValues(t *testing.T, enums protoreflect.EnumDescriptors) {
+	t.Helper()
+	for index := 0; index < enums.Len(); index++ {
+		enum := enums.Get(index)
+		if enum.Values().Len() == 0 || enum.Values().Get(0).Number() != 0 || !strings.HasSuffix(string(enum.Values().Get(0).Name()), "_UNSPECIFIED") {
+			t.Errorf("enum %s must define an UNSPECIFIED zero value", enum.FullName())
+		}
+	}
+}
+
+func checkMessageContractShape(t *testing.T, messages protoreflect.MessageDescriptors) {
+	t.Helper()
+	for index := 0; index < messages.Len(); index++ {
+		message := messages.Get(index)
+		checkEnumZeroValues(t, message.Enums())
+		checkMessageContractShape(t, message.Messages())
+		fields := message.Fields()
+		for fieldIndex := 0; fieldIndex < fields.Len(); fieldIndex++ {
+			field := fields.Get(fieldIndex)
+			if message.ReservedNames().Has(field.Name()) || message.ReservedRanges().Has(field.Number()) {
+				t.Errorf("active field %s collides with a reserved identifier", field.FullName())
+			}
+		}
+	}
+}
 
 func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 	t.Parallel()
@@ -145,7 +309,7 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		"await Promise.all(oneShotFolders.map(loadFolder));",
 		"const buffer = await context.decodeAudioData(raw.slice(0));",
 		"if (!rawBufs.has(url)) await prefetch(url);",
-		"await Promise.all(supported.map(file =>",
+		"await Promise.all(supported.map(prefetch));",
 		"enableWebAudio();",
 		"reportPlayback(url);",
 		"playFromFolder('single', 0.55)",
@@ -162,7 +326,7 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 	}
 
 	playerScript := read("client/client.js")
-	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack) {")
+	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack, revision = appliedSharedRevision) {")
 	if outcomeStart < 0 {
 		t.Fatal("player script is missing the common authoritative hacking-outcome boundary")
 	}
@@ -193,19 +357,19 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		}
 	}
 
-	actionResultStart := strings.Index(playerScript, "} else if (msg.type === 'ACTION_RESULT') {")
+	actionResultStart := strings.Index(playerScript, "async function applyMutationResult(operation) {")
 	if actionResultStart < 0 {
-		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+		t.Fatal("player script is missing typed mutation-result boundary")
 	}
-	actionResultEnd := strings.Index(playerScript[actionResultStart:], "} else if (msg.type === 'TERMINAL_LIVE') {")
+	actionResultEnd := strings.Index(playerScript[actionResultStart:], "function actionReasonName(reason) {")
 	if actionResultEnd < 0 {
-		t.Fatal("player script is missing ACTION_RESULT dispatch boundary")
+		t.Fatal("player script is missing typed mutation-result boundary")
 	}
 	if strings.Contains(playerScript[actionResultStart:actionResultStart+actionResultEnd], "playHack") {
 		t.Error("ACTION_RESULT must not optimistically play hacking outcome audio")
 	}
 
-	beginActionStart := strings.Index(playerScript, "function beginSharedAction(type, fields) {")
+	beginActionStart := strings.Index(playerScript, "function beginSharedMutation(procedure, invoke) {")
 	if beginActionStart < 0 {
 		t.Fatal("player script is missing the shared-action presentation boundary")
 	}
@@ -480,8 +644,8 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		"localStorage.getItem(PLAYER_TOKEN_KEY)",
 		"localStorage.setItem(PLAYER_TOKEN_KEY",
 		"option.textContent = entry.name",
-		"type: 'SESSION_HELLO'",
-		"type: 'CHARACTER_SELECT'",
+		"playerRPC.subscribe(request",
+		"playerRPC.selectCharacter({",
 	} {
 		if !strings.Contains(js, fragment) {
 			t.Errorf("player script is missing safe selection/identity contract %q", fragment)
@@ -692,8 +856,8 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 			t.Errorf("bundled player still exposes removed hacking shortcut %q", forbidden)
 		}
 	}
-	if !strings.Contains(string(playerScript), "beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })") {
-		t.Error("ordinary candidate and filler cells must continue through HACK_GUESS")
+	if !strings.Contains(string(playerScript), "beginGuess(cell.dataset.target)") {
+		t.Error("ordinary candidate and filler cells must continue through the typed Guess procedure")
 	}
 }
 
@@ -713,13 +877,13 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 		"playerState.role === 'active'",
 		"playerState.phase === 'controlling'",
 		"pendingSharedAction === null",
-		"function beginSharedAction(type, fields)",
-		"beginSharedAction('NAV_ACTION', { action: 'enter', nodeId: node.id })",
-		"beginSharedAction('NAV_ACTION', { action: 'command', nodeId: node.id })",
-		"beginSharedAction('NAV_ACTION', { action: 'entry', nodeId: node.id })",
-		"beginSharedAction('NAV_ACTION', { action: 'back' })",
-		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id })",
-		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })",
+		"function beginSharedMutation(procedure, invoke)",
+		"beginNavigation('enter', node.id)",
+		"beginNavigation('command', node.id)",
+		"beginNavigation('entry', node.id)",
+		"beginNavigation('back')",
+		"beginPattern(pattern.id)",
+		"beginGuess(cell.dataset.target)",
 		"activateRow(kids[selIndex])",
 		"goBack()",
 	} {
@@ -765,7 +929,7 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 		}
 	}
 
-	protocol, err := os.ReadFile(filepath.Join(root, "internal", "player", "protocol.go"))
+	protocol, err := os.ReadFile(filepath.Join(root, "internal", "player", "handler.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -794,8 +958,8 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 		"offset >= pattern.start && offset <= pattern.end",
 		"`[data-row=\"${pattern.row}\"][data-offset]`",
 		"if (pattern.used) setHackPatternHover(null)",
-		"beginSharedAction('HACK_PATTERN', { patternId: pattern.id })",
-		"beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })",
+		"beginPattern(pattern.id)",
+		"beginGuess(cell.dataset.target)",
 	} {
 		if !strings.Contains(playerScript, required) {
 			t.Errorf("bundled player is missing pattern interaction contract %q", required)
@@ -834,9 +998,9 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"const pattern = patternAtCell(cell)",
 		"pattern.row === row && pattern.start === offset",
 		"if (pattern && !pattern.used)",
-		"if (beginSharedAction('HACK_PATTERN', { patternId: pattern.id })) playEnter();",
+		"if (beginPattern(pattern.id)) playEnter();",
 		"if (pattern) return;",
-		"if (beginSharedAction('HACK_GUESS', { targetId: cell.dataset.target })) playEnter();",
+		"if (beginGuess(cell.dataset.target)) playEnter();",
 		"class=\"hcell word\"",
 		"class=\"hcell filler\"",
 	} {
@@ -895,7 +1059,7 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 	desktopAPI := read("frontend", "src", "desktop-api.js")
 	playerJS := read("client", "client.js")
 	playerHTML := read("client", "index.html")
-	playerProtocol := read("internal", "player", "protocol.go")
+	playerProtocol := read("internal", "player", "handler.go")
 	appBoundary := read("app.go")
 	for _, required := range []string{
 		`id="btnHackSuccess"`,
@@ -955,7 +1119,7 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 	}
 	playerSurface := strings.Join([]string{
 		read("client/index.html"), read("client/client.css"), read("client/client.js"),
-		read("internal/player/protocol.go"), read("internal/player/server.go"),
+		read("internal/player/handler.go"), read("internal/player/server.go"),
 	}, "\n")
 	for _, forbidden := range []string{"ResetFailedHack", "resetFailedHack", "btnResetFailedHack", "HACK_RESET", "URLSearchParams", "location.search"} {
 		if strings.Contains(playerSurface, forbidden) {
@@ -1058,7 +1222,7 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		read("client/index.html"),
 		read("client/client.css"),
 		read("client/client.js"),
-		read("internal/player/protocol.go"),
+		read("internal/player/handler.go"),
 	}, "\n")
 	for _, forbidden := range []string{
 		"terminalSwitchDialog",
@@ -1270,20 +1434,20 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	source := string(raw)
 	requiredFragments := []string{
 		"//go:embed all:frontend/dist\nvar frontendSource embed.FS",
-		"//go:embed all:client\nvar playerSource embed.FS",
+		"//go:embed all:client/dist\nvar playerSource embed.FS",
 		`fs.Sub(frontendSource, "frontend/dist")`,
-		`fs.Sub(playerSource, "client")`,
+		`fs.Sub(playerSource, "client/dist")`,
 		"Assets: frontendAssets",
 		"composeApplication(playerAssets)",
-		"Assets: playerAssets",
+		"Assets:  playerAssets",
 	}
 	for _, fragment := range requiredFragments {
 		if !strings.Contains(source, fragment) {
 			t.Errorf("main.go is missing production asset wiring %q", fragment)
 		}
 	}
-	if strings.Contains(source, "//go:embed all:frontend/dist all:client") ||
-		strings.Contains(source, "//go:embed all:client all:frontend/dist") {
+	if strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
+		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist") {
 		t.Error("master and remote-player assets share one embed directive; their serving boundaries must remain separate")
 	}
 
@@ -1293,6 +1457,70 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	}
 	if !strings.Contains(string(viteConfig), `./dist/.keep`) {
 		t.Error("Vite build does not restore frontend/dist/.keep after emptyOutDir")
+	}
+}
+
+func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	dist := filepath.Join(root, "client", "dist")
+	entries, err := os.ReadDir(dist)
+	if err != nil {
+		t.Fatalf("client/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
+	}
+	if len(entries) == 1 && entries[0].Name() == ".keep" {
+		return
+	}
+	assertNonEmptyFiles(t, dist, []string{"index.html"})
+
+	var bundleFiles []string
+	err = filepath.WalkDir(dist, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(dist, path)
+		if err != nil {
+			return err
+		}
+		bundleFiles = append(bundleFiles, filepath.ToSlash(relative))
+		if extension := strings.ToLower(filepath.Ext(path)); extension == ".html" || extension == ".js" || extension == ".css" {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, forbidden := range []string{"https://cdn.", "http://localhost:", "http://127.0.0.1:5173", "@vite/client"} {
+				if strings.Contains(string(raw), forbidden) {
+					t.Errorf("packaged player asset %s depends on %q", relative, forbidden)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for extension, description := range map[string]string{".js": "generated player bundle", ".css": "player stylesheet", ".ttf": "Fixedsys font"} {
+		if !containsExtension(bundleFiles, extension) {
+			t.Errorf("packaged player is missing %s", description)
+		}
+	}
+	for _, category := range []string{"ambient", "charscroll", "enter", "hack-bad", "hack-good", "menu-focus", "multiple", "single"} {
+		entries, err := os.ReadDir(filepath.Join(dist, "sounds", category))
+		if err != nil || len(entries) == 0 {
+			t.Errorf("packaged player sound category %s is missing: %v", category, err)
+		}
+	}
+
+	mainSource, err := os.ReadFile(filepath.Join(root, "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`) {
+		t.Error("production does not embed only the complete built player application")
 	}
 }
 
@@ -1316,7 +1544,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 	playerJS := read("client/client.js")
 	playerCSS := read("client/client.css")
 	playerHTTP := read("internal/player/http.go")
-	playerProtocol := read("internal/player/protocol.go")
+	playerProtocol := read("internal/player/handler.go")
 
 	for _, directive := range []string{
 		`default-src 'self'`,
@@ -1382,7 +1610,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token'",
 		"localStorage.getItem(PLAYER_TOKEN_KEY)",
 		"localStorage.setItem(PLAYER_TOKEN_KEY",
-		"sendSessionHello(socket, browserToken)",
+		"playerRPC.subscribe(request",
 	} {
 		if !strings.Contains(playerJS, fragment) {
 			t.Errorf("player token is not confined to the private handshake/storage path %q", fragment)
@@ -1492,6 +1720,94 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		if strings.Contains(playerSurface, forbidden) {
 			t.Errorf("player surface exposes private game-master capability %q", forbidden)
 		}
+	}
+}
+
+func TestPlayerBundleImportsOnlyPublicGeneratedContractsAndNoGenericPrivateCarriers(t *testing.T) {
+	t.Parallel()
+	root := assetRepositoryRoot(t)
+	for _, relative := range []string{"client/client.js", "client/sound.js", "client/index.html"} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := strings.ToLower(string(raw))
+		for _, forbidden := range []string{
+			"fallout/terminal/private", "fallout/terminal/persistence", "protojson", "base64",
+			"genericdispatch", "generic-dispatch", "forcehacksuccess", "resetfailedhack",
+		} {
+			if strings.Contains(source, forbidden) {
+				t.Errorf("%s imports or carries private desktop semantic %q", relative, forbidden)
+			}
+		}
+	}
+}
+
+func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	paths := []string{
+		"client/client.js", "client/sound.js", "client/index.html",
+		"internal/player", "internal/testutil/testdata", "tests/browser/fixture-server",
+		"go.mod", "README.md", "docs",
+	}
+	legacyIdentifiers := []string{
+		"SESSION_HELLO", "CHARACTER_SELECT", "NAV_ACTION", "HACK_GUESS", "HACK_PATTERN",
+		"SESSION_WELCOME", "PLAYER_STATE", "ACTION_RESULT", "TERMINAL_LIVE", "TERMINAL_UPDATE",
+		"TERMINAL_CLEAR", "NAV_STATE", "HACK_STATE", "HACK_ADMIN",
+	}
+	for _, relative := range paths {
+		path := filepath.Join(root, filepath.FromSlash(relative))
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var files []string
+		if info.IsDir() {
+			err = filepath.WalkDir(path, func(candidate string, entry fs.DirEntry, walkErr error) error {
+				if walkErr != nil {
+					return walkErr
+				}
+				if !entry.IsDir() && !strings.Contains(filepath.ToSlash(candidate), "/gen/") && !strings.Contains(filepath.ToSlash(candidate), "/dist/") && !strings.Contains(filepath.ToSlash(candidate), "/node_modules/") {
+					files = append(files, candidate)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			files = []string{path}
+		}
+		for _, candidate := range files {
+			raw, err := os.ReadFile(candidate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			content := string(raw)
+			lower := strings.ToLower(content)
+			for _, forbidden := range []string{"github.com/coder/websocket", "new websocket", "fakewebsocket", "/api/sounds/", "connect-src 'self' ws:", "connect-src 'self' wss:"} {
+				if strings.Contains(lower, forbidden) {
+					t.Errorf("active cutover surface %s contains %q", candidate, forbidden)
+				}
+			}
+			for _, forbidden := range legacyIdentifiers {
+				if strings.Contains(content, forbidden) {
+					t.Errorf("active cutover surface %s contains legacy identifier %q", candidate, forbidden)
+				}
+			}
+			if strings.Contains(content, "dispatch(msg") || strings.Contains(content, "send({ type:") {
+				t.Errorf("active player surface %s retains a generic message dispatcher", candidate)
+			}
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "internal", "player", "protocol.go")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("legacy handwritten protocol implementation still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "internal", "testutil", "testdata", "protocol")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("legacy JSON protocol fixture directory still exists: %v", err)
 	}
 }
 

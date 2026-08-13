@@ -2,6 +2,7 @@ package playerconfig
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -86,4 +87,29 @@ func TestPlayerConfigCancellationAndFailuresAreNonMutating(t *testing.T) {
 	if result.OK || result.Error == "" || result.Config != nil {
 		t.Fatalf("invalid LoadReferenced() = %#v", result)
 	}
+}
+
+func TestCompleteCandidateSaveFailurePublishesNoSuccessfulConfig(t *testing.T) {
+	t.Parallel()
+	store := &failingPlayerConfigStore{err: errors.New("disk full")}
+	service := NewService(store, &testutil.FakeDialog{SaveResult: "/Campaigns/players.json"}, "/Campaigns")
+	created := service.Create(context.Background())
+	if created.OK || created.Config != nil || created.FilePath != "" || store.writes != 1 {
+		t.Fatalf("failed atomic create published state: result=%#v writes=%d", created, store.writes)
+	}
+	err := service.Save(domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players"}, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}})
+	if err == nil || store.writes != 2 {
+		t.Fatalf("failed atomic save err=%v writes=%d", err, store.writes)
+	}
+}
+
+type failingPlayerConfigStore struct {
+	err    error
+	writes int
+}
+
+func (*failingPlayerConfigStore) Read(string) ([]byte, error) { return nil, errors.New("not found") }
+func (store *failingPlayerConfigStore) WriteAtomic(string, []byte) error {
+	store.writes++
+	return store.err
 }

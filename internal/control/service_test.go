@@ -17,11 +17,64 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/live"
 	"github.com/obalunenko/Fallout-Terminal/internal/nav"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/require"
 )
 
 // These tests intentionally exercise the package-private transaction seam.
 // Story commands build on this seam, while commit remains the single place
 // that assigns revisions, detaches effects, and orders their publication.
+
+func TestAttachSubscriptionCreatesCompleteSnapshotAndSelectionCommitsOnce(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	require.NoError(t, err)
+	_, err = service.StartBroadcast()
+	require.NoError(t, err)
+
+	snapshot, err := service.AttachSubscription("stream-1", nil)
+	require.NoError(t, err)
+	require.Equal(t, domain.RecognitionHandle("recognition-1"), snapshot.RecognitionHandle)
+	require.Equal(t, domain.LogicalSessionID("session-1"), snapshot.PlayerState.SessionID)
+	require.True(t, snapshot.Terminal.NoLiveTerminal)
+	require.Nil(t, snapshot.Terminal.Live)
+	require.Equal(t, snapshot.Revision, snapshot.PlayerState.Revision)
+	require.Equal(t, 1, service.ActiveStreamCount())
+
+	beforeSelection := service.Revision()
+	result := service.SelectCharacterForRecognition(snapshot.RecognitionHandle, domain.RequestID("request-1"), domain.BroadcastID("broadcast-1"), domain.CharacterID("character-1"))
+	require.True(t, result.Accepted)
+	require.Equal(t, domain.ActionReasonAccepted, result.Reason)
+	require.Equal(t, beforeSelection+1, result.Revision)
+	require.Equal(t, result.Revision, service.Revision())
+}
+
+func TestUnassignedSubscriptionCannotMutateSharedTerminalState(t *testing.T) {
+	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	require.NoError(t, err)
+	_, err = service.StartBroadcast()
+	require.NoError(t, err)
+	snapshot, err := service.AttachSubscription("stream-1", nil)
+	require.NoError(t, err)
+
+	before := service.Revision()
+	service.DispatchPlayerAction("stream-1", domain.RuntimeCommand{
+		RequestID: "request-unauthorized", BroadcastID: "broadcast-1", TerminalID: "terminal-1",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.Equal(t, before, service.Revision())
+	values := effects.Values()
+	require.NotEmpty(t, values)
+	last := values[len(values)-1]
+	require.NotNil(t, last.Result)
+	require.Equal(t, domain.ActionReasonUnassigned, last.Result.Reason)
+	require.False(t, last.Result.Accepted)
+	require.Equal(t, snapshot.PlayerState.SessionID, last.SessionID)
+}
 
 func TestServiceUsesInjectedOpaqueIDSourceDeterministically(t *testing.T) {
 	ids := &sequenceIDSource{values: []string{
@@ -416,7 +469,7 @@ func TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness(t *
 
 			fixture.service.DispatchPlayerAction(test.connection(fixture), domain.RuntimeCommand{
 				RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: terminalID,
-				Kind: domain.RuntimeCommandHackPattern, PatternID: "opaque-current-pattern",
+				Kind: domain.RuntimeCommandActivatePattern, PatternID: "opaque-current-pattern",
 			})
 
 			result := actionResultForRequest(t, fixture.effects, requestID)
@@ -434,6 +487,93 @@ func TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness(t *
 	}
 }
 
+func TestRecognitionAuthorityMatrixRejectsWithoutCanonicalReplayOrRandomEffects(t *testing.T) {
+	tests := []struct {
+		name       string
+		handle     func(us2Fixture) domain.RecognitionHandle
+		mutate     func(us2Fixture)
+		broadcast  func(us2Fixture) domain.BroadcastID
+		terminalID func(us2Fixture) string
+		wantReason domain.ActionReason
+	}{
+		{
+			name: "unknown handle", handle: func(us2Fixture) domain.RecognitionHandle { return "unknown-handle" },
+			wantReason: domain.ActionReasonInvalidSession,
+		},
+		{
+			name: "observer", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.observerToken)
+			},
+			wantReason: domain.ActionReasonNotController,
+		},
+		{
+			name: "unassigned", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.unassignedToken)
+			},
+			wantReason: domain.ActionReasonUnassigned,
+		},
+		{
+			name: "disconnected controller",
+			handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			mutate:     func(fixture us2Fixture) { fixture.service.DetachConnection(fixture.controllerConnection) },
+			wantReason: domain.ActionReasonControllerDisconnected,
+		},
+		{
+			name: "stale broadcast", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			broadcast:  func(us2Fixture) domain.BroadcastID { return "stale-broadcast" },
+			wantReason: domain.ActionReasonStaleBroadcast,
+		},
+		{
+			name: "stale terminal", handle: func(fixture us2Fixture) domain.RecognitionHandle {
+				return domain.RecognitionHandle(fixture.controllerToken)
+			},
+			terminalID: func(us2Fixture) string { return "stale-terminal" },
+			wantReason: domain.ActionReasonStaleTerminal,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			runtime := &recordingTerminalRuntime{}
+			fixture := newUS2Fixture(t, runtime)
+			if test.mutate != nil {
+				test.mutate(fixture)
+			}
+			broadcastID := fixture.broadcastID
+			if test.broadcast != nil {
+				broadcastID = test.broadcast(fixture)
+			}
+			terminalID := fixture.terminalID
+			if test.terminalID != nil {
+				terminalID = test.terminalID(fixture)
+			}
+			beforeTerminal := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
+			beforeRevision := fixture.service.Revision()
+			beforeCalls := runtime.Calls()
+			beforeRandom := runtime.RandomCalls()
+
+			result := fixture.service.DispatchPlayerActionForRecognition(test.handle(fixture), domain.RuntimeCommand{
+				RequestID: "authority-" + domain.RequestID(test.name), BroadcastID: broadcastID, TerminalID: terminalID,
+				Kind: domain.RuntimeCommandActivatePattern, PatternID: "current-pattern",
+			})
+
+			if result.Accepted || result.Reason != test.wantReason || result.Revision != beforeRevision {
+				t.Fatalf("result = %#v, want %q at revision %d", result, test.wantReason, beforeRevision)
+			}
+			if fixture.service.Revision() != beforeRevision || runtime.Calls() != beforeCalls || runtime.RandomCalls() != beforeRandom {
+				t.Fatalf("rejection changed canonical counters: revision=%d calls=%d random=%d", fixture.service.Revision(), runtime.Calls(), runtime.RandomCalls())
+			}
+			if got := canonicalTerminalBytes(t, fixture.service, fixture.terminalID); !reflect.DeepEqual(got, beforeTerminal) {
+				t.Fatalf("rejection changed canonical terminal\nbefore: %s\nafter: %s", beforeTerminal, got)
+			}
+		})
+	}
+}
+
 func TestControllerActionIsAuthorizedAndObserverStateRemainsCanonical(t *testing.T) {
 	runtime := &recordingTerminalRuntime{}
 	fixture := newUS2Fixture(t, runtime)
@@ -441,7 +581,7 @@ func TestControllerActionIsAuthorizedAndObserverStateRemainsCanonical(t *testing
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "controller-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
 
 	result := actionResultForRequest(t, fixture.effects, "controller-nav")
@@ -463,7 +603,7 @@ func TestDuplicatePlayerActionFingerprintNeverMutatesTwice(t *testing.T) {
 	fixture := newUS2Fixture(t, runtime)
 	command := domain.RuntimeCommand{
 		RequestID: "duplicate-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	}
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
@@ -496,6 +636,143 @@ func TestDuplicatePlayerActionFingerprintNeverMutatesTwice(t *testing.T) {
 	}
 }
 
+func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpoch(t *testing.T) {
+	fixture := newUS2Fixture(t, &recordingTerminalRuntime{})
+	fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+		runtime.SessionsByID[fixture.controllerSession].RequestResults = make(map[domain.RequestID]domain.RequestResultRecord)
+		return transition{persist: true}
+	})
+	beforeRevision := fixture.service.Revision()
+
+	for index := 0; index < 257; index++ {
+		requestID := domain.RequestID(fmt.Sprintf("request-%03d", index))
+		result := fixture.service.SelectCharacter(CharacterSelection{
+			ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: requestID,
+			BroadcastID: fixture.broadcastID, CharacterID: "character-does-not-matter",
+		})
+		if result.Accepted || result.Reason != domain.ActionReasonConflict {
+			t.Fatalf("fill request %q = %#v, want conflict", requestID, result)
+		}
+	}
+
+	fixture.service.mu.RLock()
+	cache := fixture.service.runtime.SessionsByID[fixture.controllerSession].RequestResults
+	_, oldestRetained := cache["request-000"]
+	_, newestRetained := cache["request-256"]
+	cacheSize := len(cache)
+	fixture.service.mu.RUnlock()
+	if cacheSize != defaultRequestResultLimit || oldestRetained || !newestRetained {
+		t.Fatalf("bounded replay cache size=%d oldest=%t newest=%t", cacheSize, oldestRetained, newestRetained)
+	}
+
+	exact := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-256",
+		BroadcastID: fixture.broadcastID, CharacterID: "character-does-not-matter",
+	})
+	if exact.Accepted || exact.Reason != domain.ActionReasonConflict || exact.Revision != beforeRevision {
+		t.Fatalf("retained exact replay = %#v", exact)
+	}
+	changed := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-256",
+		BroadcastID: fixture.broadcastID, CharacterID: "different-payload",
+	})
+	if changed.Accepted || changed.Reason != domain.ActionReasonDuplicate || changed.Revision != beforeRevision {
+		t.Fatalf("retained changed replay = %#v", changed)
+	}
+	evicted := fixture.service.SelectCharacter(CharacterSelection{
+		ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: "request-000",
+		BroadcastID: fixture.broadcastID, CharacterID: "different-payload",
+	})
+	if evicted.Accepted || evicted.Reason != domain.ActionReasonConflict || evicted.Revision != beforeRevision {
+		t.Fatalf("evicted request was not evaluated anew: %#v", evicted)
+	}
+	if fixture.service.Revision() != beforeRevision {
+		t.Fatalf("replay stress changed revision: got %d want %d", fixture.service.Revision(), beforeRevision)
+	}
+
+	if _, err := fixture.service.EndBroadcast(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fixture.service.StartBroadcast(); err != nil {
+		t.Fatal(err)
+	}
+	fixture.service.mu.RLock()
+	defer fixture.service.mu.RUnlock()
+	if got := len(fixture.service.runtime.SessionsByID[fixture.controllerSession].RequestResults); got != 0 {
+		t.Fatalf("broadcast restart retained %d replay records", got)
+	}
+}
+
+func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequenceAcross100Races(t *testing.T) {
+	for trial := 0; trial < 100; trial++ {
+		random := &controlCountingRandom{}
+		liveRuntime := live.New(random, controlFixedWords{})
+		effects := testutil.NewFakeOrderedEffectSink[Effect]()
+		service := New(Config{
+			IDs: &counterIDSource{}, Enqueue: effects.Enqueue,
+			Runtime: liveRuntime, Terminals: liveRuntime, TrustedHack: liveRuntime,
+		})
+		state, err := service.AddCharacter("Mara")
+		if err != nil {
+			t.Fatal(err)
+		}
+		state, err = service.StartBroadcast()
+		if err != nil {
+			t.Fatal(err)
+		}
+		connectionID := domain.ConnectionID(fmt.Sprintf("pattern-controller-%d", trial))
+		controller := service.CreateSession(connectionID)
+		if result := service.SelectCharacter(CharacterSelection{
+			ConnectionID: connectionID, SessionID: controller.SessionID, RequestID: "select-controller",
+			BroadcastID: state.Broadcast.ID, CharacterID: state.Roster[0].ID,
+		}); !result.Accepted {
+			t.Fatalf("trial %d selection = %#v", trial, result)
+		}
+		if _, err = service.RequestTerminalActivation(domain.TerminalTarget{
+			TerminalID: "terminal-pattern", TerminalName: "Pattern", HackLevel: 1, Tree: testPatternTree(),
+		}); err != nil {
+			t.Fatalf("trial %d activation: %v", trial, err)
+		}
+		projection, _, ok := service.CurrentLiveForSession(controller.SessionID)
+		if !ok || projection == nil || projection.Hack == nil || len(projection.Hack.Patterns) == 0 {
+			t.Fatalf("trial %d has no generated pattern: %#v", trial, projection)
+		}
+		patternID := projection.Hack.Patterns[0].ID
+		beforeRandom := random.Calls()
+		beforeRevision := service.Revision()
+
+		start := make(chan struct{})
+		results := make(chan domain.ActionResult, 2)
+		for contender := 0; contender < 2; contender++ {
+			contender := contender
+			go func() {
+				<-start
+				results <- service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+					RequestID:   domain.RequestID(fmt.Sprintf("pattern-%d-%d", trial, contender)),
+					BroadcastID: state.Broadcast.ID, TerminalID: "terminal-pattern",
+					Kind: domain.RuntimeCommandActivatePattern, PatternID: patternID,
+				})
+			}()
+		}
+		close(start)
+		first, second := <-results, <-results
+		accepted := 0
+		for _, result := range []domain.ActionResult{first, second} {
+			if result.Accepted {
+				accepted++
+			} else if result.Reason != domain.ActionReasonInvalidAction {
+				t.Fatalf("trial %d losing result = %#v", trial, result)
+			}
+		}
+		if accepted != 1 || service.Revision() != beforeRevision+1 {
+			t.Fatalf("trial %d accepted=%d revision=%d want %d", trial, accepted, service.Revision(), beforeRevision+1)
+		}
+		if draws := random.Calls() - beforeRandom; draws < 1 || draws > 2 {
+			t.Fatalf("trial %d action random draws=%d, want one outcome plus at most one dud draw", trial, draws)
+		}
+	}
+}
+
 func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -507,7 +784,7 @@ func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.
 		defer close(actionDone)
 		fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 			RequestID: "before-reassign", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-			Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+			Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 		})
 	}()
 	select {
@@ -546,7 +823,7 @@ func TestPlayerActionAndControllerReassignmentFollowCoordinatorOrder(t *testing.
 	beforeRevision := fixture.service.Revision()
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "after-reassign", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "back",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
 	})
 	result := actionResultForRequest(t, fixture.effects, "after-reassign")
 	if result.Accepted || result.Reason != domain.ActionReasonNotController || result.Revision != beforeRevision {
@@ -627,7 +904,7 @@ func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavin
 			requestID := domain.RequestID(fmt.Sprintf("reassign-race-%03d", trial))
 			command := domain.RuntimeCommand{
 				RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-				Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+				Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 			}
 
 			type reassignmentResult struct {
@@ -710,7 +987,7 @@ func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavin
 			beforeRejectedRevision := fixture.service.Revision()
 			fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 				RequestID: domain.RequestID(fmt.Sprintf("former-controller-%03d", trial)), BroadcastID: fixture.broadcastID,
-				TerminalID: fixture.terminalID, Kind: domain.RuntimeCommandNavAction, Action: "back",
+				TerminalID: fixture.terminalID, Kind: domain.RuntimeCommandNavigate, Action: "back",
 			})
 			formerResult := actionResultForRequest(t, fixture.effects, fmt.Sprintf("former-controller-%03d", trial))
 			if formerResult.Accepted || formerResult.Reason != domain.ActionReasonNotController || formerResult.Revision != beforeRejectedRevision {
@@ -792,7 +1069,7 @@ func TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes(t *testing.T)
 
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "outcome-nav", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
 	if result := actionResultForRequest(t, fixture.effects, "outcome-nav"); !result.Accepted {
 		t.Fatalf("navigation result = %#v, want accepted", result)
@@ -806,7 +1083,7 @@ func TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes(t *testing.T)
 	hack.ApplyGuess(wantHack, "candidate-wrong")
 	fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
 		RequestID: "outcome-guess", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
-		Kind: domain.RuntimeCommandHackGuess, TargetID: "candidate-wrong",
+		Kind: domain.RuntimeCommandGuess, TargetID: "candidate-wrong",
 	})
 	if result := actionResultForRequest(t, fixture.effects, "outcome-guess"); !result.Accepted {
 		t.Fatalf("hacking result = %#v, want accepted", result)
@@ -1220,7 +1497,7 @@ func TestInactiveAndClearedTerminalActionsAreRejectedWithoutTouchingRuntimeSlots
 		beforeCalls := actions.Calls()
 		service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
 			RequestID: domain.RequestID(requestID), BroadcastID: state.Broadcast.ID, TerminalID: terminalID,
-			Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+			Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 		})
 		result := actionResultForRequest(t, effects, requestID)
 		if result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || result.Revision != beforeRevision {
@@ -1261,7 +1538,7 @@ func TestUnfinishedTerminalSwitchPreserveKeepsSourceActionableAndRestoresExactCh
 
 	fixture.service.DispatchPlayerAction(fixture.connectionID, domain.RuntimeCommand{
 		RequestID: "pending-source-action", BroadcastID: fixture.broadcastID, TerminalID: "terminal-a",
-		Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs",
+		Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs",
 	})
 	if result := actionResultForRequest(t, fixture.effects, "pending-source-action"); !result.Accepted {
 		t.Fatalf("source action while switch pending = %#v, want accepted", result)
@@ -1345,7 +1622,7 @@ func TestUnfinishedTerminalSwitchCancelDiscardStaleAndDeletionGuards(t *testing.
 		beforeSlots := canonicalTerminalSlotBytes(t, fixture.service)
 		fixture.service.DispatchPlayerAction(fixture.connectionID, domain.RuntimeCommand{
 			RequestID: "discarded-source-action", BroadcastID: fixture.broadcastID, TerminalID: "terminal-a",
-			Kind: domain.RuntimeCommandNavAction, Action: "back",
+			Kind: domain.RuntimeCommandNavigate, Action: "back",
 		})
 		result := actionResultForRequest(t, fixture.effects, "discarded-source-action")
 		if result.Accepted || result.Reason != domain.ActionReasonStaleTerminal || fixture.actions.Calls() != beforeCalls || !reflect.DeepEqual(canonicalTerminalSlotBytes(t, fixture.service), beforeSlots) {
@@ -2236,6 +2513,7 @@ type us2Fixture struct {
 	unassignedSession    domain.LogicalSessionID
 	controllerToken      domain.BrowserToken
 	observerToken        domain.BrowserToken
+	unassignedToken      domain.BrowserToken
 }
 
 func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
@@ -2282,7 +2560,7 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 		service: service, effects: effects, broadcastID: state.Broadcast.ID, terminalID: terminalID,
 		controllerConnection: controllerConnection, observerConnection: observerConnection, unassignedConnection: unassignedConnection,
 		controllerSession: controller.SessionID, observerSession: observer.SessionID, unassignedSession: unassigned.SessionID,
-		controllerToken: controller.BrowserToken, observerToken: observer.BrowserToken,
+		controllerToken: controller.BrowserToken, observerToken: observer.BrowserToken, unassignedToken: unassigned.BrowserToken,
 	}
 }
 
@@ -2299,7 +2577,7 @@ type recordingTerminalRuntime struct {
 func (runtime *recordingTerminalRuntime) Apply(state *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.PublicLiveState, bool) {
 	runtime.mu.Lock()
 	runtime.calls = append(runtime.calls, command)
-	if command.Kind == domain.RuntimeCommandHackPattern {
+	if command.Kind == domain.RuntimeCommandActivatePattern {
 		runtime.randomCalls++
 	}
 	started := runtime.started
@@ -2313,14 +2591,14 @@ func (runtime *recordingTerminalRuntime) Apply(state *domain.TerminalRuntime, co
 	}
 
 	switch command.Kind {
-	case domain.RuntimeCommandNavAction:
+	case domain.RuntimeCommandNavigate:
 		state.Nav = nav.ApplyAction(state.Nav, state.Tree, command.Action, command.NodeID)
-	case domain.RuntimeCommandHackGuess:
+	case domain.RuntimeCommandGuess:
 		if state.Hack == nil || state.Hack.Solved || state.Hack.Failed {
 			return nil, false
 		}
 		hack.ApplyGuess(state.Hack, command.TargetID)
-	case domain.RuntimeCommandHackPattern:
+	case domain.RuntimeCommandActivatePattern:
 		return nil, false
 	default:
 		return nil, false
@@ -2531,6 +2809,34 @@ func sessionRoleCount(state *domain.MasterCoordinationState, role domain.PlayerR
 
 type counterIDSource struct {
 	next atomic.Uint64
+}
+
+type controlFixedWords struct{}
+
+type controlCountingRandom struct{ calls atomic.Int64 }
+
+func (random *controlCountingRandom) Intn(limit int) int {
+	random.calls.Add(1)
+	if limit <= 1 {
+		return 0
+	}
+	return 1
+}
+
+func (random *controlCountingRandom) Calls() int {
+	return int(random.calls.Load())
+}
+
+func (controlFixedWords) PickWords(length, count int) []string {
+	pools := map[int][]string{
+		4: {"CODE", "CAVE", "DUST", "IRON", "GATE", "BOLT", "RAMP", "CORE", "FUSE", "GRID", "LAMP", "MASK", "NODE", "PIPE", "RING", "RUST"},
+		5: {"ALLOY", "ARMOR", "ATLAS", "BASIN", "BLAST", "BRICK", "CABLE", "CACHE", "CARGO", "CLIFF", "CLOCK", "CRANE", "CRATE", "CREEK", "DRAIN", "DRONE"},
+	}
+	return append([]string(nil), pools[length][:count]...)
+}
+
+func testPatternTree() domain.ContentNode {
+	return testTerminalRuntime("pattern-tree").Tree
 }
 
 func (source *counterIDSource) Next() string {

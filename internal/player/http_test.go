@@ -1,7 +1,9 @@
 package player
 
 import (
-	"encoding/json"
+	"bytes"
+	"compress/gzip"
+	"context"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +11,193 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"testing/fstest"
+
+	"connectrpc.com/connect"
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/proto"
 )
+
+type countingConnectCoordinator struct {
+	ConnectCoordinator
+	mutations atomic.Int64
+}
+
+func (coordinator *countingConnectCoordinator) DispatchPlayerActionForRecognition(handle domain.RecognitionHandle, command domain.RuntimeCommand) domain.ActionResult {
+	coordinator.mutations.Add(1)
+	return coordinator.ConnectCoordinator.DispatchPlayerActionForRecognition(handle, command)
+}
+
+func TestConnectHTTPRejectsDecodedCompressedUnknownAndMalformedBodiesBeforeCanonicalMutation(t *testing.T) {
+	t.Parallel()
+
+	base := newConnectTestCoordinator(t)
+	coordinator := &countingConnectCoordinator{ConnectCoordinator: base}
+	service, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rpcPath, rpcHandler := NewConnectHandler(service)
+	handler := NewApplicationHandler(playerAssets(), rpcPath, rpcHandler)
+	request := &playerv1.NavigateRequest{
+		RecognitionHandle: "recognition-1", RequestId: "request-1", BroadcastId: "broadcast-1", TerminalId: "terminal-1",
+		Action: &playerv1.NavigateRequest_Back{Back: &playerv1.NavigateBack{}},
+	}
+	unknown := protowire.AppendTag(nil, 100, protowire.BytesType)
+	unknown = protowire.AppendBytes(unknown, bytes.Repeat([]byte{'x'}, MaxUncompressedMessageBytes))
+	request.ProtoReflect().SetUnknown(unknown)
+	oversized, err := proto.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(oversized) <= MaxUncompressedMessageBytes || len(oversized) >= MaxEncodedBodyBytes {
+		t.Fatalf("unknown-field fixture size = %d, want between decoded and encoded limits", len(oversized))
+	}
+
+	var compressed bytes.Buffer
+	zipper, err := gzip.NewWriterLevel(&compressed, gzip.BestCompression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zipper.Write(oversized); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipper.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if compressed.Len() >= MaxUncompressedMessageBytes {
+		t.Fatalf("compressed fixture size = %d, want below decoded limit", compressed.Len())
+	}
+
+	tests := []struct {
+		name            string
+		body            []byte
+		contentEncoding string
+		wantStatus      int
+		wantCode        string
+	}{
+		{name: "unknown field growth", body: oversized, wantStatus: http.StatusTooManyRequests, wantCode: "resource_exhausted"},
+		{name: "compressed expansion", body: compressed.Bytes(), contentEncoding: "gzip", wantStatus: http.StatusTooManyRequests, wantCode: "resource_exhausted"},
+		{name: "malformed bounded protobuf", body: []byte{0x0a}, wantStatus: http.StatusBadRequest, wantCode: "invalid_argument"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			httpRequest := httptest.NewRequest(http.MethodPost, "http://player.test/fallout.terminal.player.v1.PlayerService/Navigate", bytes.NewReader(test.body))
+			httpRequest.Header.Set("Content-Type", "application/proto")
+			if test.contentEncoding != "" {
+				httpRequest.Header.Set("Content-Encoding", test.contentEncoding)
+			}
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, httpRequest)
+			if recorder.Code != test.wantStatus || !strings.Contains(recorder.Body.String(), test.wantCode) {
+				t.Fatalf("status/body = %d %q, want %d containing %q", recorder.Code, recorder.Body.String(), test.wantStatus, test.wantCode)
+			}
+		})
+	}
+	if got := coordinator.mutations.Load(); got != 0 {
+		t.Fatalf("canonical mutation calls = %d, want zero", got)
+	}
+	if base.Revision() != 2 {
+		t.Fatalf("canonical revision changed after boundary rejection: %d", base.Revision())
+	}
+}
+
+func TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBeforeRPC(t *testing.T) {
+	t.Parallel()
+
+	var calls int
+	rpc := http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		calls++
+		response.WriteHeader(http.StatusNoContent)
+	})
+	handler := NewApplicationHandler(playerAssets(), "/fallout.terminal.player.v1.PlayerService/", rpc)
+
+	tests := []struct {
+		name   string
+		host   string
+		origin string
+		body   []byte
+		path   string
+		status int
+		calls  int
+	}{
+		{name: "same origin", host: "player.test", origin: "https://player.test", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusNoContent, calls: 1},
+		{name: "foreign origin", host: "player.test", origin: "https://evil.example", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusForbidden, calls: 1},
+		{name: "malformed host", host: "player.test bad", path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusForbidden, calls: 1},
+		{name: "encoded body over eight KiB", host: "player.test", body: bytes.Repeat([]byte{'x'}, MaxEncodedBodyBytes+1), path: "/fallout.terminal.player.v1.PlayerService/Navigate", status: http.StatusRequestEntityTooLarge, calls: 1},
+		{name: "lookalike service path", host: "player.test", path: "/fallout.terminal.player.v1.PlayerServiceEvil/Navigate", status: http.StatusMethodNotAllowed, calls: 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "http://player.test"+test.path, bytes.NewReader(test.body))
+			request.Host = test.host
+			if test.origin != "" {
+				request.Header.Set("Origin", test.origin)
+			}
+			recorder := httptest.NewRecorder()
+			handler.ServeHTTP(recorder, request)
+			if recorder.Code != test.status {
+				t.Fatalf("status = %d, want %d; body=%q", recorder.Code, test.status, recorder.Body.String())
+			}
+			if calls != test.calls {
+				t.Fatalf("RPC calls = %d, want %d", calls, test.calls)
+			}
+			if recorder.Header().Get("Access-Control-Allow-Origin") == "*" {
+				t.Fatal("public handler emitted wildcard CORS")
+			}
+		})
+	}
+}
+
+func TestTypedSoundManifestAllowsOnlyEightCategoriesAndSafeSortedAssets(t *testing.T) {
+	t.Parallel()
+
+	service, err := NewConnectService(ConnectServiceConfig{Coordinator: newConnectTestCoordinator(t), Assets: playerAssets()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		category playerv1.SoundCategory
+		want     []string
+	}{
+		{playerv1.SoundCategory_SOUND_CATEGORY_AMBIENT, []string{"sounds/ambient/HISS.OGG", "sounds/ambient/hum.wav", "sounds/ambient/theme.m4a"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_HACK_GOOD, []string{"sounds/hack-good/good.mp3"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_HACK_BAD, []string{"sounds/hack-bad/bad.wav"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_MENU_FOCUS, []string{"sounds/menu-focus/focus.wav"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_SINGLE, []string{"sounds/single/single.wav"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_MULTIPLE, []string{"sounds/multiple/multiple.wav"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_ENTER, []string{"sounds/enter/enter.wav"}},
+		{playerv1.SoundCategory_SOUND_CATEGORY_CHARSCROLL, []string{"sounds/charscroll/scroll.wav"}},
+	}
+	for _, test := range tests {
+		response, err := service.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: test.category}))
+		if err != nil {
+			t.Fatalf("SoundManifest(%s): %v", test.category, err)
+		}
+		if !reflect.DeepEqual(response.Msg.Assets, test.want) {
+			t.Errorf("SoundManifest(%s) assets = %#v, want %#v", test.category, response.Msg.Assets, test.want)
+		}
+	}
+	for _, invalid := range []playerv1.SoundCategory{playerv1.SoundCategory_SOUND_CATEGORY_UNSPECIFIED, 999} {
+		_, err := service.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: invalid}))
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("SoundManifest(%d) code = %s, want invalid_argument", invalid, connect.CodeOf(err))
+		}
+	}
+
+	empty, err := NewConnectService(ConnectServiceConfig{Coordinator: newConnectTestCoordinator(t), Assets: fstest.MapFS{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := empty.SoundManifest(context.Background(), connect.NewRequest(&playerv1.SoundManifestRequest{Category: playerv1.SoundCategory_SOUND_CATEGORY_AMBIENT}))
+	if err != nil || len(response.Msg.Assets) != 0 {
+		t.Fatalf("missing sound category = %#v, %v; want empty success", response, err)
+	}
+}
 
 func TestHTTPHandlerServesStaticAssetsAndIndexFallback(t *testing.T) {
 	t.Parallel()
@@ -90,7 +276,7 @@ func TestHTTPHandlerRejectsTraversalWithoutNormalizingItIntoAnAsset(t *testing.T
 		"/../outside.txt",
 		"/%2e%2e/outside.txt",
 		"/sounds/ambient/../../../outside.txt",
-		"/api/sounds/%2e%2e",
+		"/sounds/%2e%2e",
 	} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
@@ -108,7 +294,7 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 	t.Parallel()
 
 	handler := NewHTTPHandler(playerAssets())
-	for _, requestPath := range []string{"/", "/terminal/root", "/api/sounds/ambient"} {
+	for _, requestPath := range []string{"/", "/terminal/root", "/sounds/ambient/hum.wav"} {
 		t.Run(requestPath, func(t *testing.T) {
 			recorder := serveRequest(t, handler, requestPath)
 			if recorder.Code != http.StatusOK {
@@ -118,7 +304,7 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 				t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
 			}
 			policy := recorder.Header().Get("Content-Security-Policy")
-			for _, directive := range []string{"default-src 'self'", "connect-src", "ws:", "wss:", "media-src 'self'", "object-src 'none'"} {
+			for _, directive := range []string{"default-src 'self'", "connect-src 'self'", "media-src 'self'", "object-src 'none'"} {
 				if !strings.Contains(policy, directive) {
 					t.Errorf("Content-Security-Policy = %q, want directive %q", policy, directive)
 				}
@@ -187,116 +373,16 @@ func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing
 		t.Fatal(err)
 	}
 	js := string(clientScript)
-	start := strings.Index(js, "function playerWebSocketURL()")
-	end := strings.Index(js, "function connect()")
+	start := strings.Index(js, "const playerTransport = createConnectTransport(")
+	end := strings.Index(js, "const playerRPC = createClient(")
 	if start < 0 || end <= start {
-		t.Fatal("player script is missing the WebSocket URL construction boundary")
+		t.Fatal("player script is missing the same-origin Connect transport boundary")
 	}
 	urlBoundary := js[start:end]
 	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "searchParams", "?token", "?session"} {
 		if strings.Contains(urlBoundary, forbidden) {
-			t.Errorf("WebSocket URL construction exposes recognition material through %q", forbidden)
+			t.Errorf("Connect base URL construction exposes recognition material through %q", forbidden)
 		}
-	}
-}
-
-func TestHTTPHandlerListsOnlyAllowlistedSoundFiles(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHTTPHandler(playerAssets())
-
-	recorder := serveRequest(t, handler, "/api/sounds/ambient")
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("GET ambient status = %d, want 200", recorder.Code)
-	}
-	if got := recorder.Header().Get("Content-Type"); !strings.Contains(got, "application/json") {
-		t.Errorf("Content-Type = %q, want application/json", got)
-	}
-	var got []string
-	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
-		t.Fatalf("decode sound response: %v; body = %q", err, recorder.Body.String())
-	}
-	want := []string{"HISS.OGG", "hum.wav", "theme.m4a"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("ambient sounds = %#v, want sorted supported filenames %#v", got, want)
-	}
-	for _, name := range got {
-		if strings.ContainsAny(name, `/\\`) {
-			t.Errorf("sound response exposed a path instead of a filename: %q", name)
-		}
-	}
-}
-
-func TestHTTPHandlerSoundManifestExcludesNonRegularEntries(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHTTPHandler(fstest.MapFS{
-		"sounds/ambient/hum.wav":    {Data: []byte("wav")},
-		"sounds/ambient/linked.wav": {Data: []byte("symlink"), Mode: fs.ModeSymlink},
-		"sounds/ambient/device.mp3": {Data: []byte("device"), Mode: fs.ModeDevice},
-	})
-	recorder := serveRequest(t, handler, "/api/sounds/ambient")
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("GET ambient status = %d, want 200", recorder.Code)
-	}
-
-	var got []string
-	if err := json.Unmarshal(recorder.Body.Bytes(), &got); err != nil {
-		t.Fatalf("decode sound response: %v; body = %q", err, recorder.Body.String())
-	}
-	want := []string{"hum.wav"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("ambient sounds = %#v, want regular files only %#v", got, want)
-	}
-}
-
-func TestHTTPHandlerServesHackingSoundManifestsAndAssets(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHTTPHandler(playerAssets())
-	for folder, want := range map[string][]string{
-		"charscroll": {"scroll.wav"},
-		"enter":      {"enter.wav"},
-		"hack-bad":   {"bad.wav"},
-		"hack-good":  {"good.mp3"},
-		"menu-focus": {"focus.wav"},
-		"multiple":   {"multiple.wav"},
-		"single":     {"single.wav"},
-	} {
-		manifest := serveRequest(t, handler, "/api/sounds/"+folder)
-		if manifest.Code != http.StatusOK {
-			t.Fatalf("GET %s manifest status = %d, want 200", folder, manifest.Code)
-		}
-		var files []string
-		if err := json.Unmarshal(manifest.Body.Bytes(), &files); err != nil {
-			t.Fatalf("decode %s manifest: %v", folder, err)
-		}
-		if !reflect.DeepEqual(files, want) {
-			t.Fatalf("%s manifest = %#v, want %#v", folder, files, want)
-		}
-		asset := serveRequest(t, handler, "/sounds/"+folder+"/"+want[0])
-		if asset.Code != http.StatusOK || asset.Body.Len() == 0 {
-			t.Fatalf("GET %s asset status = %d bytes = %d, want 200 and non-empty", folder, asset.Code, asset.Body.Len())
-		}
-	}
-}
-
-func TestHTTPHandlerSoundDiscoveryDegradesToAnEmptyJSONArray(t *testing.T) {
-	t.Parallel()
-
-	handler := NewHTTPHandler(playerAssets())
-	for _, requestPath := range []string{
-		"/api/sounds/not-allowed",
-	} {
-		t.Run(requestPath, func(t *testing.T) {
-			recorder := serveRequest(t, handler, requestPath)
-			if recorder.Code != http.StatusOK {
-				t.Fatalf("GET %s status = %d, want 200", requestPath, recorder.Code)
-			}
-			if got := strings.TrimSpace(recorder.Body.String()); got != "[]" {
-				t.Fatalf("GET %s body = %q, want exact empty JSON array", requestPath, got)
-			}
-		})
 	}
 }
 

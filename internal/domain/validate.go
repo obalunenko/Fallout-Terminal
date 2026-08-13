@@ -19,10 +19,104 @@ const (
 	MaxRosterEntries = 1000
 	// MaxCharacterNameRunes is the shared player-facing character-name limit.
 	MaxCharacterNameRunes = 80
+	// MaxRecognitionHandleBytes bounds the opaque process-local browser handle.
+	MaxRecognitionHandleBytes = 128
+	// MaxRequestIDBytes bounds a browser-generated mutation identity.
+	MaxRequestIDBytes = 128
+	// MaxBroadcastIDBytes bounds a process-local broadcast identity.
+	MaxBroadcastIDBytes = 128
+	// MaxGenerationIDBytes bounds a private/current puzzle generation identity.
+	MaxGenerationIDBytes = 128
+	// MaxTerminalIDBytes bounds an authored/current terminal identity.
+	MaxTerminalIDBytes = 256
+	// MaxCharacterIDBytes bounds an authored roster identity.
+	MaxCharacterIDBytes = 256
+	// MaxActionTargetBytes bounds node, guess, and opaque pattern targets.
+	MaxActionTargetBytes = 256
+	// MaxSoundCategoryBytes bounds typed sound adapter input before lookup.
+	MaxSoundCategoryBytes = 32
 	maxNameBytes          = 256
 	maxIntroBytes         = 64 * 1024
 	maxBodyBytes          = 1024 * 1024
 )
+
+// PublicField identifies one finitely bounded public scalar category.
+type PublicField string
+
+const (
+	PublicFieldRecognitionHandle PublicField = "recognition handle"
+	PublicFieldRequestID         PublicField = "request ID"
+	PublicFieldBroadcastID       PublicField = "broadcast ID"
+	PublicFieldGenerationID      PublicField = "generation ID"
+	PublicFieldTerminalID        PublicField = "terminal ID"
+	PublicFieldCharacterID       PublicField = "character ID"
+	PublicFieldActionTarget      PublicField = "action target"
+)
+
+// ValidatePublicField validates one required opaque/identity scalar without
+// interpreting its lifecycle or authority. Values are ASCII-safe, nonblank,
+// and bounded before they can reach canonical services.
+func ValidatePublicField(field PublicField, value string) error {
+	limit := publicFieldLimit(field)
+	if limit == 0 {
+		return fmt.Errorf("unsupported public field %q", field)
+	}
+	if value == "" || strings.TrimSpace(value) != value || !utf8.ValidString(value) {
+		return fmt.Errorf("%s must be a nonblank valid UTF-8 value", field)
+	}
+	if len([]byte(value)) > limit {
+		return fmt.Errorf("%s exceeds %d bytes", field, limit)
+	}
+	for _, character := range value {
+		if character < 0x21 || character > 0x7e {
+			return fmt.Errorf("%s contains an invalid character", field)
+		}
+	}
+	return nil
+}
+
+// ValidateSoundCategory returns the stable category or rejects arbitrary path
+// and filesystem input before any asset capability is consulted.
+func ValidateSoundCategory(value string) (SoundCategory, error) {
+	if value == "" || len([]byte(value)) > MaxSoundCategoryBytes || strings.ContainsAny(value, `/\\`) {
+		return "", fmt.Errorf("sound category is invalid")
+	}
+	category := SoundCategory(value)
+	switch category {
+	case SoundCategoryAmbient,
+		SoundCategoryHackGood,
+		SoundCategoryHackBad,
+		SoundCategoryMenuFocus,
+		SoundCategorySingle,
+		SoundCategoryMultiple,
+		SoundCategoryEnter,
+		SoundCategoryCharscroll:
+		return category, nil
+	default:
+		return "", fmt.Errorf("sound category %q is unsupported", value)
+	}
+}
+
+func publicFieldLimit(field PublicField) int {
+	switch field {
+	case PublicFieldRecognitionHandle:
+		return MaxRecognitionHandleBytes
+	case PublicFieldRequestID:
+		return MaxRequestIDBytes
+	case PublicFieldBroadcastID:
+		return MaxBroadcastIDBytes
+	case PublicFieldGenerationID:
+		return MaxGenerationIDBytes
+	case PublicFieldTerminalID:
+		return MaxTerminalIDBytes
+	case PublicFieldCharacterID:
+		return MaxCharacterIDBytes
+	case PublicFieldActionTarget:
+		return MaxActionTargetBytes
+	default:
+		return 0
+	}
+}
 
 // ValidateSession validates every known version-1 field without mutating data.
 func ValidateSession(session Session) error {

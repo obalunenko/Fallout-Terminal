@@ -1,0 +1,20 @@
+version: v2
+clean: true
+
+inputs:
+  - directory: .
+    paths:
+      - fallout/terminal/player/v1
+
+plugins:
+  - local:
+      - npm
+      - exec
+      - --prefix
+      - ../client
+      - --
+      - protoc-gen-es
+    out: ../client/gen
+    opt:
+      - target=js
+      - import_extension=js

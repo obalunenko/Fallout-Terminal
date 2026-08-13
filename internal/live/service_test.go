@@ -287,10 +287,10 @@ func TestTerminalRuntimeLifecycleCreatesUpdatesAndProjectsDetachedCheckpoints(t 
 		t.Fatalf("projection aliases private runtime: %#v", projected)
 	}
 
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs"}); !ok {
 		t.Fatal("Apply() rejected created runtime")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "entry", NodeID: "report"}); !ok {
 		t.Fatal("Apply() rejected created runtime entry")
 	}
 	privateHackBefore := cloneHackForLifecycleTest(runtime.Hack)
@@ -327,10 +327,10 @@ func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegene
 	if runtime == nil || runtime.Hack == nil || initial == nil || initial.Hack == nil {
 		t.Fatalf("CreateRuntime() = runtime %#v projection %#v", runtime, initial)
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "enter", NodeID: "docs"}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "docs"}); !ok {
 		t.Fatal("navigation into checkpoint was rejected")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavAction, Action: "entry", NodeID: "report"}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandNavigate, Action: "entry", NodeID: "report"}); !ok {
 		t.Fatal("entry navigation into checkpoint was rejected")
 	}
 	wrongTarget := ""
@@ -343,11 +343,11 @@ func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegene
 	if wrongTarget == "" {
 		t.Fatal("generated puzzle has no non-secret candidate")
 	}
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: wrongTarget}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandGuess, TargetID: wrongTarget}); !ok {
 		t.Fatal("wrong guess was rejected")
 	}
 	patternID := service.ProjectRuntime(runtime).Hack.Patterns[0].ID
-	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackPattern, PatternID: patternID}); !ok {
+	if _, ok := service.Apply(runtime, domain.RuntimeCommand{Kind: domain.RuntimeCommandActivatePattern, PatternID: patternID}); !ok {
 		t.Fatal("pattern use was rejected")
 	}
 
@@ -437,7 +437,7 @@ func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T
 		t.Fatalf("fresh generation reused stale candidate identity %q", oldTargetID)
 	}
 	freshBeforeStaleAction := cloneRuntimeForLifecycleTest(replacement)
-	if _, accepted := service.Apply(replacement, domain.RuntimeCommand{Kind: domain.RuntimeCommandHackGuess, TargetID: oldTargetID}); accepted || !reflect.DeepEqual(replacement, freshBeforeStaleAction) {
+	if _, accepted := service.Apply(replacement, domain.RuntimeCommand{Kind: domain.RuntimeCommandGuess, TargetID: oldTargetID}); accepted || !reflect.DeepEqual(replacement, freshBeforeStaleAction) {
 		t.Fatalf("stale generation action was accepted or mutated replacement: accepted=%t", accepted)
 	}
 

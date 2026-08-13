@@ -92,6 +92,7 @@ type CharacterSelection struct {
 	RequestID    domain.RequestID
 	BroadcastID  domain.BroadcastID
 	CharacterID  domain.CharacterID
+	Fingerprint  string
 }
 
 // Effect is one transport-neutral publication produced by a transaction.
@@ -108,6 +109,7 @@ type Effect struct {
 	TerminalID        string
 	Result            *domain.ActionResult
 	ClearLiveTerminal bool
+	Update            *domain.CompoundUpdate
 }
 
 // Service serializes every process-runtime transition under one mutex.
@@ -241,6 +243,96 @@ func (service *Service) Revision() uint64 {
 	service.mu.RLock()
 	defer service.mu.RUnlock()
 	return service.runtime.Revision
+}
+
+// ResolveRecognition returns the current process-local logical session for an
+// opaque recognition handle. It performs identity lookup only; callers must
+// still enforce presence, assignment, controller, terminal, and action rules.
+func (service *Service) ResolveRecognition(handle domain.RecognitionHandle) (domain.LogicalSessionID, bool) {
+	if service == nil || handle == "" {
+		return "", false
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	sessionID, ok := service.runtime.SessionIDByBrowserToken[handle]
+	if !ok || service.runtime.SessionsByID[sessionID] == nil {
+		return "", false
+	}
+	return sessionID, true
+}
+
+// ResolveConnection returns the logical owner of one active physical stream.
+func (service *Service) ResolveConnection(connectionID domain.ConnectionID) (domain.LogicalSessionID, bool) {
+	if service == nil || connectionID == "" {
+		return "", false
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	sessionID, session := sessionForConnection(&service.runtime, connectionID)
+	return sessionID, session != nil
+}
+
+// ActiveStreamCount reports raw physical stream membership, not logical
+// presence. It is safe for the private desktop client-count projection.
+func (service *Service) ActiveStreamCount() int {
+	if service == nil {
+		return 0
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	count := 0
+	for _, session := range service.runtime.SessionsByID {
+		if session != nil {
+			count += len(session.ConnectionIDs)
+		}
+	}
+	return count
+}
+
+// CompoundUpdates returns one complete personalized authoritative value per
+// currently recognized session for revision. This is a detached post-commit
+// projection used by the generated public stream boundary.
+func (service *Service) CompoundUpdates(revision uint64) map[domain.LogicalSessionID]*domain.CompoundUpdate {
+	updates := make(map[domain.LogicalSessionID]*domain.CompoundUpdate)
+	if service == nil {
+		return updates
+	}
+	service.mu.RLock()
+	defer service.mu.RUnlock()
+	if revision == 0 || revision > service.runtime.Revision {
+		return updates
+	}
+	for _, sessionID := range sortedSessionIDs(&service.runtime) {
+		if update := service.compoundUpdateLocked(&service.runtime, sessionID, revision); update != nil {
+			updates[sessionID] = update
+		}
+	}
+	return updates
+}
+
+func (service *Service) compoundUpdateLocked(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, revision uint64) *domain.CompoundUpdate {
+	state, ok := playerSnapshot(runtime, sessionID)
+	if !ok {
+		return nil
+	}
+	state.Revision = revision
+	update := &domain.CompoundUpdate{Revision: revision, Player: state}
+	if service.terminals == nil || runtime.Broadcast == nil || !sessionAssigned(runtime.Broadcast, sessionID) {
+		return update
+	}
+	terminal := activeTerminalRuntime(runtime.Broadcast)
+	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+		presentation := domain.TerminalPresentation{NoLiveTerminal: true}
+		update.Terminal = &presentation
+		return update
+	}
+	if live := service.terminals.ProjectRuntime(terminal); live != nil {
+		presentation := domain.TerminalPresentation{Live: clonePublicLiveState(live)}
+		update.Terminal = &presentation
+		update.Nav = &live.Nav
+		update.Hack = live.Hack
+	}
+	return domain.CloneCompoundUpdate(update)
 }
 
 // Snapshot returns a deeply detached game-master coordination projection.
@@ -980,8 +1072,35 @@ func (service *Service) CreateSession(connectionID domain.ConnectionID) SessionI
 // session and replacement token. Additional tabs mutate only private
 // membership; aggregate presence effects are emitted on the first connection.
 func (service *Service) AttachConnection(connectionID domain.ConnectionID, browserToken domain.BrowserToken) (domain.BrowserToken, *domain.PlayerState) {
+	var handle *domain.RecognitionHandle
+	if browserToken != "" {
+		value := domain.RecognitionHandle(browserToken)
+		handle = &value
+	}
+	snapshot, err := service.AttachSubscription(connectionID, handle)
+	if err != nil || snapshot == nil {
+		return "", nil
+	}
+	return snapshot.RecognitionHandle, domain.ClonePlayerState(snapshot.PlayerState)
+}
+
+// AttachSubscription atomically resolves recognition, registers the physical
+// stream, and captures the complete revision-R personalized snapshot. The
+// active terminal projection is read under the same coordinator order and
+// never creates or regenerates a puzzle.
+func (service *Service) AttachSubscription(connectionID domain.ConnectionID, recognitionHandle *domain.RecognitionHandle) (*domain.PersonalizedSnapshot, error) {
+	if service == nil {
+		return nil, fmt.Errorf("coordinator is not configured")
+	}
+	if connectionID == "" {
+		return nil, fmt.Errorf("physical stream ID must not be blank")
+	}
+	browserToken := domain.BrowserToken("")
+	if recognitionHandle != nil {
+		browserToken = domain.BrowserToken(*recognitionHandle)
+	}
 	var returnedToken domain.BrowserToken
-	var state *domain.PlayerState
+	var snapshot *domain.PersonalizedSnapshot
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
 		sessionID, known := runtime.SessionIDByBrowserToken[browserToken]
 		session := runtime.SessionsByID[sessionID]
@@ -1001,37 +1120,72 @@ func (service *Service) AttachConnection(connectionID domain.ConnectionID, brows
 			}
 			runtime.SessionsByID[sessionID] = session
 			runtime.SessionIDByBrowserToken[returnedToken] = sessionID
-			state, _ = playerSnapshot(runtime, sessionID)
+			snapshot = service.subscriptionSnapshot(runtime, sessionID, returnedToken)
 			return transition{accepted: true, effects: presenceEffects(runtime)}
 		}
 
 		returnedToken = browserToken
-		if connectionID == "" {
-			state, _ = playerSnapshot(runtime, sessionID)
-			return transition{}
-		}
 		if session.ConnectionIDs == nil {
 			session.ConnectionIDs = make(map[domain.ConnectionID]struct{})
 		}
 		if _, alreadyAttached := session.ConnectionIDs[connectionID]; alreadyAttached {
-			state, _ = playerSnapshot(runtime, sessionID)
+			snapshot = service.subscriptionSnapshot(runtime, sessionID, returnedToken)
 			return transition{}
 		}
 		wasConnected := len(session.ConnectionIDs) > 0
 		otherPresenceChanged := removeConnectionFromOtherSessions(runtime, connectionID, sessionID)
 		session.ConnectionIDs[connectionID] = struct{}{}
-		state, _ = playerSnapshot(runtime, sessionID)
+		snapshot = service.subscriptionSnapshot(runtime, sessionID, returnedToken)
 		effects := []Effect(nil)
 		if !wasConnected || otherPresenceChanged {
 			effects = presenceEffects(runtime)
 		}
 		return transition{accepted: true, effects: effects}
 	})
-	if state == nil {
-		return "", nil
+	if snapshot == nil {
+		return nil, fmt.Errorf("could not capture subscription snapshot")
 	}
-	state.Revision = result.revision
-	return returnedToken, domain.ClonePlayerState(state)
+	snapshot.Revision = result.revision
+	snapshot.PlayerState.Revision = result.revision
+	return domain.ClonePersonalizedSnapshot(snapshot), nil
+}
+
+func (service *Service) subscriptionSnapshot(runtime *domain.ProcessRuntime, sessionID domain.LogicalSessionID, handle domain.BrowserToken) *domain.PersonalizedSnapshot {
+	state, ok := playerSnapshot(runtime, sessionID)
+	if !ok {
+		return nil
+	}
+	presentation := domain.TerminalPresentation{NoLiveTerminal: true}
+	if service.terminals != nil && runtime.Broadcast != nil && sessionAssigned(runtime.Broadcast, sessionID) {
+		terminal := activeTerminalRuntime(runtime.Broadcast)
+		if terminal != nil && terminal.Lifecycle == domain.TerminalLifecycleActive {
+			if live := service.terminals.ProjectRuntime(terminal); live != nil {
+				presentation = domain.TerminalPresentation{Live: clonePublicLiveState(live)}
+			}
+		}
+	}
+	return &domain.PersonalizedSnapshot{
+		RecognitionHandle: domain.RecognitionHandle(handle),
+		Revision:          runtime.Revision,
+		PlayerState:       state,
+		Terminal:          presentation,
+	}
+}
+
+// SelectCharacterForRecognition resolves a unary recognition handle without
+// creating replacement state and requires an active subscription before the
+// existing atomic selection transaction is evaluated.
+func (service *Service) SelectCharacterForRecognition(handle domain.RecognitionHandle, requestID domain.RequestID, broadcastID domain.BroadcastID, characterID domain.CharacterID) domain.ActionResult {
+	sessionID, ok := service.ResolveRecognition(handle)
+	if !ok {
+		return domain.ActionResult{RequestID: requestID, Reason: domain.ActionReasonInvalidSession, Revision: service.Revision()}
+	}
+	return service.SelectCharacter(CharacterSelection{
+		SessionID:   sessionID,
+		RequestID:   requestID,
+		BroadcastID: broadcastID,
+		CharacterID: characterID,
+	})
 }
 
 // DetachConnection removes one concrete membership idempotently. Claims,
@@ -1068,6 +1222,10 @@ func (service *Service) SelectCharacter(selection CharacterSelection) domain.Act
 		}
 		if selection.RequestID == "" {
 			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return transition{effects: selectionResultEffects(runtime, selection, outcome)}
+		}
+		if len(session.ConnectionIDs) == 0 {
+			outcome = rejectedSelection(selection.RequestID, domain.ActionReasonInvalidSession, runtime.Revision)
 			return transition{effects: selectionResultEffects(runtime, selection, outcome)}
 		}
 
@@ -1132,68 +1290,70 @@ func (service *Service) SelectCharacter(selection CharacterSelection) domain.Act
 // shared navigation or hacking command. Every failed precondition returns
 // before the gameplay boundary is invoked. Accepted canonical effects are
 // enqueued before the initiating connection's correlated result.
-func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, command domain.RuntimeCommand) {
+func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, command domain.RuntimeCommand) domain.ActionResult {
+	var outcome domain.ActionResult
 	service.commit(func(runtime *domain.ProcessRuntime) transition {
 		sessionID, session := sessionForConnection(runtime, connectionID)
 		if session == nil {
-			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidSession, runtime.Revision)
-			return transition{effects: []Effect{playerActionResultEffect(connectionID, "", result)}}
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidSession, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, "", outcome)}}
 		}
 		if command.RequestID == "" {
-			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
-			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, result)}}
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, outcome)}}
 		}
 
 		fingerprint := playerActionFingerprint(command)
 		if cached, exists := service.requestResult(runtime, sessionID, command.RequestID); exists {
 			if cached.Fingerprint == fingerprint {
-				return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, cached.Result)}}
+				outcome = cached.Result
+				return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, outcome)}}
 			}
-			result := rejectedAction(command.RequestID, domain.ActionReasonDuplicate, runtime.Revision)
-			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, result)}}
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonDuplicate, runtime.Revision)
+			return transition{effects: []Effect{playerActionResultEffect(connectionID, sessionID, outcome)}}
 		}
 		if !validRuntimeCommand(command) {
-			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if runtime.Broadcast == nil || runtime.Broadcast.ID != command.BroadcastID {
-			result := rejectedAction(command.RequestID, domain.ActionReasonStaleBroadcast, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleBroadcast, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if _, assigned := runtime.Broadcast.AssignmentsBySession[sessionID]; !assigned {
-			result := rejectedAction(command.RequestID, domain.ActionReasonUnassigned, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonUnassigned, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if runtime.Broadcast.ControllerSessionID == nil || *runtime.Broadcast.ControllerSessionID != sessionID {
-			result := rejectedAction(command.RequestID, domain.ActionReasonNotController, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonNotController, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if len(session.ConnectionIDs) == 0 {
-			result := rejectedAction(command.RequestID, domain.ActionReasonControllerDisconnected, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonControllerDisconnected, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if runtime.Broadcast.ActiveTerminalID == nil || *runtime.Broadcast.ActiveTerminalID != command.TerminalID {
-			result := rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		terminal := runtime.Broadcast.TerminalRuntimes[command.TerminalID]
 		if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
-			result := rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 		if service.actions == nil {
-			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
 
 		before := cloneTerminalRuntime(terminal)
 		projection, ok := service.actions.Apply(terminal, command)
 		if !ok || projection == nil {
 			runtime.Broadcast.TerminalRuntimes[command.TerminalID] = before
-			result := rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
-			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, result)
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
-		result := domain.ActionResult{
+		outcome = domain.ActionResult{
 			RequestID: command.RequestID,
 			Accepted:  true,
 			Reason:    domain.ActionReasonAccepted,
@@ -1201,16 +1361,49 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 		}
 		service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{
 			Fingerprint: fingerprint,
-			Result:      result,
+			Result:      outcome,
 		})
 		return transition{
 			accepted: true,
 			effects: []Effect{
 				{Live: projection},
-				playerActionResultEffect(connectionID, sessionID, result),
+				playerActionResultEffect(connectionID, sessionID, outcome),
 			},
 		}
 	})
+	return outcome
+}
+
+// DispatchPlayerActionForRecognition resolves the opaque handle to one active
+// physical stream without creating state, then executes the same canonical
+// transaction used by transport compatibility callers.
+func (service *Service) DispatchPlayerActionForRecognition(handle domain.RecognitionHandle, command domain.RuntimeCommand) domain.ActionResult {
+	if service == nil {
+		return domain.ActionResult{RequestID: command.RequestID, Reason: domain.ActionReasonInvalidSession}
+	}
+	service.mu.RLock()
+	sessionID, ok := service.runtime.SessionIDByBrowserToken[handle]
+	session := service.runtime.SessionsByID[sessionID]
+	var connectionID domain.ConnectionID
+	if ok && session != nil {
+		connections := make([]domain.ConnectionID, 0, len(session.ConnectionIDs))
+		for candidate := range session.ConnectionIDs {
+			connections = append(connections, candidate)
+		}
+		sort.Slice(connections, func(left, right int) bool { return connections[left] < connections[right] })
+		if len(connections) > 0 {
+			connectionID = connections[0]
+		}
+	}
+	revision := service.runtime.Revision
+	service.mu.RUnlock()
+	if !ok || session == nil {
+		return domain.ActionResult{RequestID: command.RequestID, Reason: domain.ActionReasonInvalidSession, Revision: revision}
+	}
+	if connectionID == "" {
+		return domain.ActionResult{RequestID: command.RequestID, Reason: domain.ActionReasonControllerDisconnected, Revision: revision}
+	}
+	return service.DispatchPlayerAction(connectionID, command)
 }
 
 // ForceHackSuccess executes the exact private game-master operation inside the
@@ -1267,7 +1460,14 @@ func (service *Service) commit(apply func(*domain.ProcessRuntime) transition) tr
 		service.runtime = *working
 	}
 	revision := service.runtime.Revision
+	updatedSessions := make(map[domain.LogicalSessionID]struct{})
 	for _, effect := range result.effects {
+		if result.accepted && effect.SessionID != "" {
+			if _, exists := updatedSessions[effect.SessionID]; !exists {
+				effect.Update = service.compoundUpdateLocked(&service.runtime, effect.SessionID, revision)
+				updatedSessions[effect.SessionID] = struct{}{}
+			}
+		}
 		service.enqueue(detachEffect(effect, revision))
 	}
 	return transitionResult{accepted: result.accepted, revision: revision}
@@ -1497,8 +1697,11 @@ func rejectedSelection(requestID domain.RequestID, reason domain.ActionReason, r
 }
 
 func selectionFingerprint(selection CharacterSelection) string {
+	if selection.Fingerprint != "" {
+		return selection.Fingerprint
+	}
 	fields := []string{string(selection.BroadcastID), string(selection.CharacterID)}
-	return fingerprintFields(fields...)
+	return fingerprintFields("SelectCharacter", fields[0], fields[1])
 }
 
 func sessionForConnection(runtime *domain.ProcessRuntime, connectionID domain.ConnectionID) (domain.LogicalSessionID, *domain.LogicalSession) {
@@ -1543,7 +1746,7 @@ func validRuntimeCommand(command domain.RuntimeCommand) bool {
 		return false
 	}
 	switch command.Kind {
-	case domain.RuntimeCommandNavAction:
+	case domain.RuntimeCommandNavigate:
 		if command.TargetID != "" || command.PatternID != "" {
 			return false
 		}
@@ -1555,9 +1758,9 @@ func validRuntimeCommand(command domain.RuntimeCommand) bool {
 		default:
 			return false
 		}
-	case domain.RuntimeCommandHackGuess:
+	case domain.RuntimeCommandGuess:
 		return strings.TrimSpace(command.TargetID) != "" && command.Action == "" && command.NodeID == "" && command.PatternID == ""
-	case domain.RuntimeCommandHackPattern:
+	case domain.RuntimeCommandActivatePattern:
 		return strings.TrimSpace(command.PatternID) != "" && command.Action == "" && command.NodeID == "" && command.TargetID == ""
 	default:
 		return false
@@ -1565,6 +1768,9 @@ func validRuntimeCommand(command domain.RuntimeCommand) bool {
 }
 
 func playerActionFingerprint(command domain.RuntimeCommand) string {
+	if command.PayloadFingerprint != "" {
+		return command.PayloadFingerprint
+	}
 	return fingerprintFields(
 		string(command.Kind),
 		string(command.BroadcastID),
@@ -1827,6 +2033,7 @@ func detachEffect(effect Effect, revision uint64) Effect {
 	}
 	detached.Live = clonePublicLiveState(effect.Live)
 	detached.Hack = clonePublicHackState(effect.Hack)
+	detached.Update = domain.CloneCompoundUpdate(effect.Update)
 	if effect.Result != nil {
 		result := *effect.Result
 		if result.Revision == 0 {

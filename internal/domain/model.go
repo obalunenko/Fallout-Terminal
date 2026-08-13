@@ -181,8 +181,21 @@ type LogicalSessionID string
 // coordinator state and must never appear in a public projection.
 type BrowserToken string
 
-// ConnectionID identifies one concrete WebSocket connection.
+// RecognitionHandle is the public name for the opaque process-local browser
+// recognition value. BrowserToken remains as a compatibility alias while the
+// legacy transport is removed.
+type RecognitionHandle = BrowserToken
+
+// ConnectionID identifies one concrete public stream.
 type ConnectionID string
+
+// PhysicalStream is detached identity metadata for one active subscription.
+// Queue, cancellation, and synchronization objects remain transport-owned and
+// are deliberately not part of this serializable boundary value.
+type PhysicalStream struct {
+	ID        ConnectionID
+	SessionID LogicalSessionID
+}
 
 // CharacterID identifies one process-local roster entry.
 type CharacterID string
@@ -201,10 +214,10 @@ type RequestID = string
 type RuntimeCommandKind string
 
 const (
-	RuntimeCommandCharacterSelect RuntimeCommandKind = "CHARACTER_SELECT"
-	RuntimeCommandNavAction       RuntimeCommandKind = "NAV_ACTION"
-	RuntimeCommandHackGuess       RuntimeCommandKind = "HACK_GUESS"
-	RuntimeCommandHackPattern     RuntimeCommandKind = "HACK_PATTERN"
+	RuntimeCommandSelectCharacter RuntimeCommandKind = "select-character"
+	RuntimeCommandNavigate        RuntimeCommandKind = "navigate"
+	RuntimeCommandGuess           RuntimeCommandKind = "guess"
+	RuntimeCommandActivatePattern RuntimeCommandKind = "activate-pattern"
 )
 
 // PlayerRole is a logical session's current broadcast-wide authority.
@@ -279,20 +292,31 @@ type ActionResult struct {
 // RuntimeCommand is the transport-independent form of a shared player request.
 // Only fields relevant to its command kind are populated.
 type RuntimeCommand struct {
-	RequestID   RequestID
-	BroadcastID BroadcastID
-	TerminalID  string
-	Kind        RuntimeCommandKind
-	Action      string
-	NodeID      string
-	TargetID    string
-	PatternID   string
+	RequestID          RequestID
+	BroadcastID        BroadcastID
+	TerminalID         string
+	Kind               RuntimeCommandKind
+	Action             string
+	NodeID             string
+	TargetID           string
+	PatternID          string
+	PayloadFingerprint string
 }
 
 // RequestResultRecord retains enough information to make request replay idempotent.
 type RequestResultRecord struct {
 	Fingerprint string
 	Result      ActionResult
+}
+
+// RequestReplayRecord is the complete detached value retained by the bounded
+// Connect mutation replay cache. It carries no transport request object.
+type RequestReplayRecord struct {
+	RequestID          RequestID
+	Procedure          string
+	PayloadFingerprint string
+	Result             ActionResult
+	Revision           uint64
 }
 
 // BrowserRecognition is the private mapping from an opaque browser token to a
@@ -406,6 +430,60 @@ type PlayerState struct {
 	BroadcastID      BroadcastID         `json:"-"`
 	ActiveTerminalID string              `json:"-"`
 	Roster           []PlayerRosterEntry `json:"roster"`
+}
+
+// TerminalPresentation is an exclusive detached public terminal projection.
+// Live is non-nil for a complete active terminal; NoLiveTerminal is true for
+// the explicit empty variant. Adapters reject every other combination.
+type TerminalPresentation struct {
+	Live           *PublicLiveState
+	NoLiveTerminal bool
+}
+
+// PersonalizedSnapshot is the mandatory first value for every subscription.
+type PersonalizedSnapshot struct {
+	RecognitionHandle RecognitionHandle
+	Revision          uint64
+	PlayerState       *PlayerState
+	Terminal          TerminalPresentation
+}
+
+// CompoundUpdate is one complete personalized publication for a committed
+// revision. Nil components mean unchanged, never clear or partial patch.
+type CompoundUpdate struct {
+	Revision uint64
+	Player   *PlayerState
+	Terminal *TerminalPresentation
+	Nav      *NavState
+	Hack     *PublicHackState
+}
+
+// BrowserPendingAction tracks the two independent acknowledgements required
+// before an accepted browser action is no longer pending.
+type BrowserPendingAction struct {
+	RequestID      RequestID
+	Result         *ActionResult
+	StreamRevision uint64
+}
+
+// SoundCategory is one stable allowlisted same-origin asset group.
+type SoundCategory string
+
+const (
+	SoundCategoryAmbient    SoundCategory = "ambient"
+	SoundCategoryHackGood   SoundCategory = "hack-good"
+	SoundCategoryHackBad    SoundCategory = "hack-bad"
+	SoundCategoryMenuFocus  SoundCategory = "menu-focus"
+	SoundCategorySingle     SoundCategory = "single"
+	SoundCategoryMultiple   SoundCategory = "multiple"
+	SoundCategoryEnter      SoundCategory = "enter"
+	SoundCategoryCharscroll SoundCategory = "charscroll"
+)
+
+// SoundManifest contains only sorted safe relative same-origin asset paths.
+type SoundManifest struct {
+	Category SoundCategory
+	Assets   []string
 }
 
 // MarshalJSON preserves nullable identifiers while keeping convenient typed
@@ -525,6 +603,99 @@ func ClonePlayerState(state *PlayerState) *PlayerState {
 	clone := *state
 	clone.Character = clonePlayerCharacter(state.Character)
 	clone.Roster = append([]PlayerRosterEntry(nil), state.Roster...)
+	return &clone
+}
+
+// CloneTerminalPresentation returns a deeply detached terminal variant.
+func CloneTerminalPresentation(presentation TerminalPresentation) TerminalPresentation {
+	return TerminalPresentation{
+		Live:           clonePublicLiveState(presentation.Live),
+		NoLiveTerminal: presentation.NoLiveTerminal,
+	}
+}
+
+// ClonePersonalizedSnapshot returns a deeply detached first-stream value.
+func ClonePersonalizedSnapshot(snapshot *PersonalizedSnapshot) *PersonalizedSnapshot {
+	if snapshot == nil {
+		return nil
+	}
+	clone := *snapshot
+	clone.PlayerState = ClonePlayerState(snapshot.PlayerState)
+	clone.Terminal = CloneTerminalPresentation(snapshot.Terminal)
+	return &clone
+}
+
+// CloneCompoundUpdate returns a deeply detached authoritative publication.
+func CloneCompoundUpdate(update *CompoundUpdate) *CompoundUpdate {
+	if update == nil {
+		return nil
+	}
+	clone := *update
+	clone.Player = ClonePlayerState(update.Player)
+	if update.Terminal != nil {
+		terminal := CloneTerminalPresentation(*update.Terminal)
+		clone.Terminal = &terminal
+	}
+	if update.Nav != nil {
+		nav := *update.Nav
+		nav.Path = append([]string(nil), update.Nav.Path...)
+		nav.ViewEntryID = cloneString(update.Nav.ViewEntryID)
+		nav.CommandNodeID = cloneString(update.Nav.CommandNodeID)
+		clone.Nav = &nav
+	}
+	clone.Hack = clonePublicHackState(update.Hack)
+	return &clone
+}
+
+func clonePublicLiveState(state *PublicLiveState) *PublicLiveState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	clone.Tree = cloneContentNode(state.Tree)
+	clone.Nav.Path = append([]string(nil), state.Nav.Path...)
+	clone.Nav.ViewEntryID = cloneString(state.Nav.ViewEntryID)
+	clone.Nav.CommandNodeID = cloneString(state.Nav.CommandNodeID)
+	clone.Hack = clonePublicHackState(state.Hack)
+	return &clone
+}
+
+func cloneContentNode(node ContentNode) ContentNode {
+	clone := node
+	clone.Extra = cloneRawMessages(node.Extra)
+	clone.Children = make([]ContentNode, len(node.Children))
+	for index := range node.Children {
+		clone.Children[index] = cloneContentNode(node.Children[index])
+	}
+	return clone
+}
+
+func cloneRawMessages(values map[string]json.RawMessage) map[string]json.RawMessage {
+	if values == nil {
+		return nil
+	}
+	clone := make(map[string]json.RawMessage, len(values))
+	for key, value := range values {
+		clone[key] = append(json.RawMessage(nil), value...)
+	}
+	return clone
+}
+
+func clonePublicHackState(state *PublicHackState) *PublicHackState {
+	if state == nil {
+		return nil
+	}
+	clone := *state
+	clone.Log = append([]string(nil), state.Log...)
+	clone.Patterns = append([]PublicHackPattern(nil), state.Patterns...)
+	clone.Columns = make([]HackColumn, len(state.Columns))
+	for index, column := range state.Columns {
+		clone.Columns[index] = HackColumn{
+			Addresses: append([]string(nil), column.Addresses...),
+			Text:      column.Text,
+			Words:     append([]HackWord(nil), column.Words...),
+		}
+	}
 	return &clone
 }
 

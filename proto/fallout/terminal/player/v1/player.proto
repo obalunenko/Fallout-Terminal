@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package fallout.terminal.player.v1;
+
+import "fallout/terminal/player/v1/hacking.proto";
+import "fallout/terminal/player/v1/navigation.proto";
+import "fallout/terminal/player/v1/sound.proto";
+import "fallout/terminal/player/v1/terminal.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
+
+enum PlayerRole {
+  PLAYER_ROLE_UNSPECIFIED = 0;
+  PLAYER_ROLE_UNASSIGNED = 1;
+  PLAYER_ROLE_ACTIVE = 2;
+  PLAYER_ROLE_OBSERVER = 3;
+}
+
+enum PlayerPhase {
+  PLAYER_PHASE_UNSPECIFIED = 0;
+  PLAYER_PHASE_NO_BROADCAST = 1;
+  PLAYER_PHASE_SELECTING = 2;
+  PLAYER_PHASE_WAITING = 3;
+  PLAYER_PHASE_CONTROLLING = 4;
+  PLAYER_PHASE_OBSERVING = 5;
+}
+
+enum RosterAvailability {
+  ROSTER_AVAILABILITY_UNSPECIFIED = 0;
+  ROSTER_AVAILABILITY_AVAILABLE = 1;
+  ROSTER_AVAILABILITY_CLAIMED = 2;
+}
+
+enum ActionReason {
+  ACTION_REASON_UNSPECIFIED = 0;
+  ACTION_REASON_ACCEPTED = 1;
+  ACTION_REASON_INVALID_SESSION = 2;
+  ACTION_REASON_STALE_BROADCAST = 3;
+  ACTION_REASON_UNASSIGNED = 4;
+  ACTION_REASON_NOT_CONTROLLER = 5;
+  ACTION_REASON_CONTROLLER_DISCONNECTED = 6;
+  ACTION_REASON_STALE_TERMINAL = 7;
+  ACTION_REASON_INVALID_ACTION = 8;
+  ACTION_REASON_CONFLICT = 9;
+  ACTION_REASON_DUPLICATE = 10;
+}
+
+message RosterEntry {
+  string character_id = 1;
+  string display_name = 2;
+  RosterAvailability availability = 3;
+}
+
+message AssignedCharacter {
+  string character_id = 1;
+  string display_name = 2;
+}
+
+message PlayerState {
+  string logical_session_id = 1;
+  string fallback_name = 2;
+  AssignedCharacter assigned_character = 3;
+  PlayerRole role = 4;
+  PlayerPhase phase = 5;
+  optional string broadcast_id = 6;
+  optional string active_terminal_id = 7;
+  repeated RosterEntry roster = 8;
+}
+
+message SubscribeRequest {
+  optional string recognition_handle = 1;
+}
+
+message PersonalizedSnapshot {
+  string recognition_handle = 1;
+  uint64 revision = 2;
+  PlayerState player_state = 3;
+  TerminalPresentation terminal_presentation = 4;
+}
+
+message CompoundUpdate {
+  uint64 revision = 1;
+  PlayerState player_state = 2;
+  TerminalPresentation terminal_presentation = 3;
+  NavigationState navigation = 4;
+  PublicHackState hacking = 5;
+}
+
+message SubscriptionMessage {
+  oneof payload {
+    PersonalizedSnapshot snapshot = 1;
+    CompoundUpdate update = 2;
+  }
+}
+
+message SelectCharacterRequest {
+  string recognition_handle = 1;
+  string request_id = 2;
+  string broadcast_id = 3;
+  string character_id = 4;
+}
+
+message ActionResult {
+  string request_id = 1;
+  bool accepted = 2;
+  ActionReason reason = 3;
+  uint64 revision = 4;
+}
+
+service PlayerService {
+  rpc Subscribe(SubscribeRequest) returns (stream SubscriptionMessage);
+  rpc SelectCharacter(SelectCharacterRequest) returns (ActionResult);
+  rpc Navigate(NavigateRequest) returns (ActionResult);
+  rpc Guess(GuessRequest) returns (ActionResult);
+  rpc ActivatePattern(ActivatePatternRequest) returns (ActionResult);
+  rpc SoundManifest(SoundManifestRequest) returns (SoundManifestResponse);
+}

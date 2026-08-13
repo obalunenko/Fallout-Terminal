@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
@@ -116,7 +117,7 @@ type Browser interface {
 	OpenURL(string) error
 }
 
-// PlayerServer owns the in-process HTTP/WebSocket listener.
+// PlayerServer owns the in-process HTTP/Connect listener.
 type PlayerServer interface {
 	Start(context.Context) (domain.ServerInfo, error)
 	Stop(context.Context) error
@@ -155,16 +156,18 @@ type EventSink interface {
 // AppDependencies contains constructed services. Construction acquires no
 // external resources; Start owns acquisition in contract order.
 type AppDependencies struct {
-	Sessions      SessionService
-	PlayerConfigs PlayerConfigService
-	Live          LiveService
-	Coordination  CoordinationService
-	Player        PlayerServer
-	Tunnel        TunnelService
-	Desktop       DesktopRuntime
-	Browser       Browser
-	Events        EventSink
-	TunnelEnabled bool
+	Sessions        SessionService
+	PlayerConfigs   PlayerConfigService
+	Live            LiveService
+	Coordination    CoordinationService
+	Player          PlayerServer
+	Tunnel          TunnelService
+	Desktop         DesktopRuntime
+	Browser         Browser
+	Events          EventSink
+	TunnelEnabled   bool
+	StartupTimeout  time.Duration
+	ShutdownTimeout time.Duration
 }
 
 // RuntimeStatus is the synchronous startup/status snapshot used to avoid
@@ -331,7 +334,7 @@ func (app *App) Start(ctx context.Context) error {
 	app.mu.Unlock()
 
 	if app.deps.Events != nil {
-		if err := app.deps.Events.Emit(serverInfoEvent, info); err != nil {
+		if err := app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(info)); err != nil {
 			return app.failLocked(ctx, fmt.Errorf("publish player server status to desktop bridge: %w", err))
 		}
 	}
@@ -365,7 +368,7 @@ func (app *App) Shutdown(ctx context.Context) error {
 func (app *App) GetRuntimeStatus() RuntimeStatus {
 	app.mu.RLock()
 	defer app.mu.RUnlock()
-	return RuntimeStatus{
+	status := RuntimeStatus{
 		ServerInfo:        cloneServerInfoPointer(app.serverInfo),
 		ClientCount:       app.clientCount,
 		HackState:         clonePublicHackState(app.hackState),
@@ -375,6 +378,8 @@ func (app *App) GetRuntimeStatus() RuntimeStatus {
 		SavedRevision:     app.savedRevision,
 		CoordinationState: domain.CloneMasterCoordinationState(app.coordinationState),
 	}
+	_ = runtimeStatusToPrivate(status)
+	return status
 }
 
 // NewSession opens the native destination dialog and creates a validated
@@ -387,7 +392,7 @@ func (app *App) NewSession() sessionservice.SessionResult {
 	result := commands.Create(app.contextSnapshot())
 	app.captureSessionStatus(commands)
 	app.resetPlayerConfigForSession(result)
-	return result
+	return routeSessionOperationResult(result)
 }
 
 // OpenSession opens and validates an existing version-1 session.
@@ -399,7 +404,7 @@ func (app *App) OpenSession() sessionservice.SessionResult {
 	result := commands.Open(app.contextSnapshot())
 	app.captureSessionStatus(commands)
 	app.resetPlayerConfigForSession(result)
-	return result
+	return routeSessionOperationResult(result)
 }
 
 // CopyDemo creates an explicit writable copy of the bundled demo.
@@ -411,7 +416,7 @@ func (app *App) CopyDemo() sessionservice.SessionResult {
 	result := commands.CopyDemo(app.contextSnapshot())
 	app.captureSessionStatus(commands)
 	app.resetPlayerConfigForSession(result)
-	return result
+	return routeSessionOperationResult(result)
 }
 
 // SaveSession assigns a monotonic revision and waits until it or a newer
@@ -440,7 +445,7 @@ func (app *App) SaveSession(session domain.Session) sessionservice.SaveResult {
 		}
 	}
 	app.mu.Unlock()
-	return result
+	return routeSaveSessionResult(result)
 }
 
 // LoadReferencedPlayerConfig reloads the active session's durable roster.
@@ -548,19 +553,19 @@ func (app *App) installPlayerConfig(result playerconfigservice.Result, associate
 		return app.playerConfigFailure(err.Error(), false)
 	}
 	app.publishCoordinationState(state)
-	return PlayerConfigCommandResult{
+	return routePlayerConfigResult(PlayerConfigCommandResult{
 		OK:      true,
 		Config:  &domain.PlayerConfigMetadata{Status: "loaded", FilePath: handle.Path, Version: handle.Version, Name: handle.Name},
 		Session: associatedSession,
 		State:   domain.CloneMasterCoordinationState(state),
-	}
+	})
 }
 
 func (app *App) playerConfigFailure(message string, canceled bool) PlayerConfigCommandResult {
 	app.mu.RLock()
 	state := domain.CloneMasterCoordinationState(app.coordinationState)
 	app.mu.RUnlock()
-	return PlayerConfigCommandResult{Canceled: canceled, Error: message, State: state}
+	return routePlayerConfigResult(PlayerConfigCommandResult{Canceled: canceled, Error: message, State: state})
 }
 
 func (app *App) resetPlayerConfigForSession(result sessionservice.SessionResult) {
@@ -598,7 +603,7 @@ func (app *App) AddCharacter(name string) CoordinationCommandResult {
 		return app.coordinationFailure("character could not be added")
 	}
 	app.publishCoordinationState(state)
-	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
 }
 
 // RenameCharacter validates the stable roster ID and display name before
@@ -727,7 +732,7 @@ func (app *App) StartBroadcast() CoordinationCommandResult {
 		return app.coordinationFailure("broadcast could not be started")
 	}
 	app.publishCoordinationState(state)
-	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
 }
 
 // EndBroadcast ends only the process-local broadcast epoch. Authored durable
@@ -826,7 +831,7 @@ func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationComman
 	app.mu.RLock()
 	coordinationState := domain.CloneMasterCoordinationState(app.coordinationState)
 	app.mu.RUnlock()
-	return CoordinationCommandResult{OK: true, State: coordinationState}
+	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: coordinationState})
 }
 
 // ResetFailedHack validates the latest authored terminal payload at the
@@ -858,7 +863,7 @@ func (app *App) ForceHackSuccess() CommandResult {
 			return commandFailure("no active hacking puzzle")
 		}
 		app.updateHackState(state)
-		return CommandResult{OK: true}
+		return routeCommandResult(CommandResult{OK: true})
 	}
 
 	// Compatibility for partial compositions that predate the coordinator's
@@ -874,7 +879,7 @@ func (app *App) ForceHackSuccess() CommandResult {
 		publisher.PublishHack()
 	}
 	app.updateHackState(state)
-	return CommandResult{OK: true}
+	return routeCommandResult(CommandResult{OK: true})
 }
 
 // OpenURL validates immediately before crossing the system-browser boundary.
@@ -889,12 +894,17 @@ func (app *App) OpenURL(rawURL string) CommandResult {
 	if err := app.deps.Browser.OpenURL(parsed.String()); err != nil {
 		return commandFailure("could not open the external URL")
 	}
-	return CommandResult{OK: true}
+	return routeCommandResult(CommandResult{OK: true})
 }
 
 func (app *App) startup(ctx context.Context) {
 	if setter, ok := app.deps.Events.(interface{ SetContext(context.Context) }); ok {
 		setter.SetContext(ctx)
+	}
+	if app.deps.StartupTimeout > 0 {
+		bounded, cancel := context.WithTimeout(ctx, app.deps.StartupTimeout)
+		defer cancel()
+		ctx = bounded
 	}
 	_ = app.Start(ctx)
 }
@@ -909,15 +919,20 @@ func (app *App) domReady(ctx context.Context) {
 	app.mu.Unlock()
 	if app.deps.Events != nil {
 		if info != nil {
-			_ = app.deps.Events.Emit(serverInfoEvent, *info)
+			_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*info))
 		}
-		_ = app.deps.Events.Emit(clientCountEvent, clientCount)
-		_ = app.deps.Events.Emit(hackStateEvent, hackState)
-		_ = app.deps.Events.Emit(coordinationStateEvent, coordinationState)
+		_ = app.deps.Events.Emit(clientCountEvent, routeClientCountEvent(clientCount))
+		_ = app.deps.Events.Emit(hackStateEvent, routeHackStateEvent(hackState))
+		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(coordinationState))
 	}
 }
 
 func (app *App) shutdown(ctx context.Context) {
+	if app.deps.ShutdownTimeout > 0 {
+		bounded, cancel := context.WithTimeout(ctx, app.deps.ShutdownTimeout)
+		defer cancel()
+		ctx = bounded
+	}
 	_ = app.Shutdown(ctx)
 }
 
@@ -954,7 +969,7 @@ func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) 
 	app.phase = "ready-public"
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, public)
+		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(public))
 	}
 }
 
@@ -976,7 +991,7 @@ func (app *App) recordTunnelFailure(message string) {
 	info := cloneServerInfoPointer(app.serverInfo)
 	app.mu.Unlock()
 	if info != nil && app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, *info)
+		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*info))
 	}
 }
 
@@ -1094,8 +1109,8 @@ func (app *App) captureSessionStatus(commands sessionCommands) {
 	app.mu.Unlock()
 }
 
-// updateHackState is also the player-server callback boundary for accepted
-// HACK_GUESS and HACK_PATTERN actions. Only the detached public projection enters
+// updateHackState is the trusted desktop projection boundary for accepted
+// typed guess and pattern actions. Only the detached public projection enters
 // RuntimeStatus or crosses the desktop event bridge.
 func (app *App) updateHackState(state *domain.PublicHackState) {
 	clone := clonePublicHackState(state)
@@ -1103,7 +1118,7 @@ func (app *App) updateHackState(state *domain.PublicHackState) {
 	app.hackState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(hackStateEvent, clonePublicHackState(clone))
+		_ = app.deps.Events.Emit(hackStateEvent, routeHackStateEvent(clonePublicHackState(clone)))
 	}
 }
 
@@ -1115,7 +1130,7 @@ func (app *App) updateClientCount(count int) {
 	app.clientCount = count
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(clientCountEvent, count)
+		_ = app.deps.Events.Emit(clientCountEvent, routeClientCountEvent(count))
 	}
 }
 
@@ -1125,7 +1140,7 @@ func (app *App) publishCoordinationState(state *domain.MasterCoordinationState) 
 	app.coordinationState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(coordinationStateEvent, domain.CloneMasterCoordinationState(clone))
+		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
 	}
 }
 
@@ -1133,7 +1148,7 @@ func (app *App) coordinationFailure(message string) CoordinationCommandResult {
 	app.mu.RLock()
 	state := domain.CloneMasterCoordinationState(app.coordinationState)
 	app.mu.RUnlock()
-	return CoordinationCommandResult{Error: message, State: state}
+	return routeCoordinationResult(CoordinationCommandResult{Error: message, State: state})
 }
 
 func (app *App) completeCoordinationCommand(state *domain.MasterCoordinationState, err error, nilStateMessage string) CoordinationCommandResult {
@@ -1141,13 +1156,13 @@ func (app *App) completeCoordinationCommand(state *domain.MasterCoordinationStat
 		if state == nil {
 			return app.coordinationFailure(err.Error())
 		}
-		return CoordinationCommandResult{Error: err.Error(), State: domain.CloneMasterCoordinationState(state)}
+		return routeCoordinationResult(CoordinationCommandResult{Error: err.Error(), State: domain.CloneMasterCoordinationState(state)})
 	}
 	if state == nil {
 		return app.coordinationFailure(nilStateMessage)
 	}
 	app.publishCoordinationState(state)
-	return CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)}
+	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
 }
 
 func (app *App) terminalSwitchFailure(message string, state *domain.MasterCoordinationState) TerminalSwitchCommandResult {
@@ -1156,7 +1171,7 @@ func (app *App) terminalSwitchFailure(message string, state *domain.MasterCoordi
 		state = domain.CloneMasterCoordinationState(app.coordinationState)
 		app.mu.RUnlock()
 	}
-	return TerminalSwitchCommandResult{Error: message, State: domain.CloneMasterCoordinationState(state)}
+	return routeTerminalSwitchResult(TerminalSwitchCommandResult{Error: message, State: domain.CloneMasterCoordinationState(state)})
 }
 
 func (app *App) completeTerminalSwitchCommand(state *domain.MasterCoordinationState, err error, status, nilStateMessage string) TerminalSwitchCommandResult {
@@ -1167,9 +1182,9 @@ func (app *App) completeTerminalSwitchCommand(state *domain.MasterCoordinationSt
 		return app.terminalSwitchFailure(nilStateMessage, nil)
 	}
 	app.publishCoordinationState(state)
-	return TerminalSwitchCommandResult{
+	return routeTerminalSwitchResult(TerminalSwitchCommandResult{
 		OK: true, Status: status, State: domain.CloneMasterCoordinationState(state),
-	}
+	})
 }
 
 func (app *App) completeTerminalSwitchRequest(state *domain.MasterCoordinationState, err error, completedStatus, nilStateMessage string) TerminalSwitchCommandResult {
@@ -1186,10 +1201,10 @@ func (app *App) completeTerminalSwitchRequest(state *domain.MasterCoordinationSt
 		switchID = state.PendingSwitch.SwitchID
 	}
 	app.publishCoordinationState(state)
-	return TerminalSwitchCommandResult{
+	return routeTerminalSwitchResult(TerminalSwitchCommandResult{
 		OK: true, Status: status, SwitchID: switchID,
 		State: domain.CloneMasterCoordinationState(state),
-	}
+	})
 }
 
 func validatedCoordinationDisplayName(value string, label string) (string, error) {
@@ -1232,7 +1247,7 @@ func cloneTreeForBridgeValidation(node domain.ContentNode) domain.ContentNode {
 }
 
 func commandFailure(message string) CommandResult {
-	return CommandResult{Error: message}
+	return routeCommandResult(CommandResult{Error: message})
 }
 
 func clonePublicHackState(state *domain.PublicHackState) *domain.PublicHackState {

@@ -2,28 +2,17 @@ package player
 
 import (
 	"bytes"
-	"encoding/json"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
-	"sort"
 	"strings"
 )
 
-const playerContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+const playerContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; media-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
 
 var (
-	allowedSoundFolders = map[string]struct{}{
-		"ambient":    {},
-		"hack-good":  {},
-		"hack-bad":   {},
-		"menu-focus": {},
-		"single":     {},
-		"multiple":   {},
-		"enter":      {},
-		"charscroll": {},
-	}
 	allowedSoundExtensions = map[string]struct{}{
 		".mp3":  {},
 		".wav":  {},
@@ -38,6 +27,72 @@ var (
 // opened or derived from requests.
 func NewHTTPHandler(assets fs.FS) http.Handler {
 	return &playerHTTPHandler{assets: assets}
+}
+
+// NewApplicationHandler mounts generated Connect procedures before the static
+// player application. RPC paths never fall through to the SPA index, and all
+// page, generated client, sound, and RPC traffic remains same-origin.
+func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler) http.Handler {
+	staticHandler := NewHTTPHandler(assets)
+	boundedRPC := http.MaxBytesHandler(rpcHandler, MaxEncodedBodyBytes)
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if rpcHandler != nil && rpcPath != "" && rpcRequestPath(request.URL.Path, rpcPath) {
+			response.Header().Set("X-Content-Type-Options", "nosniff")
+			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
+			if !validRequestHost(request.Host) || !sameHostOrigin(request) {
+				http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			if request.ContentLength > MaxEncodedBodyBytes {
+				http.Error(response, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
+				return
+			}
+			boundedRPC.ServeHTTP(response, request)
+			return
+		}
+		staticHandler.ServeHTTP(response, request)
+	})
+}
+
+func rpcRequestPath(requestPath, servicePath string) bool {
+	servicePath = strings.TrimSuffix(servicePath, "/")
+	return requestPath == servicePath || strings.HasPrefix(requestPath, servicePath+"/")
+}
+
+func validRequestHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" || strings.ContainsAny(host, "/\\\r\n\t @") {
+		return false
+	}
+	if strings.HasPrefix(host, "[") {
+		_, _, err := net.SplitHostPort(host)
+		return err == nil || strings.HasSuffix(host, "]")
+	}
+	if strings.Count(host, ":") > 1 {
+		return false
+	}
+	if strings.Contains(host, ":") {
+		name, port, err := net.SplitHostPort(host)
+		return err == nil && name != "" && port != ""
+	}
+	return true
+}
+
+// sameHostOrigin accepts non-browser clients without Origin and browser
+// clients whose HTTP(S) origin host exactly matches the request Host.
+func sameHostOrigin(request *http.Request) bool {
+	if request == nil {
+		return false
+	}
+	rawOrigin := strings.TrimSpace(request.Header.Get("Origin"))
+	if rawOrigin == "" {
+		return true
+	}
+	origin, err := url.Parse(rawOrigin)
+	if err != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
+		return false
+	}
+	return strings.EqualFold(origin.Host, request.Host)
 }
 
 type playerHTTPHandler struct {
@@ -57,50 +112,12 @@ func (handler *playerHTTPHandler) ServeHTTP(response http.ResponseWriter, reques
 		http.NotFound(response, request)
 		return
 	}
-	if strings.HasPrefix(request.URL.Path, "/api/sounds/") {
-		handler.serveSoundList(response, request)
-		return
-	}
 	if strings.HasPrefix(request.URL.Path, "/api/") {
 		http.NotFound(response, request)
 		return
 	}
 
 	handler.serveAsset(response, request)
-}
-
-func (handler *playerHTTPHandler) serveSoundList(response http.ResponseWriter, request *http.Request) {
-	folder := strings.TrimPrefix(request.URL.Path, "/api/sounds/")
-	if _, allowed := allowedSoundFolders[folder]; !allowed || strings.Contains(folder, "/") {
-		writeSoundList(response, nil)
-		return
-	}
-
-	files := make([]string, 0)
-	if handler.assets != nil {
-		entries, err := fs.ReadDir(handler.assets, "sounds/"+folder)
-		if err == nil {
-			for _, entry := range entries {
-				info, err := entry.Info()
-				if err != nil || !info.Mode().IsRegular() {
-					continue
-				}
-				if _, allowed := allowedSoundExtensions[strings.ToLower(path.Ext(entry.Name()))]; allowed {
-					files = append(files, entry.Name())
-				}
-			}
-		}
-	}
-	sort.Strings(files)
-	writeSoundList(response, files)
-}
-
-func writeSoundList(response http.ResponseWriter, files []string) {
-	if files == nil {
-		files = make([]string, 0)
-	}
-	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(response).Encode(files)
 }
 
 func (handler *playerHTTPHandler) serveAsset(response http.ResponseWriter, request *http.Request) {
