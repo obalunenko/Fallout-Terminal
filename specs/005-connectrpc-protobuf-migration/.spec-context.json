@@ -1,0 +1,487 @@
+{
+  "workflow": "companion",
+  "specName": "connectrpc protobuf migration",
+  "branch": "005-connectrpc-protobuf-migration",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-12T23:52:24.089Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T00:00:48.156Z"
+    }
+  ],
+  "last_action": "living specs evaluated — skipped (not configured)",
+  "coverage": {
+    "FR-001": {
+      "title": "The feature MUST preserve the Go 1.26 modular-monolith architecture on Wails v2.13.0 and all behavior compatible with `develop` commit `8f306ce42e55b199ada4761d165461e2ebedc8ae`, including feature-003 hacking behavior and feature-004 player-session and control behavior."
+    },
+    "FR-002": {
+      "title": "If `develop` advances before implementation, the implementation MUST inventory and preserve compatible newer behavior rather than revert to the recorded baseline."
+    },
+    "FR-003": {
+      "title": "Before public transport implementation begins, the project MUST inventory every application-owned public player contract, private desktop payload, known persistence field, and serializable application configuration field."
+    },
+    "FR-004": {
+      "title": "Every inventory item MUST be classified as represented by a versioned protobuf contract, governed by a third-party schema, or excluded as a non-serializable implementation dependency."
+    },
+    "FR-005": {
+      "title": "The completed inventory MUST contain zero unclassified application-owned structured boundaries and zero unclassified serializable configuration fields."
+    },
+    "FR-006": {
+      "title": "Versioned public schemas MUST govern recognition exchange, personalized player state, roles, phases, assignments, controller state, roster availability, terminal content and presentation, navigation, public hacking patterns, typed mutation requests and results, complete snapshots, compound updates, and sound manifests."
+    },
+    "FR-007": {
+      "title": "Versioned private schemas MUST govern known session-v1, terminal, recursive content-node, player-config-v1, roster, Wails request, Wails result, status, event, session-operation, player-config-operation, command, coordination, terminal-switch, server-information, runtime-status, and serializable configuration semantics."
+    },
+    "FR-008": {
+      "title": "Serializable configuration contracts MUST cover application, player-server, coordination, queue, timeout, path, tunnel, startup, and shutdown values that can cross or be recorded at application-owned boundaries."
+    },
+    "FR-009": {
+      "title": "Embedded filesystems, callbacks, event sinks, clocks, random sources, service interfaces, process handles, listeners, and other dependency-injection objects MUST remain excluded from serializable configuration contracts."
+    },
+    "FR-010": {
+      "title": "Third-party schemas including `wails.json`, `package.json`, Buf configuration, GitHub Actions workflows, plist files, and third-party traffic-policy formats MUST NOT be duplicated in application protobuf schemas."
+    },
+    "FR-011": {
+      "title": "Public and private schemas MUST use separate versioned packages and MUST preserve an inspectable one-way boundary in which public schemas never import private schemas."
+    },
+    "FR-012": {
+      "title": "Generated player-client inputs and their transitive bundle MUST contain no private desktop, persistence, native-path, resolved-configuration, tunnel, credential, or private hacking contract."
+    },
+    "FR-013": {
+      "title": "Protobuf schema existence MUST NOT authorize public exposure of any message or capability."
+    },
+    "FR-014": {
+      "title": "Generated protobuf values MUST remain detached boundary values and MUST NOT become canonical mutable domain, navigation, live, coordination, or hacking aggregates."
+    },
+    "FR-015": {
+      "title": "Public transport MUST contain no handwritten JSON envelopes, generic maps, generic command procedure, generic RPC dispatcher, duplicated public transport DTO, or manually maintained RPC router."
+    },
+    "FR-016": {
+      "title": "The public player service MUST expose exactly one server-streaming subscription responsibility and separate unary responsibilities for character selection, navigation action, password-or-filler guess, special-pattern activation, and sound-manifest discovery."
+    },
+    "FR-017": {
+      "title": "The public service MUST NOT merge player mutations into a generic command procedure."
+    },
+    "FR-018": {
+      "title": "Browser-originated mutations MUST use unary procedures and authoritative state delivery MUST use server streaming."
+    },
+    "FR-019": {
+      "title": "The browser player MUST NOT require client-streaming or bidirectional-streaming request bodies."
+    },
+    "FR-020": {
+      "title": "The player page, generated player procedures, static resources, and sound assets MUST remain same-origin in local and ngrok modes without wildcard CORS."
+    },
+    "FR-021": {
+      "title": "The public listener MUST NOT expose runtime status, server information, health, reflection, generic capability discovery, diagnostics, tunnel status, or client-count procedures."
+    },
+    "FR-022": {
+      "title": "The public listener MUST NOT expose `ForceHackSuccess`, `ResetFailedHack`, native dialogs, arbitrary file operations, URL opening, tunnel configuration, private candidates, secret words, future outcomes, credentials, raw connection identities, or another session's private information."
+    },
+    "FR-023": {
+      "title": "The browser Connect transport MAY use generated protobuf JSON or binary encoding, but planning MUST choose and pin one encoding using official ConnectRPC guidance."
+    },
+    "FR-024": {
+      "title": "A first-time subscription without a recognition handle MUST create exactly one process-local logical session and return its opaque handle in the first snapshot."
+    },
+    "FR-025": {
+      "title": "The browser MUST persist only the opaque recognition handle in same-origin local storage."
+    },
+    "FR-026": {
+      "title": "The browser MUST NOT persist assignment, role, phase, controller, broadcast, terminal, navigation, hacking, pending-action, or replay state."
+    },
+    "FR-027": {
+      "title": "A subscription with a currently recognized handle MUST reattach to the same logical session."
+    },
+    "FR-028": {
+      "title": "A subscription with an unknown or expired nonblank handle MUST create a fresh logical session and return a replacement handle."
+    },
+    "FR-029": {
+      "title": "A structurally valid unary mutation with an unknown nonblank handle MUST return `invalid-session` without creating a session or replacement handle."
+    },
+    "FR-030": {
+      "title": "Concurrent first-time tabs in one browser profile MUST converge on one accepted recognition handle and one logical session."
+    },
+    "FR-031": {
+      "title": "Every active stream using one valid handle MUST attach to the same logical session and receive equivalent personalized state."
+    },
+    "FR-032": {
+      "title": "Raw displayed browser connection count MUST equal active public server streams."
+    },
+    "FR-033": {
+      "title": "Aggregate logical-session presence MUST remain connected while at least one stream for that session remains active."
+    },
+    "FR-034": {
+      "title": "Closing a logical session's final stream MUST mark it disconnected without automatically releasing its character claim or controller identity."
+    },
+    "FR-035": {
+      "title": "Reconnecting within the same process MUST restore current presence and current authoritative assignment."
+    },
+    "FR-036": {
+      "title": "Process restart MUST restore no recognition mapping, logical session, character claim, controller, broadcast, revision, live terminal, navigation, hacking, pending action, or replay-cache state."
+    },
+    "FR-037": {
+      "title": "Recognition handles MUST be treated only as process-local conveniences and MUST never bypass assignment, presence, controller, broadcast, terminal, gameplay, or replay validation."
+    },
+    "FR-038": {
+      "title": "The first application message on every new or reconnecting subscription MUST be exactly one complete personalized compound snapshot."
+    },
+    "FR-039": {
+      "title": "Every complete snapshot MUST contain the accepted or replacement recognition handle, complete current personalized player state, current authoritative revision, and exactly one terminal-presentation variant."
+    },
+    "FR-040": {
+      "title": "The snapshot terminal-presentation variant MUST be either the complete current public live-terminal projection or an explicit no-live-terminal state."
+    },
+    "FR-041": {
+      "title": "Snapshot creation MUST never generate or regenerate a hacking puzzle."
+    },
+    "FR-042": {
+      "title": "Reconnect snapshots MUST NOT replay ambient transitions, hacking outcome cues, stale actions, or prior accepted actions."
+    },
+    "FR-043": {
+      "title": "Stream attachment and snapshot capture MUST form a gap-free boundary such that a snapshot at revision R is followed by no application message at revision R or lower."
+    },
+    "FR-044": {
+      "title": "Every relevant committed revision after a subscriber's snapshot MUST be delivered or that stream MUST terminate so the client can reconnect to a new complete snapshot."
+    },
+    "FR-045": {
+      "title": "One accepted mutation MUST commit exactly one coordinator revision."
+    },
+    "FR-046": {
+      "title": "Each affected logical session MUST receive exactly one personalized compound authoritative update for an accepted mutation's revision."
+    },
+    "FR-047": {
+      "title": "Every physical stream for the same logical session MUST receive an equivalent personalized update for a given revision."
+    },
+    "FR-048": {
+      "title": "The compound-update contract MUST permit several complete changed player, terminal-presentation, navigation, and hacking projections in one value."
+    },
+    "FR-049": {
+      "title": "An omitted compound-update component MUST mean unchanged and MUST NOT act as an ambiguous partial patch."
+    },
+    "FR-050": {
+      "title": "A subscriber MUST NOT receive several player, terminal, navigation, or hacking application messages with the same revision."
+    },
+    "FR-051": {
+      "title": "Revisions observed by one subscriber after its snapshot MUST be strictly increasing while revisions irrelevant to that personalized projection MAY be skipped."
+    },
+    "FR-052": {
+      "title": "Publication MUST permit one committed revision to produce different personalized compound updates for different logical sessions."
+    },
+    "FR-053": {
+      "title": "Clients MUST NOT optimistically mutate assignment, role, active terminal, navigation, attempts, logs, patterns, removed duds, puzzle result, or any other canonical shared state."
+    },
+    "FR-054": {
+      "title": "An accepted action MUST remain pending until the client has both its correlated unary result and an applicable authoritative stream state at the result revision or a later relevant revision."
+    },
+    "FR-055": {
+      "title": "A rejected action MUST clear its correlated pending state immediately."
+    },
+    "FR-056": {
+      "title": "Every player mutation MUST resolve its recognition handle to a current logical session before domain mutation."
+    },
+    "FR-057": {
+      "title": "Every player mutation MUST validate request identity, current broadcast identity, assignment, active-stream presence, controller authority, applicable terminal identity, and action-specific rules."
+    },
+    "FR-058": {
+      "title": "An accepted mutation MUST mutate canonical state exactly once, commit exactly one revision, and enqueue its authoritative transition before completing the unary response."
+    },
+    "FR-059": {
+      "title": "A rejected, stale, duplicate, structurally invalid, observer-originated, disconnected-controller, or non-actionable request MUST NOT mutate canonical state, increment revision, publish an update, consume an attempt, or consume hacking randomness."
+    },
+    "FR-060": {
+      "title": "Replay storage MUST default to 256 request-result records per logical session and broadcast."
+    },
+    "FR-061": {
+      "title": "Exact replay MUST be guaranteed only while the matching request-result record remains retained."
+    },
+    "FR-062": {
+      "title": "An identical retained request MUST return its original result and revision without another canonical effect."
+    },
+    "FR-063": {
+      "title": "A retained request identity reused with a different procedure or payload fingerprint MUST return `duplicate` without mutation."
+    },
+    "FR-064": {
+      "title": "Replay-cache eviction MUST be deterministic but MUST NOT be presented as a public protocol guarantee."
+    },
+    "FR-065": {
+      "title": "After eviction, cache clearing, logical-session removal, or process restart, a reused request identity MUST be evaluated as new against current state and MAY be accepted if still valid."
+    },
+    "FR-066": {
+      "title": "The feature MUST NOT claim broadcast-lifetime or process-lifetime exactly-once behavior after replay-record loss."
+    },
+    "FR-067": {
+      "title": "Concurrent activation of one unused current-generation special pattern MUST produce exactly one accepted mutation."
+    },
+    "FR-068": {
+      "title": "Randomness consumption MUST be limited to the winning accepted special-pattern activation."
+    },
+    "FR-069": {
+      "title": "An accepted special-pattern activation MUST consume one outcome draw and at most one additional dud-selection draw under unchanged feature-003 rules."
+    },
+    "FR-070": {
+      "title": "Every stale, used, duplicate, rejected, or losing concurrent special-pattern activation MUST consume zero random calls."
+    },
+    "FR-071": {
+      "title": "The feature MUST preserve current pattern probabilities, dud-removal rules, attempts-reset rules, board-generation rules, and opaque generation-bound `patternId` semantics."
+    },
+    "FR-072": {
+      "title": "`HACK_ADMIN` MUST remain removed from every public contract, handler, generated client, fixture, and active document."
+    },
+    "FR-073": {
+      "title": "Malformed protobuf, illegal or missing variants, required `UNSPECIFIED` enums, blank or structurally invalid request identity, blank unary recognition handle, missing required broadcast or terminal identity, and structurally invalid action targets MUST return Connect `invalid_argument`."
+    },
+    "FR-074": {
+      "title": "A request above the effective 4 KiB player-controlled mutation limit or another documented public bound MUST return Connect `resource_exhausted` before canonical service invocation."
+    },
+    "FR-075": {
+      "title": "Unsupported public services or procedures MUST return Connect `unimplemented`."
+    },
+    "FR-076": {
+      "title": "Request or stream cancellation MUST return Connect `canceled`."
+    },
+    "FR-077": {
+      "title": "Temporary public service unavailability MUST return Connect `unavailable`."
+    },
+    "FR-078": {
+      "title": "Unexpected failures outside authoritative domain rejection MUST return Connect `internal`."
+    },
+    "FR-079": {
+      "title": "Decoded structurally valid player mutations rejected by current state or domain rules MUST return a typed authoritative action result."
+    },
+    "FR-080": {
+      "title": "Typed action results MUST use only `accepted`, `invalid-session`, `stale-broadcast`, `unassigned`, `not-controller`, `controller-disconnected`, `stale-terminal`, `invalid-action`, `conflict`, or `duplicate` as stable reasons."
+    },
+    "FR-081": {
+      "title": "Stale-generation, used-pattern, absent-puzzle, non-actionable-puzzle, solved-puzzle, failed-puzzle, exhausted-puzzle, and well-formed invalid-target rejections MUST use `invalid-action` unless `stale-terminal` is more specific."
+    },
+    "FR-082": {
+      "title": "Invalid Basic Auth MUST fail closed with HTTP `401` before player capabilities are reached."
+    },
+    "FR-083": {
+      "title": "Public errors MAY include safe correction or retry guidance but MUST NOT expose request bytes, legacy JSON, recognition handles, credentials, native paths, stack traces, private identities, private candidates, secret words, future outcomes, tunnel policy details, or internal dependency errors."
+    },
+    "FR-084": {
+      "title": "Wails MUST remain the trusted private desktop transport and MUST preserve its native structured-object transport."
+    },
+    "FR-085": {
+      "title": "Every structured Wails request, result, status, and event MUST have a versioned private protobuf semantic contract."
+    },
+    "FR-086": {
+      "title": "Explicit typed adapters MUST exhaustively map existing Wails-facing compatibility values, generated private protobuf values, and transport-independent application or domain values."
+    },
+    "FR-087": {
+      "title": "Wails-facing compatibility DTOs MUST remain narrow private adapter projections and MUST NOT become reusable public transport models or an independent source of business semantics."
+    },
+    "FR-088": {
+      "title": "Adding or changing a private protobuf field or variant without updating its Wails adapter MUST fail verification."
+    },
+    "FR-089": {
+      "title": "Wails MAY retain framework-native internal JSON marshalling but MUST NOT carry protobuf binary, Base64, ProtoJSON, serialized protobuf envelopes, or generic maps."
+    },
+    "FR-090": {
+      "title": "Existing named Wails methods and events MUST NOT be replaced by a generic protobuf or RPC dispatcher."
+    },
+    "FR-091": {
+      "title": "Private business and validation outcomes MUST remain explicit structured result objects rather than ad hoc error strings."
+    },
+    "FR-092": {
+      "title": "All private desktop capabilities for sessions, player configurations, roster and logical-session coordination, broadcast control, terminal switching, failed-hack reset, `ForceHackSuccess`, URL opening, runtime status, server information, and desktop events MUST remain available under their current eligibility rules."
+    },
+    "FR-093": {
+      "title": "Every frontend-facing private method and event listed in the Verbatim Constraints section MUST preserve its exact name, argument behavior, result behavior, and native JavaScript value or object shape."
+    },
+    "FR-094": {
+      "title": "Known `Session`, `Terminal`, recursive `ContentNode`, `PlayerConfig`, and roster fields MUST have protobuf definitions without replacing their established persistence codecs."
+    },
+    "FR-095": {
+      "title": "Persisted sessions MUST remain portable JSON version-1 documents and persisted player configurations MUST remain separate strict JSON version-1 documents."
+    },
+    "FR-096": {
+      "title": "Neither governed persistence format MUST be replaced by protobuf binary or generic ProtoJSON."
+    },
+    "FR-097": {
+      "title": "Session and player-config JSON field names MUST remain exactly compatible with their current version-1 documents."
+    },
+    "FR-098": {
+      "title": "Session-compatible unknown fields MUST be preserved at every currently supported level."
+    },
+    "FR-099": {
+      "title": "Current persistence validation limits, defaults, selected-path behavior, normalized relative player-config references, ordered save revisions, and atomic-save behavior MUST remain unchanged."
+    },
+    "FR-100": {
+      "title": "Player-config decoding MUST continue to reject unknown fields, trailing data, unsupported versions, invalid identities, duplicate identities, and all other current validation failures."
+    },
+    "FR-101": {
+      "title": "Runtime recognition, assignments, controller state, broadcasts, revisions, live-terminal runtime, navigation, hacking, pending actions, and replay caches MUST remain absent from durable session and player-config data."
+    },
+    "FR-102": {
+      "title": "A roster or association change MUST NOT be published before its required complete-file atomic save succeeds."
+    },
+    "FR-103": {
+      "title": "Environment variables and command-line arguments MUST retain their current precedence and validation."
+    },
+    "FR-104": {
+      "title": "The player listener MUST retain default port 3690, delivery queue default 32, and current startup-timeout behavior."
+    },
+    "FR-105": {
+      "title": "Protected public access MUST retain domain `fallout-terminal.ngrok.app`, credential-pair validation, and fail-closed Basic Auth."
+    },
+    "FR-106": {
+      "title": "Tunnel credentials MUST remain process-local and redacted."
+    },
+    "FR-107": {
+      "title": "Credentials MUST be absent from public schemas, runtime status, desktop events, logs, public errors, session files, player-config files, and generated public documentation."
+    },
+    "FR-108": {
+      "title": "Private protobuf configuration contracts MUST NOT authorize configuration exposure through public procedures."
+    },
+    "FR-109": {
+      "title": "The structured sound-list endpoint MUST be replaced by the typed unary sound-manifest responsibility."
+    },
+    "FR-110": {
+      "title": "Sound discovery MUST preserve all current categories and allowlisted extensions listed in Verbatim Constraints."
+    },
+    "FR-111": {
+      "title": "A successful sound manifest MUST return the requested allowlisted category and deterministically sorted allowlisted filenames or safe relative asset paths."
+    },
+    "FR-112": {
+      "title": "A sound manifest MUST NOT return absolute origins, native filesystem paths, embedded filesystem capabilities, or arbitrary caller-supplied paths."
+    },
+    "FR-113": {
+      "title": "The browser MUST resolve sound asset URLs against the current same origin."
+    },
+    "FR-114": {
+      "title": "A valid category with a missing, unreadable, or empty folder MUST return an empty successful manifest."
+    },
+    "FR-115": {
+      "title": "An absent or `UNSPECIFIED` sound category MUST return `invalid_argument`."
+    },
+    "FR-116": {
+      "title": "Sound discovery and prefetch MUST remain asynchronous, optional, and non-blocking."
+    },
+    "FR-117": {
+      "title": "Ambient and hacking cues MUST continue to follow newly applied authoritative transitions."
+    },
+    "FR-118": {
+      "title": "Reconnect snapshots, stale updates, rejected actions, exact replays, and rerenders MUST NOT replay authoritative outcome cues."
+    },
+    "FR-119": {
+      "title": "Static HTML, CSS, fonts, images, generated scripts, and sound files MUST remain ordinary embedded same-origin HTTP resources."
+    },
+    "FR-120": {
+      "title": "Packaged operation MUST remain fully offline without a CDN or external development server."
+    },
+    "FR-121": {
+      "title": "Every subscriber MUST have bounded buffering."
+    },
+    "FR-122": {
+      "title": "A slow, blocked, overflowing, canceled, or disconnected subscriber MUST NOT block canonical mutation, another subscriber, effect publication, detachment, or shutdown."
+    },
+    "FR-123": {
+      "title": "Subscriber buffer overflow MUST cancel or close only the affected physical stream."
+    },
+    "FR-124": {
+      "title": "Shutdown MUST cancel streams, release subscribers and logical presence, close the listener, stop tunnel-owned resources, wait for owned workers, and remain idempotent."
+    },
+    "FR-125": {
+      "title": "The browser MUST retain the current three-second reconnect delay unless planning documents an equivalent or safer bounded policy."
+    },
+    "FR-126": {
+      "title": "Before bulk migration, planning MUST require a thin vertical proof covering generated subscription and snapshot, at least one unary mutation, same-origin local mode, authenticated ngrok mode, Basic Auth failure, and bundled packaged assets."
+    },
+    "FR-127": {
+      "title": "Any temporary side-by-side player transport MUST be limited to the migration branch and the period while parity tests are constructed."
+    },
+    "FR-128": {
+      "title": "Final acceptance MUST contain exactly one application-owned public player protocol."
+    },
+    "FR-129": {
+      "title": "Final cutover MUST remove active WebSocket routes and upgrades, browser `WebSocket` construction, legacy JSON request decoders and envelopes, legacy protocol fixtures, the direct `github.com/coder/websocket` dependency, WebSocket CSP allowances, and active documentation describing the superseded protocol."
+    },
+    "FR-130": {
+      "title": "Any retained historical completed feature document MUST mark legacy WebSocket contracts as superseded and non-authoritative."
+    },
+    "FR-131": {
+      "title": "The same public schemas MUST generate type-safe Go public handlers and values plus ECMAScript player values and clients."
+    },
+    "FR-132": {
+      "title": "Private schemas MUST generate the types required by explicit Wails and persistence adapters without entering the player bundle."
+    },
+    "FR-133": {
+      "title": "The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned."
+    },
+    "FR-134": {
+      "title": "Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited."
+    },
+    "FR-135": {
+      "title": "The packaged application MUST contain all required generated and bundled player code."
+    },
+    "FR-136": {
+      "title": "Clean development startup MUST remain one root `wails dev` command."
+    },
+    "FR-137": {
+      "title": "Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping."
+    },
+    "FR-138": {
+      "title": "Breaking-change checks MUST reject incompatible field-number, field-type, enum, package, and service changes against the committed baseline once it exists."
+    },
+    "FR-139": {
+      "title": "Compatible unknown protobuf fields MUST follow standard forward-compatible protobuf behavior while known request fields remain authoritatively validated."
+    },
+    "FR-140": {
+      "title": "Removed protobuf fields and enum values MUST reserve prior names and numbers as applicable."
+    },
+    "FR-141": {
+      "title": "Every protobuf enum MUST define an `UNSPECIFIED` zero value."
+    },
+    "FR-142": {
+      "title": "Protobuf fields MUST use explicit presence when absence differs from a scalar default."
+    },
+    "FR-143": {
+      "title": "Mutually exclusive protobuf states MUST use `oneof` or another explicit protobuf variant."
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 48,
+    "projectedTasks": 86,
+    "scopeSignal": "larger",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: internal/player public protocol, streaming, static assets, and sounds",
+    "area: internal/control canonical coordination, replay, presence, and revision semantics",
+    "area: app.go and frontend/src/desktop-api.js private Wails methods and events",
+    "area: internal/domain, internal/session, internal/playerconfig, internal/tunnel, and platform configuration",
+    "constraint: baseline develop commit 8f306ce42e55b199ada4761d165461e2ebedc8ae with compatible newer behavior preserved",
+    "constraint: public/private protobuf separation, JSON-v1 persistence compatibility, and one-protocol final cutover"
+  ],
+  "intent": "Replace handwritten player JSON HTTP/WebSocket contracts with a protobuf-first ConnectRPC API while preserving authoritative gameplay, private Wails behavior, persistence, security, lifecycle, sound, and packaging compatibility.",
+  "expectations": [
+    "No new player roles, controller rules, assignment rules, or remembered-selection behavior beyond feature 004.",
+    "No accounts, login identity, cross-device identity, or durable logical-session restoration.",
+    "No persisted live, navigation, hacking, assignment, controller, recognition, pending-action, or replay-cache runtime state.",
+    "No exactly-once guarantee after replay-cache eviction or loss.",
+    "No session version 2 or player-config version 2.",
+    "No replacement of governed JSON files with protobuf binary or generic ProtoJSON.",
+    "No gameplay, navigation, hacking, special-pattern, character-selection, controller, or sound redesign.",
+    "No separately deployed backend or microservice.",
+    "No public exposure of the private Wails bridge or trusted operations.",
+    "No protobuf binary, Base64, ProtoJSON, or generic dispatcher through Wails.",
+    "No public health, runtime-status, server-information, reflection, capability-discovery, or diagnostic service.",
+    "No support for old external WebSocket clients after final cutover.",
+    "No wildcard CORS, CDN, or required player development server.",
+    "No change to the public ngrok domain, default player port, credential rules, release signing, notarization, or supported packaging scope."
+  ]
+}
