@@ -1,14 +1,10 @@
 package tunnel
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -90,101 +86,6 @@ func TestParseConfigRejectsInvalidCredentialsWithoutDisclosingPassword(t *testin
 
 		})
 	}
-}
-
-func TestCreatePolicyEscapesCredentialAndUsesPrivatePermissions(t *testing.T) {
-	t.Parallel()
-
-	parent := t.TempDir()
-	credential := Credentials{
-		Username: `player"\\name`,
-		Password: `long-"password\\value`,
-	}
-	policy, err := CreatePolicy(parent, credential)
-	require.Falsef(t, err != nil,
-		"CreatePolicy() error = %v", err)
-
-	t.Cleanup(func() { _ = policy.Cleanup() })
-
-	raw, err := os.ReadFile(policy.Path)
-	require.Falsef(t, err != nil,
-		"read policy: %v", err)
-
-	var document struct {
-		OnHTTPRequest []struct {
-			Actions []struct {
-				Type   string `json:"type"`
-				Config struct {
-					Realm       string   `json:"realm"`
-					Credentials []string `json:"credentials"`
-					Enforce     bool     `json:"enforce"`
-				} `json:"config"`
-			} `json:"actions"`
-		} `json:"on_http_request"`
-	}
-	{
-		err := json.Unmarshal(raw, &document)
-		require.Falsef(t, err != nil,
-			"policy is not valid escaped JSON: %v\n%s", err, raw)
-	}
-	require.Falsef(t, len(document.OnHTTPRequest) != 1 || len(document.OnHTTPRequest[0].Actions) != 1,
-		"policy actions = %#v", document.OnHTTPRequest)
-
-	action := document.OnHTTPRequest[0].Actions[0]
-	wantCredential := credential.Username + ":" + credential.Password
-	require.Falsef(t, action.Type != "basic-auth" || !action.Config.Enforce || !cmp.Equal(action.Config.Credentials, []string{wantCredential}),
-		"basic-auth action = %#v", action)
-
-	if runtime.GOOS != "windows" {
-		fileInfo, err := os.Stat(policy.Path)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		{
-			got := fileInfo.Mode().Perm()
-			assert.Falsef(t, got != 0o600,
-				"policy permissions = %04o, want 0600", got)
-		}
-
-		directoryInfo, err := os.Stat(filepath.Dir(policy.Path))
-		if err != nil {
-			require.NoError(t, err)
-		}
-		{
-			got := directoryInfo.Mode().Perm()
-			assert.Falsef(t, got != 0o700,
-				"policy directory permissions = %04o, want 0700", got)
-		}
-
-	}
-}
-
-func TestPolicyCleanupIsIdempotent(t *testing.T) {
-	t.Parallel()
-
-	policy, err := CreatePolicy(t.TempDir(), Credentials{Username: "players", Password: "password-long-enough"})
-	if err != nil {
-		require.NoError(t, err)
-	}
-	directory := filepath.Dir(policy.Path)
-	{
-		err := policy.Cleanup()
-		require.Falsef(t, err != nil,
-			"Cleanup() error = %v", err)
-	}
-	{
-
-		err := policy.Cleanup()
-		require.Falsef(t, err != nil,
-			"second Cleanup() error = %v", err)
-	}
-	{
-
-		_, err := os.Stat(directory)
-		require.Falsef(t, !errors.Is(err, os.ErrNotExist),
-			"policy directory remains after cleanup: %v", err)
-	}
-
 }
 
 func TestFindPublicURLAcceptsOnlyHTTPSStartedTunnelMessages(t *testing.T) {
@@ -270,7 +171,7 @@ func TestServiceEarlyExitReturnsBoundedRedactedDiagnosticAndCleansUp(t *testing.
 	assertNoPolicyDirectories(t, config.PolicyParent)
 }
 
-func TestServiceSuccessReturnsPublicInfoWithoutCredentialsAndRemovesPolicy(t *testing.T) {
+func TestServiceSuccessReturnsPublicInfoWithoutCredentialsOrTrafficPolicy(t *testing.T) {
 	t.Parallel()
 
 	config := serviceConfig(t.TempDir())
@@ -293,18 +194,11 @@ func TestServiceSuccessReturnsPublicInfoWithoutCredentialsAndRemovesPolicy(t *te
 	wantArgs := []string{
 		"http", "3690",
 		"--url", "https://fallout-terminal.ngrok.app",
-		"--traffic-policy-file", runner.spec.Args[5],
 		"--log", "stdout",
 		"--log-format", "json",
 	}
 	require.Falsef(t, !cmp.Equal(runner.spec.Args, wantArgs),
 		"protected forwarding args = %#v, want %#v", runner.spec.Args, wantArgs)
-
-	policyRaw, err := os.ReadFile(runner.spec.Args[5])
-	require.Falsef(t, err != nil && !errors.Is(err, os.ErrNotExist),
-		"inspect short-lived auth policy: %v", err)
-	require.Falsef(t, len(policyRaw) > 0 && (!bytes.Contains(policyRaw, []byte(`"type":"basic-auth"`)) || !bytes.Contains(policyRaw, []byte(`"enforce":true`))),
-		"ngrok policy is not fail-closed Basic Auth: %s", policyRaw)
 
 	assertNoPolicyDirectories(t, config.PolicyParent)
 	{

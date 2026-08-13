@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 const RECOGNITION_KEY = 'fallout-terminal.player-token';
+const NGROK_TEST_URL = process.env.NGROK_TEST_URL;
+const NGROK_TEST_USERNAME = process.env.NGROK_USERNAME;
+const NGROK_TEST_PASSWORD = process.env.NGROK_PASSWORD;
+const NGROK_TEST_FIXTURE = process.env.NGROK_TEST_FIXTURE === '1';
+const PROTECTED_FIXTURE_URL = 'http://127.0.0.1:34120';
 
 test.beforeEach(async ({ request, page }) => {
   await page.addInitScript(() => {
@@ -24,8 +29,8 @@ test('built player contains no legacy JSON protocol or WebSocket constructor', a
   }
 });
 
-test('protected forwarding rejects invalid Basic Auth before static or Connect capabilities', async ({ request }) => {
-  const protectedURL = '/__fixture/protected/';
+test('protected forwarding authenticates static, unary, and streaming capabilities', async ({ browser, request }) => {
+  const protectedURL = PROTECTED_FIXTURE_URL + '/';
   for (const headers of [{}, { Authorization: `Basic ${Buffer.from('players:wrong-password').toString('base64')}` }]) {
     const response = await request.get(protectedURL, { headers });
     expect(response.status()).toBe(401);
@@ -39,13 +44,95 @@ test('protected forwarding rejects invalid Basic Auth before static or Connect c
   expect(await pageResponse.text()).toContain('characterSelect');
 
   const rpcResponse = await request.post(
-    '/__fixture/protected/fallout.terminal.player.v1.PlayerService/SoundManifest',
+    PROTECTED_FIXTURE_URL + '/fallout.terminal.player.v1.PlayerService/SoundManifest',
     {
       headers: { Authorization: authorization, 'Content-Type': 'application/json' },
       data: { category: 'SOUND_CATEGORY_AMBIENT' },
     },
   );
   expect(rpcResponse.status()).toBe(200);
+
+  const unauthorizedSubscribe = await request.post(
+    PROTECTED_FIXTURE_URL + '/fallout.terminal.player.v1.PlayerService/Subscribe',
+    {
+      headers: {
+        'Content-Type': 'application/connect+proto',
+        'Connect-Protocol-Version': '1',
+      },
+      data: Buffer.alloc(5),
+    },
+  );
+  expect(unauthorizedSubscribe.status()).toBe(401);
+
+  const context = await browser.newContext({
+    httpCredentials: { username: 'players', password: 'password-long-enough' },
+  });
+  const page = await context.newPage();
+  const subscribeResponses = [];
+  page.on('response', response => {
+    if (response.url().endsWith('/fallout.terminal.player.v1.PlayerService/Subscribe')) {
+      subscribeResponses.push(response.status());
+    }
+  });
+  await page.goto(protectedURL);
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  await expect(page.locator('#characterSelect')).toBeVisible();
+  await page.locator('#characterOptions button:not([disabled])').first().click();
+  await expect(page.locator('#termList')).toBeVisible();
+  await expect.poll(() => subscribeResponses.length).toBe(1);
+  expect(subscribeResponses).toEqual([200]);
+  await context.close();
+});
+
+test.describe('actual authenticated ngrok endpoint', () => {
+  test.skip(
+    !NGROK_TEST_URL || !NGROK_TEST_USERNAME || !NGROK_TEST_PASSWORD,
+    'set NGROK_TEST_URL, NGROK_USERNAME, and NGROK_PASSWORD for the public streaming acceptance journey',
+  );
+
+  test('delivers the first snapshot, dismisses the overlay, and reconnects', async ({ browser }) => {
+    const context = await browser.newContext({
+      httpCredentials: {
+        username: NGROK_TEST_USERNAME,
+        password: NGROK_TEST_PASSWORD,
+      },
+    });
+    const page = await context.newPage();
+    const subscribeResponses = [];
+    page.on('response', response => {
+      if (response.url().endsWith('/fallout.terminal.player.v1.PlayerService/Subscribe')) {
+        subscribeResponses.push({
+          status: response.status(),
+          contentType: response.headers()['content-type'] || '',
+        });
+      }
+    });
+
+    await page.goto(NGROK_TEST_URL, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 20_000 });
+    await expect.poll(() => page.evaluate(key => Boolean(localStorage.getItem(key)), RECOGNITION_KEY)).toBe(true);
+    await expect(page.locator('#screen')).toBeVisible();
+    if (await page.locator('#characterSelect').isVisible()) {
+      await page.locator('#characterOptions button:not([disabled])').first().click();
+      await expect(page.locator('#termList')).toBeVisible();
+    }
+    if (NGROK_TEST_FIXTURE) {
+      await expect(page.locator('#termList')).toBeVisible();
+      const update = await page.request.post(new URL('/__fixture/update', NGROK_TEST_URL).href);
+      expect(update.status()).toBe(204);
+      await expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible();
+    }
+
+    const handle = await page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 20_000 });
+    expect(await page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)).toBe(handle);
+    await expect.poll(() => subscribeResponses.length).toBeGreaterThanOrEqual(2);
+    expect(subscribeResponses.every(response => response.status === 200)).toBe(true);
+    expect(subscribeResponses.every(response => response.contentType === 'application/connect+proto')).toBe(true);
+
+    await context.close();
+  });
 });
 
 test('local player discovers sounds only through the typed same-origin manifest', async ({ page }) => {

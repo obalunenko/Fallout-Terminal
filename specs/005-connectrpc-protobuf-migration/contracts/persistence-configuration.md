@@ -83,5 +83,4 @@ Tests may use deterministic fakes for these dependencies, but fakes are not seri
 
 ## Third-party schemas not duplicated
 
-`wails.json`, every `package.json`/lockfile, Buf configuration, GitHub Actions workflows, macOS plist/entitlement files, and ngrok traffic-policy JSON remain governed by their owning third-party schemas. Protobuf configuration messages may describe application values fed into those tools, but never duplicate the tool documents or authorize their exposure.
-
+`wails.json`, every `package.json`/lockfile, Buf configuration, GitHub Actions workflows, macOS plist/entitlement files, and ngrok CLI configuration remain governed by their owning third-party schemas. Protobuf configuration messages may describe application values fed into those tools, but never duplicate the tool documents or authorize their exposure. The active ngrok launch uses no generated traffic-policy document.

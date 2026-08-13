@@ -19,9 +19,10 @@ const defaultAddress = "0.0.0.0:3690"
 // Config contains the generated Connect player server's process-local
 // dependencies. Assets are the complete built player application.
 type Config struct {
-	Address string
-	Assets  fs.FS
-	Connect *ConnectService
+	Address      string
+	Assets       fs.FS
+	Connect      *ConnectService
+	PublicAccess *PublicAccess
 }
 
 // Server owns the LAN HTTP listener and generated Connect stream lifecycle.
@@ -53,6 +54,12 @@ func NewServer(config Config) (*Server, error) {
 	if config.Connect == nil {
 		return nil, errors.New("generated Connect player service is not configured")
 	}
+	if config.PublicAccess != nil {
+		config.PublicAccess = normalizedPublicAccess(config.PublicAccess)
+		if !validPublicAccess(config.PublicAccess) {
+			return nil, errors.New("public Subscribe authentication is incomplete")
+		}
+	}
 	return &Server{config: config}, nil
 }
 
@@ -79,7 +86,7 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 	server.stopDone = make(chan struct{})
 
 	rpcPath, rpcHandler := NewConnectHandler(server.config.Connect)
-	application := NewApplicationHandler(server.config.Assets, rpcPath, rpcHandler)
+	application := NewApplicationHandlerWithPublicAccess(server.config.Assets, rpcPath, rpcHandler, server.config.PublicAccess)
 	server.httpServer = &http.Server{
 		Handler: application,
 		BaseContext: func(net.Listener) context.Context {

@@ -6,6 +6,7 @@
 **Baseline**: `develop` at `8f306ce42e55b199ada4761d165461e2ebedc8ae`
 
 **Bugfix**: 2026-08-13 — BUG-001 Clarified that all protobuf generation flows through the pinned Buf CLI and checked-in Buf v2 templates, without a standalone `protoc` requirement.
+**Bugfix**: 2026-08-13 — BUG-002 Clarified that authenticated-ngrok acceptance requires a real public server-streaming player journey through the configured ngrok endpoint; local protected-forwarding simulation alone is insufficient.
 
 ## Clarifications
 
@@ -226,6 +227,7 @@ An operator starts the application with the same one-command development lifecyc
 4. **Given** a packaged application without external network availability, **When** it starts, **Then** all generated player code, fonts, images, scripts, sounds, and application assets load without a CDN, development server, or network-time package download.
 5. **Given** oversized unary mutation, Subscribe, SoundManifest, compressed, and unknown-field-enlarged public requests, **When** each crosses the applicable uncompressed-message, encoded-body, or decompression limit, **Then** it returns Connect `resource_exhausted` at the transport or decoding boundary and a canonical-service spy records zero invocations and zero side effects.
 6. **Given** an in-size SoundManifest request, **When** its category is absent, `UNSPECIFIED`, outside the existing catalog, path-like, or arbitrary filesystem input, **Then** it returns Connect `invalid_argument` before canonical service invocation and exposes no filesystem behavior.
+7. **Given** ngrok is enabled on the configured public domain and valid Basic Auth credentials are supplied, **When** a clean browser opens the public player URL, **Then** its generated Connect `Subscribe` request receives one complete first snapshot, the `УСТАНОВКА СВЯЗИ...` overlay is hidden, the current terminal is rendered, and subsequent stream updates or reconnect snapshots continue through that same authenticated public endpoint.
 
 ---
 
@@ -434,6 +436,7 @@ A maintainer proves parity through a thin vertical slice and migration tests, th
 - **FR-124**: Shutdown MUST cancel streams, release subscribers and logical presence, close the listener, stop tunnel-owned resources, wait for owned workers, and remain idempotent.
 - **FR-125**: The browser MUST retain the current three-second reconnect delay unless planning documents an equivalent or safer bounded policy.
 - **FR-126**: Before bulk migration, planning MUST require a thin vertical proof covering generated subscription and snapshot, at least one unary mutation, same-origin local mode, authenticated ngrok mode, Basic Auth failure, and bundled packaged assets.
+- **FR-150**: Acceptance of authenticated ngrok mode MUST include a clean-browser, generated-code `Subscribe` journey through the actual configured public ngrok endpoint that proves first-snapshot delivery, connection-overlay dismissal, terminal rendering, and continued streaming or reconnect behavior. Local or synthetic protected-forwarding evidence MUST NOT by itself satisfy authenticated-ngrok streaming acceptance.
 - **FR-127**: Any temporary side-by-side player transport MUST be limited to the migration branch and the period while parity tests are constructed.
 - **FR-128**: Final acceptance MUST contain exactly one application-owned public player protocol.
 - **FR-129**: Final cutover MUST remove active WebSocket routes and upgrades, browser `WebSocket` construction, legacy JSON request decoders and envelopes, legacy protocol fixtures, the direct `github.com/coder/websocket` dependency, WebSocket CSP allowances, and active documentation describing the superseded protocol.
@@ -567,11 +570,12 @@ Wails lifecycle callbacks remain private application lifecycle boundaries and ar
 - **SC-027**: Player-config-v1 fixture tests preserve every current strict validation case and prove no roster or association publication occurs before successful atomic save.
 - **SC-028**: Oversized unary mutation, Subscribe, SoundManifest, compressed, and unknown-field-enlarged requests exceeding the 4 KiB uncompressed message limit or planned encoded-body or decompression limit return `resource_exhausted`, and malformed bounded requests return `invalid_argument`; spies prove zero application-adapter and canonical-service invocations and zero session, mutation, revision, publication, replay, or random-source effects for every boundary rejection.
 - **SC-029**: Sound tests cover all eight current categories, five allowlisted extensions, deterministic ordering, empty successful manifests, asynchronous failure, and authoritative one-shot cues.
-- **SC-030**: Local-network and authenticated-ngrok journeys cover page loading, first snapshot, all five unary responsibilities, compound updates, multi-tab behavior, reconnect, HTTP `401`, sound discovery, and sound playback.
-- **SC-031**: Before final cutover, a manual or scheduled soak representative of a three-to-four-hour game proves an idle local and authenticated-ngrok stream either remains usable or reconnects after interruption and receives a complete current snapshot.
+- **SC-030**: Local-network and authenticated-ngrok journeys cover page loading, first snapshot, all five unary responsibilities, compound updates, multi-tab behavior, reconnect, HTTP `401`, sound discovery, and sound playback. This criterion requires evidence from the actual configured public ngrok endpoint; a local protected proxy alone does not satisfy it.
+- **SC-031**: Before final cutover, a manual or scheduled soak representative of a three-to-four-hour game proves an idle local and authenticated-ngrok stream either remains usable or reconnects after interruption and receives a complete current snapshot. This criterion requires evidence from the actual configured public ngrok endpoint; a local protected proxy alone does not satisfy it.
 - **SC-032**: A packaged offline run loads all generated player code and embedded assets without a CDN, external development server, or network-time package download.
 - **SC-033**: `gofmt`, `go vet`, `go test`, `go test -race`, pinned-Buf-only schema and generation checks, frontend and player builds, browser journeys, and the affected macOS package smoke test all pass.
 - **SC-034**: Final scans of source, dependencies, routes, built assets, fixtures, CSP, and active documentation find zero active WebSocket implementation, browser constructor, handwritten JSON player envelope, direct legacy dependency, active legacy fixture, or permanent dual stack.
+- **SC-035**: A credential-gated clean-browser journey through the actual configured ngrok public URL receives a complete first player snapshot, hides `#connOverlay`, renders the current live terminal, and observes a later update or reconnect snapshot. If external ngrok credentials or connectivity are unavailable, the result MUST be recorded as `NOT RUN` and MUST NOT be used to mark SC-030 or SC-031 as passed.
 
 ## Assumptions
 

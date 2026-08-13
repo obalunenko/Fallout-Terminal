@@ -1285,9 +1285,78 @@
       "by": "ai",
       "at": "2026-08-13T15:36:00.791Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T16:00:11.427Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T133",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:12:01.132Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:13:58.751Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:14:07.261Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T134",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:25:59.499Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:29:30.601Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:33:27.913Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T16:34:04.818Z",
+      "reopened": true
     }
   ],
-  "last_action": "all 132 tasks done — BUG-001 Buf-only generation and full acceptance gates pass",
+  "last_action": "BUG-002 resolved; all tasks and validation gates complete",
   "coverage": {
     "FR-001": {
       "title": "The feature MUST preserve the Go 1.26 modular-monolith architecture on Wails v2.13.0 and all behavior compatible with `develop` commit `8f306ce42e55b199ada4761d165461e2ebedc8ae`, including feature-003 hacking behavior and feature-004 player-session and control behavior.",
@@ -2344,6 +2413,10 @@
         "T096",
         "T100",
         "T103"
+      ],
+      "tests": [
+        "internal/player/http_test.go::TestApplicationHandlerAuthenticatesEveryPublicHostRequestBeforeRPC",
+        "tests/browser/connectrpc-player.spec.mjs::protected forwarding authenticates static unary and streaming capabilities"
       ]
     },
     "FR-106": {
@@ -2588,6 +2661,9 @@
         "T097",
         "T098",
         "T104"
+      ],
+      "tests": [
+        "tests/browser/connectrpc-player.spec.mjs::actual authenticated ngrok endpoint"
       ]
     },
     "FR-127": {
@@ -2987,6 +3063,11 @@
         "T073",
         "T074"
       ]
+    },
+    "FR-150": {
+      "tests": [
+        "tests/browser/connectrpc-player.spec.mjs::actual authenticated ngrok endpoint"
+      ]
     }
   },
   "size": "oversized",
@@ -3132,6 +3213,11 @@
       "decision": "Remove the unused partial player-state offer seam and narrow ConnectCoordinator",
       "why": "All authoritative stream publications must remain coordinator-assembled compound updates inside the transaction boundary",
       "rejected": "Retaining an unused compatibility path that could reintroduce out-of-transaction partial publication"
+    },
+    {
+      "decision": "Enforce Basic Auth in the player application for every exact configured public Host and launch ngrok without traffic-policy processing",
+      "why": "The ngrok traffic-policy engine buffered non-empty Connect server-streaming POST responses even for a non-matching rule; application auth preserves streaming and keeps credentials out of process arguments",
+      "rejected": "Per-path policy exclusion still buffered; deprecated agent Basic Auth streamed but exposed credentials in process arguments"
     }
   ],
   "step_summaries": {
@@ -3143,10 +3229,10 @@
       "summary": "122 tasks across Setup, blocking Foundational infrastructure, 13 user-story phases, and Polish; explicit dependency waves and test-first story increments."
     },
     "implement": {
-      "summary": "Revalidated and completed BUG-001 with pinned Buf-only generation, accepted protoc unknown provenance, CI enforcement, and all repository gates passing."
+      "summary": "Resolved authenticated ngrok Subscribe buffering with application-side exact-public-Host Basic Auth and verified first snapshot, terminal update, reconnect, and full gates"
     }
   },
-  "currentTask": "T129",
+  "currentTask": "T122",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -3851,17 +3937,16 @@
     },
     "T096": {
       "status": "DONE",
-      "did": "Strengthened tunnel tests for exact fixed-domain forwarding arguments, fail-closed Basic Auth policy, precedence, cleanup, and redaction.",
+      "did": "Added a failing tunnel-policy regression requiring only Subscribe to bypass ngrok Basic Auth for application-side authentication",
       "files": [
         "internal/tunnel/service_test.go"
       ]
     },
     "T097": {
       "status": "DONE",
-      "did": "Added browser journeys for protected static/RPC forwarding and typed same-origin sound discovery alongside existing local action, multi-tab, reconnect, and playback journeys.",
+      "did": "Added and confirmed a failing credential-gated clean-browser journey against the actual ngrok endpoint for first snapshot and reconnect",
       "files": [
-        "tests/browser/connectrpc-player.spec.mjs",
-        "tests/browser/fixture-server/main.go"
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "T098": {
@@ -4045,29 +4130,27 @@
     },
     "T120": {
       "status": "DONE",
-      "did": "Ran and recorded a deterministic three-hour-equivalent 10,800-update/36-reconnect soak plus local and fail-closed authenticated-public browser journeys.",
+      "did": "Recorded the 10,800-update three-hour-equivalent workload plus real configured-ngrok first snapshot, terminal render, master update, fail-closed auth, and reconnect evidence",
       "files": [
-        "internal/player/stream_test.go",
         "specs/005-connectrpc-protobuf-migration/soak.md",
-        "tests/browser/connectrpc-player.spec.mjs"
+        "tests/browser/connectrpc-player.spec.mjs",
+        "tests/browser/fixture-server/main.go"
       ]
     },
     "T121": {
       "status": "DONE",
-      "did": "Validated all success criteria with schema, Go, browser, build, security, soak, and packaged macOS evidence",
+      "did": "Revalidated all success criteria with schema checks, Go normal/race/vet, builds, local and real-ngrok browser journeys, package smoke, scans, and SC-035 evidence",
       "files": [
         "specs/005-connectrpc-protobuf-migration/validation.md",
-        "internal/platform/startup_test.go"
+        "internal/platform/assets_test.go"
       ]
     },
     "T122": {
       "status": "DONE",
-      "did": "Resolved the Wails packaging assertion failure and documented the account-dependent public-ngrok wall-clock observation without weakening acceptance gates",
+      "did": "Resolved BUG-002, documented the confirmed ngrok traffic-policy cause and application-side public-host auth fix, and closed all affected criteria",
       "files": [
-        "specs/005-connectrpc-protobuf-migration/validation.md",
-        "frontend/package.json",
-        "wails.json",
-        "internal/platform/startup_test.go"
+        "specs/005-connectrpc-protobuf-migration/bugs/BUG-002.md",
+        "specs/005-connectrpc-protobuf-migration/validation.md"
       ]
     },
     "T123": {
@@ -4187,6 +4270,35 @@
         "internal/player/stream_test.go",
         "internal/playerconfig/service_test.go",
         "internal/tunnel/service_test.go"
+      ]
+    },
+    "T133": {
+      "status": "DONE",
+      "did": "Reproduced the authenticated public Subscribe stall and isolated it to ngrok Basic Auth policy handling of non-empty streaming POST bodies",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/bugs/BUG-002-evidence.md"
+      ]
+    },
+    "T134": {
+      "status": "DONE",
+      "did": "Moved fail-closed Basic Auth to the exact public Host in the player application and removed ngrok traffic-policy buffering while preserving local access and same-origin checks",
+      "files": [
+        "main.go",
+        "internal/player/http.go",
+        "internal/player/http_test.go",
+        "internal/player/server.go",
+        "internal/tunnel/service.go",
+        "internal/tunnel/service_test.go",
+        "internal/tunnel/policy.go",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/connectrpc-player.spec.mjs",
+        "README.md",
+        "specs/005-connectrpc-protobuf-migration/quickstart.md",
+        "specs/005-connectrpc-protobuf-migration/plan.md",
+        "specs/005-connectrpc-protobuf-migration/contracts/inventory.md",
+        "specs/005-connectrpc-protobuf-migration/contracts/persistence-configuration.md",
+        "specs/005-connectrpc-protobuf-migration/contracts/private-desktop.md",
+        "specs/005-connectrpc-protobuf-migration/bugs/BUG-002-evidence.md"
       ]
     }
   },
@@ -4469,6 +4581,74 @@
       "what": "BUG-001 post-implementation artifact consistency",
       "command": "speckit-bugfix-verify audit of bug status, spec, plan, research, tasks, IDs, waves, DAG, and Companion reopened-completion history",
       "result": "PASS: BUG-001 patched; FR-133/FR-134/FR-137 and SC-002/SC-003/SC-005/SC-033 trace through plan and completed T091/T092/T094/T129; T001-T132 unique with no gaps or dependency cycles",
+      "warnings": []
+    },
+    {
+      "what": "protobuf format lint deterministic generation and bundle authority",
+      "command": "scripts/proto-check.sh",
+      "result": "PASS",
+      "warnings": [
+        "Node emitted a benign localStorage experimental warning"
+      ]
+    },
+    {
+      "what": "representative protobuf compatibility breaks",
+      "command": "scripts/proto-breaking.sh --all-fixtures",
+      "result": "PASS: all five fixtures rejected",
+      "warnings": []
+    },
+    {
+      "what": "full Go suite",
+      "command": "go test ./... -count=1",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "full Go race suite",
+      "command": "go test -race ./... -count=1",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "player and desktop frontend production builds",
+      "command": "npm run build --prefix client and npm run build --prefix frontend",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "local browser journeys",
+      "command": "npm test --prefix tests/browser",
+      "result": "PASS: 17 passed, credential-gated external journey skipped in local-only run",
+      "warnings": [
+        "Playwright reported benign NO_COLOR/FORCE_COLOR warnings"
+      ]
+    },
+    {
+      "what": "actual authenticated ngrok first snapshot terminal update and reconnect",
+      "command": "credential-gated actual endpoint Playwright journeys",
+      "result": "PASS in production Wails process and active-terminal fixture",
+      "warnings": []
+    },
+    {
+      "what": "three-hour-equivalent stream soak",
+      "command": "TestRepresentativeThreeHourStreamReconnectSoak",
+      "result": "PASS: 10800 updates and 36 reconnect snapshots",
+      "warnings": [
+        "Duration was accelerated; public boundary was verified separately through real ngrok"
+      ]
+    },
+    {
+      "what": "macOS package and runtime smoke",
+      "command": "wails build plus packaged root and SoundManifest probes",
+      "result": "PASS",
+      "warnings": [
+        "Unsigned development package only"
+      ]
+    },
+    {
+      "what": "patch hygiene",
+      "command": "git diff --check",
+      "result": "PASS",
       "warnings": []
     }
   ],

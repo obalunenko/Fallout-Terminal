@@ -2,6 +2,7 @@ package player
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"errors"
 	"io"
 	"io/fs"
@@ -27,6 +28,15 @@ var (
 	}
 )
 
+// PublicAccess contains the process-local Basic Auth boundary for requests
+// addressed to the configured public host. Keeping authentication in the
+// application avoids ngrok traffic-policy buffering of Connect streams.
+type PublicAccess struct {
+	Host     string
+	Username string
+	Password string
+}
+
 // NewHTTPHandler serves a player filesystem rooted at client/. The supplied
 // filesystem is the handler's complete namespace; no host filesystem paths are
 // opened or derived from requests.
@@ -38,13 +48,28 @@ func NewHTTPHandler(assets fs.FS) http.Handler {
 // player application. RPC paths never fall through to the SPA index, and all
 // page, generated client, sound, and RPC traffic remains same-origin.
 func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler) http.Handler {
+	return NewApplicationHandlerWithPublicAccess(assets, rpcPath, rpcHandler, nil)
+}
+
+// NewApplicationHandlerWithPublicAccess mounts the application and enforces
+// the configured credential pair on every request addressed to the exact
+// public host. Local/LAN hosts remain unchallenged.
+func NewApplicationHandlerWithPublicAccess(assets fs.FS, rpcPath string, rpcHandler http.Handler, publicAccess *PublicAccess) http.Handler {
 	staticHandler := NewHTTPHandler(assets)
 	errorWriter := connect.NewErrorWriter()
+	publicAccess = normalizedPublicAccess(publicAccess)
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if requiresPublicAuth(request, publicAccess) && !authenticatePublicRequest(response, request, publicAccess) {
+			return
+		}
 		if supportedRPCRequestPath(request.URL.Path, rpcPath) {
 			response.Header().Set("X-Content-Type-Options", "nosniff")
 			response.Header().Set("Content-Security-Policy", playerContentSecurityPolicy)
-			if !validRequestHost(request.Host) || !sameHostOrigin(request) {
+			if !validRequestHost(request.Host) {
+				http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+			if !sameHostOrigin(request) {
 				http.Error(response, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 				return
 			}
@@ -71,6 +96,44 @@ func NewApplicationHandler(assets fs.FS, rpcPath string, rpcHandler http.Handler
 		}
 		staticHandler.ServeHTTP(response, request)
 	})
+}
+
+func normalizedPublicAccess(access *PublicAccess) *PublicAccess {
+	if access == nil {
+		return nil
+	}
+	normalized := *access
+	normalized.Host = strings.TrimSpace(normalized.Host)
+	if !strings.Contains(normalized.Host, "://") {
+		normalized.Host = "https://" + normalized.Host
+	}
+	parsed, err := url.Parse(normalized.Host)
+	if err != nil || parsed.Host == "" || parsed.Path != "" {
+		normalized.Host = ""
+	} else {
+		normalized.Host = parsed.Host
+	}
+	return &normalized
+}
+
+func validPublicAccess(access *PublicAccess) bool {
+	return access != nil && access.Host != "" && access.Username != "" && access.Password != ""
+}
+
+func requiresPublicAuth(request *http.Request, access *PublicAccess) bool {
+	return request != nil && access != nil && strings.EqualFold(request.Host, access.Host)
+}
+
+func authenticatePublicRequest(response http.ResponseWriter, request *http.Request, access *PublicAccess) bool {
+	username, password, ok := request.BasicAuth()
+	usernameMatches := subtle.ConstantTimeCompare([]byte(username), []byte(access.Username)) == 1
+	passwordMatches := subtle.ConstantTimeCompare([]byte(password), []byte(access.Password)) == 1
+	if ok && usernameMatches && passwordMatches {
+		return true
+	}
+	response.Header().Set("WWW-Authenticate", `Basic realm="Fallout Terminal Players"`)
+	http.Error(response, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	return false
 }
 
 func supportedRPCRequestPath(requestPath, servicePath string) bool {

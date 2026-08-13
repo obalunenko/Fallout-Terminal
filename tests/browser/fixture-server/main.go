@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -19,7 +20,10 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/player"
 )
 
-const fixtureAddress = "127.0.0.1:34119"
+const (
+	fixtureAddress          = "127.0.0.1:34119"
+	protectedFixtureAddress = "127.0.0.1:34120"
+)
 
 type ids struct{ next atomic.Uint64 }
 
@@ -57,7 +61,25 @@ func run() error {
 		return fmt.Errorf("construct fixture Connect service: %w", err)
 	}
 	rpcPath, rpcHandler := player.NewConnectHandler(connectPlayer)
-	applicationHandler := player.NewApplicationHandler(playerAssets, rpcPath, rpcHandler)
+	var configuredPublicAccess *player.PublicAccess
+	if publicHost := os.Getenv("FIXTURE_PUBLIC_HOST"); publicHost != "" {
+		configuredPublicAccess = &player.PublicAccess{
+			Host:     publicHost,
+			Username: os.Getenv("NGROK_USERNAME"),
+			Password: os.Getenv("NGROK_PASSWORD"),
+		}
+	}
+	applicationHandler := player.NewApplicationHandlerWithPublicAccess(playerAssets, rpcPath, rpcHandler, configuredPublicAccess)
+	protectedApplicationHandler := player.NewApplicationHandlerWithPublicAccess(
+		playerAssets,
+		rpcPath,
+		rpcHandler,
+		&player.PublicAccess{
+			Host:     protectedFixtureAddress,
+			Username: "players",
+			Password: "password-long-enough",
+		},
+	)
 
 	for _, name := range []string{"Mara", "Boone"} {
 		if _, err := service.AddCharacter(name); err != nil {
@@ -86,6 +108,17 @@ func run() error {
 		}
 		response.WriteHeader(http.StatusNoContent)
 	})
+	mux.HandleFunc("POST /__fixture/update", func(response http.ResponseWriter, _ *http.Request) {
+		updated := fixtureTerminal()
+		updated.Tree.Children = append(updated.Tree.Children, domain.ContentNode{
+			ID: "public-update", Type: domain.NodeEntry, Name: "PUBLIC UPDATE", Description: "STREAM UPDATE RECEIVED",
+		})
+		if _, err := service.UpdateLiveTerminal(updated.Tree, &updated.IntroText); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("/__fixture/protected/", func(response http.ResponseWriter, request *http.Request) {
 		username, password, ok := request.BasicAuth()
 		if !ok || username != "players" || password != "password-long-enough" {
@@ -103,10 +136,19 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", fixtureAddress, err)
 	}
+	protectedListener, err := net.Listen("tcp4", protectedFixtureAddress)
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("listen on %s: %w", protectedFixtureAddress, err)
+	}
 	httpServer := &http.Server{Handler: mux}
-	serveErrors := make(chan error, 1)
+	protectedHTTPServer := &http.Server{Handler: protectedApplicationHandler}
+	serveErrors := make(chan error, 2)
 	go func() {
 		serveErrors <- httpServer.Serve(listener)
+	}()
+	go func() {
+		serveErrors <- protectedHTTPServer.Serve(protectedListener)
 	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -122,7 +164,7 @@ func run() error {
 
 	shutdownContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	return httpServer.Shutdown(shutdownContext)
+	return errors.Join(httpServer.Shutdown(shutdownContext), protectedHTTPServer.Shutdown(shutdownContext))
 }
 
 func fixtureTerminal() domain.TerminalTarget {

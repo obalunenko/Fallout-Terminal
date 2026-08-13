@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -1454,13 +1455,14 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 		`fs.Sub(playerSource, "client/dist")`,
 		"Assets: frontendAssets",
 		"composeApplication(playerAssets)",
-		"Assets:  playerAssets",
 	}
 	for _, fragment := range requiredFragments {
 		assert.Falsef(t, !strings.Contains(source, fragment),
 			"main.go is missing production asset wiring %q", fragment)
 
 	}
+	assert.True(t, regexp.MustCompile(`Assets:\s+playerAssets`).MatchString(source),
+		"main.go is missing production player asset wiring")
 	assert.False(t, strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
 		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist"),
 		"master and remote-player assets share one embed directive; their serving boundaries must remain separate")

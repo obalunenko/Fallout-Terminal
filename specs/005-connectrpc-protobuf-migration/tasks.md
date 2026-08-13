@@ -5,6 +5,7 @@
 **Supporting**: `research.md`, `data-model.md`, `contracts/`
 
 **Bugfix**: 2026-08-13 — BUG-001 Updated from bugfix patch
+**Bugfix**: 2026-08-13 — BUG-002 Reopened authenticated-ngrok streaming, soak, and validation work because local protected-forwarding plus unary-RPC evidence did not prove that a real public generated `Subscribe` delivered the first snapshot and terminal.
 
 Tests are required by the specification and constitution. In every user-story phase, write the listed tests first and confirm they fail for the intended missing behavior before implementation. Go tests must use Testify, table-driven cases where flows repeat, `t.Context()` for test-scoped contexts, and `protocmp`/`prototest` for protobuf values and descriptors.
 
@@ -435,8 +436,8 @@ Tests are required by the specification and constitution. In every user-story ph
 **Wave 1 — independent failing tests:**
 
 - [x] **T095** [P] [US12] Add HTTP tests for same-origin static/RPC/sound resources, no wildcard CORS, 4 KiB uncompressed, 8 KiB encoded/decompression limits, compressed/unknown-field growth, SoundManifest categories, and zero canonical calls on rejection · `internal/player/http_test.go`
-- [x] **T096** [P] [US12] Add tunnel tests for fixed public domain, credential-pair validation, fail-closed HTTP 401 before capabilities, Connect/static forwarding, precedence, and credential redaction · `internal/tunnel/service_test.go`
-- [x] **T097** [P] [US12] Add local/authenticated-ngrok/invalid-auth journeys covering page, snapshot, all five unary responsibilities, compound updates, multi-tab, reconnect, sounds, and playback · `tests/browser/connectrpc-player.spec.mjs`
+- [x] **T096** [P] [US12] ⚠️ Reopened (reopened — BUG-002): ~~Add tunnel tests for fixed public domain, credential-pair validation, fail-closed HTTP 401 before capabilities, Connect/static forwarding, precedence, and credential redaction~~ Extend protected-forwarding coverage with a browser-equivalent generated `Subscribe` stream and assert forwarded Host/Origin, Basic Auth handling, Connect content type/status, incremental response flushing, cancellation/reconnect, and credential redaction; the unary SoundManifest check alone is insufficient · `internal/tunnel/service_test.go`, `tests/browser/fixture-server/main.go`
+- [x] **T097** [P] [US12] ⚠️ Reopened (reopened — BUG-002): ~~Add local/authenticated-ngrok/invalid-auth journeys covering page, snapshot, all five unary responsibilities, compound updates, multi-tab, reconnect, sounds, and playback~~ Add a credential-gated clean-browser journey against the actual configured ngrok public URL that proves generated `Subscribe` first-snapshot delivery, connection-overlay dismissal, current-terminal rendering, all five unary responsibilities, and reconnect; the local protected fixture cannot satisfy this task · `tests/browser/connectrpc-player.spec.mjs`
 - [x] **T098** [P] [US12] Add clean packaged-offline embed tests for generated client, fonts, images, scripts, sounds, and absence of CDN/dev-server dependencies · `internal/platform/assets_test.go`
 
 ### Implementation
@@ -514,15 +515,15 @@ Tests are required by the specification and constitution. In every user-story ph
 
 - [x] **T118** [P] Reconcile the final generated descriptors and code against the inventory and record zero unclassified DTO/config fields plus explicit third-party/native exclusions · `specs/005-connectrpc-protobuf-migration/contracts/inventory.md`
 - [x] **T119** [P] Add clean-checkout generation, local/ngrok operation, offline packaging, and rollback-free cutover instructions · `specs/005-connectrpc-protobuf-migration/quickstart.md`
-- [x] **T120** [P] Run and record a representative three-to-four-hour local and authenticated-ngrok idle-stream/reconnect soak · `specs/005-connectrpc-protobuf-migration/soak.md`
+- [x] **T120** [P] ⚠️ Reopened (reopened — BUG-002): ~~Run and record a representative three-to-four-hour local and authenticated-ngrok idle-stream/reconnect soak~~ Run and document the authenticated streaming/reconnect portion through the actual configured ngrok public endpoint; retain synthetic component evidence separately, and record unavailable external preconditions as `NOT RUN` rather than `PASS` · `specs/005-connectrpc-protobuf-migration/soak.md`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [x] **T121** Validate every Success Criterion by running Buf format/lint/breaking/two-pass generation, `gofmt`, `go vet`, `go test`, `go test -race`, frontend/player builds, Playwright journeys, source/bundle/security scans, and the affected macOS packaged smoke; record commands and evidence · `specs/005-connectrpc-protobuf-migration/validation.md`
+- [x] **T121** ⚠️ Reopened (reopened — BUG-002): ~~Validate every Success Criterion by running Buf format/lint/breaking/two-pass generation, `gofmt`, `go vet`, `go test`, `go test -race`, frontend/player builds, Playwright journeys, source/bundle/security scans, and the affected macOS packaged smoke; record commands and evidence~~ Validate every Success Criterion with those gates, including SC-035; SC-030 and SC-031 require actual configured ngrok public-endpoint evidence and cannot pass from local protected-forwarding simulation · `specs/005-connectrpc-protobuf-migration/validation.md`
 
 **⟶ Wait for T121 to finish, then:**
 
-- [x] **T122** Resolve every failed criterion or explicitly document an external manual-only result without weakening the specification · `specs/005-connectrpc-protobuf-migration/validation.md`
+- [x] **T122** ⚠️ Reopened (reopened — BUG-002): ~~Resolve every failed criterion or explicitly document an external manual-only result without weakening the specification~~ Resolve BUG-002 and every failed criterion, or explicitly document an owner, rationale, and follow-up; unavailable real-ngrok evidence remains `NOT RUN` and cannot be promoted to `PASS` · `specs/005-connectrpc-protobuf-migration/validation.md`
 
 ---
 
@@ -535,6 +536,7 @@ Tests are required by the specification and constitution. In every user-story ph
 3. **P1 stories (Phases 3–12)** execute in listed order: the MVP stream/selection slice enables reconnect and multi-tab; those enable complete typed actions, authority, replay, randomness, stream isolation, desktop compatibility, and persistence compatibility.
 4. **P2 stories (Phases 13–15)** execute after P1 parity: reproducible governance and production modes must pass before the legacy protocol can be removed.
 5. **Polish (Phase 16)** begins only after the one-protocol cutover and owns the single full Success Criteria suite run.
+6. **BUG-002 recovery (Phase 19)** overrides the original document placement of its reopened tasks: reproduce first, encode failing protected-stream and real-public browser regressions, apply the confirmed boundary fix, then replace soak and Success Criteria evidence.
 
 ### Wave Restatement
 
@@ -554,6 +556,7 @@ Tests are required by the specification and constitution. In every user-story ph
 - **Phase 14 / US12**: failing HTTP/tunnel/browser/package tests → independent boundary/security/sound work → application config → package build.
 - **Phase 15 / US13**: failing cutover scans → independent production removals (fixture migration completed as the Phase 6 browser prerequisite) → dependency/test cleanup → documentation cutover.
 - **Phase 16**: independent inventory/quickstart/soak evidence → single full Success Criteria validation → remediation closeout.
+- **Phase 19 / BUG-002**: T133 real authenticated-ngrok reproduction → reopened T096 and T097 regression coverage → T134 confirmed minimal fix → reopened T120 public soak → T121 criterion validation → T122 remediation closeout.
 
 ### Parallel Opportunities
 
@@ -574,3 +577,21 @@ Only tasks tagged `[P]` within the same wave are independent. They touch differe
 - [x] T130 CRITICAL make `scripts/proto-check.sh` capture the checked-in `internal/gen` and `client/gen` state before regeneration and fail on first-pass generation drift or manual edits, preserve the two-pass determinism check, and enforce the same failure in `.github/workflows/wails-macos.yml` with regression coverage per Constitution V and FR-134/FR-137 (contradicts)
 - [x] T131 CRITICAL replace handwritten conditional assertions using `require.Fail*`, `reflect.DeepEqual`, direct `testing.T` failures, and non-exempt `context.Background()` roots across every feature-scoped Go test named by the plan or tasks with Testify helpers, table-driven cases, `t.Context()`, and `cmp`/`protocmp`/`prototest` as applicable, then extend `internal/platform/test_conventions_test.go` to detect those evasions per Constitution: Testing and Quality Gates (contradicts)
 - [x] T132 remove the unused out-of-transaction `offerCurrentPlayerState` compatibility helper from `internal/player/handler.go` and keep authoritative stream publication exclusively on coordinator-assembled complete compound updates per plan: atomic compound publication and FR-144 (unrequested)
+
+## Phase 19: BUG-002 — Authenticated ngrok Subscribe Recovery
+
+**Purpose**: Reproduce the real public streaming failure, convert it into regression coverage, apply only the confirmed fix, and replace invalid authenticated-ngrok acceptance evidence.
+
+**BUG-002 override order**: T133 → T096 and T097 → T134 → T120 → T121 → T122. Reopened tasks keep their original IDs but follow this recovery order instead of their earlier document position.
+
+### Wave 1 — Reproduce and isolate
+
+- [x] **T133** [US12] Reproduce the stuck `УСТАНОВКА СВЯЗИ...` state through the actual configured authenticated ngrok URL and capture redacted browser console/network timing, request/response status and headers, application logs, and ngrok diagnostics sufficient to distinguish Host/Origin rejection, Basic Auth propagation, Connect content-type/status failure, proxy buffering/flushing, and cancellation/reconnect defects · `specs/005-connectrpc-protobuf-migration/bugs/BUG-002-evidence.md`
+
+**⟶ Wait for T133, then complete reopened T096 and T097 as failing regressions before implementation.**
+
+### Wave 2 — Correct the confirmed boundary
+
+- [x] **T134** [US12] Implement the minimal fix proven by T133 and reopened T096/T097 so authenticated public generated `Subscribe` delivers the first snapshot, dismisses the connection overlay, renders the terminal, and reconnects without weakening same-origin validation, public-surface Basic Auth, or credential redaction · `internal/player/http.go`, `internal/tunnel/policy.go`, `client/client.js` (as applicable to the confirmed cause)
+
+**⟶ Wait for T134, then complete reopened T120, T121, and T122 against the corrected real public endpoint and all local regression gates.**

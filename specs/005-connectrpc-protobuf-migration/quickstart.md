@@ -54,11 +54,14 @@ NGROK_PASSWORD='<8-to-128-character-password>' \
 wails dev
 ```
 
-The tunnel starts only with a complete valid credential pair. One fail-closed
-Basic Auth traffic policy protects both static resources and Connect calls.
-Credentials remain in process memory and a private short-lived policy file;
-they are absent from schemas exposed to the browser, native status, sessions,
-player configs, URLs, and diagnostics.
+The tunnel starts only with a complete valid credential pair. The application
+enforces one fail-closed Basic Auth boundary for every request whose Host is the
+exact configured public domain, including static resources and every Connect
+call; local/LAN hosts remain unchallenged. Authentication is intentionally not
+implemented as an ngrok traffic policy because that policy engine buffers a
+non-empty Connect server-streaming POST. Credentials remain only in process
+memory and are absent from ngrok arguments, browser-visible schemas, native
+status, sessions, player configs, URLs, and diagnostics.
 
 ## Offline package
 

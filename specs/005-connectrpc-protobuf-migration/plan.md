@@ -3,6 +3,7 @@
 **Branch**: `005-connectrpc-protobuf-migration` | **Date**: 2026-08-13 | **Spec**: `specs/005-connectrpc-protobuf-migration/spec.md`
 
 **Bugfix**: 2026-08-13 — BUG-001 Updated from bugfix patch
+**Bugfix**: 2026-08-13 — BUG-002 Tightened authenticated-ngrok verification so a real public generated `Subscribe` stream, first snapshot, overlay dismissal, terminal render, and reconnect are required evidence rather than inferred from a local protected proxy and unary RPC.
 
 ## Summary
 
@@ -147,6 +148,10 @@ Create `fallout.terminal.player.v1` as the only player-bundle input. It exposes 
 
 Mount the generated Connect handler beside ordinary static assets on the current listener, explicitly select binary protobuf in the browser transport, and prove one absent-handle `Subscribe` snapshot plus `SelectCharacter`. Exercise the same generated bundle in local same-origin mode, authenticated `fallout-terminal.ngrok.app` mode, invalid Basic Auth HTTP `401`, and a clean packaged offline build. Temporary WebSocket coexistence is permitted only on this feature branch while these parity tests are built; no production capability is duplicated into a generic dispatcher.
 
+For BUG-002, the acceptance run MUST target the actual configured public ngrok endpoint in a clean browser, capture redacted browser/network/application/tunnel diagnostics for the streaming request, and assert that the connection overlay is dismissed and the current terminal is visible. The local protected-forwarding fixture remains a component test and is not a substitute for this public-stream proof. Diagnose failures across forwarded Host/Origin, Basic Auth propagation, Connect content type/status, response flushing or buffering, and cancellation/reconnect behavior before selecting the production fix.
+
+The confirmed BUG-002 boundary is ngrok traffic-policy processing itself: a non-empty Connect streaming POST is held until cancellation even when its Basic Auth rule does not match, while an otherwise identical tunnel without a traffic-policy file streams immediately. The corrected design therefore forwards ngrok HTTP traffic without credential-bearing arguments or a traffic-policy file and enforces the same fail-closed Basic Auth pair inside the player application for every request whose Host exactly matches the configured public domain. This keeps the entire public surface protected, leaves local/LAN hosts unchallenged, and preserves existing same-origin validation.
+
 ### 4. Make snapshot attachment and compound publication atomic
 
 Refactor the canonical coordinator boundary so stream recognition, logical-session resolution, physical-stream registration, and snapshot capture occur under the coordinator order. Register the bounded stream sink before returning the revision-R snapshot; the handler sends that snapshot first and then drains only queued revisions greater than R. Each accepted state-changing action mutates the cloned canonical aggregate once, advances one revision, constructs one complete personalized `CompoundUpdate` per affected logical session, offers it once before the unary response completes, and produces no same-revision component messages.
@@ -184,7 +189,7 @@ After all Go, browser, local, ngrok, sound, reconnect, concurrency, and packaged
 | Request safety | Crafted binary, malformed, compressed, unknown-field, oversized, canceled, unsupported requests | Exact Connect codes; zero adapter/service calls and zero state, replay, publication, or random effects at rejected boundaries |
 | Master frontend | `npm ci --prefix frontend`; `npm run build --prefix frontend`; Playwright/native Wails method/event matrix | Exact method names, argument/result shapes, events, and private capabilities remain usable |
 | Player bundle | `npm ci --prefix client`; `npm run build --prefix client`; bundle inspection | Generated public client is self-contained, same-origin, offline, and private-contract-free |
-| Browser journeys | `npm ci --prefix tests/browser`; `npm test --prefix tests/browser` | First snapshot, five unary methods, compound updates, pending order, multi-tab, reconnect, sound, authority, Basic Auth |
-| Long-lived operation | Three-to-four-hour local and authenticated-ngrok soak | Idle stream stays usable or reconnects to a complete current snapshot |
+| Browser journeys | `npm ci --prefix tests/browser`; `npm test --prefix tests/browser` | First snapshot, five unary methods, compound updates, pending order, multi-tab, reconnect, sound, authority, Basic Auth; authenticated-ngrok streaming acceptance opens the actual public URL in a clean browser and observes first snapshot, overlay dismissal, terminal render, update/action, and reconnect |
+| Long-lived operation | Three-to-four-hour local and authenticated-ngrok soak | Idle stream stays usable or reconnects to a complete current snapshot; the ngrok portion uses the actual configured public endpoint or is recorded as `NOT RUN`, never passed from synthetic protected-forwarding coverage alone |
 | Packaging | `wails build -clean -platform darwin/arm64`; packaged `.app` smoke with networking disabled | Generated player code and all static/sound assets load without CDN or development server |
 | Final cutover | Source, dependency, route, CSP, fixture, built-bundle, and docs scans | Zero active WebSocket implementation, dependency, envelope, fixture, allowance, or permanent dual stack |

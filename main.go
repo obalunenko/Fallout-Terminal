@@ -97,9 +97,11 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 		RosterStore:        playerConfigs,
 		RequestResultLimit: int(runtimeConfig.Coordination.RequestResultLimit),
 	})
+	tunnel, tunnelEnabled, publicAccess := configureTunnel(os.Args[1:])
 	playerConfig := playerserver.Config{
-		Address: runtimeConfig.PlayerServer.Address,
-		Assets:  playerAssets,
+		Address:      runtimeConfig.PlayerServer.Address,
+		Assets:       playerAssets,
+		PublicAccess: publicAccess,
 	}
 	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
 		Coordinator: coordination,
@@ -128,7 +130,6 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 			ApplicationSupport: locations.ApplicationSupport,
 		},
 	)
-	tunnel, tunnelEnabled := configureTunnel(os.Args[1:])
 	app := NewAppWithDependencies(AppDependencies{
 		Sessions:        sessions,
 		PlayerConfigs:   playerConfigs,
@@ -239,16 +240,21 @@ func validateProductionResources(playerAssets fs.FS, bundledDemo string) error {
 	return nil
 }
 
-func configureTunnel(args []string) (TunnelService, bool) {
+func configureTunnel(args []string) (TunnelService, bool, *playerserver.PublicAccess) {
 	config, err := tunnelservice.ParseConfig(args, os.LookupEnv)
 	enabled := config.Enabled || publicModeRequested(args)
 	if !enabled {
-		return nil, false
+		return nil, false, nil
 	}
 	if err != nil {
-		return configurationErrorTunnel{err: err}, true
+		return configurationErrorTunnel{err: err}, true, nil
 	}
-	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true
+	publicAccess := &playerserver.PublicAccess{
+		Host:     config.Domain,
+		Username: config.Credentials.Username,
+		Password: config.Credentials.Password,
+	}
+	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true, publicAccess
 }
 
 func publicModeRequested(args []string) bool {

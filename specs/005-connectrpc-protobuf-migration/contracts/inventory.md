@@ -76,7 +76,7 @@ Selected paths, save revisions, save state, and private active handles are runti
 | `control.Config` | `RequestResultLimit` | `config.v1.CoordinationConfig` | ID source, enqueue callback, runtime/terminal/trusted-hack/roster services |
 | browser constants | recognition-storage semantics, reconnect three seconds, first-tab lease/election timing | `config.v1.BrowserClientConfig` | Web Locks API, storage events, timers themselves |
 | `session.Locations`, `platform.SessionLocations` | Documents default, bundled demo, Application Support paths | `config.v1.PathConfig` | dialogs, filesystem implementations |
-| `tunnel.Config`, `Credentials` | enabled, binary, domain, port, local URL, startup timeout, policy parent, username/password as private ephemeral values | `config.v1.TunnelConfig`, `TunnelCredentials` | process runner/handle, log writers, policy cleanup capability |
+| `tunnel.Config`, `Credentials` | enabled, binary, domain, port, local URL, startup timeout, retained policy-parent compatibility value, username/password as private ephemeral values | `config.v1.TunnelConfig`, `TunnelCredentials` | process runner/handle and log writers; application-side exact-public-Host auth enforcement |
 | `tunnel.ServiceOptions`, `ProcessOptions` | grace period and configured duration values | `config.v1.ShutdownConfig` | clock/`After` callbacks |
 | player request safety | 4 KiB message, 8 KiB body, semantic ID/category limits | `config.v1.PublicRequestLimits` | HTTP reader, decoder, cancellation context |
 
@@ -89,7 +89,7 @@ Selected paths, save revisions, save state, and private active handles are runti
 | `proto/buf.yaml`, `proto/buf.gen.*.yaml` | Buf configuration schemas; not duplicated |
 | `.github/workflows/wails-macos.yml` | GitHub Actions schema; not duplicated |
 | `build/darwin/*.plist`, entitlements | Apple plist/entitlement schemas; not duplicated |
-| generated ngrok traffic-policy JSON | ngrok schema and short-lived private file; not duplicated |
+| ngrok CLI arguments and endpoint forwarding behavior | ngrok-owned command schema; credentials and traffic-policy files are intentionally absent |
 
 ## Non-serializable implementation dependencies
 

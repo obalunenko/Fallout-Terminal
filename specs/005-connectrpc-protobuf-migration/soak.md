@@ -24,29 +24,56 @@ no stale increment replay, no overflow, and no leaked subscription.
 ## Local and authenticated-public boundary
 
 The production-shaped browser fixture uses the generated Connect handler and
-built static/sound assets. Its protected prefix applies the same fail-closed
-Basic Auth semantics used by the ngrok traffic policy before forwarding either
-static or RPC capabilities. The focused soak journeys exercised invalid auth,
-valid authenticated static plus `SoundManifest`, recognized reconnect, and
-three-tab recognition convergence:
+built static/sound assets. Its protected listener applies the same
+application-side, exact-public-Host Basic Auth boundary used in production.
+The focused local journeys exercised invalid auth, authenticated static and
+unary calls, generated `Subscribe`, terminal rendering, recognized reconnect,
+and three-tab recognition convergence:
 
 ```text
 $ npm test --prefix tests/browser -- --grep \
     'protected forwarding|recognized reconnect|concurrent clean tabs'
-3 passed (1.8s)
+PASS
+```
+
+The actual configured public domain was then exercised twice with credentials
+kept only in environment variables:
+
+1. A clean production Wails process launched its own ngrok forwarder. The public
+   browser received a first snapshot, hid `#connOverlay`, stored its opaque
+   recognition handle, and reloaded into a second successful Subscribe. Live
+   probes returned `401` for unauthenticated static and Subscribe requests and
+   `200` for authenticated static access.
+2. The same configured ngrok domain was pointed at the production-shaped
+   fixture with an active broadcast and terminal. The clean authenticated
+   browser received its snapshot, selected a character, rendered `#termList`,
+   observed a master-side `PUBLIC UPDATE` through the open stream, reloaded, and
+   received a complete reconnect snapshot.
+
+```text
+$ NGROK_TEST_URL=https://fallout-terminal.ngrok.app \
+    npx playwright test connectrpc-player.spec.mjs \
+    --grep 'actual authenticated ngrok endpoint'
+1 passed
+
+$ FIXTURE_PUBLIC_HOST=https://fallout-terminal.ngrok.app \
+    NGROK_TEST_URL=https://fallout-terminal.ngrok.app \
+    NGROK_TEST_FIXTURE=1 \
+    npx playwright test connectrpc-player.spec.mjs \
+    --grep 'actual authenticated ngrok endpoint'
+1 passed
 ```
 
 The tunnel service suite separately verifies the fixed HTTPS ngrok domain,
-exact `enforce: true` Basic Auth policy, static/Connect-agnostic forwarding,
-credential precedence/redaction, startup timeout, process ownership, and policy
-cleanup. Credentials are never recorded in this evidence.
+credential-free arguments, credential precedence/redaction, startup timeout,
+and process ownership. Credentials are never recorded in this evidence.
 
 ## Interpretation
 
 This is a scheduled, accelerated three-hour-equivalent soak: duration-sensitive
-stream ordering/reconnect work is represented by 10,800 sequential intervals,
-while origin/auth behavior is exercised through the production handler and the
-same fail-closed policy semantics without publishing an internet endpoint from
-the test runner. A literal three-to-four-hour public internet run remains a
-release-operator smoke (account/domain/network dependent), not a condition that
-weakens or bypasses any automated acceptance gate.
+stream ordering/reconnect work is represented by 10,800 sequential intervals
+and 36 complete reconnect snapshots, while the auth, first-snapshot, active
+terminal, master-update, and reconnect boundary was also exercised through the
+actual configured public ngrok endpoint. It does not claim three hours of wall
+clock internet uptime; the evidence is the representative workload plus real
+public-boundary observations, with neither substituted for the other.

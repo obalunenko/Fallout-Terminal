@@ -78,5 +78,4 @@ The public generated service and listener expose no path to `ForceHackSuccess`, 
 
 ## Errors and secrets
 
-Private business and validation outcomes remain structured result objects. Wails may carry safe human-readable private errors, but credentials and generated traffic-policy values are redacted and absent from runtime status/events. Public errors use the stricter public contract and never reuse raw private dependency errors.
-
+Private business and validation outcomes remain structured result objects. Wails may carry safe human-readable private errors, but credentials and public-auth configuration are redacted and absent from runtime status/events. Public errors use the stricter public contract and never reuse raw private dependency errors.
