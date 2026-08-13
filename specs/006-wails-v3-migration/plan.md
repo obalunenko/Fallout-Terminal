@@ -1,6 +1,7 @@
 # Implementation Plan: Wails v3 Runtime Migration
 
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Updated the design for isolated Go tool modules, the unchanged runtime-status schema, measurable soak gates, and dependency-ordered P1 acceptance.
+**Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, protected historical artifacts, and specified deterministic local/public soak procedures.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -202,9 +203,10 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - Adapt `.github/workflows/wails-macos.yml` to isolated exact-pinned Wails generation/build/package and all current gates.
 - Adapt the proven macOS release script without weakening signing/notary/DMG/Gatekeeper controls.
-- Update active README/quickstart commands; label v2 operating guidance historical while preserving completed specs and Electron rollback record.
+- Update active README/quickstart commands and links to the v3 guide while treating completed specs and the Electron rollback record as immutable historical evidence.
 - Create new v3 rollback record, perform safety-copy/source rollback drill, and record only real evidence.
-- Run the required 60-minute local soak with four to seven players, at least 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, bounded-resource observations, and five-second post-quit cleanup. Run the 30-minute authenticated-ngrok/public-release soak only when real access exists; otherwise record `NOT RUN`.
+- Run the required 60-minute local soak with four to seven players, at least 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, and five-second post-quit cleanup. At minutes 15, 30, and 60, collect five RSS samples ten seconds apart with `ps -o rss= -p <APP_PID>`, record each median KiB value, and fail when both later medians exceed 125% of the 15-minute median.
+- With real access, run the 30-minute authenticated-ngrok soak with four to seven players, at least 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel loss with local fallback, per-operation convergence, credential/private-field isolation, and final cleanup within five seconds; otherwise record `NOT RUN`.
 - Checkpoint gate: CI graph and scripts pass applicable profile; soak and rollback evidence tied to exact candidate.
 
 ### Checkpoint 5 — Parity decision and irreversible source cutover
@@ -241,7 +243,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 | Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go tool -modfile=tools/wails/go.mod wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
 | Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
-| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | required 60-minute local workload and conditional 30-minute authenticated-ngrok workload; rollback drill using safety copies | thresholds and actual results tied to candidate; no simulated pass |
+| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | required 60-minute local workload with median-RSS sampling; conditional 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | exact thresholds and actual results tied to candidate; rollback and required soak pass before v2 removal; no simulated pass |
 | Cutover | source/generated/dependency/bundle/CI/script/docs scans plus full rebuild | owner parity review | zero active v2 runtime/dual switch; historical records intact |
 
 ## Acceptance Evidence Discipline

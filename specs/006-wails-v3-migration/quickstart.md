@@ -168,7 +168,9 @@ Inspect the final, already signed bundle. Use the repository's implementation-ti
 - [ ] Include 4–7 concurrent players and at least 25 mixed operations
 - [ ] Include at least three reconnects and two save/reopen cycles plus navigation, hacking, coordination, and sound
 - [ ] Confirm convergence and expected revision after each operation, newest durable revision, and responsive clients
-- [ ] Record application RSS at 15, 30, and 60 minutes; treat sustained unexplained growth above 25% from the 15-minute steady-state sample as `FAIL` pending investigation
+- [ ] Record the packaged application PID as `APP_PID`: `________`
+- [ ] At minutes 15, 30, and 60, collect five `ps -o rss= -p <APP_PID>` samples ten seconds apart and record the median KiB values: `RSS15=________`, `RSS30=________`, `RSS60=________`
+- [ ] Mark the local soak `FAIL` when both `RSS30 > 1.25 × RSS15` and `RSS60 > 1.25 × RSS15`; a single transient sample or one elevated median does not fail this gate
 - [ ] Confirm exactly one listener during operation and zero owned listener/tunnel resources within five seconds after quit
 - Result: `________`
   Duration/environment/evidence: `________________________________`
@@ -179,7 +181,9 @@ Run only with real ngrok credentials/connectivity. If unavailable, write `NOT RU
 
 - [ ] / [ ] `NOT RUN` — authenticated public tunnel started only after local readiness
 - [ ] / [ ] `NOT RUN` — credentials and traffic policy stayed out of UI/log/session/public schemas
-- [ ] / [ ] `NOT RUN` — public 4–7-player soak ran for at least 30 minutes and retained authorization, privacy, convergence, and local fallback
+- [ ] / [ ] `NOT RUN` — public soak ran for at least 30 minutes with 4–7 players, at least 15 mixed public operations, and at least two reconnects
+- [ ] / [ ] `NOT RUN` — one unauthorized request was rejected without private detail and every accepted operation converged at the expected revision
+- [ ] / [ ] `NOT RUN` — controlled tunnel loss preserved usable local play, credentials/private fields stayed isolated, and final cleanup released owned resources within five seconds
 - Result/reason: `________________________________`
 
 ## Conditional Developer ID Release
@@ -200,6 +204,8 @@ scripts/build-macos.sh
 
 ## Cutover Scan
 
+Do not remove Wails v2 or run the final cutover scan until the required local soak and the rollback drill below have passed. Conditional public gates may remain `NOT RUN` only under their documented profile rules.
+
 Run the implementation-provided source/generated/dependency/bundle/documentation scans plus a clean rebuild after v2 removal.
 
 - [ ] No Wails v2 import or module dependency remains
@@ -211,6 +217,8 @@ Run the implementation-provided source/generated/dependency/bundle/documentation
 - [ ] Full required matrix and personal-use package gates passed against final cutover source
 
 ## Rollback Drill
+
+Complete this drill before Wails v2 removal and the final cutover scan.
 
 Use `docs/wails-v3-migration-rollback.md` after it is created. Work only on safety copies of selected session-v1 and player-config-v1 files.
 

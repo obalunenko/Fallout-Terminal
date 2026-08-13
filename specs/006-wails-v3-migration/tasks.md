@@ -1,6 +1,7 @@
 # Tasks: Wails v3 Runtime Migration
 
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Replaced the conflicting lifecycle-phase schema task, completed isolated protobuf-tool coverage, and moved final P1 journeys behind bridge integration.
+**Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, preserved historical artifacts unchanged, and made frontend/status and soak dependencies explicit.
 
 **Input**: Design documents from `/specs/006-wails-v3-migration/`
 
@@ -93,7 +94,6 @@
 - [ ] T028 [US2] Mark tunnel ownership before public-URL validation and preserve local-ready fallback plus retryable cleanup after an invalid or failed tunnel in `app.go` and `internal/tunnel/service.go`
 - [ ] T029 [US2] Implement one fresh five-second background shutdown context and preserve tunnel → player → session worker → desktop cleanup without skipping later resources after errors in `wails_host.go` and `app.go`
 - [ ] T030 [US2] Replace retained v2 startup/DomReady contexts with an application-lifetime event/desktop capability and bounded acquisition children in `main.go`, `app.go`, and `internal/platform/desktop.go`
-- [ ] T031 [US2] Render starting, ready-local, ready-public, and failed status with actionable redacted startup/tunnel errors in `frontend/src/desktop-api.js`, `frontend/src/master.js`, and `frontend/src/master.css`
 **Checkpoint**: Automated lifecycle ownership and cleanup behavior is complete; final native trigger evidence waits for the generated v3 facade/events integration checkpoint.
 
 ---
@@ -130,7 +130,8 @@
 - [ ] T042 [US4] Generate the allowlisted service only into `frontend/bindings` and configure the exact official runtime Vite plugin in `build/config.yml` and `frontend/vite.config.js`
 - [ ] T043 [US4] Replace `frontend/wailsjs`, `window.go`, and `window.runtime` discovery with explicit v3 service/runtime imports and production-failing missing-binding behavior in `frontend/src/desktop-api.js`
 - [ ] T044 [US4] Implement all-four-listeners-before-snapshot readiness, per-field newer-event precedence, `.data` unwrapping, local-URL retention, exact-once release, and no DomReady dependency in `frontend/src/desktop-api.js`
-- [ ] T045 [US4] Keep `master.js` on `window.desktopAPI` only, render the existing `startupError`, derive starting/ready-local/ready-public/failed presentation without a serialized phase, and add no `CopyDemo` or generic/native UI capability in `frontend/src/master.js` and `frontend/src/index.html`
+- [ ] T031 [US2] After T043–T044, render starting, ready-local, ready-public, and failed presentation from existing status fields with actionable redacted startup/tunnel errors in `frontend/src/master.js` and `frontend/src/master.css`
+- [ ] T045 [US4] Enforce that `master.js` consumes only `window.desktopAPI`, the T031 presentation uses existing status fields without a serialized phase, and no `CopyDemo` or generic/native UI capability is added in `frontend/src/master.js`, `frontend/src/index.html`, and `internal/platform/assets_test.go`
 - [ ] T046 [US4] Run the binding/facade/event suites and source/bundle scans, recording exact inventory and readiness evidence in `specs/006-wails-v3-migration/quickstart.md`
 
 **Checkpoint**: The generated service contains exactly 25 accepted operations, the facade preserves native semantics, all four event subscriptions are race-safe, and production contains no lifecycle/global/generic capability.
@@ -195,10 +196,10 @@
 - [ ] T062 [P] [US7] Add source rollback identity, optional-artifact evidence discipline, data safety, triggers, drill, and historical-document separation assertions in `internal/platform/startup_test.go` and `internal/platform/assets_test.go`
 - [ ] T063 [P] [US7] Add comprehensive active-v2, dual-runtime, floating-tool, generated-global, dependency, bundle, CI/script, and documentation scans in `scripts/wails-v3-cutover-check.sh`
 - [ ] T064 [US7] Complete actual candidate identity, rollback procedure, safety-copy steps, owner/expiry, trigger table, and evidence fields without inventing a v2 artifact hash in `docs/wails-v3-migration-rollback.md`
-- [ ] T065 [US7] Mark active v2 guidance historical/superseded while preserving completed specifications and the Electron→Wails v2 record in `README.md`, `docs/wails-migration-rollback.md`, and links under `specs/001-wails-v2-migration/`
-- [ ] T066 [US7] After every required parity/package/rollback gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
-- [ ] T067 [US7] Perform the source or genuinely accepted-artifact rollback drill with safety copies and record actual version-1 master/player results in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
-- [ ] T068 [US7] Run the required 60-minute local soak with 4–7 players, 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, 15/30/60-minute RSS observations, and five-second post-quit cleanup; run the 30-minute authenticated-ngrok soak only with real credentials/connectivity and record `PASS`, `FAIL`, or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T065 [US7] Update active Wails v2 operating links in `README.md` to point to `specs/006-wails-v3-migration/quickstart.md` and `docs/wails-v3-migration-rollback.md`, treating `specs/001-wails-v2-migration/` and `docs/wails-migration-rollback.md` as immutable historical evidence rather than edit targets
+- [ ] T066 [US7] Perform the source or genuinely accepted-artifact rollback drill with safety copies and record actual version-1 master/player results in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T067 [US7] Run the required 60-minute local soak with 4–7 players, 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, five `ps -o rss= -p <APP_PID>` samples ten seconds apart at minutes 15/30/60, failure when both later medians exceed 125% of the 15-minute median, and five-second post-quit cleanup; with real credentials/connectivity run the 30-minute authenticated-ngrok soak with 4–7 players, 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel-loss/local-fallback proof, convergence, isolation, and five-second cleanup, recording `PASS`, `FAIL`, or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`
+- [ ] T068 [US7] Only after T066–T067 and every other required parity/package gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
 - [ ] T069 [US7] Rebuild and rerun all required gates after v2 removal, attach final cutover scan/package evidence, and mark Wails v3 accepted only if every required profile gate passes in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
 
 **Checkpoint**: Rollback is real and data-compatible; final accepted source has zero active Wails v2 path or permanent switch; unavailable external checks are never represented as passes.
@@ -259,6 +260,7 @@ Phase 2 isolated pins + host/service/status foundation
 - US1–US4 implementation and automated-test slices may advance as coordinated P1 work after Phase 2, but tasks touching `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, or `desktop-api.js` remain sequential.
 - T024, T032, and T037 run only after T041–T046 complete, so no final native journey can pass through a v2/global binding fallback or before readiness behavior exists.
 - US5 requires the integrated P1 checkpoint; US6 requires the stable build graph; US7 requires all parity and personal-package gates.
+- Within US7, T066 rollback and T067 soak must pass before T068 removes v2; T069 then rebuilds and reruns the complete required matrix against the v2-free source.
 - Final cross-cutting verification runs only after the cutover candidate contains no active v2 implementation.
 
 ### User-story completion order
@@ -300,7 +302,7 @@ Phase 2 isolated pins + host/service/status foundation
 
 - T047 build-graph tests can precede graph implementation while documentation work stays sequential with final commands.
 - T055 package tests can run independently before Darwin task changes.
-- T062 rollback assertions and T063 cutover scanner can run in parallel before final removal.
+- T062 rollback assertions and T063 cutover scanner can run in parallel; T066 rollback and T067 soak precede T068 final removal, and T069 follows it.
 
 ### Final verification
 
