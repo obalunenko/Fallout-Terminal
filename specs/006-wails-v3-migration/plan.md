@@ -3,6 +3,7 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Updated the design for isolated Go tool modules, the unchanged runtime-status schema, measurable soak gates, and dependency-ordered P1 acceptance.
 **Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, protected historical artifacts, and specified deterministic local/public soak procedures.
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-MATRIX-2026-08-14] Made the post-removal verification matrix sequential, restartable, and solely responsible for final acceptance.
+**Bugfix**: 2026-08-14 — [ANALYZE-FINAL-CANDIDATE-2026-08-14] Added clean browser-test installation, final-candidate native/soak reruns, and non-self-referential evidence identity.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -40,7 +41,7 @@ The implementation is a checkpointed brownfield migration rather than a one-comm
 | VI. Portable session JSON v1 | No persistence change; paths, references, extras, strict player-config decode, saves, and demo-copy behavior preserved | PASS |
 | VII. Complete cutover | Immutable v2 rollback, branch-bounded coexistence, explicit removal gate, no permanent switch | PASS |
 | Dependency and tool-module rules | Exact beta.8 runtime/npm pins; every Go development tool has one isolated `tools/<tool>/` module; repository commands use `go tool -modfile`; root `go.mod` remains application-only; Wails imports stay within allowed boundaries | PASS |
-| Testing conventions | Testify, tables, `t.Context()`, protobuf comparison, gofmt/vet/test/race and full browser/package gates planned | PASS |
+| Testing conventions | Testify, tables, `t.Context()`, protobuf comparison, gofmt/vet/test/race, clean locked browser-test installation, and full browser/package gates planned | PASS |
 | Evidence integrity | Required and conditional profiles are separated; unavailable gates record `NOT RUN` | PASS |
 
 ## Project Structure
@@ -206,17 +207,17 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 - Adapt the proven macOS release script without weakening signing/notary/DMG/Gatekeeper controls.
 - Update active README/quickstart commands and links to the v3 guide while treating completed specs and the Electron rollback record as immutable historical evidence.
 - Create new v3 rollback record, perform safety-copy/source rollback drill, and record only real evidence.
-- Run the required 60-minute local soak with four to seven players, at least 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, and five-second post-quit cleanup. At minutes 15, 30, and 60, collect five RSS samples ten seconds apart with `ps -o rss= -p <APP_PID>`, record each median KiB value, and fail when both later medians exceed 125% of the 15-minute median.
-- With real access, run the 30-minute authenticated-ngrok soak with four to seven players, at least 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel loss with local fallback, per-operation convergence, credential/private-field isolation, and final cleanup within five seconds; otherwise record `NOT RUN`.
+- Run a required pre-removal 60-minute qualification soak with four to seven players, at least 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, and five-second post-quit cleanup. At minutes 15, 30, and 60, collect five RSS samples ten seconds apart with `ps -o rss= -p <APP_PID>`, record each median KiB value, and fail when both later medians exceed 125% of the 15-minute median. This qualification gate permits v2 removal but does not replace the same workload against the final v2-free build candidate.
+- With real access, run the pre-removal 30-minute authenticated-ngrok qualification soak with four to seven players, at least 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel loss with local fallback, per-operation convergence, credential/private-field isolation, and final cleanup within five seconds; otherwise record `NOT RUN`. This does not replace the conditional rerun against the final v2-free build candidate.
 - Checkpoint gate: CI graph and scripts pass applicable profile; soak and rollback evidence tied to exact candidate.
 
 ### Checkpoint 5 — Parity decision and irreversible source cutover
 
 - Reconcile all required acceptance evidence for the personal-use profile; no required gate may be `FAIL` or `NOT RUN`.
 - Remove Wails v2 imports/dependency/CLI/config/hooks, v2 generated/global assumptions, obsolete workaround if proven, active v2 instructions, and every temporary dual path.
-- Record the provisional v2-free candidate SHA and exact pins without accepting it.
-- Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, Playwright, source/generated/dependency scans, the final package, conditional gates, and reconciled documentation/evidence.
-- If any verification task changes source, generated output, a pin, or a lockfile, invalidate later evidence, record the new candidate identity, and restart the final matrix from its first task.
+- Freeze the provisional v2-free application source as the immutable **build candidate SHA** and exact pin set without accepting it. Later evidence-only documentation commits record that SHA and package digest but do not redefine the packaged candidate.
+- Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, a clean locked Playwright installation and suite, the root development command, final native parity journeys, source/generated/dependency scans, the final package, the required final-candidate local soak, conditional public gates, and reconciled documentation/evidence.
+- If any verification task changes application source, generated output, a pin, or a lockfile, invalidate later evidence, freeze a new build candidate SHA, and restart the final matrix from its first task. Evidence-only edits are limited to result/status fields in the feature quickstart and Wails v3 rollback record; they require a final documentation/cutover rescan but do not rebuild an otherwise unchanged package.
 - Checkpoint gate: zero active v2 runtime surface, zero permanent switch, all required parity gates pass; only then designate Wails v3 production.
 
 ## Workstream Attribution
@@ -240,19 +241,21 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 | Events/readiness | Go payload/detachment tests; JS four-listener/snapshot/race/unsubscribe/disposal tests | launch timing/failure presentation | exact four names/shapes; no stale overwrite, duplicate effect, false readiness, or late callback |
 | Dialog/browser | injected platform matrix for titles, filters, directories, filenames, aliases, create policy, cancel/errors, URL schemes | native open/save/cancel/HTTP(S) smoke | baseline semantics or explicitly recorded unavoidable difference |
 | Frontends | `npm ci` and production build for both `frontend/` and `client/`; bundle scans | visual master/player parity | only v3 master binding path; no CDN/runtime download; player independent of Wails |
-| Player | all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
+| Player | clean `npm ci --prefix tests/browser` followed by all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
 | Startup/shutdown | lifecycle unit/host integration, occupied port, adapter/event failure, tunnel fallback/invalid URL, partial/repeat/timeout triggers | close, Cmd+Q, dev interrupt | failure actionable; local fallback; reverse cleanup within 5s; no leaks |
 | Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go tool -modfile=tools/wails/go.mod wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
 | Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
-| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | required 60-minute local workload with median-RSS sampling; conditional 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | exact thresholds and actual results tied to candidate; rollback and required soak pass before v2 removal; no simulated pass |
+| Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | pre-removal qualification and final v2-free-candidate 60-minute local workloads with median-RSS sampling; conditional final-candidate 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | rollback and qualification soak pass before v2 removal; the same required local workload passes against the final build candidate; exact thresholds and actual results are tied to the applicable candidate; no simulated pass |
 | Cutover | source/generated/dependency/bundle/CI/script/docs scans plus full rebuild | owner parity review | zero active v2 runtime/dual switch; historical records intact |
 
 ## Acceptance Evidence Discipline
 
 - [quickstart.md](./quickstart.md) begins with every evidence box unchecked.
 - Every result records exact source commit, version pin set, target/profile, command/procedure, timestamp/environment, and `PASS`, `FAIL`, or `NOT RUN`.
+- The build candidate SHA identifies the immutable application source used for generation, tests, packaging, native journeys, and soak. A later evidence-only commit may record that SHA and artifact digest without changing candidate identity; it may modify only result/status fields in the feature quickstart and Wails v3 rollback record.
 - A version change invalidates generated, build, package, and acceptance evidence until research/pins/locks/CI/scripts are updated and gates rerun.
+- Any application source, generated-output, pin, or lockfile change restarts the final matrix. An evidence-only documentation change requires the final active-documentation and cutover scan but does not rebuild the unchanged candidate.
 - A v2 artifact digest is recorded only for an artifact actually built and accepted.
 - Developer ID, notarization, stapling, DMG, Gatekeeper, and public ngrok evidence cannot be inferred from personal-use checks.
 
