@@ -22,10 +22,10 @@ func TestWailsOwnsTheWholeDevelopmentStartup(t *testing.T) {
 
 	required := map[string]string{
 		"frontend:dir":           "frontend",
-		"frontend:install":       "npm ci",
-		"frontend:dev:install":   "npm ci",
-		"frontend:build":         "npm run build",
-		"frontend:dev:watcher":   "npm run dev",
+		"frontend:install":       "npm run install:all",
+		"frontend:dev:install":   "npm run install:all",
+		"frontend:build":         "npm run build:all",
+		"frontend:dev:watcher":   "npm run dev:all",
 		"frontend:dev:serverUrl": "auto",
 	}
 	for key, want := range required {
@@ -42,6 +42,42 @@ func TestWailsOwnsTheWholeDevelopmentStartup(t *testing.T) {
 		if got != want {
 			t.Errorf("wails.json %q = %q, want %q", key, got, want)
 		}
+	}
+
+	packageRaw, err := os.ReadFile(filepath.Join(root, "frontend", "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var packageConfig struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if err := json.Unmarshal(packageRaw, &packageConfig); err != nil {
+		t.Fatalf("decode frontend/package.json: %v", err)
+	}
+	requiredScripts := map[string]string{
+		"install:all":    "npm ci && npm ci --prefix ../client",
+		"proto:generate": "../scripts/proto-generate.sh --sync-revision",
+		"dev:all":        "npm run proto:generate && vite",
+		"build:all":      "npm run proto:generate && npm run build --prefix ../client && vite build",
+	}
+	for name, want := range requiredScripts {
+		if got := packageConfig.Scripts[name]; got != want {
+			t.Errorf("frontend/package.json script %q = %q, want %q", name, got, want)
+		}
+	}
+
+	clientPackageRaw, err := os.ReadFile(filepath.Join(root, "client", "package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var clientPackageConfig struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if err := json.Unmarshal(clientPackageRaw, &clientPackageConfig); err != nil {
+		t.Fatalf("decode client/package.json: %v", err)
+	}
+	if got, want := clientPackageConfig.Scripts["generate"], "../scripts/proto-generate.sh --sync-revision"; got != want {
+		t.Errorf("client/package.json script %q = %q, want %q", "generate", got, want)
 	}
 }
 
