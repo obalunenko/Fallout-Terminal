@@ -2,8 +2,8 @@
   "workflow": "companion",
   "specName": "connectrpc protobuf migration",
   "branch": "005-connectrpc-protobuf-migration",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -46,438 +46,2724 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-13T09:49:46.700Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T09:51:23.538Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:56:42.452Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T09:57:42.775Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T09:58:05.583Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:58:11.882Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.066Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.279Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.395Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.491Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:36.588Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T09:59:58.659Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.136Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.240Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.337Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.433Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.529Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.625Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.813Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:42.909Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:43.003Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:02:43.097Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:07:22.814Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:07:22.926Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:09:10.925Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:09:11.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:09:11.133Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:12:04.304Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:12:04.406Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:12:04.507Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:14:28.164Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:14:28.289Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:14:28.401Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:16:51.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:16:51.929Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:18:39.295Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:52:16.902Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:55:36.092Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:55:36.195Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.388Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.491Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.602Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.713Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.811Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:57:14.907Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:58:01.711Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:58:01.821Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:58:01.919Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:58:02.018Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T10:58:02.114Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.007Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.215Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.313Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.411Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.509Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.609Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:09:00.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T112",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:19:49.725Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:22:42.197Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:25:23.329Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:25:23.512Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:25:36.448Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:25:36.629Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:25:36.798Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:26:56.187Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:30:19.746Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:30:19.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:30:20.103Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:30:20.279Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:32:19.101Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:32:19.278Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:32:19.448Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:32:19.619Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:38:45.206Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:38:45.381Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:38:45.552Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:38:45.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:38:45.888Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:44.365Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:44.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T084",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:44.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T085",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:44.877Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T086",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:45.049Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T087",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:45.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T088",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T11:41:45.389Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:11.320Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:11.496Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:11.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:11.850Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:12.022Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:03:12.189Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:06:43.825Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:06:43.938Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:26:00.614Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:26:00.730Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:26:00.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:26:44.680Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:33:05.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:33:05.925Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:33:06.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T098",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:33:06.143Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T099",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:35:02.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T100",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:35:02.447Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T101",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:35:02.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T102",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:35:02.655Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T103",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:37:14.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T104",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:37:14.661Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T105",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:39:39.258Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T106",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:39:39.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T107",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:52.889Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T108",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:52.994Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T109",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:53.094Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T110",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:53.204Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T111",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:53.306Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T113",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:53.412Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:58:53.518Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T115",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:59:03.163Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:59:51.969Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T117",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T12:59:52.069Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T13:00:41.042Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T13:00:41.137Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T13:02:13.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T13:13:07.196Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T13:13:13.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T13:13:13.960Z"
     }
   ],
-  "last_action": "living specs evaluated — skipped (not configured)",
+  "last_action": "all 122 tasks done — schema, Go/race, browser, soak, security, builds, and macOS package smoke pass",
   "coverage": {
     "FR-001": {
-      "title": "The feature MUST preserve the Go 1.26 modular-monolith architecture on Wails v2.13.0 and all behavior compatible with `develop` commit `8f306ce42e55b199ada4761d165461e2ebedc8ae`, including feature-003 hacking behavior and feature-004 player-session and control behavior."
+      "title": "The feature MUST preserve the Go 1.26 modular-monolith architecture on Wails v2.13.0 and all behavior compatible with `develop` commit `8f306ce42e55b199ada4761d165461e2ebedc8ae`, including feature-003 hacking behavior and feature-004 player-session and control behavior.",
+      "tasks": [
+        "T001",
+        "T118",
+        "T121"
+      ]
     },
     "FR-002": {
-      "title": "If `develop` advances before implementation, the implementation MUST inventory and preserve compatible newer behavior rather than revert to the recorded baseline."
+      "title": "If `develop` advances before implementation, the implementation MUST inventory and preserve compatible newer behavior rather than revert to the recorded baseline.",
+      "tasks": [
+        "T001",
+        "T118"
+      ]
     },
     "FR-003": {
-      "title": "Before public transport implementation begins, the project MUST inventory every application-owned public player contract, private desktop payload, known persistence field, and serializable application configuration field."
+      "title": "Before public transport implementation begins, the project MUST inventory every application-owned public player contract, private desktop payload, known persistence field, and serializable application configuration field.",
+      "tasks": [
+        "T001",
+        "T118"
+      ]
     },
     "FR-004": {
-      "title": "Every inventory item MUST be classified as represented by a versioned protobuf contract, governed by a third-party schema, or excluded as a non-serializable implementation dependency."
+      "title": "Every inventory item MUST be classified as represented by a versioned protobuf contract, governed by a third-party schema, or excluded as a non-serializable implementation dependency.",
+      "tasks": [
+        "T001",
+        "T118"
+      ]
     },
     "FR-005": {
-      "title": "The completed inventory MUST contain zero unclassified application-owned structured boundaries and zero unclassified serializable configuration fields."
+      "title": "The completed inventory MUST contain zero unclassified application-owned structured boundaries and zero unclassified serializable configuration fields.",
+      "tasks": [
+        "T001",
+        "T118"
+      ]
     },
     "FR-006": {
-      "title": "Versioned public schemas MUST govern recognition exchange, personalized player state, roles, phases, assignments, controller state, roster availability, terminal content and presentation, navigation, public hacking patterns, typed mutation requests and results, complete snapshots, compound updates, and sound manifests."
+      "title": "Versioned public schemas MUST govern recognition exchange, personalized player state, roles, phases, assignments, controller state, roster availability, terminal content and presentation, navigation, public hacking patterns, typed mutation requests and results, complete snapshots, compound updates, and sound manifests.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T011",
+        "T012",
+        "T013",
+        "T020",
+        "T021"
+      ]
     },
     "FR-007": {
-      "title": "Versioned private schemas MUST govern known session-v1, terminal, recursive content-node, player-config-v1, roster, Wails request, Wails result, status, event, session-operation, player-config-operation, command, coordination, terminal-switch, server-information, runtime-status, and serializable configuration semantics."
+      "title": "Versioned private schemas MUST govern known session-v1, terminal, recursive content-node, player-config-v1, roster, Wails request, Wails result, status, event, session-operation, player-config-operation, command, coordination, terminal-switch, server-information, runtime-status, and serializable configuration semantics.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T018",
+        "T020"
+      ]
     },
     "FR-008": {
-      "title": "Serializable configuration contracts MUST cover application, player-server, coordination, queue, timeout, path, tunnel, startup, and shutdown values that can cross or be recorded at application-owned boundaries."
+      "title": "Serializable configuration contracts MUST cover application, player-server, coordination, queue, timeout, path, tunnel, startup, and shutdown values that can cross or be recorded at application-owned boundaries.",
+      "tasks": [
+        "T019",
+        "T103"
+      ]
     },
     "FR-009": {
-      "title": "Embedded filesystems, callbacks, event sinks, clocks, random sources, service interfaces, process handles, listeners, and other dependency-injection objects MUST remain excluded from serializable configuration contracts."
+      "title": "Embedded filesystems, callbacks, event sinks, clocks, random sources, service interfaces, process handles, listeners, and other dependency-injection objects MUST remain excluded from serializable configuration contracts.",
+      "tasks": [
+        "T019",
+        "T103"
+      ]
     },
     "FR-010": {
-      "title": "Third-party schemas including `wails.json`, `package.json`, Buf configuration, GitHub Actions workflows, plist files, and third-party traffic-policy formats MUST NOT be duplicated in application protobuf schemas."
+      "title": "Third-party schemas including `wails.json`, `package.json`, Buf configuration, GitHub Actions workflows, plist files, and third-party traffic-policy formats MUST NOT be duplicated in application protobuf schemas.",
+      "tasks": [
+        "T002",
+        "T019",
+        "T089"
+      ]
     },
     "FR-011": {
-      "title": "Public and private schemas MUST use separate versioned packages and MUST preserve an inspectable one-way boundary in which public schemas never import private schemas."
+      "title": "Public and private schemas MUST use separate versioned packages and MUST preserve an inspectable one-way boundary in which public schemas never import private schemas.",
+      "tasks": [
+        "T002",
+        "T009",
+        "T014",
+        "T089"
+      ]
     },
     "FR-012": {
-      "title": "Generated player-client inputs and their transitive bundle MUST contain no private desktop, persistence, native-path, resolved-configuration, tunnel, credential, or private hacking contract."
+      "title": "Generated player-client inputs and their transitive bundle MUST contain no private desktop, persistence, native-path, resolved-configuration, tunnel, credential, or private hacking contract.",
+      "tasks": [
+        "T021",
+        "T079",
+        "T089",
+        "T098"
+      ]
     },
     "FR-013": {
-      "title": "Protobuf schema existence MUST NOT authorize public exposure of any message or capability."
+      "title": "Protobuf schema existence MUST NOT authorize public exposure of any message or capability.",
+      "tasks": [
+        "T078",
+        "T089"
+      ]
     },
     "FR-014": {
-      "title": "Generated protobuf values MUST remain detached boundary values and MUST NOT become canonical mutable domain, navigation, live, coordination, or hacking aggregates."
+      "title": "Generated protobuf values MUST remain detached boundary values and MUST NOT become canonical mutable domain, navigation, live, coordination, or hacking aggregates.",
+      "tasks": [
+        "T022",
+        "T026",
+        "T080",
+        "T085",
+        "T086"
+      ]
     },
     "FR-015": {
-      "title": "Public transport MUST contain no handwritten JSON envelopes, generic maps, generic command procedure, generic RPC dispatcher, duplicated public transport DTO, or manually maintained RPC router."
+      "title": "Public transport MUST contain no handwritten JSON envelopes, generic maps, generic command procedure, generic RPC dispatcher, duplicated public transport DTO, or manually maintained RPC router.",
+      "tasks": [
+        "T026",
+        "T055",
+        "T105"
+      ]
     },
     "FR-016": {
-      "title": "The public player service MUST expose exactly one server-streaming subscription responsibility and separate unary responsibilities for character selection, navigation action, password-or-filler guess, special-pattern activation, and sound-manifest discovery."
+      "title": "The public player service MUST expose exactly one server-streaming subscription responsibility and separate unary responsibilities for character selection, navigation action, password-or-filler guess, special-pattern activation, and sound-manifest discovery.",
+      "tasks": [
+        "T009",
+        "T034",
+        "T049",
+        "T055"
+      ]
     },
     "FR-017": {
-      "title": "The public service MUST NOT merge player mutations into a generic command procedure."
+      "title": "The public service MUST NOT merge player mutations into a generic command procedure.",
+      "tasks": [
+        "T009",
+        "T034",
+        "T049",
+        "T055"
+      ]
     },
     "FR-018": {
-      "title": "Browser-originated mutations MUST use unary procedures and authoritative state delivery MUST use server streaming."
+      "title": "Browser-originated mutations MUST use unary procedures and authoritative state delivery MUST use server streaming.",
+      "tasks": [
+        "T009",
+        "T034",
+        "T049",
+        "T055"
+      ]
     },
     "FR-019": {
-      "title": "The browser player MUST NOT require client-streaming or bidirectional-streaming request bodies."
+      "title": "The browser player MUST NOT require client-streaming or bidirectional-streaming request bodies.",
+      "tasks": [
+        "T009",
+        "T034",
+        "T049",
+        "T055"
+      ]
     },
     "FR-020": {
-      "title": "The player page, generated player procedures, static resources, and sound assets MUST remain same-origin in local and ngrok modes without wildcard CORS."
+      "title": "The player page, generated player procedures, static resources, and sound assets MUST remain same-origin in local and ngrok modes without wildcard CORS.",
+      "tasks": [
+        "T035",
+        "T095",
+        "T097",
+        "T099"
+      ]
     },
     "FR-021": {
-      "title": "The public listener MUST NOT expose runtime status, server information, health, reflection, generic capability discovery, diagnostics, tunnel status, or client-count procedures."
+      "title": "The public listener MUST NOT expose runtime status, server information, health, reflection, generic capability discovery, diagnostics, tunnel status, or client-count procedures.",
+      "tasks": [
+        "T078",
+        "T105"
+      ]
     },
     "FR-022": {
-      "title": "The public listener MUST NOT expose `ForceHackSuccess`, `ResetFailedHack`, native dialogs, arbitrary file operations, URL opening, tunnel configuration, private candidates, secret words, future outcomes, credentials, raw connection identities, or another session's private information."
+      "title": "The public listener MUST NOT expose `ForceHackSuccess`, `ResetFailedHack`, native dialogs, arbitrary file operations, URL opening, tunnel configuration, private candidates, secret words, future outcomes, credentials, raw connection identities, or another session's private information.",
+      "tasks": [
+        "T078",
+        "T105"
+      ]
     },
     "FR-023": {
-      "title": "The browser Connect transport MAY use generated protobuf JSON or binary encoding, but planning MUST choose and pin one encoding using official ConnectRPC guidance."
+      "title": "The browser Connect transport MAY use generated protobuf JSON or binary encoding, but planning MUST choose and pin one encoding using official ConnectRPC guidance.",
+      "tasks": [
+        "T004",
+        "T006",
+        "T033"
+      ]
     },
     "FR-024": {
-      "title": "A first-time subscription without a recognition handle MUST create exactly one process-local logical session and return its opaque handle in the first snapshot."
+      "title": "Recognition handles MUST remain opaque to clients, and clients MUST NOT parse them or infer session identity, age, validity, assignment, presence, controller authority, or any lifecycle state from their contents.",
+      "tasks": [
+        "T009",
+        "T033",
+        "T046"
+      ]
     },
     "FR-025": {
-      "title": "The browser MUST persist only the opaque recognition handle in same-origin local storage."
+      "title": "The Subscribe request MUST use explicit protobuf presence for its recognition-handle scalar so absence is distinguishable from a present empty value.",
+      "tasks": [
+        "T009",
+        "T028"
+      ]
     },
     "FR-026": {
-      "title": "The browser MUST NOT persist assignment, role, phase, controller, broadcast, terminal, navigation, hacking, pending-action, or replay state."
+      "title": "A Subscribe request with the recognition handle absent MUST create exactly one process-local logical session and return its opaque handle in the initial complete snapshot.",
+      "tasks": [
+        "T028",
+        "T029",
+        "T031",
+        "T034",
+        "T042"
+      ]
     },
     "FR-027": {
-      "title": "A subscription with a currently recognized handle MUST reattach to the same logical session."
+      "title": "A Subscribe request with a present blank, oversized, or structurally malformed recognition handle MUST return Connect `invalid_argument` without creating a logical session or replacement handle.",
+      "tasks": [
+        "T028",
+        "T029",
+        "T031",
+        "T034",
+        "T042"
+      ]
     },
     "FR-028": {
-      "title": "A subscription with an unknown or expired nonblank handle MUST create a fresh logical session and return a replacement handle."
+      "title": "A Subscribe request with a currently recognized handle MUST reattach to the same logical session.",
+      "tasks": [
+        "T028",
+        "T029",
+        "T031",
+        "T034",
+        "T042"
+      ]
     },
     "FR-029": {
-      "title": "A structurally valid unary mutation with an unknown nonblank handle MUST return `invalid-session` without creating a session or replacement handle."
+      "title": "A Subscribe request with a well-formed nonblank handle that is unknown or expired MUST create a fresh logical session, issue a replacement handle, and return a complete current snapshot without restoring expired assignment or controller authority unless existing canonical rules independently establish it.",
+      "tasks": [
+        "T028",
+        "T029",
+        "T031",
+        "T034",
+        "T042"
+      ]
     },
     "FR-030": {
-      "title": "Concurrent first-time tabs in one browser profile MUST converge on one accepted recognition handle and one logical session."
+      "title": "A unary request with a missing, blank, oversized, or structurally malformed recognition handle MUST return Connect `invalid_argument`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T061"
+      ]
     },
     "FR-031": {
-      "title": "Every active stream using one valid handle MUST attach to the same logical session and receive equivalent personalized state."
+      "title": "A unary request with a well-formed nonblank handle that is unknown or expired MUST return typed `invalid-session` without creating a logical session or replacement handle and without mutation, revision advancement, random-source advancement, publication, or a replay result for the nonexistent session.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T061"
+      ]
     },
     "FR-032": {
-      "title": "Raw displayed browser connection count MUST equal active public server streams."
+      "title": "Recognition-handle validation MUST impose a finite documented semantic bound while preserving handle opacity.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T061"
+      ]
     },
     "FR-033": {
-      "title": "Aggregate logical-session presence MUST remain connected while at least one stream for that session remains active."
+      "title": "Concurrent first-time tabs in one browser profile MUST converge on one accepted recognition handle and one logical session.",
+      "tasks": [
+        "T044",
+        "T046"
+      ]
     },
     "FR-034": {
-      "title": "Closing a logical session's final stream MUST mark it disconnected without automatically releasing its character claim or controller identity."
+      "title": "Every active stream using one valid handle MUST attach to the same logical session and receive equivalent personalized state.",
+      "tasks": [
+        "T043",
+        "T045"
+      ]
     },
     "FR-035": {
-      "title": "Reconnecting within the same process MUST restore current presence and current authoritative assignment."
+      "title": "Raw displayed browser connection count MUST equal active public server streams.",
+      "tasks": [
+        "T047"
+      ]
     },
     "FR-036": {
-      "title": "Process restart MUST restore no recognition mapping, logical session, character claim, controller, broadcast, revision, live terminal, navigation, hacking, pending action, or replay-cache state."
+      "title": "Aggregate logical-session presence MUST remain connected while at least one stream for that session remains active.",
+      "tasks": [
+        "T042",
+        "T043",
+        "T045",
+        "T087"
+      ]
     },
     "FR-037": {
-      "title": "Recognition handles MUST be treated only as process-local conveniences and MUST never bypass assignment, presence, controller, broadcast, terminal, gameplay, or replay validation."
+      "title": "Closing a logical session's final stream MUST mark it disconnected without automatically releasing its character claim or controller identity; reconnecting within the same process MUST restore current presence and authoritative assignment, while process restart MUST restore no recognition mapping, logical session, claim, controller, broadcast, revision, live terminal, navigation, hacking, pending action, or replay-cache state.",
+      "tasks": [
+        "T042",
+        "T043",
+        "T045",
+        "T087"
+      ]
     },
     "FR-038": {
-      "title": "The first application message on every new or reconnecting subscription MUST be exactly one complete personalized compound snapshot."
+      "title": "The first application message on every new or reconnecting subscription MUST be exactly one complete personalized compound snapshot.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T028",
+        "T029",
+        "T031",
+        "T039",
+        "T042"
+      ]
     },
     "FR-039": {
-      "title": "Every complete snapshot MUST contain the accepted or replacement recognition handle, complete current personalized player state, current authoritative revision, and exactly one terminal-presentation variant."
+      "title": "Every complete snapshot MUST contain the accepted or replacement recognition handle, complete current personalized player state, current authoritative revision, and exactly one terminal-presentation variant.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T028",
+        "T029",
+        "T031",
+        "T039",
+        "T042"
+      ]
     },
     "FR-040": {
-      "title": "The snapshot terminal-presentation variant MUST be either the complete current public live-terminal projection or an explicit no-live-terminal state."
+      "title": "The snapshot terminal-presentation variant MUST be either the complete current public live-terminal projection or an explicit no-live-terminal state.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T028",
+        "T029",
+        "T031",
+        "T039",
+        "T042"
+      ]
     },
     "FR-041": {
-      "title": "Snapshot creation MUST never generate or regenerate a hacking puzzle."
+      "title": "Snapshot creation MUST never generate or regenerate a hacking puzzle.",
+      "tasks": [
+        "T037",
+        "T039"
+      ]
     },
     "FR-042": {
-      "title": "Reconnect snapshots MUST NOT replay ambient transitions, hacking outcome cues, stale actions, or prior accepted actions."
+      "title": "Reconnect snapshots MUST NOT replay ambient transitions, hacking outcome cues, stale actions, or prior accepted actions.",
+      "tasks": [
+        "T038",
+        "T041"
+      ]
     },
     "FR-043": {
-      "title": "Stream attachment and snapshot capture MUST form a gap-free boundary such that a snapshot at revision R is followed by no application message at revision R or lower."
+      "title": "Stream attachment and snapshot capture MUST form a gap-free boundary such that a snapshot at revision R is followed by no application message at revision R or lower.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-044": {
-      "title": "Every relevant committed revision after a subscriber's snapshot MUST be delivered or that stream MUST terminate so the client can reconnect to a new complete snapshot."
+      "title": "Every relevant committed revision after a subscriber's snapshot MUST be offered once to its affected logical session; every attached physical stream that remains active and responsive through delivery MUST observe that revision exactly once, while a canceled, disconnected, or overflowing stream MAY observe zero messages for it and MUST terminate so recovery can use a new complete snapshot.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-045": {
-      "title": "One accepted mutation MUST commit exactly one coordinator revision."
+      "title": "One accepted mutation MUST commit exactly one coordinator revision.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-046": {
-      "title": "Each affected logical session MUST receive exactly one personalized compound authoritative update for an accepted mutation's revision."
+      "title": "Each affected logical session MUST be offered exactly once the accepted mutation's single logical compound authoritative update, personalized to contain every public state component changed for that session by the action.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-047": {
-      "title": "Every physical stream for the same logical session MUST receive an equivalent personalized update for a given revision."
+      "title": "No physical stream MUST observe the same revision more than once, and every physical stream attached to an affected logical session that remains active and responsive through delivery MUST observe the session's equivalent personalized update exactly once.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-048": {
-      "title": "The compound-update contract MUST permit several complete changed player, terminal-presentation, navigation, and hacking projections in one value."
+      "title": "The compound-update contract MUST permit several complete changed player, terminal-presentation, navigation, and hacking projections in one value.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-049": {
-      "title": "An omitted compound-update component MUST mean unchanged and MUST NOT act as an ambiguous partial patch."
+      "title": "An omitted compound-update component MUST mean unchanged and MUST NOT act as an ambiguous partial patch.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-050": {
-      "title": "A subscriber MUST NOT receive several player, terminal, navigation, or hacking application messages with the same revision."
+      "title": "A subscriber MUST NOT receive several player, terminal, navigation, or hacking application messages with the same revision.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-051": {
-      "title": "Revisions observed by one subscriber after its snapshot MUST be strictly increasing while revisions irrelevant to that personalized projection MAY be skipped."
+      "title": "Revisions observed by one subscriber after its snapshot MUST be strictly increasing while revisions irrelevant to that personalized projection MAY be skipped.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-052": {
-      "title": "Publication MUST permit one committed revision to produce different personalized compound updates for different logical sessions."
+      "title": "Publication MUST permit one committed revision to produce different personalized compound updates for different logical sessions.",
+      "tasks": [
+        "T031",
+        "T048",
+        "T051",
+        "T073"
+      ]
     },
     "FR-053": {
-      "title": "Clients MUST NOT optimistically mutate assignment, role, active terminal, navigation, attempts, logs, patterns, removed duds, puzzle result, or any other canonical shared state."
+      "title": "Clients MUST NOT optimistically mutate assignment, role, active terminal, navigation, attempts, logs, patterns, removed duds, puzzle result, or any other canonical shared state.",
+      "tasks": [
+        "T050",
+        "T053",
+        "T062"
+      ]
     },
     "FR-054": {
-      "title": "An accepted action MUST remain pending until the client has both its correlated unary result and an applicable authoritative stream state at the result revision or a later relevant revision."
+      "title": "An accepted action MUST remain pending until the client has both its correlated unary result and an applicable authoritative stream state at the result revision or a later relevant revision.",
+      "tasks": [
+        "T050",
+        "T053",
+        "T062"
+      ]
     },
     "FR-055": {
-      "title": "A rejected action MUST clear its correlated pending state immediately."
+      "title": "A rejected action MUST clear its correlated pending state immediately.",
+      "tasks": [
+        "T050",
+        "T053",
+        "T062"
+      ]
     },
     "FR-056": {
-      "title": "Every player mutation MUST resolve its recognition handle to a current logical session before domain mutation."
+      "title": "Every player mutation MUST validate request structure and finite bounds, recognition handle, live logical session with the required active subscription relationship, request identity, broadcast identity, and action-specific semantic fields before domain mutation.",
+      "tasks": [
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T061"
+      ]
     },
     "FR-057": {
-      "title": "Every player mutation MUST validate request identity, current broadcast identity, assignment, active-stream presence, controller authority, applicable terminal identity, and action-specific rules."
+      "title": "Character selection MUST be allowed only for a connected, recognized, currently unassigned logical session; MUST NOT require an existing assignment, controller authority, terminal identity, or hacking generation; MUST reject unavailable, unknown, conflicting, malformed, stale, or duplicate selection attempts without shared-state mutation, except that an exact request whose result remains retained replays only that result without a new effect under FR-062; and MUST preserve the current domain behavior by which acceptance can establish controller ownership.",
+      "tasks": [
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T061"
+      ]
     },
     "FR-058": {
-      "title": "An accepted mutation MUST mutate canonical state exactly once, commit exactly one revision, and enqueue its authoritative transition before completing the unary response."
+      "title": "Navigation actions, password-or-filler guesses, and special-pattern activation MUST require an assigned, eligible, connected active controller, the applicable current terminal or broadcast identity, and the current hacking generation when generation-bound; requests from unassigned sessions, observers, non-controllers, disconnected sessions, stale broadcasts, stale terminals, or stale generations MUST be rejected without mutation or random-source advancement.",
+      "tasks": [
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T061"
+      ]
     },
     "FR-059": {
-      "title": "A rejected, stale, duplicate, structurally invalid, observer-originated, disconnected-controller, or non-actionable request MUST NOT mutate canonical state, increment revision, publish an update, consume an attempt, or consume hacking randomness."
+      "title": "A rejected, stale, duplicate, structurally invalid, observer-originated, disconnected-controller, or non-actionable request MUST NOT mutate canonical state, increment revision, publish an update, consume an attempt, or consume hacking randomness.",
+      "tasks": [
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T061"
+      ]
     },
     "FR-060": {
-      "title": "Replay storage MUST default to 256 request-result records per logical session and broadcast."
+      "title": "Replay storage MUST default to 256 request-result records per logical session and broadcast.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-061": {
-      "title": "Exact replay MUST be guaranteed only while the matching request-result record remains retained."
+      "title": "Exact replay MUST be guaranteed only while the matching request-result record remains retained.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-062": {
-      "title": "An identical retained request MUST return its original result and revision without another canonical effect."
+      "title": "An identical retained request MUST return its original result and revision without another canonical effect.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-063": {
-      "title": "A retained request identity reused with a different procedure or payload fingerprint MUST return `duplicate` without mutation."
+      "title": "A retained request identity reused with a different procedure or payload fingerprint MUST return `duplicate` without mutation.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-064": {
-      "title": "Replay-cache eviction MUST be deterministic but MUST NOT be presented as a public protocol guarantee."
+      "title": "Replay-cache eviction MUST be deterministic but MUST NOT be presented as a public protocol guarantee.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-065": {
-      "title": "After eviction, cache clearing, logical-session removal, or process restart, a reused request identity MUST be evaluated as new against current state and MAY be accepted if still valid."
+      "title": "After eviction, cache clearing, logical-session removal, or process restart, a reused request identity MUST be evaluated as new against current state and MAY be accepted if still valid.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-066": {
-      "title": "The feature MUST NOT claim broadcast-lifetime or process-lifetime exactly-once behavior after replay-record loss."
+      "title": "The feature MUST NOT claim broadcast-lifetime or process-lifetime exactly-once behavior after replay-record loss.",
+      "tasks": [
+        "T063",
+        "T064",
+        "T065",
+        "T066"
+      ]
     },
     "FR-067": {
-      "title": "Concurrent activation of one unused current-generation special pattern MUST produce exactly one accepted mutation."
+      "title": "Concurrent activation of one unused current-generation special pattern MUST produce exactly one accepted mutation.",
+      "tasks": [
+        "T067",
+        "T068",
+        "T069",
+        "T070"
+      ]
     },
     "FR-068": {
-      "title": "Randomness consumption MUST be limited to the winning accepted special-pattern activation."
+      "title": "Randomness consumption MUST be limited to the winning accepted special-pattern activation.",
+      "tasks": [
+        "T067",
+        "T068",
+        "T069",
+        "T070"
+      ]
     },
     "FR-069": {
-      "title": "An accepted special-pattern activation MUST consume one outcome draw and at most one additional dud-selection draw under unchanged feature-003 rules."
+      "title": "An accepted special-pattern activation MUST consume one outcome draw and at most one additional dud-selection draw under unchanged feature-003 rules.",
+      "tasks": [
+        "T067",
+        "T068",
+        "T069",
+        "T070"
+      ]
     },
     "FR-070": {
-      "title": "Every stale, used, duplicate, rejected, or losing concurrent special-pattern activation MUST consume zero random calls."
+      "title": "Every stale, used, duplicate, rejected, or losing concurrent special-pattern activation MUST consume zero random calls.",
+      "tasks": [
+        "T067",
+        "T068",
+        "T069",
+        "T070"
+      ]
     },
     "FR-071": {
-      "title": "The feature MUST preserve current pattern probabilities, dud-removal rules, attempts-reset rules, board-generation rules, and opaque generation-bound `patternId` semantics."
+      "title": "The feature MUST preserve current pattern probabilities, dud-removal rules, attempts-reset rules, board-generation rules, and opaque generation-bound `patternId` semantics.",
+      "tasks": [
+        "T067",
+        "T068",
+        "T069",
+        "T070"
+      ]
     },
     "FR-072": {
-      "title": "`HACK_ADMIN` MUST remain removed from every public contract, handler, generated client, fixture, and active document."
+      "title": "`HACK_ADMIN` MUST remain removed from every public contract, handler, generated client, fixture, and active document.",
+      "tasks": [
+        "T012",
+        "T105"
+      ]
     },
     "FR-073": {
-      "title": "Malformed protobuf, illegal or missing variants, required `UNSPECIFIED` enums, blank or structurally invalid request identity, blank unary recognition handle, missing required broadcast or terminal identity, and structurally invalid action targets MUST return Connect `invalid_argument`."
+      "title": "Malformed bounded protobuf messages, illegal or missing variants, prohibited required `UNSPECIFIED` enums, a present invalid Subscribe recognition handle, a missing or invalid unary recognition handle, blank or structurally invalid request identity, missing required broadcast or terminal identity, invalid sound category, and structurally invalid action targets MUST return Connect `invalid_argument` before canonical service invocation.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-074": {
-      "title": "A request above the effective 4 KiB player-controlled mutation limit or another documented public bound MUST return Connect `resource_exhausted` before canonical service invocation."
+      "title": "Every public player RPC, including Subscribe and SoundManifest, MUST enforce a maximum 4 KiB uncompressed protobuf request-message size at the Connect transport or decoding boundary before application adapters or canonical services are invoked; exceeding that limit MUST return Connect `resource_exhausted`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-075": {
-      "title": "Unsupported public services or procedures MUST return Connect `unimplemented`."
+      "title": "Unsupported public services or procedures MUST return Connect `unimplemented`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-076": {
-      "title": "Request or stream cancellation MUST return Connect `canceled`."
+      "title": "Request or stream cancellation MUST return Connect `canceled`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-077": {
-      "title": "Temporary public service unavailability MUST return Connect `unavailable`."
+      "title": "Temporary public service unavailability MUST return Connect `unavailable`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-078": {
-      "title": "Unexpected failures outside authoritative domain rejection MUST return Connect `internal`."
+      "title": "Unexpected failures outside authoritative domain rejection MUST return Connect `internal`.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-079": {
-      "title": "Decoded structurally valid player mutations rejected by current state or domain rules MUST return a typed authoritative action result."
+      "title": "Decoded structurally valid player mutations rejected by current state or domain rules MUST return a typed authoritative action result.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-080": {
-      "title": "Typed action results MUST use only `accepted`, `invalid-session`, `stale-broadcast`, `unassigned`, `not-controller`, `controller-disconnected`, `stale-terminal`, `invalid-action`, `conflict`, or `duplicate` as stable reasons."
+      "title": "Typed action results MUST use only `accepted`, `invalid-session`, `stale-broadcast`, `unassigned`, `not-controller`, `controller-disconnected`, `stale-terminal`, `invalid-action`, `conflict`, or `duplicate` as stable reasons.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-081": {
-      "title": "Stale-generation, used-pattern, absent-puzzle, non-actionable-puzzle, solved-puzzle, failed-puzzle, exhausted-puzzle, and well-formed invalid-target rejections MUST use `invalid-action` unless `stale-terminal` is more specific."
+      "title": "Stale-generation, used-pattern, absent-puzzle, non-actionable-puzzle, solved-puzzle, failed-puzzle, exhausted-puzzle, and well-formed invalid-target rejections MUST use `invalid-action` unless `stale-terminal` is more specific.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T095",
+        "T099"
+      ]
     },
     "FR-082": {
-      "title": "Invalid Basic Auth MUST fail closed with HTTP `401` before player capabilities are reached."
+      "title": "Invalid Basic Auth MUST fail closed with HTTP `401` before player capabilities are reached.",
+      "tasks": [
+        "T096",
+        "T100"
+      ]
     },
     "FR-083": {
-      "title": "Public errors MAY include safe correction or retry guidance but MUST NOT expose request bytes, legacy JSON, recognition handles, credentials, native paths, stack traces, private identities, private candidates, secret words, future outcomes, tunnel policy details, or internal dependency errors."
+      "title": "Public errors MAY include safe correction or retry guidance but MUST NOT expose request bytes, legacy JSON, recognition handles, credentials, native paths, stack traces, private identities, private candidates, secret words, future outcomes, tunnel policy details, or internal dependency errors.",
+      "tasks": [
+        "T058",
+        "T061",
+        "T078"
+      ]
     },
     "FR-084": {
-      "title": "Wails MUST remain the trusted private desktop transport and MUST preserve its native structured-object transport."
+      "title": "Wails MUST remain the trusted private desktop transport and MUST preserve its native structured-object transport.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-085": {
-      "title": "Every structured Wails request, result, status, and event MUST have a versioned private protobuf semantic contract."
+      "title": "Every structured Wails request, result, status, and event MUST have a versioned private protobuf semantic contract.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-086": {
-      "title": "Explicit typed adapters MUST exhaustively map existing Wails-facing compatibility values, generated private protobuf values, and transport-independent application or domain values."
+      "title": "Explicit typed adapters MUST exhaustively map existing Wails-facing compatibility values, generated private protobuf values, and transport-independent application or domain values.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-087": {
-      "title": "Wails-facing compatibility DTOs MUST remain narrow private adapter projections and MUST NOT become reusable public transport models or an independent source of business semantics."
+      "title": "Wails-facing compatibility DTOs MUST remain narrow private adapter projections and MUST NOT become reusable public transport models or an independent source of business semantics.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-088": {
-      "title": "Adding or changing a private protobuf field or variant without updating its Wails adapter MUST fail verification."
+      "title": "Adding or changing a private protobuf field or variant without updating its Wails adapter MUST fail verification.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-089": {
-      "title": "Wails MAY retain framework-native internal JSON marshalling but MUST NOT carry protobuf binary, Base64, ProtoJSON, serialized protobuf envelopes, or generic maps."
+      "title": "Wails MAY retain framework-native internal JSON marshalling but MUST NOT carry protobuf binary, Base64, ProtoJSON, serialized protobuf envelopes, or generic maps.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-090": {
-      "title": "Existing named Wails methods and events MUST NOT be replaced by a generic protobuf or RPC dispatcher."
+      "title": "Existing named Wails methods and events MUST NOT be replaced by a generic protobuf or RPC dispatcher.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-091": {
-      "title": "Private business and validation outcomes MUST remain explicit structured result objects rather than ad hoc error strings."
+      "title": "Private business and validation outcomes MUST remain explicit structured result objects rather than ad hoc error strings.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-092": {
-      "title": "All private desktop capabilities for sessions, player configurations, roster and logical-session coordination, broadcast control, terminal switching, failed-hack reset, `ForceHackSuccess`, URL opening, runtime status, server information, and desktop events MUST remain available under their current eligibility rules."
+      "title": "All private desktop capabilities for sessions, player configurations, roster and logical-session coordination, broadcast control, terminal switching, failed-hack reset, `ForceHackSuccess`, URL opening, runtime status, server information, and desktop events MUST remain available under their current eligibility rules.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-093": {
-      "title": "Every frontend-facing private method and event listed in the Verbatim Constraints section MUST preserve its exact name, argument behavior, result behavior, and native JavaScript value or object shape."
+      "title": "Every frontend-facing private method and event listed in the Verbatim Constraints section MUST preserve its exact name, argument behavior, result behavior, and native JavaScript value or object shape.",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T081"
+      ]
     },
     "FR-094": {
-      "title": "Known `Session`, `Terminal`, recursive `ContentNode`, `PlayerConfig`, and roster fields MUST have protobuf definitions without replacing their established persistence codecs."
+      "title": "Known `Session`, `Terminal`, recursive `ContentNode`, `PlayerConfig`, and roster fields MUST have protobuf definitions without replacing their established persistence codecs.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-095": {
-      "title": "Persisted sessions MUST remain portable JSON version-1 documents and persisted player configurations MUST remain separate strict JSON version-1 documents."
+      "title": "Persisted sessions MUST remain portable JSON version-1 documents and persisted player configurations MUST remain separate strict JSON version-1 documents.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-096": {
-      "title": "Neither governed persistence format MUST be replaced by protobuf binary or generic ProtoJSON."
+      "title": "Neither governed persistence format MUST be replaced by protobuf binary or generic ProtoJSON.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-097": {
-      "title": "Session and player-config JSON field names MUST remain exactly compatible with their current version-1 documents."
+      "title": "Session and player-config JSON field names MUST remain exactly compatible with their current version-1 documents.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-098": {
-      "title": "Session-compatible unknown fields MUST be preserved at every currently supported level."
+      "title": "Session-compatible unknown fields MUST be preserved at every currently supported level.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-099": {
-      "title": "Current persistence validation limits, defaults, selected-path behavior, normalized relative player-config references, ordered save revisions, and atomic-save behavior MUST remain unchanged."
+      "title": "Current persistence validation limits, defaults, selected-path behavior, normalized relative player-config references, ordered save revisions, and atomic-save behavior MUST remain unchanged.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-100": {
-      "title": "Player-config decoding MUST continue to reject unknown fields, trailing data, unsupported versions, invalid identities, duplicate identities, and all other current validation failures."
+      "title": "Player-config decoding MUST continue to reject unknown fields, trailing data, unsupported versions, invalid identities, duplicate identities, and all other current validation failures.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-101": {
-      "title": "Runtime recognition, assignments, controller state, broadcasts, revisions, live-terminal runtime, navigation, hacking, pending actions, and replay caches MUST remain absent from durable session and player-config data."
+      "title": "Runtime recognition, assignments, controller state, broadcasts, revisions, live-terminal runtime, navigation, hacking, pending actions, and replay caches MUST remain absent from durable session and player-config data.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-102": {
-      "title": "A roster or association change MUST NOT be published before its required complete-file atomic save succeeds."
+      "title": "A roster or association change MUST NOT be published before its required complete-file atomic save succeeds.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T082",
+        "T083",
+        "T084",
+        "T085",
+        "T086",
+        "T087",
+        "T088"
+      ]
     },
     "FR-103": {
-      "title": "Environment variables and command-line arguments MUST retain their current precedence and validation."
+      "title": "Environment variables and command-line arguments MUST retain their current precedence and validation.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-104": {
-      "title": "The player listener MUST retain default port 3690, delivery queue default 32, and current startup-timeout behavior."
+      "title": "The player listener MUST retain default port 3690, delivery queue default 32, and current startup-timeout behavior.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-105": {
-      "title": "Protected public access MUST retain domain `fallout-terminal.ngrok.app`, credential-pair validation, and fail-closed Basic Auth."
+      "title": "Protected public access MUST retain domain `fallout-terminal.ngrok.app`, credential-pair validation, and fail-closed Basic Auth.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-106": {
-      "title": "Tunnel credentials MUST remain process-local and redacted."
+      "title": "Tunnel credentials MUST remain process-local and redacted.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-107": {
-      "title": "Credentials MUST be absent from public schemas, runtime status, desktop events, logs, public errors, session files, player-config files, and generated public documentation."
+      "title": "Credentials MUST be absent from public schemas, runtime status, desktop events, logs, public errors, session files, player-config files, and generated public documentation.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-108": {
-      "title": "Private protobuf configuration contracts MUST NOT authorize configuration exposure through public procedures."
+      "title": "Private protobuf configuration contracts MUST NOT authorize configuration exposure through public procedures.",
+      "tasks": [
+        "T019",
+        "T096",
+        "T100",
+        "T103"
+      ]
     },
     "FR-109": {
-      "title": "The structured sound-list endpoint MUST be replaced by the typed unary sound-manifest responsibility."
+      "title": "The structured sound-list endpoint MUST be replaced by the typed unary sound-manifest responsibility.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-110": {
-      "title": "Sound discovery MUST preserve all current categories and allowlisted extensions listed in Verbatim Constraints."
+      "title": "Sound discovery MUST preserve all current categories and allowlisted extensions listed in Verbatim Constraints.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-111": {
-      "title": "A successful sound manifest MUST return the requested allowlisted category and deterministically sorted allowlisted filenames or safe relative asset paths."
+      "title": "A successful sound manifest MUST return the requested allowlisted category and deterministically sorted allowlisted filenames or safe relative asset paths.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-112": {
-      "title": "A sound manifest MUST NOT return absolute origins, native filesystem paths, embedded filesystem capabilities, or arbitrary caller-supplied paths."
+      "title": "A sound manifest MUST NOT return absolute origins, native filesystem paths, embedded filesystem capabilities, or arbitrary caller-supplied paths.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-113": {
-      "title": "The browser MUST resolve sound asset URLs against the current same origin."
+      "title": "The browser MUST resolve sound asset URLs against the current same origin.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-114": {
-      "title": "A valid category with a missing, unreadable, or empty folder MUST return an empty successful manifest."
+      "title": "A valid category with a missing, unreadable, or empty folder MUST return an empty successful manifest.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-115": {
-      "title": "An absent or `UNSPECIFIED` sound category MUST return `invalid_argument`."
+      "title": "An absent or `UNSPECIFIED` sound category MUST return `invalid_argument`.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-116": {
-      "title": "Sound discovery and prefetch MUST remain asynchronous, optional, and non-blocking."
+      "title": "Sound discovery and prefetch MUST remain asynchronous, optional, and non-blocking.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-117": {
-      "title": "Ambient and hacking cues MUST continue to follow newly applied authoritative transitions."
+      "title": "Ambient and hacking cues MUST continue to follow newly applied authoritative transitions.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-118": {
-      "title": "Reconnect snapshots, stale updates, rejected actions, exact replays, and rerenders MUST NOT replay authoritative outcome cues."
+      "title": "Reconnect snapshots, stale updates, rejected actions, exact replays, and rerenders MUST NOT replay authoritative outcome cues.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-119": {
-      "title": "Static HTML, CSS, fonts, images, generated scripts, and sound files MUST remain ordinary embedded same-origin HTTP resources."
+      "title": "Static HTML, CSS, fonts, images, generated scripts, and sound files MUST remain ordinary embedded same-origin HTTP resources.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-120": {
-      "title": "Packaged operation MUST remain fully offline without a CDN or external development server."
+      "title": "Packaged operation MUST remain fully offline without a CDN or external development server.",
+      "tasks": [
+        "T013",
+        "T041",
+        "T054",
+        "T095",
+        "T098",
+        "T101",
+        "T102",
+        "T104"
+      ]
     },
     "FR-121": {
-      "title": "Every subscriber MUST have bounded buffering."
+      "title": "Every subscriber MUST have bounded buffering.",
+      "tasks": [
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075"
+      ]
     },
     "FR-122": {
-      "title": "A slow, blocked, overflowing, canceled, or disconnected subscriber MUST NOT block canonical mutation, another subscriber, effect publication, detachment, or shutdown."
+      "title": "A slow, blocked, overflowing, canceled, or disconnected subscriber MUST NOT block canonical mutation, another subscriber, effect publication, detachment, or shutdown.",
+      "tasks": [
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075"
+      ]
     },
     "FR-123": {
-      "title": "Subscriber buffer overflow MUST cancel or close only the affected physical stream."
+      "title": "Subscriber cancellation, disconnection, or buffer overflow MUST cancel or close only the affected physical stream within bounded time, release its resources, and MUST NOT block canonical mutation, other logical sessions, or sibling physical streams.",
+      "tasks": [
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075"
+      ]
     },
     "FR-124": {
-      "title": "Shutdown MUST cancel streams, release subscribers and logical presence, close the listener, stop tunnel-owned resources, wait for owned workers, and remain idempotent."
+      "title": "Shutdown MUST cancel streams, release subscribers and logical presence, close the listener, stop tunnel-owned resources, wait for owned workers, and remain idempotent.",
+      "tasks": [
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075"
+      ]
     },
     "FR-125": {
-      "title": "The browser MUST retain the current three-second reconnect delay unless planning documents an equivalent or safer bounded policy."
+      "title": "The browser MUST retain the current three-second reconnect delay unless planning documents an equivalent or safer bounded policy.",
+      "tasks": [
+        "T038",
+        "T040"
+      ]
     },
     "FR-126": {
-      "title": "Before bulk migration, planning MUST require a thin vertical proof covering generated subscription and snapshot, at least one unary mutation, same-origin local mode, authenticated ngrok mode, Basic Auth failure, and bundled packaged assets."
+      "title": "Before bulk migration, planning MUST require a thin vertical proof covering generated subscription and snapshot, at least one unary mutation, same-origin local mode, authenticated ngrok mode, Basic Auth failure, and bundled packaged assets.",
+      "tasks": [
+        "T028",
+        "T030",
+        "T035",
+        "T036",
+        "T095",
+        "T096",
+        "T097",
+        "T098",
+        "T104"
+      ]
     },
     "FR-127": {
-      "title": "Any temporary side-by-side player transport MUST be limited to the migration branch and the period while parity tests are constructed."
+      "title": "Any temporary side-by-side player transport MUST be limited to the migration branch and the period while parity tests are constructed.",
+      "tasks": [
+        "T105",
+        "T106",
+        "T107",
+        "T108",
+        "T109",
+        "T110",
+        "T111",
+        "T112",
+        "T113",
+        "T114",
+        "T115",
+        "T116",
+        "T117"
+      ]
     },
     "FR-128": {
-      "title": "Final acceptance MUST contain exactly one application-owned public player protocol."
+      "title": "Final acceptance MUST contain exactly one application-owned public player protocol.",
+      "tasks": [
+        "T105",
+        "T106",
+        "T107",
+        "T108",
+        "T109",
+        "T110",
+        "T111",
+        "T112",
+        "T113",
+        "T114",
+        "T115",
+        "T116",
+        "T117"
+      ]
     },
     "FR-129": {
-      "title": "Final cutover MUST remove active WebSocket routes and upgrades, browser `WebSocket` construction, legacy JSON request decoders and envelopes, legacy protocol fixtures, the direct `github.com/coder/websocket` dependency, WebSocket CSP allowances, and active documentation describing the superseded protocol."
+      "title": "Final cutover MUST remove active WebSocket routes and upgrades, browser `WebSocket` construction, legacy JSON request decoders and envelopes, legacy protocol fixtures, the direct `github.com/coder/websocket` dependency, WebSocket CSP allowances, and active documentation describing the superseded protocol.",
+      "tasks": [
+        "T105",
+        "T106",
+        "T107",
+        "T108",
+        "T109",
+        "T110",
+        "T111",
+        "T112",
+        "T113",
+        "T114",
+        "T115",
+        "T116",
+        "T117"
+      ]
     },
     "FR-130": {
-      "title": "Any retained historical completed feature document MUST mark legacy WebSocket contracts as superseded and non-authoritative."
+      "title": "Any retained historical completed feature document MUST mark legacy WebSocket contracts as superseded and non-authoritative.",
+      "tasks": [
+        "T105",
+        "T106",
+        "T107",
+        "T108",
+        "T109",
+        "T110",
+        "T111",
+        "T112",
+        "T113",
+        "T114",
+        "T115",
+        "T116",
+        "T117"
+      ]
     },
     "FR-131": {
-      "title": "The same public schemas MUST generate type-safe Go public handlers and values plus ECMAScript player values and clients."
+      "title": "The same public schemas MUST generate type-safe Go public handlers and values plus ECMAScript player values and clients.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-132": {
-      "title": "Private schemas MUST generate the types required by explicit Wails and persistence adapters without entering the player bundle."
+      "title": "Private schemas MUST generate the types required by explicit Wails and persistence adapters without entering the player bundle.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-133": {
-      "title": "The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned."
+      "title": "The Buf CLI, protobuf compiler and generators, ConnectRPC generator, Go runtime packages, ECMAScript runtime packages, and package-manager dependencies MUST be pinned.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-134": {
-      "title": "Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited."
+      "title": "Generated files MUST be deterministic, reproducible, handled according to repository policy, and never manually edited.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-135": {
-      "title": "The packaged application MUST contain all required generated and bundled player code."
+      "title": "The packaged application MUST contain all required generated and bundled player code.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-136": {
-      "title": "Clean development startup MUST remain one root `wails dev` command."
+      "title": "Clean development startup MUST remain one root `wails dev` command.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-137": {
-      "title": "Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping."
+      "title": "Contract verification MUST cover formatting, lint, deterministic zero-diff generation, one schema revision for Go and ECMAScript outputs, breaking-change detection, public/private dependency inspection, and exhaustive private adapter mapping.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-138": {
-      "title": "Breaking-change checks MUST reject incompatible field-number, field-type, enum, package, and service changes against the committed baseline once it exists."
+      "title": "Breaking-change checks MUST reject incompatible field-number, field-type, enum, package, and service changes against the committed baseline once it exists.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-139": {
-      "title": "Compatible unknown protobuf fields MUST follow standard forward-compatible protobuf behavior while known request fields remain authoritatively validated."
+      "title": "Compatible unknown protobuf fields MUST follow standard forward-compatible protobuf behavior while known request fields remain authoritatively validated.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-140": {
-      "title": "Removed protobuf fields and enum values MUST reserve prior names and numbers as applicable."
+      "title": "Removed protobuf fields, mutually exclusive variants, and enum values MUST reserve their former names and numbers as applicable.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-141": {
-      "title": "Every protobuf enum MUST define an `UNSPECIFIED` zero value."
+      "title": "Every protobuf enum MUST define an `UNSPECIFIED` zero value unless the schema imports a well-known type whose governing rules already define its representation.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-142": {
-      "title": "Protobuf fields MUST use explicit presence when absence differs from a scalar default."
+      "title": "Protobuf `optional` MUST be reserved for scalar presence when absence is semantically different from the scalar default.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
     },
     "FR-143": {
-      "title": "Mutually exclusive protobuf states MUST use `oneof` or another explicit protobuf variant."
+      "title": "Mutually exclusive protobuf payload variants MUST use `oneof`; parallel optional variant fields and string discriminator fields are prohibited.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T009",
+        "T014",
+        "T017",
+        "T019",
+        "T020",
+        "T021",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094"
+      ]
+    },
+    "FR-144": {
+      "title": "Every accepted state-changing action MUST mutate canonical state exactly once, advance the authoritative revision exactly once, produce exactly one logical compound update for the committed revision, and offer it once to each affected logical session before completing the unary response.",
+      "tasks": [
+        "T048",
+        "T051",
+        "T055"
+      ]
+    },
+    "FR-145": {
+      "title": "Planning MUST record and tests MUST enforce a finite encoded HTTP-body limit and decompression limit consistent with Connect framing overhead, including compressed requests and messages enlarged with unknown protobuf fields.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T095",
+        "T099",
+        "T101"
+      ]
+    },
+    "FR-146": {
+      "title": "Recognition handles, request identities, broadcast identities, terminal and generation identifiers, pattern identifiers, navigation targets, guesses, and sound categories MUST each have finite semantic limits below the public request-message maximum.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T095",
+        "T099",
+        "T101"
+      ]
+    },
+    "FR-147": {
+      "title": "Sound categories MUST be validated against the existing allowed catalog and MUST NOT accept paths, path fragments, or arbitrary filesystem input.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T095",
+        "T099",
+        "T101"
+      ]
+    },
+    "FR-148": {
+      "title": "Rejection at any public message-size, encoded-body, decompression, structural, finite field-bound, or sound-category boundary check MUST create no logical session, mutation, revision, logical publication, replay entry, or random-source advancement and MUST occur before canonical service invocation.",
+      "tasks": [
+        "T027",
+        "T058",
+        "T095",
+        "T099",
+        "T101"
+      ]
+    },
+    "FR-149": {
+      "title": "The server MUST NOT retry old incremental events as though physical delivery had been acknowledged; a terminated stream MUST recover only by reconnecting to a complete current authoritative snapshot.",
+      "tasks": [
+        "T071",
+        "T073",
+        "T074"
+      ]
     }
   },
   "size": "oversized",
@@ -563,12 +2849,1042 @@
       "decision": "Prove a vertical Connect slice first, then complete a one-protocol cutover that removes all WebSocket code and dependencies.",
       "why": "The slice reduces integration risk while the final gate enforces the specification prohibition on dual production protocols.",
       "rejected": "Permanent WebSocket compatibility or a flag-selectable dual stack."
+    },
+    {
+      "decision": "Execute T112 before T056 as the browser parity prerequisite",
+      "why": "The migrated Playwright client can only establish a generated Connect subscription after the fixture exposes the production-shaped Connect handler and bundled static assets",
+      "rejected": "Keep the generated order and retain a temporary WebSocket-only fixture during typed browser parity"
+    },
+    {
+      "decision": "Keep compound client/frontend install and build commands in named frontend npm scripts invoked by Wails",
+      "why": "Wails forwards shell operators from configuration as frontend CLI arguments; named scripts package reliably and remain contract-testable",
+      "rejected": "Embedding && compound commands directly in wails.json"
     }
   ],
   "step_summaries": {
     "plan": {
       "summary": "Planned pinned protobuf and ConnectRPC generation, typed public RPCs, exhaustive private and persistence adapters, atomic compound streaming, and a gated one-protocol cutover.",
       "key_finding": "The existing control.Service commit boundary can remain canonical if stream registration and snapshot capture join its ordering and each revision becomes one personalized compound publication per logical session."
+    },
+    "tasks": {
+      "summary": "122 tasks across Setup, blocking Foundational infrastructure, 13 user-story phases, and Polish; explicit dependency waves and test-first story increments."
+    },
+    "implement": {
+      "summary": "Migrated the player boundary to generated ConnectRPC/protobuf contracts, preserved private desktop and persistence compatibility, removed the active WebSocket stack, and passed all repository-controlled acceptance gates."
     }
-  }
+  },
+  "currentTask": "T122",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified the complete public, private, persistence, configuration, third-party, and injected-dependency migration ledger with a zero-unclassified completion rule.",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/contracts/inventory.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added the Buf v2 module with STANDARD linting and FILE-level breaking policy.",
+      "files": [
+        "proto/buf.yaml"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added deterministic local Go protobuf and Connect generator configuration targeting internal/gen.",
+      "files": [
+        "proto/buf.gen.go.yaml"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added public-only ECMAScript generation through the pinned local Protobuf-ES plugin.",
+      "files": [
+        "proto/buf.gen.es.yaml"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Declared pinned Buf, protobuf, Connect-Go, generator, Testify, and protobuf test dependencies while retaining Wails and the temporary legacy dependency.",
+      "files": [
+        "go.mod"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Created the pinned Connect-ES, Protobuf-ES, and Vite player package and build scripts.",
+      "files": [
+        "client/package.json"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Extended Wails install and build orchestration to include the generated player bundle.",
+      "files": [
+        "wails.json"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Resolved the exact player dependency graph at Protobuf-ES 2.13.0, Connect-ES 2.1.2, and Vite 8.1.5 with zero audit vulnerabilities.",
+      "files": [
+        "client/package-lock.json"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Defined the exact PlayerService surface, recognition, player state, snapshot, compound update, selection, and stable action result contracts.",
+      "files": [
+        "proto/fallout/terminal/player/v1/player.proto"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Defined recursive public content and exclusive live/no-live terminal presentation messages.",
+      "files": [
+        "proto/fallout/terminal/player/v1/terminal.proto"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Defined complete navigation state and typed back, enter, command, and entry action variants.",
+      "files": [
+        "proto/fallout/terminal/player/v1/navigation.proto"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Defined player-safe hacking projections and typed word, filler, and opaque pattern requests without HACK_ADMIN.",
+      "files": [
+        "proto/fallout/terminal/player/v1/hacking.proto"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Defined the typed eight-category SoundManifest request and response contract.",
+      "files": [
+        "proto/fallout/terminal/player/v1/sound.proto"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Defined inventoried private Wails request, result, operation, and terminal-switch semantic messages.",
+      "files": [
+        "proto/fallout/terminal/private/v1/desktop.proto"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Defined detached private roster, logical-session, broadcast, controller, switch, and coordination semantics.",
+      "files": [
+        "proto/fallout/terminal/private/v1/coordination.proto"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Defined runtime status, server information, client count, hack state, coordination state, and event semantics.",
+      "files": [
+        "proto/fallout/terminal/private/v1/runtime.proto"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Defined every known session-v1, terminal, and recursive content-node semantic field while leaving JSON authoritative.",
+      "files": [
+        "proto/fallout/terminal/persistence/v1/session.proto"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Defined every known strict player-config-v1 and roster semantic field.",
+      "files": [
+        "proto/fallout/terminal/persistence/v1/player_config.proto"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Defined serializable application, server, coordination, browser, path, tunnel, startup, shutdown, and request-limit values with native dependencies excluded.",
+      "files": [
+        "proto/fallout/terminal/config/v1/config.proto"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Generated and compiled deterministic Go protobuf values plus the PlayerService Connect handlers for all four schema graphs.",
+      "files": [
+        "internal/gen/fallout/terminal/player/v1/player.pb.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Generated deterministic ECMAScript descriptors from only the public player graph and verified no private, persistence, or configuration output exists in client/gen.",
+      "files": [
+        "client/gen/fallout/terminal/player/v1/player_pb.js"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added detached recognition, physical-stream, snapshot, compound-update, replay, pending-action, terminal-presentation, and sound-manifest domain values with deep cloning.",
+      "files": [
+        "internal/domain/model.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Added finite public identity/target bounds and allowlisted sound-category validation while preserving persistence validation.",
+      "files": [
+        "internal/domain/validate.go"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Added concurrency-safe deterministic random, canonical-invocation spy, and bounded stream-sink fakes alongside existing clocks and opaque IDs.",
+      "files": [
+        "internal/testutil/fakes.go"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Exposed coordinator-owned recognition, physical-stream ownership, raw stream count, revision, replay, and personalized publication state without transport coupling.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added exhaustive generated-public request/projection adapters for recognition, every typed mutation, snapshots, compound updates, terminal/navigation/hacking state, results, and sound manifests.",
+      "files": [
+        "internal/player/adapter.go"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Centralized 4 KiB protobuf/decompression and 8 KiB encoded-body enforcement helpers that count unknown fields before canonical invocation.",
+      "files": [
+        "internal/player/limits.go"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Added failing generated Connect subscription/selection and invalid-handle tests; confirmed failure is the missing Connect service implementation.",
+      "files": [
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Added failing coordinator tests for complete attachment snapshots, recognition-based selection, one revision, and effect-free pre-assignment shared actions; confirmed only the new APIs are missing.",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Added the clean-profile generated Subscribe/SelectCharacter browser journey and confirmed it fails because the current player still uses WebSocket rather than Connect.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Implemented atomic recognition resolution, physical attachment, complete revisioned snapshot capture, active-stream selection lookup, and no-live/live terminal variants without puzzle regeneration.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Implemented a bounded physical Connect subscription with an immutable first snapshot, strictly newer update queue, isolated cancellation, and logical-session hub.",
+      "files": [
+        "internal/player/stream.go"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Replaced first-time browser WebSocket handshake and selection dispatch with the generated binary Connect client, complete snapshot application, handle-only persistence, and generated enum/value adapters; Vite bundle passes.",
+      "files": [
+        "client/client.js",
+        "client/index.html"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Implemented generated Subscribe and SelectCharacter handlers with atomic snapshot-first attachment, active-stream recognition, typed results, authoritative post-commit updates, bounded queues, and safe Connect error mapping; all coordinator/player tests pass.",
+      "files": [
+        "internal/player/handler.go",
+        "internal/player/http_test.go"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Mounted generated Connect paths ahead of the same-origin static player handler with Origin/Host enforcement and explicit RPC non-fallback while retaining temporary branch-only WebSocket coexistence.",
+      "files": [
+        "internal/player/http.go",
+        "internal/player/server.go"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Composed the canonical coordinator into the generated Connect service, player server, static assets, and existing effect router; updated one-command and asset contract tests; the full Go suite passes.",
+      "files": [
+        "main.go",
+        "internal/platform/startup_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Verified and retained failing-first live projection coverage proving detached snapshots and runtime updates do not regenerate or alter private puzzles.",
+      "files": [
+        "internal/live/service_test.go"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added generated Connect journeys for known-handle reconnect, current snapshot, cue suppression, and unknown-handle replacement; browser execution remains gated on the planned fixture cutover.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Verified the existing ProjectRuntime boundary returns detached complete terminal, navigation, and player-safe hacking projections without invoking board generation.",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Implemented generated snapshot replacement/reattach, complete current state application, abortable stream recovery, and the exact three-second reconnect delay without optimistic shared state.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Added revision-keyed authoritative cue deduplication and retained reconnect/stale/rejected/replay suppression for ambient and hacking sounds.",
+      "files": [
+        "client/sound.js",
+        "client/client.js"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Integrated recognized and replacement handle resolution with atomic complete snapshot capture from coordinator-owned current live projections.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Verified concurrent coordinator coverage for same-handle multi-stream attachment, equivalent state, raw stream membership, final-detach presence, and retained claim/controller identity.",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Added generated Connect concurrent clean-tab convergence and staged sibling-close browser coverage.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Verified and retained coordinator first-attach/final-detach aggregate presence plus equivalent session fan-out semantics; Connect subscriptions share the logical hub.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Retained Web Locks/storage-lease first-tab election and held it across the first generated snapshot until the accepted handle is stored.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Verified raw client count remains tied to active physical public streams and event delivery remains race-free across staged closes.",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Verified coordinator coverage for one canonical mutation/revision, detached effects, personalized state, ordered revisions, and mixed concurrent convergence.",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Added and passed generated handler tests for separate Navigate, Guess, and ActivatePattern procedures with typed stable results and no generic command endpoint.",
+      "files": [
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Added the generated Connect browser convergence/pending-action journey and explicit absence of a generic Command procedure.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Implemented detached complete personalized compound projections for one committed revision and synchronous offer-before-unary-response delivery.",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Completed exhaustive typed navigation, word/filler guess, opaque pattern, snapshot, compound, player, terminal, navigation, hacking, result, and sound adapters.",
+      "files": [
+        "internal/player/adapter.go"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Applied generated snapshots and compound updates authoritatively and retained result-plus-stream pending reconciliation without optimistic canonical changes.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Keyed ambient/hacking outcome cues to newly applied authoritative revisions and deduplicated one-shot transitions.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Implemented separate generated Navigate, Guess, and ActivatePattern unary handlers with stable ActionResult reasons and compound publication before response completion.",
+      "files": [
+        "internal/player/handler.go"
+      ]
+    },
+    "T112": {
+      "status": "DONE",
+      "did": "Replaced the legacy browser fixture protocol with generated Connect handlers and served a verified Vite production bundle",
+      "files": [
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/playwright.config.mjs",
+        "client/index.html",
+        "client/client.js",
+        "client/sound.js",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Replaced the handwritten WebSocket parity harness with real generated-Connect selection, navigation, convergence, continuity, authority, and audio-failure journeys",
+      "files": [
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Added a table-driven recognition authority matrix proving invalid, observer, unassigned, disconnected, stale-broadcast, and stale-terminal actions are effect-free",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Added transport classification tests for bounded structural failures, illegal variants, unknown recognition, UNSPECIFIED fallback, cancellation, exhaustion, unavailability, and redaction",
+      "files": [
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "Verified bounded public-field and action-target validation distinguishes structural failures before canonical invocation",
+      "files": [
+        "internal/domain/validate.go",
+        "internal/player/adapter.go"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "Verified selection and shared-action authorization rejects before mutation, revision, replayed effects, attempts, or randomness",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Verified generated handlers decode structurally first, map the complete stable reason vocabulary, and redact boundary errors",
+      "files": [
+        "internal/player/handler.go",
+        "internal/player/adapter.go"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Added a two-session typed selection conflict race proving pending clears and the rejected canonical projection never changes optimistically",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Added 257-request replay stress covering exact replay, changed payload duplicate, the 256-record bound, deterministic eviction, re-evaluation, and epoch clearing",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Added a generated browser retry journey proving retained request-ID reuse with a different typed payload clears pending without canonical mutation",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Implemented procedure-qualified SHA-256 fingerprints over deterministic structurally validated protobuf request bytes, including unknown fields",
+      "files": [
+        "internal/player/adapter.go",
+        "internal/player/adapter_test.go",
+        "internal/domain/model.go",
+        "internal/control/service.go"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Verified bounded per-session replay lookup, exact-result replay, duplicate rejection, deterministic eviction, and broadcast clearing in the canonical coordinator",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Added 100 coordinator-level concurrent pattern races proving one winner, one revision, invalid-action losers, and one-plus-optional-one total action draws",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Verified deterministic pattern probability, dud removal, attempt restoration, generation, stale/used rejection, and draw-count regressions",
+      "files": [
+        "internal/live/service_test.go",
+        "internal/hack/hack_test.go"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Verified the live runtime exposes one atomic eligible pattern transition and consumes randomness only inside accepted ApplyPattern",
+      "files": [
+        "internal/live/service.go"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Verified coordinator serialization owns pattern validation, replay, commit, revision, publication ordering, and single-winner randomness across 100 races",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Added deterministic queue-size-32, nonblocking overflow, cancellation, sibling continuity, stale-increment rejection, and snapshot-only recovery tests",
+      "files": [
+        "internal/player/stream_test.go"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Added a real Connect server test with active unread and canceled physical streams that shuts down idempotently under five seconds",
+      "files": [
+        "internal/player/stream_test.go"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "Implemented and verified nonblocking per-session fan-out that unregisters only failed physical subscriptions while responsive siblings continue",
+      "files": [
+        "internal/player/stream.go",
+        "internal/player/handler.go"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "Implemented and verified bounded queues, strictly increasing updates, cancellation, overflow termination, idempotent close, and resource release per physical stream",
+      "files": [
+        "internal/player/stream.go"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Added explicit generated-subscription CloseAll before HTTP worker shutdown and verified bounded idempotent listener/stream shutdown",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/handler.go",
+        "internal/player/stream.go"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "Added generated protobuf-aware session-v1 round trips for every known field and recursive JSON-extra preservation through compatibility templates",
+      "files": [
+        "internal/session/contract_test.go"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "Added generated player-config-v1 mappings plus strict version, roster, identity, and duplicate validation tests",
+      "files": [
+        "internal/playerconfig/contract_test.go"
+      ]
+    },
+    "T084": {
+      "status": "DONE",
+      "did": "Added complete-candidate atomic-save failure injection proving no successful player-config result is published",
+      "files": [
+        "internal/playerconfig/service_test.go"
+      ]
+    },
+    "T085": {
+      "status": "DONE",
+      "did": "Implemented known session semantics through generated persistence values while retaining JSON-v1 extras and codecs",
+      "files": [
+        "internal/session/contract.go"
+      ]
+    },
+    "T086": {
+      "status": "DONE",
+      "did": "Implemented all known player-config semantics through generated persistence values while retaining strict JSON-v1 files",
+      "files": [
+        "internal/playerconfig/contract.go"
+      ]
+    },
+    "T087": {
+      "status": "DONE",
+      "did": "Integrated generated session semantic verification into create/open/demo/save/association without adding runtime state to durable files",
+      "files": [
+        "internal/session/service.go"
+      ]
+    },
+    "T088": {
+      "status": "DONE",
+      "did": "Gated player-config create/load/save success on generated semantic verification and complete atomic writes",
+      "files": [
+        "internal/playerconfig/service.go"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Added descriptor-driven private message/field/enum coverage and generated semantic adapter tests for runtime, command, coordination, switching, and four events",
+      "files": [
+        "app_contract_test.go"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Verified every bound App method plus exact four native event identifiers and the complete existing desktop compatibility suite",
+      "files": [
+        "app_contract_test.go",
+        "app_test.go"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Added public descriptor/procedure assertions excluding desktop, dialogs, URL opening, trusted hack controls, status, credentials, secrets, and other-session state",
+      "files": [
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Added player source scans rejecting private/persistence imports, ProtoJSON, Base64, generic dispatch, and trusted-only command carriers",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Implemented typed compatibility DTO to private generated semantic adapters for runtime, command, session, save, player-config, coordination, terminal switching, and events",
+      "files": [
+        "app_contract.go"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Routed unchanged App result and four event boundaries through private generated semantic adapters while retaining native Wails DTO transport",
+      "files": [
+        "app.go",
+        "app_contract.go"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "Added descriptor-driven public service, import-boundary, enum, optional, oneof, reservation, and schema-revision assertions.",
+      "files": [
+        "internal/platform/assets_test.go",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "Added representative metadata fixtures for field-number, field-type, enum, package, and service compatibility breaks.",
+      "files": [
+        "internal/testutil/testdata/protobuf/breaking-fixtures.json"
+      ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "Added pinned clean Go and ECMAScript generation with isolated output roots and a shared source-derived schema revision.",
+      "files": [
+        "scripts/proto-generate.sh",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "Added format, lint, descriptor, two-pass determinism, header, graph isolation, adapter compilation, and browser bundle gates.",
+      "files": [
+        "scripts/proto-check.sh"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "Committed a descriptor compatibility baseline and automated all five representative breaking-edit checks.",
+      "files": [
+        "scripts/proto-breaking.sh",
+        "proto/compatibility-baseline.binpb",
+        "internal/testutil/testdata/protobuf/breaking-fixtures.json"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "Expanded CI to gate race-tested Go, both frontend builds, deterministic schema checks, breaking fixtures, browser journeys, and packaged output.",
+      "files": [
+        ".github/workflows/wails-macos.yml"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "Added HTTP boundary and typed SoundManifest tests covering origin/host, encoded limits, route isolation, all categories, safe sorting, empty results, and wildcard-CORS absence.",
+      "files": [
+        "internal/player/http_test.go"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "Strengthened tunnel tests for exact fixed-domain forwarding arguments, fail-closed Basic Auth policy, precedence, cleanup, and redaction.",
+      "files": [
+        "internal/tunnel/service_test.go"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "Added browser journeys for protected static/RPC forwarding and typed same-origin sound discovery alongside existing local action, multi-tab, reconnect, and playback journeys.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T098": {
+      "status": "DONE",
+      "did": "Added packaged-offline asset tests for player HTML, generated scripts, styles, font, every sound category, no CDN/dev server, and dist-only embedding.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T099": {
+      "status": "DONE",
+      "did": "Enforced exact RPC routing, valid Host/same-origin requests, 8 KiB encoded bodies, and 4 KiB generated-handler decode/decompression limits before application calls.",
+      "files": [
+        "internal/player/http.go",
+        "internal/player/handler.go",
+        "internal/player/server.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T100": {
+      "status": "DONE",
+      "did": "Verified and preserved fixed HTTPS domain forwarding through an enforce=true Basic Auth policy with process-local paired credentials, precedence, cleanup, and redaction.",
+      "files": [
+        "internal/tunnel/policy.go",
+        "internal/tunnel/service_test.go"
+      ]
+    },
+    "T101": {
+      "status": "DONE",
+      "did": "Implemented typed SoundManifest for all eight enum categories with validation-before-I/O, five-extension filtering, safe sorted relative assets, and empty success.",
+      "files": [
+        "internal/player/handler.go",
+        "internal/player/adapter.go",
+        "main.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T102": {
+      "status": "DONE",
+      "did": "Migrated optional asynchronous sound discovery and prefetch to typed same-origin SoundManifest RPCs with strict response path validation.",
+      "files": [
+        "client/sound.js"
+      ]
+    },
+    "T103": {
+      "status": "DONE",
+      "did": "Wired generated serializable defaults into the composition root for port, queue, replay/request limits, browser timing, paths, and bounded lifecycle contexts while excluding credentials.",
+      "files": [
+        "main.go",
+        "app.go"
+      ]
+    },
+    "T104": {
+      "status": "DONE",
+      "did": "Made clean macOS builds install and verify both frontends, copy all sounds into the player dist, and embed only the complete offline player build.",
+      "files": [
+        "scripts/build-macos.sh",
+        "client/vite.config.js",
+        "main.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T105": {
+      "status": "DONE",
+      "did": "Added repository-wide active source, dependency, route, CSP, fixture, bundle, and documentation scans for dual-stack and legacy player artifacts.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T106": {
+      "status": "DONE",
+      "did": "Made every Connect browser journey poison WebSocket construction and added a built-bundle assertion against legacy JSON message identifiers.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T107": {
+      "status": "DONE",
+      "did": "Deleted the handwritten player envelope types and JSON decoder implementation after generated browser parity passed.",
+      "files": [
+        "internal/player/protocol.go"
+      ]
+    },
+    "T108": {
+      "status": "DONE",
+      "did": "Replaced the dual-stack server with Connect-only HTTP lifecycle and removed WebSocket upgrade, component envelopes, legacy client registry, sound-list route, and CSP allowances.",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/client.go",
+        "internal/player/http.go",
+        "internal/player/http_test.go",
+        "internal/control/service.go",
+        "internal/player/handler.go",
+        "internal/player/stream.go",
+        "main.go"
+      ]
+    },
+    "T109": {
+      "status": "DONE",
+      "did": "Removed the browser generic JSON dispatcher and all legacy message identifiers in favor of direct generated procedure and projection functions.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T110": {
+      "status": "DONE",
+      "did": "Removed the direct coder/websocket module requirement after all production imports were deleted.",
+      "files": [
+        "go.mod"
+      ]
+    },
+    "T111": {
+      "status": "DONE",
+      "did": "Added a player document CSP restricted to same-origin Connect/static/media traffic with no ws or wss schemes.",
+      "files": [
+        "client/index.html",
+        "internal/player/http.go"
+      ]
+    },
+    "T113": {
+      "status": "DONE",
+      "did": "Replaced legacy JSON fixtures with reviewable valid, malformed, compressed, unknown-field, and size-bound protobuf fixtures.",
+      "files": [
+        "internal/testutil/testdata/protobuf/README.md",
+        "internal/testutil/testdata/protobuf/sound-manifest-valid.hex",
+        "internal/testutil/testdata/protobuf/malformed-truncated.hex",
+        "internal/testutil/testdata/protobuf/unknown-field.hex",
+        "internal/testutil/testdata/protobuf/sound-manifest-valid.gzip.base64",
+        "internal/testutil/testdata/protobuf/limits.json",
+        "internal/testutil/testdata/protocol"
+      ]
+    },
+    "T114": {
+      "status": "DONE",
+      "did": "Deleted superseded JSON protocol and WebSocket server tests while retaining generated descriptor, handler, stream, HTTP, and browser coverage.",
+      "files": [
+        "internal/player/protocol_test.go",
+        "internal/player/client_test.go",
+        "internal/player/server_test.go",
+        "internal/player/handler_test.go",
+        "internal/player/stream_test.go",
+        "internal/player/http_test.go"
+      ]
+    },
+    "T115": {
+      "status": "DONE",
+      "did": "Regenerated module metadata after legacy transport removal; coder/websocket is absent and only Wails-transitive gorilla/websocket remains indirect.",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    "T116": {
+      "status": "DONE",
+      "did": "Documented generated same-origin ConnectRPC operation, schema generation/checks, troubleshooting, and explicit absence of a supported legacy player protocol.",
+      "files": [
+        "README.md",
+        "docs/wails-migration-rollback.md"
+      ]
+    },
+    "T117": {
+      "status": "DONE",
+      "did": "Marked the feature-001 WebSocket contract as superseded, historical, non-authoritative, and linked the current public Connect contract.",
+      "files": [
+        "specs/001-wails-v2-migration/contracts/websocket-protocol.md"
+      ]
+    },
+    "T118": {
+      "status": "DONE",
+      "did": "Reconciled final public/private/persistence/config descriptors and code, recording zero unclassified DTO/config fields and explicit governed/native exclusions.",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/contracts/inventory.md"
+      ]
+    },
+    "T119": {
+      "status": "DONE",
+      "did": "Added clean-checkout generation, local and protected-ngrok operation, offline packaging, troubleshooting, and rollback-free recovery instructions.",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/quickstart.md"
+      ]
+    },
+    "T120": {
+      "status": "DONE",
+      "did": "Ran and recorded a deterministic three-hour-equivalent 10,800-update/36-reconnect soak plus local and fail-closed authenticated-public browser journeys.",
+      "files": [
+        "internal/player/stream_test.go",
+        "specs/005-connectrpc-protobuf-migration/soak.md",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T121": {
+      "status": "DONE",
+      "did": "Validated all success criteria with schema, Go, browser, build, security, soak, and packaged macOS evidence",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/validation.md",
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T122": {
+      "status": "DONE",
+      "did": "Resolved the Wails packaging assertion failure and documented the account-dependent public-ngrok wall-clock observation without weakening acceptance gates",
+      "files": [
+        "specs/005-connectrpc-protobuf-migration/validation.md",
+        "frontend/package.json",
+        "wails.json",
+        "internal/platform/startup_test.go"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Full Go suite through the composed Connect MVP",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./...",
+      "result": "pass",
+      "warnings": []
+    },
+    {
+      "what": "Generated player production bundle",
+      "command": "npm run build --prefix client",
+      "result": "pass; 143 modules transformed",
+      "warnings": [
+        "Vite leaves non-module sound.js as a separate same-origin script"
+      ]
+    },
+    {
+      "what": "Feature-004 browser parity migration checkpoint",
+      "command": "npx playwright test player-sessions-control.spec.mjs --grep handshake keeps",
+      "result": "fail: timed out waiting for legacy window.__playerSocket after Connect client cutover",
+      "warnings": []
+    },
+    {
+      "what": "production-shaped Connect browser fixture",
+      "command": "npx playwright test connectrpc-player.spec.mjs --config playwright.config.mjs",
+      "result": "5 passed",
+      "warnings": []
+    },
+    {
+      "what": "feature-003/004 generated Connect browser parity",
+      "command": "npx playwright test player-sessions-control.spec.mjs --config playwright.config.mjs",
+      "result": "7 passed",
+      "warnings": []
+    },
+    {
+      "what": "authority and public transport matrix",
+      "command": "GOCACHE=/private/tmp/fallout-go-cache go test ./internal/control ./internal/player ./internal/platform",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "rejected typed action browser reconciliation",
+      "command": "npx playwright test connectrpc-player.spec.mjs:97 --config playwright.config.mjs",
+      "result": "1 passed",
+      "warnings": []
+    },
+    {
+      "what": "Schema governance and reproducibility",
+      "command": "scripts/proto-check.sh && scripts/proto-breaking.sh --all-fixtures",
+      "result": "passed: format/lint, byte-identical two-pass generation, revision parity, all five breaking fixtures rejected",
+      "warnings": []
+    },
+    {
+      "what": "Go correctness, race safety, formatting, and static analysis",
+      "command": "gofmt -l .; go vet ./...; go test ./... -count=1; go test -race ./... -count=1",
+      "result": "all passed; gofmt reported no files",
+      "warnings": []
+    },
+    {
+      "what": "Browser and production-boundary journeys",
+      "command": "npm test --prefix tests/browser",
+      "result": "17 of 17 passed, including protected forwarding, multi-tab, reconnect, actions, sounds, and CSP",
+      "warnings": []
+    },
+    {
+      "what": "Three-hour-equivalent stream soak",
+      "command": "go test ./internal/player -run TestRepresentativeThreeHourStreamReconnectSoak -count=1 -v",
+      "result": "passed: 10800 ordered updates and 36 complete-snapshot reconnects",
+      "warnings": [
+        "literal public-internet wall-clock observation remains release-operator and environment dependent"
+      ]
+    },
+    {
+      "what": "macOS package and offline runtime smoke",
+      "command": "wails build -clean -platform darwin/arm64; launch packaged app and request root plus SoundManifest",
+      "result": "passed: arm64 bundle, HTTP 200, embedded generated assets, typed manifest, no ws/wss CSP",
+      "warnings": [
+        "development package is unsigned; signing and notarization are outside feature scope"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "T056 cannot complete in declared phase order: player-sessions-control.spec.mjs is coupled to the legacy WebSocket fixture and times out waiting for window.__playerSocket; the production-shaped Connect fixture conversion is scheduled later as T112. Resume must move/split T112 before T056 or explicitly authorize executing that dependency early.",
+      "step": "implement"
+    },
+    {
+      "note": "A literal three-to-four-hour authenticated public-ngrok observation depends on operator account, fixed domain, credentials, and public network; scheduled accelerated soak and protected forwarding gates pass and remain authoritative repository evidence.",
+      "step": "implement"
+    }
+  ]
 }
