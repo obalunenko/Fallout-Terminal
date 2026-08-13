@@ -4,6 +4,7 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Ordered rollback and soak before v2 removal, protected historical artifacts, and specified deterministic local/public soak procedures.
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-MATRIX-2026-08-14] Made the post-removal verification matrix sequential, restartable, and solely responsible for final acceptance.
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-CANDIDATE-2026-08-14] Added clean browser-test installation, final-candidate native/soak reruns, and non-self-referential evidence identity.
+**Bugfix**: 2026-08-14 — [ANALYZE-ATTRIBUTABLE-CANDIDATE-2026-08-14] Required a clean committed build candidate and separated final native, package, and soak attribution.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -215,8 +216,8 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - Reconcile all required acceptance evidence for the personal-use profile; no required gate may be `FAIL` or `NOT RUN`.
 - Remove Wails v2 imports/dependency/CLI/config/hooks, v2 generated/global assumptions, obsolete workaround if proven, active v2 instructions, and every temporary dual path.
-- Freeze the provisional v2-free application source as the immutable **build candidate SHA** and exact pin set without accepting it. Later evidence-only documentation commits record that SHA and package digest but do not redefine the packaged candidate.
-- Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, a clean locked Playwright installation and suite, the root development command, final native parity journeys, source/generated/dependency scans, the final package, the required final-candidate local soak, conditional public gates, and reconciled documentation/evidence.
+- Commit all prior qualification evidence separately, commit the complete v2-free application/configuration/active-documentation source, require a clean working tree, and freeze that commit as the immutable **build candidate SHA** with its exact pin set without accepting it. Later evidence-only documentation commits record that SHA and package digest but do not redefine the packaged candidate.
+- Sequentially verify tool/protobuf state, Wails bindings, both frontends/reproducible builds, Go tests, race tests, a clean locked Playwright installation and suite, root-development/native parity, final package/offline smoke, the required final-candidate local soak, conditional public gates, and reconciled documentation/evidence as separate attributable boundaries.
 - If any verification task changes application source, generated output, a pin, or a lockfile, invalidate later evidence, freeze a new build candidate SHA, and restart the final matrix from its first task. Evidence-only edits are limited to result/status fields in the feature quickstart and Wails v3 rollback record; they require a final documentation/cutover rescan but do not rebuild an otherwise unchanged package.
 - Checkpoint gate: zero active v2 runtime surface, zero permanent switch, all required parity gates pass; only then designate Wails v3 production.
 
@@ -253,7 +254,9 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - [quickstart.md](./quickstart.md) begins with every evidence box unchecked.
 - Every result records exact source commit, version pin set, target/profile, command/procedure, timestamp/environment, and `PASS`, `FAIL`, or `NOT RUN`.
-- The build candidate SHA identifies the immutable application source used for generation, tests, packaging, native journeys, and soak. A later evidence-only commit may record that SHA and artifact digest without changing candidate identity; it may modify only result/status fields in the feature quickstart and Wails v3 rollback record.
+- The build candidate SHA is captured with `git rev-parse HEAD` only after the complete v2-free application/configuration/active-documentation source is committed and `git status --porcelain` is empty. It identifies the immutable inputs used for generation, tests, packaging, native journeys, and soak.
+- The personal-use artifact identity is the SHA-256 of the final app produced from that build candidate. The required local and conditional public soaks must verify and record that unchanged identity before and after exercising it; any separately produced Developer ID app or DMG records its own distinct digest and profile.
+- A later evidence-only commit may record the build candidate SHA and artifact digest without changing either identity; it may modify only result/status fields in the feature quickstart and Wails v3 rollback record. Before each final gate, every other tracked path must remain identical to the build candidate.
 - A version change invalidates generated, build, package, and acceptance evidence until research/pins/locks/CI/scripts are updated and gates rerun.
 - Any application source, generated-output, pin, or lockfile change restarts the final matrix. An evidence-only documentation change requires the final active-documentation and cutover scan but does not rebuild the unchanged candidate.
 - A v2 artifact digest is recorded only for an artifact actually built and accepted.
