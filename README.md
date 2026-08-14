@@ -255,5 +255,5 @@ scripts/build-macos.sh
 - `specs/` — требования, планы и задачи по реализованным возможностям;
 - `specs/006-wails-v3-migration/quickstart.md` — активный Wails v3 acceptance guide;
 - `docs/wails-v3-migration-rollback.md` — активная процедура отката Wails v3 → v2;
-- `specs/001-wails-v2-migration/` и `docs/wails-migration-rollback.md` — неизменяемые historical evidence предыдущей Electron → Wails v2 миграции, не активные инструкции;
+- `specs/001-wails-v2-migration/` и `docs/wails-migration-rollback.md` — неизменяемые исторические evidence (historical evidence) предыдущей Electron → Wails v2 миграции, не активные инструкции;
 - `specs/003-hacking-game-evolution/` — актуальный контракт механики взлома и специальных последовательностей.
