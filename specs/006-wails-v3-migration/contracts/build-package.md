@@ -17,26 +17,27 @@
 
 No reproducible configuration or command uses Go/npm `latest`, `@latest`, caret, tilde, wildcard, or unbounded range for Wails. Lockfile changes are committed with source pins.
 
-Each `tools/<tool>/go.mod` declares exactly one direct tool command and an explicit Go language version. Tool resolution, tidying, generation, CI, Taskfiles, release automation, and documentation must not add a tool directive or tool-only dependency/checksum to the root application module.
+Each `tools/<tool>/go.mod` declares exactly one direct tool command and an explicit Go language version. Tool resolution, tidying, generation, the repository Go build command, CI, release automation, and documentation must not add a tool directive or tool-only dependency/checksum to the root application module.
 
-## Visible Wails v3 Build Model
+## Repository-Owned Go Build Model
 
 The active build model consists of:
 
 ```text
-Taskfile.yml
+cmd/
+└── build/main.go                 # sole root development/build/package entry
+internal/
+└── buildtool/
+    ├── buildtool.go              # standard-library-only ordered graph
+    └── buildtool_test.go         # ordering, ownership, and signing tests
 build/
-├── config.yml
-├── Taskfile.yml                  # project build composition if selected by template layout
-├── common/Taskfile.yml           # pinned beta.8-derived common tasks
-├── darwin/Taskfile.yml           # project-customized macOS package/sign order
 ├── darwin/Info.plist
 ├── darwin/Info.dev.plist
 ├── darwin/entitlements.plist
 └── appicon.png
 ```
 
-Exact paths may follow the beta.8 build-asset generator, but responsibility must remain explicit. Generated/updatable Wails assets record their beta.8 provenance; project-owned custom tasks/config are reviewed and protected by source assertions. Running `go tool -modfile=tools/wails/go.mod wails3 update build-assets` is a code change that must not silently replace output path, deployment target, resource copy, signing, or frontend ordering.
+The graph uses only the Go standard library and already-required repository tools. It invokes the exact pinned Wails CLI only for Wails-specific binding and icon generation; it does not use Wails build assets, Taskfile, Make, or a globally installed helper. Project-owned Go orchestration and macOS assets are reviewed and protected by source and plan-order assertions.
 
 The v2 `wails.json` and `postBuildHooks` become inactive and are removed only at final cutover after the v3 graph is proven.
 
@@ -44,10 +45,10 @@ The v2 `wails.json` and `postBuildHooks` become inactive and are removed only at
 
 | Purpose | Repository-root command | Requirement |
 |---|---|---|
-| full development | `go tool -modfile=tools/wails/go.mod wails3 dev` | sole root dev command; prepares bindings, both frontends, native host, listener, and optional configured tunnel |
+| full development | `go run ./cmd/build dev` | sole root dev command; prepares bindings, both frontends, native host, listener, and optional configured tunnel |
 | clean bindings | `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` (with configured `frontend/bindings` output) | exact 25-method deterministic surface before master build |
-| native build | `go tool -modfile=tools/wails/go.mod wails3 build` | runs governed dependency graph, not stale prebuilt assets |
-| macOS package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64` | produces the required app at the preserved path |
+| native build | `go run ./cmd/build build` | runs governed dependency graph, not stale prebuilt assets |
+| macOS package | `go run ./cmd/build package` | produces the required app at the preserved path |
 
 Developer docs may provide focused verification commands, but they do not create a second root development workflow.
 
@@ -77,10 +78,10 @@ copy non-embedded bundle resources
 final signature → inspection → digest/artifact
 ```
 
-- Protobuf generation has one owner. Do not invoke a root npm script that recursively invokes Taskfile targets.
+- Protobuf verification/generation has one owner. Do not invoke an npm script that recursively invokes the Go build command.
 - `client/` remains independent of Wails/private bindings and can be clean-built directly.
 - Binding generation must finish before the master Vite bundle consumes `frontend/bindings`.
-- Shared generation tasks use run-once/dependency semantics; no duplicate concurrent writes.
+- The sequential Go plan visits every shared generation node exactly once; no duplicate concurrent writes.
 - Direct locked production checks for both frontend packages remain documented and successful.
 - Generated bindings are handled deliberately: if tracked, clean generation must leave no drift; if untracked, CI still compares two clean output trees/content inventories and builds from the second.
 

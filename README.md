@@ -2,7 +2,7 @@
 
 Приложение для ведущего настольной RPG: мастер создаёт и редактирует терминалы в нативном окне macOS, а игроки видят общий Fallout-style терминал в браузере. Навигация, взлом, подключение новых игроков и восстановление соединения синхронизируются встроенным HTTP/ConnectRPC-сервером.
 
-Приложение работает на Go + Wails v2. Текущий поддерживаемый профиль — **персональное использование на macOS 13+ / Apple Silicon (`arm64`)**. Локально собранный и подписанный ad-hoc пакет `Fallout Terminal.app` принят для этого профиля. Сервер игроков является частью приложения: его не нужно и нельзя запускать отдельной командой.
+Приложение работает на Go + Wails v3. Текущий поддерживаемый профиль — **персональное использование на macOS 13+ / Apple Silicon (`arm64`)**. Локально собранный и подписанный ad-hoc пакет `Fallout Terminal.app` принят для этого профиля. Сервер игроков является частью приложения: его не нужно и нельзя запускать отдельной командой.
 
 Публичное распространение — отдельный условный профиль. Он запрещён, пока оператор не выполнит Developer ID signing, notarization, stapling, сборку DMG и проверку Gatekeeper. Отсутствие этих credentials не блокирует персональное использование.
 
@@ -22,27 +22,25 @@
 - Xcode Command Line Tools;
 - Go 1.26.x;
 - Node.js 20.19+ и npm;
-- Wails CLI строго версии 2.13.0;
 - бинарник ngrok — только если нужен публичный доступ.
 
-Установка и проверка Wails относятся к подготовке рабочего места, а не к ежедневному запуску:
+Отдельно устанавливать `task`, `make` или Wails CLI не требуется. Репозиторная Go-команда вызывает закреплённый Wails v3 CLI только для Wails-специфичной генерации bindings и иконок через изолированный `tools/wails/go.mod`.
 
 ```bash
-go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
-wails doctor
+go tool -modfile=tools/wails/go.mod wails3 version
 ```
 
-Frontend-зависимости отдельно устанавливать не требуется: корневой `wails.json` поручает Wails выполнить `npm ci`, запустить Vite, собрать Go-приложение и поднять сервер игроков.
+Frontend-зависимости отдельно устанавливать не требуется: репозиторная Go-команда выполняет locked `npm ci`, проверяет protobuf, генерирует bindings, собирает оба frontend-приложения и Go-приложение.
 
 ## Запуск всей системы одной командой
 
 После установки требований перейдите в корень репозитория и выполните ровно одну команду:
 
 ```bash
-wails dev
+go run ./cmd/build dev
 ```
 
-Это единственная команда запуска разработки. Не запускайте отдельно `npm run dev`, `go run`, старый Node-сервер или второй терминал. Wails откроет окно мастера и внутри того же процесса поднимет адрес игроков на порту `3690`, обычно `http://<IP-мастера>:3690`.
+Это единственная команда запуска разработки. Не запускайте отдельно Vite, старый Node-сервер или второй терминал. Команда соберёт и откроет окно мастера; приложение внутри того же процесса поднимет адрес игроков на порту `3690`, обычно `http://<IP-мастера>:3690`.
 
 Если порт занят, приложение должно показать понятную ошибку и не сообщать о готовности. После нормального выхода окно, HTTP/Connect listener и принадлежащие приложению дочерние процессы должны завершиться.
 
@@ -116,7 +114,7 @@ wails dev
 
 ## Локальный и публичный режим
 
-По умолчанию `wails dev` работает только в локальной сети и не запускает ngrok.
+По умолчанию `go run ./cmd/build dev` работает только в локальной сети и не запускает ngrok.
 
 Для публичного режима сначала установите ngrok, настройте токен аккаунта и зарезервируйте используемый HTTPS-домен. Это одноразовая подготовка:
 
@@ -127,13 +125,13 @@ ngrok config add-authtoken <ВАШ_ТОКЕН>
 Затем запустите всю систему одной командой из корня репозитория:
 
 ```bash
-NGROK_ENABLED=1 NGROK_USERNAME=players NGROK_PASSWORD='<ПАРОЛЬ_ОТ_8_ДО_128_СИМВОЛОВ>' wails dev
+NGROK_ENABLED=1 NGROK_USERNAME=players NGROK_PASSWORD='<ПАРОЛЬ_ОТ_8_ДО_128_СИМВОЛОВ>' go run ./cmd/build dev
 ```
 
 Вместо пары переменных можно передать combined credential, сохранив тот же единственный вызов:
 
 ```bash
-NGROK_ENABLED=1 NGROK_BASIC_AUTH='players:<ПАРОЛЬ_ОТ_8_ДО_128_СИМВОЛОВ>' wails dev
+NGROK_ENABLED=1 NGROK_BASIC_AUTH='players:<ПАРОЛЬ_ОТ_8_ДО_128_СИМВОЛОВ>' go run ./cmd/build dev
 ```
 
 Дополнительные параметры:
@@ -149,7 +147,7 @@ NGROK_ENABLED=1 NGROK_BASIC_AUTH='players:<ПАРОЛЬ_ОТ_8_ДО_128_СИМВ
 
 Единственный поддерживаемый публичный протокол игроков — сгенерированный `fallout.terminal.player.v1.PlayerService`: server-streaming `Subscribe` и отдельные unary-процедуры `SelectCharacter`, `Navigate`, `Guess`, `ActivatePattern`, `SoundManifest`. Браузер вызывает их на том же origin; старого WebSocket/JSON player protocol и совместимого маршрута больше нет.
 
-Схемы находятся в `proto/fallout/terminal/`. Go-код генерируется только в `internal/gen`, а публичный ECMAScript — только в `client/gen`. `wails dev` и `wails build` перед запуском Vite автоматически синхронизируют `proto/schema-revision.txt` и полностью регенерируют оба дерева. Для отдельной ручной генерации после изменения `.proto` выполните:
+Схемы находятся в `proto/fallout/terminal/`. Go-код генерируется только в `internal/gen`, а публичный ECMAScript — только в `client/gen`. `go run ./cmd/build dev` и `go run ./cmd/build build` перед запуском Vite проверяют revision и полностью регенерированные деревья. Для осознанного обновления revision после изменения `.proto` выполните:
 
 ```bash
 npm ci --prefix client
@@ -200,17 +198,17 @@ scripts/proto-check.sh
 scripts/proto-breaking.sh --all-fixtures
 ```
 
-`gofmt -l .` не должен печатать имена Go-файлов. Race-проверка обязательна для live/player кода. Полный ручной сценарий с 4–7 браузерами, reconnect, звуком, публичным доступом и упаковкой находится в [quickstart миграции](specs/005-connectrpc-protobuf-migration/quickstart.md).
+`gofmt -l .` не должен печатать имена Go-файлов. Race-проверка обязательна для live/player кода. Полный ручной сценарий с 4–7 браузерами, reconnect, звуком, публичным доступом и упаковкой находится в [активном Wails v3 quickstart](specs/006-wails-v3-migration/quickstart.md).
 
 ## Активная персональная сборка macOS
 
 Собрать тестовый Apple Silicon `.app` без релизных credentials:
 
 ```bash
-wails build -clean -platform darwin/arm64
+go run ./cmd/build package
 ```
 
-Ожидаемый результат — `build/bin/Fallout Terminal.app`. Это активный персональный пакет: он должен запускаться без dev-серверов и инструментов, открывать локальный адрес игроков, содержать все master/player assets и корректно завершать listener. Wails создаёт локальную ad-hoc подпись; при первом запуске перенесённого пакета macOS может потребовать одноразовое разрешение через **System Settings → Privacy & Security → Open Anyway**. Не отключайте Gatekeeper глобально и не публикуйте этот пакет как Developer ID release.
+Ожидаемый результат — `build/bin/Fallout Terminal.app`. Это активный персональный пакет: он должен запускаться без dev-серверов и инструментов, открывать локальный адрес игроков, содержать все master/player assets и корректно завершать listener. Go-команда создаёт локальную ad-hoc подпись после копирования ресурсов; при первом запуске перенесённого пакета macOS может потребовать одноразовое разрешение через **System Settings → Privacy & Security → Open Anyway**. Не отключайте Gatekeeper глобально и не публикуйте этот пакет как Developer ID release.
 
 ## Условный публичный релиз и notarization
 
@@ -232,19 +230,19 @@ scripts/build-macos.sh
 
 Скрипт собирает и подписывает `.app`, проверяет архитектуру и hardened runtime, нотариализует и staples приложение, создаёт подписанный `build/bin/Fallout-Terminal-arm64.dmg`, затем нотариализует, staples и проверяет DMG через Gatekeeper. В конце выводятся пути и SHA-256 артефактов; значения credentials в вывод не попадают.
 
-На данный момент README **не утверждает**, что подписанный/notarized/stapled DMG уже получен или прошёл Gatekeeper. Такое утверждение допустимо только после записи реального evidence в [quickstart миграции](specs/001-wails-v2-migration/quickstart.md). Официальные справки: [Apple — notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) и [Apple — distribution and releases](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases).
+На данный момент README **не утверждает**, что подписанный/notarized/stapled DMG уже получен или прошёл Gatekeeper. Такое утверждение допустимо только после записи реального evidence в [активном Wails v3 quickstart](specs/006-wails-v3-migration/quickstart.md). Официальные справки: [Apple — notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) и [Apple — distribution and releases](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases).
 
 ## Восстановление после ошибки
 
 - **Порт 3690 занят:** корректно закройте предыдущий экземпляр Fallout Terminal или другой известный процесс, затем снова выполните единственную команду запуска. Не поднимайте сервер игроков вручную на другом порту.
 - **Публичный режим не запускается:** локальная игра остаётся доступна. Проверьте `NGROK_USERNAME`, длину пароля, `NGROK_BIN`, зарезервированный HTTPS-домен и токен ngrok; либо уберите `NGROK_ENABLED` и перезапустите локально.
-- **Прерван `wails dev` с активным ngrok:** предпочтительно сначала закрыть нативное приложение через Quit. Если supervisor был аварийно остановлен, найдите только тестовый процесс командой `pgrep -fl '[n]grok'` и завершите конкретный PID через `kill -TERM <PID>`; не используйте широкое удаление процессов.
+- **Прерван `go run ./cmd/build dev` с активным ngrok:** предпочтительно сначала закрыть нативное приложение через Quit. Если процесс был аварийно остановлен, найдите только принадлежащий этому запуску ngrok командой `pgrep -fl '[n]grok'` и завершите конкретный PID через `kill -TERM <PID>`; не используйте широкое удаление процессов.
 - **Сессия не открывается:** исходный файл не заменяется при ошибке валидации. Сохраните его копию и проверьте, что это корректный JSON формата version 1.
-- **Новая Wails-сборка не прошла персональный acceptance:** переключитесь на зафиксированный Electron rollback commit или артефакт по [процедуре отката](docs/wails-migration-rollback.md). Публичные trust gates не влияют на решение о персональном откате.
+- **Wails v3-сборка не прошла персональный acceptance:** остановите cutover и следуйте [активной процедуре отката Wails v3 → v2](docs/wails-v3-migration-rollback.md). Публичные trust gates не влияют на решение о персональном откате.
 
 ## Отложенные платформы
 
-Первый поддерживаемый релиз — только macOS 13+ / Apple Silicon. Intel Mac, universal macOS binary и Windows/WebView2 отложены и не должны считаться проверенными или распространяться как поддерживаемые сборки. Текущий путь разработки Wails всегда начинается с `wails dev`; Electron-исходники доступны только через зафиксированную rollback-ревизию.
+Первый поддерживаемый релиз — только macOS 13+ / Apple Silicon. Intel Mac, universal macOS binary и Windows/WebView2 отложены и не должны считаться проверенными или распространяться как поддерживаемые сборки. Текущий путь разработки всегда начинается с `go run ./cmd/build dev`; Electron-исходники доступны только через зафиксированную rollback-ревизию.
 
 ## Основные каталоги
 
@@ -255,5 +253,7 @@ scripts/build-macos.sh
 - `build/` — metadata, icon и локальные build artifacts;
 - `scripts/build-macos.sh` — preflight и полный Developer ID/notarization pipeline для macOS;
 - `specs/` — требования, планы и задачи по реализованным возможностям;
-- `specs/001-wails-v2-migration/quickstart.md` — подробный migration acceptance guide;
+- `specs/006-wails-v3-migration/quickstart.md` — активный Wails v3 acceptance guide;
+- `docs/wails-v3-migration-rollback.md` — активная процедура отката Wails v3 → v2;
+- `specs/001-wails-v2-migration/` и `docs/wails-migration-rollback.md` — неизменяемые historical evidence предыдущей Electron → Wails v2 миграции, не активные инструкции;
 - `specs/003-hacking-game-evolution/` — актуальный контракт механики взлома и специальных последовательностей.

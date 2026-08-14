@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -69,4 +70,31 @@ func cleanAbsolutePath(name, path string) (string, error) {
 		return "", fmt.Errorf("%s must be absolute", name)
 	}
 	return cleaned, nil
+}
+
+// dialogLocation resolves a suggested native-dialog location without creating
+// directories. Missing paths fall back to the nearest existing ancestor.
+func dialogLocation(path string, pathIncludesFilename bool) (directory, filename string) {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if path == "." || path == "" {
+		return "", ""
+	}
+	if pathIncludesFilename {
+		directory = filepath.Dir(path)
+		filename = filepath.Base(path)
+	} else {
+		directory = path
+	}
+	for directory != "" && directory != "." {
+		info, err := os.Stat(directory)
+		if err == nil && info.IsDir() {
+			return directory, filename
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			break
+		}
+		directory = parent
+	}
+	return "", filename
 }

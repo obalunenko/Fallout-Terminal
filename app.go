@@ -276,20 +276,31 @@ type App struct {
 	deps AppDependencies
 	ctx  context.Context
 
-	phase             string
-	serverInfo        *domain.ServerInfo
-	clientCount       int
-	hackState         *domain.PublicHackState
-	coordinationState *domain.MasterCoordinationState
-	startupError      string
-	saveState         string
-	requestedRevision uint64
-	savedRevision     uint64
-	playerStarted     bool
-	tunnelStarted     bool
-	desktopReady      bool
-	sessionsClosed    bool
-	stopped           bool
+	phase               string
+	serverInfo          *domain.ServerInfo
+	clientCount         int
+	hackState           *domain.PublicHackState
+	coordinationState   *domain.MasterCoordinationState
+	startupError        string
+	saveState           string
+	requestedRevision   uint64
+	savedRevision       uint64
+	playerStarted       bool
+	tunnelStarted       bool
+	desktopReady        bool
+	sessionsClosed      bool
+	processStateCleared bool
+	stopped             bool
+}
+
+// lifecyclePhase returns the host-owned lifecycle observation used by Go
+// tests and adapters. It is deliberately absent from RuntimeStatus and every
+// protobuf/native DTO; the master derives presentation from serverInfo and
+// startupError instead.
+func (app *App) lifecyclePhase() string {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	return app.phase
 }
 
 // NewApp constructs the application without acquiring external resources.
@@ -312,6 +323,9 @@ func NewAppWithDependencies(deps AppDependencies) *App {
 func (app *App) Start(ctx context.Context) error {
 	app.lifecycleMu.Lock()
 	defer app.lifecycleMu.Unlock()
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	app.mu.RLock()
 	alreadyStarted := app.playerStarted
@@ -320,13 +334,27 @@ func (app *App) Start(ctx context.Context) error {
 		return nil
 	}
 	if app.deps.Player == nil {
-		return app.failLocked(ctx, errors.New("player server is not configured"))
+		return app.failLocked(errors.New("player server is not configured"))
+	}
+	if setter, ok := app.deps.Events.(interface{ SetContext(context.Context) }); ok {
+		setter.SetContext(ctx)
+	}
+	app.mu.Lock()
+	app.ctx = ctx
+	app.stopped = false
+	app.mu.Unlock()
+
+	acquisitionContext := ctx
+	if app.deps.StartupTimeout > 0 {
+		bounded, cancel := context.WithTimeout(ctx, app.deps.StartupTimeout)
+		defer cancel()
+		acquisitionContext = bounded
 	}
 
-	app.setPhase(ctx, "starting-player-server")
-	info, err := app.deps.Player.Start(ctx)
+	app.setPhase("starting-player-server")
+	info, err := app.deps.Player.Start(acquisitionContext)
 	if err != nil {
-		return app.failLocked(ctx, fmt.Errorf("start player server: %w", err))
+		return app.failLocked(fmt.Errorf("start player server: %w", err))
 	}
 	app.mu.Lock()
 	app.playerStarted = true
@@ -335,23 +363,23 @@ func (app *App) Start(ctx context.Context) error {
 
 	if app.deps.Events != nil {
 		if err := app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(info)); err != nil {
-			return app.failLocked(ctx, fmt.Errorf("publish player server status to desktop bridge: %w", err))
+			return app.failLocked(fmt.Errorf("publish player server status to desktop bridge: %w", err))
 		}
 	}
 
-	app.setPhase(ctx, "desktop-loading")
+	app.setPhase("desktop-loading")
 	if app.deps.Desktop != nil {
 		if err := app.deps.Desktop.Ready(ctx); err != nil {
-			return app.failLocked(ctx, fmt.Errorf("make desktop ready: %w", err))
+			return app.failLocked(fmt.Errorf("make desktop ready: %w", err))
 		}
 		app.mu.Lock()
 		app.desktopReady = true
 		app.mu.Unlock()
 	}
-	app.setPhase(ctx, "ready-local")
+	app.setPhase("ready-local")
 
 	if app.deps.TunnelEnabled {
-		app.startTunnelLocked(ctx, info)
+		app.startTunnelLocked(acquisitionContext, info)
 	}
 	return nil
 }
@@ -921,51 +949,12 @@ func (app *App) OpenURL(rawURL string) CommandResult {
 	return routeCommandResult(CommandResult{OK: true})
 }
 
-func (app *App) startup(ctx context.Context) {
-	if setter, ok := app.deps.Events.(interface{ SetContext(context.Context) }); ok {
-		setter.SetContext(ctx)
-	}
-	if app.deps.StartupTimeout > 0 {
-		bounded, cancel := context.WithTimeout(ctx, app.deps.StartupTimeout)
-		defer cancel()
-		ctx = bounded
-	}
-	_ = app.Start(ctx)
-}
-
-func (app *App) domReady(ctx context.Context) {
-	app.mu.Lock()
-	app.ctx = ctx
-	info := cloneServerInfoPointer(app.serverInfo)
-	clientCount := app.clientCount
-	hackState := clonePublicHackState(app.hackState)
-	coordinationState := domain.CloneMasterCoordinationState(app.coordinationState)
-	app.mu.Unlock()
-	if app.deps.Events != nil {
-		if info != nil {
-			_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*info))
-		}
-		_ = app.deps.Events.Emit(clientCountEvent, routeClientCountEvent(clientCount))
-		_ = app.deps.Events.Emit(hackStateEvent, routeHackStateEvent(hackState))
-		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(coordinationState))
-	}
-}
-
-func (app *App) shutdown(ctx context.Context) {
-	if app.deps.ShutdownTimeout > 0 {
-		bounded, cancel := context.WithTimeout(ctx, app.deps.ShutdownTimeout)
-		defer cancel()
-		ctx = bounded
-	}
-	_ = app.Shutdown(ctx)
-}
-
 func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) {
 	if app.deps.Tunnel == nil {
 		app.recordTunnelFailure("public tunnel is enabled but not configured")
 		return
 	}
-	app.setPhase(ctx, "starting-tunnel")
+	app.setPhase("starting-tunnel")
 	public, err := app.deps.Tunnel.Start(ctx)
 	if err != nil {
 		// Tunnel implementations own detailed diagnostics and credential
@@ -974,11 +963,18 @@ func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) 
 		app.recordTunnelFailure(tunnelStartupFailureMessage)
 		return
 	}
+	app.mu.Lock()
+	app.tunnelStarted = true
+	app.mu.Unlock()
 	publicURL, valid := protectedPublicURL(public.URL)
 	if !valid {
 		// Start returning success means a process may have been acquired. Stop it
 		// before reporting the invalid address and falling back to local mode.
-		_ = app.deps.Tunnel.Stop(ctx)
+		if err := app.deps.Tunnel.Stop(ctx); err == nil {
+			app.mu.Lock()
+			app.tunnelStarted = false
+			app.mu.Unlock()
+		}
 		app.recordTunnelFailure(tunnelAddressFailureMessage)
 		return
 	}
@@ -987,7 +983,6 @@ func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) 
 	public.Tunnel = true
 	public.TunnelError = ""
 	app.mu.Lock()
-	app.tunnelStarted = true
 	app.serverInfo = cloneServerInfo(public)
 	app.startupError = ""
 	app.phase = "ready-public"
@@ -1019,12 +1014,14 @@ func (app *App) recordTunnelFailure(message string) {
 	}
 }
 
-func (app *App) failLocked(ctx context.Context, cause error) error {
+func (app *App) failLocked(cause error) error {
 	app.mu.Lock()
 	app.startupError = cause.Error()
 	app.phase = "failed"
 	app.mu.Unlock()
-	cleanupErr := app.shutdownLocked(ctx, true)
+	cleanupContext, cancel := app.freshShutdownContext()
+	defer cancel()
+	cleanupErr := app.shutdownLocked(cleanupContext, true)
 	if cleanupErr != nil {
 		return errors.Join(cause, cleanupErr)
 	}
@@ -1042,52 +1039,73 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 	playerStarted := app.playerStarted
 	desktopReady := app.desktopReady
 	sessionsOpen := app.deps.Sessions != nil && !app.sessionsClosed
-	app.tunnelStarted = false
-	app.playerStarted = false
-	app.desktopReady = false
-	app.sessionsClosed = true
+	clearProcessState := !app.processStateCleared
+	app.processStateCleared = true
+	app.ctx = nil
 	app.mu.Unlock()
 
 	var cleanupErrors []error
-	if app.deps.Live != nil {
+	if clearProcessState && app.deps.Live != nil {
 		app.deps.Live.Clear()
 		app.mu.Lock()
 		app.hackState = nil
 		app.mu.Unlock()
 	}
-	if coordination, ok := app.deps.Coordination.(coordinationShutdownService); ok {
-		coordination.Shutdown()
-		app.mu.Lock()
-		app.coordinationState = nil
-		app.mu.Unlock()
+	if clearProcessState {
+		if coordination, ok := app.deps.Coordination.(coordinationShutdownService); ok {
+			coordination.Shutdown()
+			app.mu.Lock()
+			app.coordinationState = nil
+			app.mu.Unlock()
+		}
 	}
 	if tunnelStarted && app.deps.Tunnel != nil {
 		if err := app.deps.Tunnel.Stop(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop public tunnel: %w", err))
+		} else {
+			app.mu.Lock()
+			app.tunnelStarted = false
+			app.mu.Unlock()
 		}
 	}
 	if playerStarted && app.deps.Player != nil {
 		if err := app.deps.Player.Stop(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop player server: %w", err))
+		} else {
+			app.mu.Lock()
+			app.playerStarted = false
+			app.mu.Unlock()
 		}
 	}
 	if sessionsOpen {
 		if err := app.deps.Sessions.Shutdown(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop session service: %w", err))
+		} else {
+			app.mu.Lock()
+			app.sessionsClosed = true
+			app.mu.Unlock()
 		}
 	}
 	if desktopReady && app.deps.Desktop != nil {
 		if err := app.deps.Desktop.Close(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("close desktop runtime: %w", err))
+		} else {
+			app.mu.Lock()
+			app.desktopReady = false
+			app.mu.Unlock()
 		}
 	}
 
 	app.mu.Lock()
-	app.ctx = nil
-	app.serverInfo = nil
-	app.stopped = true
+	remaining := app.tunnelStarted || app.playerStarted || app.desktopReady || (app.deps.Sessions != nil && !app.sessionsClosed)
+	app.stopped = !remaining
+	if !remaining {
+		app.serverInfo = nil
+	}
 	if preserveFailure {
 		app.phase = "failed"
+	} else if remaining {
+		app.phase = "stop-failed"
 	} else {
 		app.phase = "stopped"
 	}
@@ -1095,12 +1113,19 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 	return errors.Join(cleanupErrors...)
 }
 
-func (app *App) setPhase(ctx context.Context, phase string) {
+func (app *App) setPhase(phase string) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	app.ctx = ctx
 	app.phase = phase
 	app.stopped = false
+}
+
+func (app *App) freshShutdownContext() (context.Context, context.CancelFunc) {
+	timeout := app.deps.ShutdownTimeout
+	if timeout <= 0 {
+		timeout = wailsShutdownTimeout
+	}
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 func cloneServerInfo(info domain.ServerInfo) *domain.ServerInfo {

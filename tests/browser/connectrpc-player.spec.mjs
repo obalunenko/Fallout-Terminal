@@ -24,7 +24,10 @@ test('built player contains no legacy JSON protocol or WebSocket constructor', a
     .match(/src="\/assets\/(.+\.js)"/)?.[1]);
   expect(response.ok()).toBe(true);
   const bundle = await response.text();
-  for (const forbidden of ['WebSocket(', 'SESSION_HELLO', 'CHARACTER_SELECT', 'NAV_ACTION', 'HACK_GUESS', 'HACK_PATTERN', 'ACTION_RESULT']) {
+  for (const forbidden of [
+    'WebSocket(', 'SESSION_HELLO', 'CHARACTER_SELECT', 'NAV_ACTION', 'HACK_GUESS', 'HACK_PATTERN', 'ACTION_RESULT',
+    '@wailsio/runtime', 'wailsjs', 'window.desktopAPI', 'fallout/terminal/private', 'genericDispatch',
+  ]) {
     expect(bundle).not.toContain(forbidden);
   }
 });

@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+fail() {
+  printf 'tool module check: %s\n' "$1" >&2
+  return 1
+}
+
+check_tool_module() {
+  local scan_root="$1"
+  local directory="$2"
+  local command_package="$3"
+  local parent_module="$4"
+  local version="$5"
+  local module_file="$scan_root/tools/$directory/go.mod"
+  local sum_file="$scan_root/tools/$directory/go.sum"
+  local tool_count
+
+  [[ -f "$module_file" ]] || { fail "missing tools/$directory/go.mod"; return 1; }
+  [[ -s "$sum_file" ]] || { fail "missing or empty tools/$directory/go.sum"; return 1; }
+  rg -q '^go[[:space:]]+[0-9]+\.[0-9]+([.][0-9]+)?$' "$module_file" || {
+    fail "tools/$directory/go.mod has no explicit Go version"
+    return 1
+  }
+  tool_count="$(rg -c '^tool[[:space:]]+' "$module_file" || true)"
+  [[ "$tool_count" == 1 ]] || {
+    fail "tools/$directory/go.mod must declare exactly one tool"
+    return 1
+  }
+  rg -q "^tool[[:space:]]+${command_package//\//\\/}$" "$module_file" || {
+    fail "tools/$directory/go.mod does not own $command_package"
+    return 1
+  }
+  rg -q "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}$" "$module_file" || {
+    fail "tools/$directory/go.mod does not directly pin $parent_module $version"
+    return 1
+  }
+}
+
+check_root_module() {
+  local scan_root="$1"
+  local root_module="$scan_root/go.mod"
+
+  [[ -f "$root_module" ]] || { fail 'root go.mod is missing'; return 1; }
+  if rg -n '^tool[[:space:]]*(\(|[^[:space:]])|github\.com/bufbuild/buf|github\.com/wailsapp/wails/v3/cmd/wails3|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go' "$root_module"; then
+    fail 'root application go.mod contains a tool declaration or tool-only dependency'
+    return 1
+  fi
+}
+
+check_active_commands() {
+  local scan_root="$1"
+  local matches
+
+  matches="$(rg -n --hidden \
+    -g '!scripts/tool-modules-check.sh' \
+    -g '!specs/**' \
+    -g '!docs/wails-migration-rollback.md' \
+    -g '!node_modules/**' \
+    -g '!frontend/node_modules/**' \
+    -g '!client/node_modules/**' \
+    -g '!tests/browser/node_modules/**' \
+    '(go[[:space:]]+install[[:space:]]+(github\.com/wailsapp/wails|github\.com/bufbuild/buf/cmd/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)|go[[:space:]]+tool[[:space:]]+(wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)|(^|[[:space:]`;&|])(wails3|buf)[[:space:]]+(dev|build|package|generate|format|lint|breaking)([[:space:]]|$))' \
+    "$scan_root" || true)"
+  matches="$(printf '%s\n' "$matches" | rg -v 'go tool -modfile=tools/(wails|buf|protoc-gen-go|protoc-gen-connect-go)/go\.mod (wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)' || true)"
+  [[ -z "$matches" ]] || {
+    printf '%s\n' "$matches" >&2
+    fail 'active files contain a global, bare, or root-module Go tool invocation'
+    return 1
+  }
+}
+
+check_tree() {
+  local scan_root="$1"
+
+  check_tool_module "$scan_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.8 || return
+  check_tool_module "$scan_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0 || return
+  check_tool_module "$scan_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11 || return
+  check_tool_module "$scan_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0 || return
+  check_root_module "$scan_root" || return
+  check_active_commands "$scan_root" || return
+}
+
+write_fixture_module() {
+  local scan_root="$1"
+  local directory="$2"
+  local command_package="$3"
+  local parent_module="$4"
+  local version="$5"
+
+  mkdir -p "$scan_root/tools/$directory"
+  printf 'module example.test/tools/%s\n\ngo 1.26\n\ntool %s\n\nrequire %s %s\n' \
+    "$directory" "$command_package" "$parent_module" "$version" >"$scan_root/tools/$directory/go.mod"
+  printf '%s %s/go.mod h1:fixture\n' "$parent_module" "$version" >"$scan_root/tools/$directory/go.sum"
+}
+
+self_test() {
+  local fixture_root
+  fixture_root="$(mktemp -d)"
+  trap 'rm -rf "$fixture_root"' RETURN
+
+  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  mkdir -p "$fixture_root/docs"
+  printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
+  write_fixture_module "$fixture_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.8
+  write_fixture_module "$fixture_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0
+  write_fixture_module "$fixture_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11
+  write_fixture_module "$fixture_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0
+  check_tree "$fixture_root"
+
+  printf '\ntool github.com/bufbuild/buf/cmd/buf\n' >>"$fixture_root/go.mod"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a root tool declaration'
+  fi
+  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+
+  printf 'go install github.com/wailsapp/wails/v3/cmd/wails3@latest\n' >"$fixture_root/docs/commands.md"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a global tool installation'
+  fi
+
+  printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
+  printf '\ntool example.test/second-tool\n' >>"$fixture_root/tools/wails/go.mod"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted multiple tools in one module'
+  fi
+
+  printf 'tool module check self-test passed\n'
+}
+
+case "${1:-}" in
+  --self-test)
+    self_test
+    ;;
+  '')
+    check_tree "$repository_root"
+    printf 'Go development tools are isolated, exactly pinned, and invoked through their owning modules.\n'
+    ;;
+  *)
+    fail "unknown argument: $1"
+    ;;
+esac

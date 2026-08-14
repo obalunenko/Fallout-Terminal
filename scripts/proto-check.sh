@@ -14,12 +14,9 @@ generated_revision() {
     | awk '{print $1}'
 }
 
-(
-  cd proto
-  go tool buf format --diff --exit-code
-  go tool buf lint
-  go tool buf build >/dev/null
-)
+go tool -modfile=tools/buf/go.mod buf format proto --diff --exit-code
+go tool -modfile=tools/buf/go.mod buf lint proto
+go tool -modfile=tools/buf/go.mod buf build proto >/dev/null
 
 checked_in_revision="$(generated_revision)"
 scripts/proto-generate.sh

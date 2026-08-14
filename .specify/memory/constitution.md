@@ -1,25 +1,19 @@
 <!--
 Sync Impact Report
-- Version change: 3.3.0 -> 3.3.1
+- Version change: 3.3.1 -> 3.3.2
 - Modified principles: None
 - Added principles: None
 - Added sections:
   - Go Development Tool Modules
 - Removed sections: None
 - Expanded guidance:
-  - Go Development Tool Modules now explicitly prohibits every `tool` directive and tool-only
-    dependency reference in the root application `go.mod` and isolates tool checksum changes from
-    the root `go.sum`.
-  - Tool invocations and tool-module maintenance MUST leave the application module files unchanged.
+  - Repository development, build, and packaging orchestration uses the already-required Go
+    toolchain and standard library; Taskfile, Make, and global Wails CLI installation are prohibited.
+  - The exact pinned Wails CLI remains isolated and is invoked only where Wails-specific generation
+    is required.
 - Follow-up TODOs:
-  - Reconcile active feature 006 specification, research, plan, contracts, quickstart, and future
-    tasks with the new `go tool -modfile=tools/<tool>/go.mod <command>` contract before
-    implementation.
-  - Create one module per Go development tool under `tools/` and update scripts, Taskfiles, CI,
-    release automation, documentation, and cache/lock verification in a separate feature workflow;
-    this constitution command is scope-limited to the constitution.
-  - Update tool-command examples in `.specify/templates/` through a separate template-maintenance
-    workflow; this constitution command MUST NOT modify dependent templates.
+  - Complete feature 006 reproducible-build, CI, package verification, and native acceptance tasks
+    against `go run ./cmd/build ...`.
 -->
 # Fallout Terminal Constitution
 
@@ -98,7 +92,7 @@ Generated Go and ECMAScript types and explicit boundary adapters MUST implement 
 Application code MUST NOT maintain handwritten duplicates of transport DTOs.
 
 Third-party and tool-native manifests, schemas, and metadata are outside this rule and MUST NOT be
-duplicated in protobuf. This exclusion includes Wails v3 configuration, Taskfiles, package
+duplicated in protobuf. This exclusion includes repository Go build orchestration, package
 manifests, npm and Go lockfiles, framework-generated binding metadata, Buf configuration, GitHub
 Actions workflows, and macOS plist files. The exclusion covers tool orchestration and metadata,
 not application-owned structured desktop requests, results, events, runtime statuses, or
@@ -243,7 +237,7 @@ they had targeted Wails v3.
 - `client/` MAY use browser APIs, generated ECMAScript Connect clients, server-streaming responses,
   and static HTTP assets. It MUST NOT depend on Wails, filesystem APIs, private services, or
   handwritten RPC envelopes.
-- Wails v3 configuration, Taskfiles, package manifests, plist files, framework-generated binding
+- Repository Go build orchestration, package manifests, plist files, framework-generated binding
   metadata, other third-party tool configuration, and non-serializable injected dependencies MUST
   remain native to their owning tools or language and MUST NOT acquire parallel protobuf
   definitions.
@@ -275,11 +269,15 @@ installation and lock mechanisms.
 - Tool modules MUST pin exact module versions and an explicit Go language version. They MUST NOT
   use pseudo-install scripts, floating versions, `@latest`, or depend on whichever executable is
   first on `PATH`.
-- Repository commands MUST invoke a tool through its owning module from the repository root, using
-  `go tool -modfile=tools/<tool>/go.mod <command> ...` or a checked-in wrapper/Taskfile target that
-  executes that exact form. Development documentation, code-generation scripts, Taskfiles, CI, and
-  release automation MUST NOT use `go install` or a globally installed Go tool as their executable
-  source.
+- Repository commands MUST invoke a third-party tool through its owning module from the repository
+  root, using `go tool -modfile=tools/<tool>/go.mod <command> ...` directly or from the checked-in
+  standard-library-only `cmd/build` command. Taskfiles and Makefiles are prohibited build entry
+  points. Development documentation, code-generation scripts, CI, and release automation MUST NOT
+  use `go install` or a globally installed Go tool as their executable source.
+- First-party orchestration in `cmd/build` and `internal/buildtool` MAY live in the root application
+  module because it is repository source rather than a separately versioned executable dependency;
+  it MUST use only the Go standard library and invoke versioned third-party tools through their
+  isolated modules.
 - The root application `go.mod` MUST contain production/runtime dependencies only and MUST contain
   no `tool` directive or tool block. It MUST NOT contain a `require`, `replace`, or other module
   entry whose only purpose is to build, install, pin, or execute a development tool. The root
@@ -343,15 +341,15 @@ Applicable commands MUST succeed before a change is considered complete:
   embedding, asset, or packaging changes.
 - `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` succeed for affected player
   journeys when the required local environment is available.
-- `go tool -modfile=tools/wails/go.mod wails3 dev` is the sole repository-root development entry
+- `go run ./cmd/build dev` is the sole repository-root development entry
   and passes affected interactive master/player journeys without a separately started frontend or
   player server.
 - `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` succeeds and produces
   no unexplained working-tree drift; both generated bindings and protobuf generation remain
   deterministic and MUST NOT be edited manually.
-- `go tool -modfile=tools/wails/go.mod wails3 build` succeeds after both `frontend/` and `client/`
+- `go run ./cmd/build build` succeeds after both `frontend/` and `client/`
   production builds succeed.
-- `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64` succeeds and
+- `go run ./cmd/build package` succeeds and
   produces a self-contained macOS Apple Silicon application for packaging-sensitive changes.
 - Release candidates pass signing, hardened-runtime, notarization, stapling, DMG, and Gatekeeper
   checks when release credentials are available.
@@ -438,4 +436,4 @@ MUST reject unrecorded exceptions, manually edited generated files, schema-break
 public capability leakage, generic bridge dispatchers, and permanent dual protocols without an
 explicit compatibility requirement.
 
-**Version**: 3.3.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-14
+**Version**: 3.3.2 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-14

@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+fail() {
+  printf 'wails-v3 contract check: %s\n' "$1" >&2
+  return 1
+}
+
+scan_unqualified_commands() {
+  local scan_root="$1"
+  local matches
+
+  matches="$(rg -n --hidden \
+    -g '!scripts/wails-v3-contract-check.sh' \
+    -g '!scripts/tool-modules-check.sh' \
+    -g '!specs/**' \
+    -g '!docs/wails-migration-rollback.md' \
+    -g '!**/*_test.go' \
+    -g '!node_modules/**' \
+    -g '!frontend/node_modules/**' \
+    -g '!client/node_modules/**' \
+    -g '!tests/browser/node_modules/**' \
+    '(^|[[:space:]`;&|])(wails3|wails)[[:space:]]+(dev|build|package|generate)([[:space:]]|$)' \
+    "$scan_root" || true)"
+  matches="$(printf '%s\n' "$matches" | rg -v 'go tool -modfile=tools/wails/go\.mod wails3 ' || true)"
+  [[ -z "$matches" ]] || {
+    printf '%s\n' "$matches" >&2
+    fail 'active files contain an unqualified Wails command'
+  }
+}
+
+scan_floating_versions() {
+  local scan_root="$1"
+  local matches
+
+  matches="$(rg -n --hidden \
+    -g '!scripts/wails-v3-contract-check.sh' \
+    -g '!scripts/tool-modules-check.sh' \
+    -g '!specs/**' \
+    -g '!docs/wails-migration-rollback.md' \
+    -g '!node_modules/**' \
+    -g '!frontend/node_modules/**' \
+    -g '!client/node_modules/**' \
+    -g '!tests/browser/node_modules/**' \
+    '(@wailsio/[A-Za-z0-9_./-]+"?[[:space:]]*:[[:space:]]*"(latest|\^|~|\*)|github\.com/wailsapp/wails(/v3)?@latest|go[[:space:]]+install[[:space:]]+github\.com/wailsapp/wails[^[:space:]]*@latest)' \
+    "$scan_root" || true)"
+  [[ -z "$matches" ]] || {
+    printf '%s\n' "$matches" >&2
+    fail 'active files contain a floating Wails version'
+  }
+}
+
+scan_build_orchestration() {
+  local scan_root="$1"
+  local taskfiles forbidden_commands
+
+  taskfiles="$(find "$scan_root" \
+    -type d \( -name node_modules -o -name .git \) -prune -o \
+    -type f \( -name 'Taskfile.yml' -o -name 'Taskfile.yaml' \) -print)"
+  [[ -z "$taskfiles" ]] || {
+    printf '%s\n' "$taskfiles" >&2
+    fail 'active repository contains a Taskfile'
+    return 1
+  }
+
+  forbidden_commands="$(rg -n --hidden \
+    -g '!scripts/wails-v3-contract-check.sh' \
+    -g '!scripts/tool-modules-check.sh' \
+    -g '!specs/**' \
+    -g '!docs/wails-migration-rollback.md' \
+    -g '!**/*_test.go' \
+    -g '!node_modules/**' \
+    -g '!frontend/node_modules/**' \
+    -g '!client/node_modules/**' \
+    -g '!tests/browser/node_modules/**' \
+    'wails3[[:space:]]+(dev|build|package|task)([[:space:]]|$)' \
+    "$scan_root" || true)"
+  [[ -z "$forbidden_commands" ]] || {
+    printf '%s\n' "$forbidden_commands" >&2
+    fail 'active files bypass the repository-owned Go build command'
+  }
+}
+
+scan_root_module() {
+  local scan_root="$1"
+  local root_module="$scan_root/go.mod"
+
+  [[ -f "$root_module" ]] || fail 'root go.mod is missing'
+
+  if rg -n '^tool[[:space:]]*(\(|[^[:space:]])' "$root_module"; then
+    fail 'root application go.mod contains a tool declaration'
+    return 1
+  fi
+
+  if rg -n '^[[:space:]]*(github\.com/bufbuild/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)([[:space:]]|$)' "$root_module"; then
+    fail 'root application go.mod contains a tool-only dependency'
+    return 1
+  fi
+}
+
+scan_lifecycle_schema() {
+  local scan_root="$1"
+  local runtime_schema="$scan_root/proto/fallout/terminal/private/v1/runtime.proto"
+
+  [[ -f "$runtime_schema" ]] || fail 'private runtime schema is missing'
+  if rg -n '(LifecyclePhase|lifecycle_phase|lifecyclePhase|^[[:space:]]*(optional[[:space:]]+)?(string|int32|int64|uint32|uint64|[A-Za-z_][A-Za-z0-9_.]*)[[:space:]]+phase[[:space:]]*=)' "$runtime_schema"; then
+    fail 'private runtime schema contains a serialized lifecycle phase'
+  fi
+
+  local runtime_digest revision_digest baseline_digest
+  runtime_digest="$(shasum -a 256 "$runtime_schema" | awk '{print $1}')"
+  revision_digest="$(shasum -a 256 "$scan_root/proto/schema-revision.txt" | awk '{print $1}')"
+  baseline_digest="$(shasum -a 256 "$scan_root/proto/compatibility-baseline.binpb" | awk '{print $1}')"
+  [[ "$runtime_digest" == 41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741 ]] || {
+    fail 'feature-005 private runtime schema changed during the Wails migration'
+    return 1
+  }
+  [[ "$revision_digest" == e2e1f53725c02255cbdac9b83dedc8ccb22abfb13f58541032b3abaf43e8e2cf ]] || {
+    fail 'feature-005 schema revision record changed during the Wails migration'
+    return 1
+  }
+  [[ "$baseline_digest" == af0f7c7ce8e7e1215f6b4436d35d69b40032e563d20e93d6919b027737a1f1c9 ]] || {
+    fail 'feature-005 compatibility baseline changed during the Wails migration'
+    return 1
+  }
+}
+
+check_tree() {
+  local scan_root="$1"
+
+  scan_unqualified_commands "$scan_root" || return
+  scan_build_orchestration "$scan_root" || return
+  scan_floating_versions "$scan_root" || return
+  scan_root_module "$scan_root" || return
+  scan_lifecycle_schema "$scan_root" || return
+}
+
+self_test() {
+  local fixture_root
+  fixture_root="$(mktemp -d)"
+  trap 'rm -rf "$fixture_root"' RETURN
+
+  mkdir -p "$fixture_root/proto/fallout/terminal/private/v1" "$fixture_root/docs"
+  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  cp "$repository_root/proto/fallout/terminal/private/v1/runtime.proto" "$fixture_root/proto/fallout/terminal/private/v1/runtime.proto"
+  cp "$repository_root/proto/schema-revision.txt" "$fixture_root/proto/schema-revision.txt"
+  cp "$repository_root/proto/compatibility-baseline.binpb" "$fixture_root/proto/compatibility-baseline.binpb"
+  printf 'go run ./cmd/build dev\n' >"$fixture_root/docs/commands.md"
+  check_tree "$fixture_root"
+
+  printf 'go tool -modfile=tools/wails/go.mod wails3 dev\n' >"$fixture_root/docs/commands.md"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a Wails-owned development command'
+  fi
+
+  printf 'go run ./cmd/build dev\n"@wailsio/runtime": "latest"\n' >"$fixture_root/docs/commands.md"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a floating Wails version'
+  fi
+
+  printf 'go run ./cmd/build dev\n' >"$fixture_root/docs/commands.md"
+  printf 'module example.test/app\n\ngo 1.26\n\ntool github.com/bufbuild/buf/cmd/buf\n' >"$fixture_root/go.mod"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a root tool declaration'
+  fi
+
+  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf '\nmessage LifecycleFixture { string lifecycle_phase = 1; }\n' >>"$fixture_root/proto/fallout/terminal/private/v1/runtime.proto"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted a serialized lifecycle phase'
+  fi
+
+  printf 'wails-v3 contract check self-test passed\n'
+}
+
+case "${1:-}" in
+  --self-test)
+    self_test
+    ;;
+  '')
+    check_tree "$repository_root"
+    printf 'Wails v3 migration contracts are qualified, pinned, tool-isolated, and schema-stable.\n'
+    ;;
+  *)
+    fail "unknown argument: $1"
+    ;;
+esac

@@ -27,6 +27,10 @@ schema_revision() {
     | awk '{print $1}'
 }
 
+root_module_revision() {
+  shasum -a 256 go.mod go.sum | shasum -a 256 | awk '{print $1}'
+}
+
 require_version() {
   local description="$1"
   local actual="$2"
@@ -37,9 +41,10 @@ require_version() {
   fi
 }
 
-require_version "Buf" "$(go tool buf --version)" "1.72.0"
-require_version "protoc-gen-go" "$(go tool protoc-gen-go --version)" "protoc-gen-go v1.36.11"
-require_version "protoc-gen-connect-go" "$(go tool protoc-gen-connect-go --version)" "1.20.0"
+root_module_before="$(root_module_revision)"
+require_version "Buf" "$(go tool -modfile=tools/buf/go.mod buf --version)" "1.72.0"
+require_version "protoc-gen-go" "$(go tool -modfile=tools/protoc-gen-go/go.mod protoc-gen-go --version)" "protoc-gen-go v1.36.11"
+require_version "protoc-gen-connect-go" "$(go tool -modfile=tools/protoc-gen-connect-go/go.mod protoc-gen-connect-go --version)" "1.20.0"
 require_version "protoc-gen-es" "$(node -p "require('./client/node_modules/@bufbuild/protoc-gen-es/package.json').version")" "2.13.0"
 
 actual_revision="$(schema_revision)"
@@ -52,23 +57,24 @@ if [[ "${actual_revision}" != "${expected_revision}" ]]; then
   exit 1
 fi
 
-if [[ "$(grep -Ec '^    out: \.\./internal/gen$' proto/buf.gen.go.yaml)" -ne 2 ]]; then
+if [[ "$(grep -Ec '^    out: internal/gen$' proto/buf.gen.go.yaml)" -ne 2 ]]; then
   printf 'Go generation outputs must remain isolated under internal/gen\n' >&2
   exit 1
 fi
-if [[ "$(grep -Ec '^    out: \.\./client/gen$' proto/buf.gen.es.yaml)" -ne 1 ]]; then
+if [[ "$(grep -Ec '^    out: client/gen$' proto/buf.gen.es.yaml)" -ne 1 ]]; then
   printf 'ECMAScript generation output must remain isolated under client/gen\n' >&2
   exit 1
 fi
 
-(
-  cd proto
-  go tool buf generate --template buf.gen.go.yaml
-  go tool buf generate --template buf.gen.es.yaml
-)
+go tool -modfile=tools/buf/go.mod buf generate --template proto/buf.gen.go.yaml
+go tool -modfile=tools/buf/go.mod buf generate --template proto/buf.gen.es.yaml
 
 if [[ "$(schema_revision)" != "${expected_revision}" ]]; then
   printf 'generation modified schema inputs\n' >&2
+  exit 1
+fi
+if [[ "$(root_module_revision)" != "${root_module_before}" ]]; then
+  printf 'isolated protobuf generation modified root go.mod or go.sum\n' >&2
   exit 1
 fi
 

@@ -61,9 +61,9 @@ The selected Wails source declares Go `1.25.0`; this repository's governed Go `1
 
 ### Reproducibility rules
 
-- No source, Taskfile, workflow, release script, quickstart, or acceptance command may use Go `@latest`, npm `latest`, a caret, a tilde, or an unbounded range for the selected Wails components.
+- No source, Go build command, workflow, release script, quickstart, or acceptance command may use Go `@latest`, npm `latest`, a caret, a tilde, or an unbounded range for the selected Wails components.
 - Commit `go.mod`, `go.sum`, `frontend/package.json`, and `frontend/package-lock.json` together.
-- Pin the CLI in `tools/wails/go.mod` and invoke that owning module consistently from CI, Taskfiles, documentation, and `scripts/build-macos.sh`; do not install or select a global executable.
+- Pin the CLI in `tools/wails/go.mod` and invoke that owning module consistently from the Go build command, CI, documentation, and binding checks; do not install or select a global executable.
 - Run npm with `npm ci` in clean and CI paths. Do not copy the upstream template's floating `latest` dependency or caret-based Vite defaults.
 - If implementation changes the selected version, update this file, every pin, both lock systems, CI, release automation, generated bindings, package evidence, and acceptance records as one atomic compatibility decision.
 
@@ -190,7 +190,7 @@ Use injected fakes to test defaults, cancel, errors, alias flags, creation polic
 
 ### Decision
 
-Adopt the visible Wails v3 [build system](https://v3.wails.io/concepts/build-system/), root `Taskfile.yml`, `build/config.yml`, common task assets, and Darwin task assets. Do not translate the v2 `wails.json` shape. Pin the imported/generated build-asset provenance to beta.8, place project-owned customization in deliberate Taskfile/config layers, and test update behavior so `go tool -modfile=tools/wails/go.mod wails3 update build-assets` cannot silently erase local requirements.
+Use the already-required Go toolchain for a repository-owned, standard-library-only build command. Do not adopt Wails Taskfiles, Make, or translate the v2 `wails.json` shape. Keep the pinned beta.8 CLI only for explicit Wails binding and icon generation, place project-owned orchestration in `internal/buildtool`, and protect ordering, output, resource copy, and final signing with plan/source tests.
 
 The canonical nonrecursive graph is:
 
@@ -202,7 +202,7 @@ The canonical nonrecursive graph is:
 6. copy non-embedded resources into the unsigned bundle;
 7. perform the final signature and inspection.
 
-`go tool -modfile=tools/wails/go.mod wails3 dev` remains the sole repository-root development command. Direct documented clean checks for `client/` and `frontend/` remain valid. Avoid Taskfile→npm→Taskfile recursion, duplicate protobuf generation, and concurrent generation into shared paths. Use run-once/dependency semantics where multiple build nodes converge.
+`go run ./cmd/build dev` is the sole repository-root development command. Direct documented clean checks for `client/` and `frontend/` remain valid. Avoid Go-command→npm→Go-command recursion, duplicate protobuf generation, and concurrent generation into shared paths. Use one sequential Go plan so converging nodes execute once.
 
 The official beta.8 template defaults to `bin/`; this project will set `BIN_DIR`/equivalent output to `build/bin` and preserve `build/bin/Fallout Terminal.app`. The project-specific path is already consumed by scripts, CI, README, acceptance evidence, and rollback instructions; the default offers no compensating value.
 
@@ -213,7 +213,7 @@ Track the chosen Wails build assets deliberately. Record which files remain upda
 ### Rejected alternatives
 
 - **Keep flat `wails.json` as the active v3 model**: rejected because it hides or fights the v3 task/configuration contract.
-- **Allow both npm scripts and Taskfiles to own the same generation**: rejected because it creates races and makes failures unattributable.
+- **Allow both npm scripts and the Go build command to own the same generation**: rejected because it creates races and makes failures unattributable.
 - **Move to `bin/`**: rejected because preserving `build/bin` avoids broad consumer churn.
 
 ## 8. macOS Packaging, Resources, and Signing
@@ -244,7 +244,7 @@ Final bundle inspection covers:
 - final ad-hoc signature for the required personal-use profile;
 - one offline launch, one player listener, and clean quit.
 
-Adapt `scripts/build-macos.sh` to `go tool -modfile=tools/wails/go.mod wails3 package` and the corresponding isolated build command while preserving its preflight, arm64 verification, Developer ID replacement signing, hardened runtime, notarization, stapling, DMG, Gatekeeper, credential redaction, and SHA-256 steps. Public release gates run only with real credentials and evidence; otherwise record `NOT RUN`.
+Adapt `scripts/build-macos.sh` to `go run ./cmd/build package` while preserving its preflight, arm64 verification, Developer ID replacement signing, hardened runtime, notarization, stapling, DMG, Gatekeeper, credential redaction, and SHA-256 steps. Public release gates run only with real credentials and evidence; otherwise record `NOT RUN`.
 
 ## 9. Binding-Generation Resource Workaround
 
@@ -279,7 +279,7 @@ Final cutover removes v2 imports/dependency, CLI/configuration/hooks, generated 
 
 No application data model changes are planned. Domain models, private protobuf contracts, `fallout.terminal.player.v1` public ConnectRPC contracts, session-v1, player-config-v1, revision/replay behavior, and private/public graph isolation remain unchanged.
 
-Wails generated binding metadata, Taskfiles, configuration, package manifests, lockfiles, and plist files are tool-native metadata, not a reason to modify protobuf. If implementation discovers a real semantic contract delta, stop that slice, specify it separately, and update compatibility evidence before changing a schema.
+Wails generated binding metadata, the Go build graph, package manifests, lockfiles, and plist files are build metadata, not a reason to modify protobuf. If implementation discovers a real semantic contract delta, stop that slice, specify it separately, and update compatibility evidence before changing a schema.
 
 ### Rejected alternatives
 

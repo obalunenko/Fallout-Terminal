@@ -1,18 +1,23 @@
 version: v2
 clean: true
 
+inputs:
+  - directory: proto
+
 plugins:
   - local:
       - go
       - tool
+      - -modfile=tools/protoc-gen-go/go.mod
       - protoc-gen-go
-    out: ../internal/gen
+    out: internal/gen
     opt:
       - paths=source_relative
   - local:
       - go
       - tool
+      - -modfile=tools/protoc-gen-connect-go/go.mod
       - protoc-gen-connect-go
-    out: ../internal/gen
+    out: internal/gen
     opt:
       - paths=source_relative

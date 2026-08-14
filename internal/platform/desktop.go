@@ -4,12 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/url"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 var errDesktopNotReady = errors.New("desktop runtime is not ready")
@@ -18,14 +15,101 @@ var errDesktopNotReady = errors.New("desktop runtime is not ready")
 // dialogs and external HTTP(S) links. It retains only the Wails application
 // context and exposes no general filesystem or process surface.
 type Desktop struct {
-	mu  sync.RWMutex
-	ctx context.Context
+	mu      sync.RWMutex
+	ctx     context.Context
+	dialogs DialogManager
+	browser BrowserManager
 }
 
-// NewDesktop constructs a wrapper without acquiring resources. A non-nil
-// context may be supplied by tests or composition code that already started.
-func NewDesktop(ctx context.Context) *Desktop {
-	return &Desktop{ctx: ctx}
+type FileFilter struct {
+	DisplayName string
+	Pattern     string
+}
+
+type OpenFileOptions struct {
+	Title            string
+	DefaultDirectory string
+	DefaultFilename  string
+	Filters          []FileFilter
+	ResolvesAliases  bool
+}
+
+type SaveFileOptions struct {
+	Title                string
+	DefaultDirectory     string
+	DefaultFilename      string
+	Filters              []FileFilter
+	CanCreateDirectories bool
+}
+
+type DialogManager interface {
+	OpenFile(context.Context, OpenFileOptions) (string, error)
+	SaveFile(context.Context, SaveFileOptions) (string, error)
+}
+
+type BrowserManager interface {
+	OpenURL(context.Context, string) error
+}
+
+type wailsV3DialogManager struct {
+	manager *application.DialogManager
+}
+
+func (manager wailsV3DialogManager) OpenFile(_ context.Context, options OpenFileOptions) (string, error) {
+	if manager.manager == nil {
+		return "", errors.New("native dialog manager is unavailable")
+	}
+	filters := make([]application.FileFilter, 0, len(options.Filters))
+	for _, filter := range options.Filters {
+		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: filter.Pattern})
+	}
+	dialog := manager.manager.OpenFileWithOptions(&application.OpenFileDialogOptions{
+		Title:           options.Title,
+		Directory:       options.DefaultDirectory,
+		Filters:         filters,
+		ResolvesAliases: options.ResolvesAliases,
+	})
+	return dialog.PromptForSingleSelection()
+}
+
+func (manager wailsV3DialogManager) SaveFile(_ context.Context, options SaveFileOptions) (string, error) {
+	if manager.manager == nil {
+		return "", errors.New("native dialog manager is unavailable")
+	}
+	filters := make([]application.FileFilter, 0, len(options.Filters))
+	for _, filter := range options.Filters {
+		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: filter.Pattern})
+	}
+	dialog := manager.manager.SaveFileWithOptions(&application.SaveFileDialogOptions{
+		Title:                options.Title,
+		Directory:            options.DefaultDirectory,
+		Filename:             options.DefaultFilename,
+		Filters:              filters,
+		CanCreateDirectories: options.CanCreateDirectories,
+	})
+	return dialog.PromptForSingleSelection()
+}
+
+type wailsV3BrowserManager struct {
+	manager *application.BrowserManager
+}
+
+func (manager wailsV3BrowserManager) OpenURL(_ context.Context, rawURL string) error {
+	if manager.manager == nil {
+		return errors.New("external browser manager is unavailable")
+	}
+	return manager.manager.OpenURL(rawURL)
+}
+
+// NewDesktop constructs a wrapper over the application-owned Wails v3
+// managers. A non-nil context may be supplied by tests or composition code
+// that already started.
+func NewDesktop(ctx context.Context, dialogs *application.DialogManager, browser *application.BrowserManager) *Desktop {
+	return NewDesktopWithManagers(ctx, wailsV3DialogManager{manager: dialogs}, wailsV3BrowserManager{manager: browser})
+}
+
+func NewDesktopWithManagers(ctx context.Context, dialogs DialogManager, browser BrowserManager) *Desktop {
+	return &Desktop{ctx: ctx, dialogs: dialogs, browser: browser}
 }
 
 // Ready installs the Wails application context.
@@ -56,11 +140,14 @@ func (desktop *Desktop) OpenFile(defaultPath string) (string, error) {
 		return "", err
 	}
 	directory, filename := dialogLocation(defaultPath, false)
-	return wailsruntime.OpenFileDialog(ctx, wailsruntime.OpenDialogOptions{
+	if desktop.dialogs == nil {
+		return "", errors.New("native dialog manager is unavailable")
+	}
+	return desktop.dialogs.OpenFile(ctx, OpenFileOptions{
 		Title:            "Open Fallout Terminal Session",
 		DefaultDirectory: directory,
 		DefaultFilename:  filename,
-		Filters: []wailsruntime.FileFilter{
+		Filters: []FileFilter{
 			{DisplayName: "Fallout Terminal sessions (*.json)", Pattern: "*.json"},
 		},
 		ResolvesAliases: true,
@@ -74,12 +161,15 @@ func (desktop *Desktop) SaveFile(defaultPath string) (string, error) {
 		return "", err
 	}
 	directory, filename := dialogLocation(defaultPath, true)
-	return wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{
+	if desktop.dialogs == nil {
+		return "", errors.New("native dialog manager is unavailable")
+	}
+	return desktop.dialogs.SaveFile(ctx, SaveFileOptions{
 		Title:                "Save Fallout Terminal Session",
 		DefaultDirectory:     directory,
 		DefaultFilename:      filename,
 		CanCreateDirectories: true,
-		Filters: []wailsruntime.FileFilter{
+		Filters: []FileFilter{
 			{DisplayName: "Fallout Terminal sessions (*.json)", Pattern: "*.json"},
 		},
 	})
@@ -95,8 +185,10 @@ func (desktop *Desktop) OpenURL(rawURL string) error {
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return errors.New("external URL must be an absolute HTTP or HTTPS URL")
 	}
-	wailsruntime.BrowserOpenURL(ctx, parsed.String())
-	return nil
+	if desktop.browser == nil {
+		return errors.New("external browser manager is unavailable")
+	}
+	return desktop.browser.OpenURL(ctx, parsed.String())
 }
 
 func (desktop *Desktop) context() (context.Context, error) {
@@ -106,29 +198,4 @@ func (desktop *Desktop) context() (context.Context, error) {
 		return nil, errDesktopNotReady
 	}
 	return desktop.ctx, nil
-}
-
-func dialogLocation(path string, pathIncludesFilename bool) (directory, filename string) {
-	path = filepath.Clean(strings.TrimSpace(path))
-	if path == "." || path == "" {
-		return "", ""
-	}
-	if pathIncludesFilename {
-		directory = filepath.Dir(path)
-		filename = filepath.Base(path)
-	} else {
-		directory = path
-	}
-	for directory != "" && directory != "." {
-		info, err := os.Stat(directory)
-		if err == nil && info.IsDir() {
-			return directory, filename
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			break
-		}
-		directory = parent
-	}
-	return "", filename
 }

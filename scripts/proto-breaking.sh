@@ -10,10 +10,7 @@ fixtures="${repository_root}/internal/testutil/testdata/protobuf/breaking-fixtur
 
 check_baseline() {
   test -s "${baseline}"
-  (
-    cd proto
-    go tool buf breaking . --against "${baseline}"
-  )
+  go tool -modfile=tools/buf/go.mod buf breaking proto --against "${baseline}"
 }
 
 check_fixture() {
@@ -38,7 +35,7 @@ check_fixture() {
   fi
   BEFORE="${before}" AFTER="${after}" perl -0pi -e 's/\Q$ENV{BEFORE}\E/$ENV{AFTER}/' "${candidate}"
 
-  if go tool buf breaking "${temporary_root}/schema" --against "${baseline}" >/dev/null 2>&1; then
+  if go tool -modfile=tools/buf/go.mod buf breaking "${temporary_root}/schema" --against "${baseline}" >/dev/null 2>&1; then
     printf 'breaking fixture %s was not rejected\n' "${fixture_id}" >&2
     exit 1
   fi

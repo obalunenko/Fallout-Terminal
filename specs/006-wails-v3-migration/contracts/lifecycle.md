@@ -105,7 +105,7 @@ The configured overall deadline is five seconds. Component graceful escalation (
 |---|---|
 | master window close under accepted macOS behavior | one shutdown sequence, one clean app exit |
 | Cmd+Q/application quit | same sequence and deadline |
-| handled `go tool -modfile=tools/wails/go.mod wails3 dev` interrupt | same sequence; no lingering listener/ngrok process |
+| handled `go run ./cmd/build dev` interrupt | same sequence; no lingering listener/ngrok process |
 | normal core shutdown | tunnel → player → session worker → desktop |
 | startup failed after player acquisition | acquired subset released in reverse; master failure remains explainable while host lives |
 | tunnel acquired but URL invalid | tunnel stop attempted immediately and retried at shutdown if still owned |

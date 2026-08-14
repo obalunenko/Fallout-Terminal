@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
 import { writeFileSync } from "node:fs";
+import wails from "@wailsio/runtime/plugins/vite";
 
 export default defineConfig({
   root: "src",
   base: "./",
   plugins: [
+    wails("./bindings"),
     {
       name: "preserve-go-embed-marker",
       closeBundle() {

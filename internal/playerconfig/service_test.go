@@ -97,6 +97,25 @@ func TestPlayerConfigCancellationAndFailuresAreNonMutating(t *testing.T) {
 
 }
 
+func TestPlayerConfigRejectsUnknownFieldsWithoutReplacingKnownFile(t *testing.T) {
+	t.Parallel()
+
+	fs := testutil.NewFakeFileSystem()
+	target := "/Campaigns/players.json"
+	unknown := []byte(`{"version":1,"name":"Players","roster":[],"futureCapability":true}`)
+	fs.SeedFile(target, unknown)
+	service := NewService(NewStorage(fs), &testutil.FakeDialog{OpenResult: target}, "/Campaigns")
+
+	result := service.Open(t.Context())
+	require.False(t, result.OK)
+	require.False(t, result.Canceled)
+	require.Nil(t, result.Config)
+	require.Contains(t, result.Error, "not a valid version-1 player config")
+	stored, ok := fs.File(target)
+	require.True(t, ok)
+	require.Equal(t, unknown, stored)
+}
+
 func TestCompleteCandidateSaveFailurePublishesNoSuccessfulConfig(t *testing.T) {
 	t.Parallel()
 	store := &failingPlayerConfigStore{err: errors.New("disk full")}

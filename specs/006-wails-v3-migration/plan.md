@@ -15,7 +15,7 @@
 
 Replace only the Wails v2 desktop host, binding/event integration, build model, and macOS packaging path with a verified exact Wails v3 beta.8 set. Preserve the single master window, runtime-neutral facade, exact 25-operation trusted bridge, four event names/shapes, application-owned startup observability, feature-005 protobuf/ConnectRPC/session contracts, both Vite applications, macOS 13+ arm64 personal-use package, and the existing `build/bin/Fallout Terminal.app` location.
 
-The implementation is a checkpointed brownfield migration rather than a one-commit rewrite. Root composition creates the Wails application first, injects a narrow host capability into platform adapters, composes the unchanged core, registers an unbound lifecycle service plus an allowlisted desktop service, registers typed events, creates one accepted window, and runs. Wails v3 Taskfiles/configuration own one nonrecursive generation/build/package graph. The Wails v2 baseline remains immutable rollback authority until parity and cutover scans pass.
+The implementation is a checkpointed brownfield migration rather than a one-commit rewrite. Root composition creates the Wails application first, injects a narrow host capability into platform adapters, composes the unchanged core, registers an unbound lifecycle service plus an allowlisted desktop service, registers typed events, creates one accepted window, and runs. A standard-library-only Go command owns one nonrecursive generation/build/package graph; the pinned Wails CLI is used only for binding generation. The Wails v2 baseline remains immutable rollback authority until parity and cutover scans pass.
 
 ## Technical Context
 
@@ -78,18 +78,16 @@ tools/                              # isolated Go development-tool modules; neve
 ├── protoc-gen-go/go.mod / go.sum   # only protoc-gen-go; exact v1.36.11 parent-module pin
 └── protoc-gen-connect-go/          # only protoc-gen-connect-go; exact v1.20.0 parent-module pin
     └── go.mod / go.sum
-Taskfile.yml                        # sole root v3 development/build entry
+cmd/build/main.go                   # sole root development/build/package entry
+internal/buildtool/                 # standard-library-only graph and tests
 build/
-├── config.yml                      # Wails v3 application/build configuration
-├── common/Taskfile.yml             # pinned/generated common graph plus governed customization
-├── darwin/Taskfile.yml             # arm64 assembly, resources-before-sign, final signature
 ├── darwin/Info*.plist
 ├── darwin/entitlements.plist
 └── appicon.png
 internal/platform/
 ├── desktop.go                      # injected v3 dialogs/browser/event host adapter
 ├── paths.go                        # preserve Documents/Application Support/bundle resource semantics
-├── startup_test.go                 # v3 Taskfile/config/root-command assertions
+├── startup_test.go                 # Go build graph/root-command assertions
 └── assets_test.go                  # embedding/facade/resources/forbidden-surface assertions
 frontend/
 ├── bindings/                       # one explicit Wails v3 generated directory
@@ -162,7 +160,7 @@ The lifecycle service maps Wails startup into the existing bounded core startup.
 
 ### Platform and packaging
 
-`internal/platform` wraps Wails v3 managers for dialogs, browser, and event emission while preserving all defaults/cancel/validation semantics. Taskfiles/configuration replace active `wails.json`; the graph builds player, generates bindings, builds master, packages, copies all resources, then signs. Output remains `build/bin/Fallout Terminal.app`.
+`internal/platform` wraps Wails v3 managers for dialogs, browser, and event emission while preserving all defaults/cancel/validation semantics. The repository Go command replaces active `wails.json` orchestration; its graph builds player, generates bindings, builds master, packages, copies all resources, then signs. Output remains `build/bin/Fallout Terminal.app`.
 
 ## Bounded Migration Checkpoints
 
@@ -172,9 +170,9 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 - Capture/verify the immutable v2 source rollback in the new migration rollback record before removing active v2 paths.
 - Add the exact beta.8 Go/npm application pins and the independently pinned beta.8 CLI under `tools/wails/`; commit every application and tool lock change; add automated pin consistency, root-module-drift, and no-floating/global-tool scans.
-- Introduce beta.8-derived `Taskfile.yml`, `build/config.yml`, common/Darwin build assets, ownership comments/tests, and preserved `build/bin` output.
+- Introduce `cmd/build`, a standard-library-only ordered graph, Darwin build assets, ownership comments/tests, and preserved `build/bin` output.
 - Establish one nonrecursive graph and direct locked frontend checks while v2 remains the production fallback.
-- Checkpoint gate: exact pins, clean tool preflight, Taskfile/config source assertions, no unexplained lock drift; rollback source verified.
+- Checkpoint gate: exact pins, clean tool preflight, Go build graph/source assertions, no unexplained lock drift; rollback source verified.
 
 ### Checkpoint 1 — Go host, lifecycle, and platform adapters
 
@@ -227,7 +225,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 
 | Failure class | Primary checkpoint/files | Diagnostic boundary |
 |---|---|---|
-| version/tool/template incompatibility | CP0; manifests, locks, Taskfiles/config | exact pin probe, clean generate/build skeleton |
+| version/tool/template incompatibility | CP0; manifests, locks, Go build graph/assets | exact pin probe, clean generate/build skeleton |
 | core startup/shutdown/platform regression | CP1; `main.go`, lifecycle/service adapter, `internal/platform` | Go unit/host integration trigger matrix |
 | generated surface/readiness/payload drift | CP2; `frontend/bindings`, `desktop-api.js`, Vite config | deterministic inventory + direct JS facade/event tests |
 | assets/output/signing regression | CP3; build tasks, resource root, plist/entitlements | final bundle inventory/signature/offline smoke |
@@ -246,8 +244,8 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 | Frontends | `npm ci` and production build for both `frontend/` and `client/`; bundle scans | visual master/player parity | only v3 master binding path; no CDN/runtime download; player independent of Wails |
 | Player | clean `npm ci --prefix tests/browser` followed by all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
 | Startup/shutdown | lifecycle unit/host integration, occupied port, adapter/event failure, tunnel fallback/invalid URL, partial/repeat/timeout triggers | close, Cmd+Q, dev interrupt | failure actionable; local fallback; reverse cleanup within 5s; no leaks |
-| Build graph | clean Taskfile source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go tool -modfile=tools/wails/go.mod wails3 dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
-| Personal package | `go tool -modfile=tools/wails/go.mod wails3 package GOOS=darwin GOARCH=arm64`; architecture/plist/minimum/entitlements/icon/resource/signature scans; canonical bundle-manifest digest | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path with stable before/after bundle identity |
+| Build graph | clean Go-plan source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go run ./cmd/build dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
+| Personal package | `go run ./cmd/build package`; architecture/plist/minimum/entitlements/icon/resource/signature scans; canonical bundle-manifest digest | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path with stable before/after bundle identity |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
 | Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | pre-removal qualification and final v2-free-candidate 60-minute local workloads with median-RSS sampling; conditional final-candidate 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | rollback and qualification soak pass before v2 removal; the same required local workload passes against the final build candidate; exact thresholds and actual results are tied to the applicable candidate; no simulated pass |
 | Cutover | source/generated/dependency/bundle/CI/script/docs scans plus full rebuild | owner parity review | zero active v2 runtime/dual switch; historical records intact |
@@ -271,4 +269,4 @@ PASS after the 2026-08-14 reconciliation. The contracts keep Wails at governed b
 
 ## Complexity Tracking
 
-No constitution violation requires justification. The separate lifecycle and desktop services, narrow platform capability, explicit event readiness state, and visible Taskfile layers are the minimum structures needed to enforce existing ownership and exposure rules.
+No constitution violation requires justification. The separate lifecycle and desktop services, narrow platform capability, explicit event readiness state, and dependency-free Go build graph are the minimum structures needed to enforce existing ownership and exposure rules.

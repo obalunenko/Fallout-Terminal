@@ -4,6 +4,8 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 
+root_module_before="$(shasum -a 256 go.mod go.sum)"
+
 fixture="internal/gen/fallout/terminal/player/v1/player.pb.go"
 backup="$(mktemp "${TMPDIR:-/tmp}/fallout-proto-drift.XXXXXX")"
 cp "${fixture}" "${backup}"
@@ -20,6 +22,10 @@ if scripts/proto-check.sh; then
 fi
 if ! cmp -s "${fixture}" "${backup}"; then
   printf 'proto-check did not restore the generated fixture through regeneration\n' >&2
+  exit 1
+fi
+if [[ "$(shasum -a 256 go.mod go.sum)" != "${root_module_before}" ]]; then
+  printf 'proto drift verification modified root go.mod or go.sum\n' >&2
   exit 1
 fi
 
