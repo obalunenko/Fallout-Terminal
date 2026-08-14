@@ -2,6 +2,9 @@
   "name": "fallout-terminal-browser-tests",
   "version": "1.0.0",
   "private": true,
+  "allowScripts": {
+    "fsevents": false
+  },
   "type": "module",
   "scripts": {
     "test": "playwright test"

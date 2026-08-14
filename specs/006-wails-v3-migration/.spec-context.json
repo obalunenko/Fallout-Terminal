@@ -1,0 +1,1904 @@
+{
+  "workflow": "companion",
+  "specName": "wails v3 migration",
+  "branch": "006-wails-v3-migration",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T18:07:56.751Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T18:14:12.328Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T18:54:39.127Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T19:44:59.086Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T19:52:16.092Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T19:52:45.911Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-13T20:19:33.967Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-13T22:47:02.287Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:48:47.815Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:49:39.853Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:50:53.386Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:51:24.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:51:51.989Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:52:22.960Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:52:53.897Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:54:01.619Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:55:18.914Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T22:58:12.970Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:00:49.021Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:01:48.419Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:03:14.835Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:04:03.579Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:05:28.669Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:06:25.958Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:07:46.326Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:09:38.183Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:11:00.749Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:11:38.792Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:14:14.723Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:15:02.495Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:16:24.421Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:50.964Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:51.061Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:51.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:51.283Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:51.380Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:22:51.477Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:26:16.868Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:26:16.967Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:26:17.063Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:27:04.801Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:44.952Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.059Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.156Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.262Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.365Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.462Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.588Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.789Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-13T23:40:45.901Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T07:54:43.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T08:14:57.795Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:12:16.922Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:14:30.877Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:14:37.383Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:15:12.603Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:19:38.428Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:19:38.528Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:19:38.630Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:23:28.791Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:26:43.687Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:26:43.792Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:26:43.898Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T09:26:44.007Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T10:15:30.435Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:04:36.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:07:48.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:10:46.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:13:22.370Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:14:03.169Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:16:41.650Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:24:53.529Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:25:18.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:25:44.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:42:12.218Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:42:36.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:44:20.799Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T14:07:35.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T17:12:17.300Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T17:14:01.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-14T19:45:28.340Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:46:31.698Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:47:41.003Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:56:41.337Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:04:25.507Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:05:35.660Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:05:48.998Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:15:28.983Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:19:10.225Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:19:29.285Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:19:52.429Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:32:56.393Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:33:27.574Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:36:27.211Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:59:02.189Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T21:01:38.184Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T21:02:28.209Z",
+      "reopened": true
+    }
+  ],
+  "last_action": "all 81 tasks complete — soak workloads removed; contract/cutover scans pass; bundle 7672ac4679 unchanged",
+  "coverage": {
+    "FR-001": {
+      "title": "The migration MUST replace the accepted Wails v2 desktop runtime with Wails v3 without intentionally changing gameplay, persistence, security, visual presentation, public network behavior, or user workflows."
+    },
+    "FR-002": {
+      "title": "The implementation MUST use the current constitution, baseline code, and completed specifications 001–005 as evidence, giving precedence to feature 005 and current code for post-ConnectRPC private and public behavior while surfacing rather than silently resolving active-contract discrepancies."
+    },
+    "FR-003": {
+      "title": "The candidate MUST retain one native master window on macOS 13+ arm64 with title `Fallout Terminal — Master Control`, initial size 1200×780, minimum size 900×600, and the accepted dark presentation."
+    },
+    "FR-004": {
+      "title": "The master experience MUST preserve every accepted control and the create, open, edit, explicit-copy, and save outcomes for representative sessions and player rosters."
+    },
+    "FR-005": {
+      "title": "Session persistence MUST preserve version-1 JSON field names, compatible unknown fields, relative references, validation, explicit selected targets, ordered revisions, atomic replacement, and zero semantic round-trip change."
+    },
+    "FR-006": {
+      "title": "Player-config persistence MUST preserve version 1, strict unknown-field and trailing-data rejection, identity validation, relative session references, complete-file atomic saves, and publication only after durable success."
+    },
+    "FR-007": {
+      "title": "macOS storage MUST preserve the Documents session default, Application Support metadata location, user-selected autosave target, and read-only bundled demonstration behavior until explicit copy."
+    },
+    "FR-008": {
+      "title": "One application process MUST compose, start, own, and stop the player listener, generated player service, optional owned ngrok process, session-storage worker, and desktop adapter exactly once."
+    },
+    "FR-009": {
+      "title": "Startup MUST remain bounded and MUST make current phase, local server information, and any actionable redacted startup failure observable to the master experience."
+    },
+    "FR-010": {
+      "title": "Local player access MUST remain enabled by default, while public tunneling MUST remain opt-in, authenticated, credential-redacted, and fail-closed before player capabilities when configuration is absent or invalid."
+    },
+    "FR-011": {
+      "title": "Failure of optional public tunneling MUST preserve usable local play and publish a non-secret failure status."
+    },
+    "FR-012": {
+      "title": "Player-listener startup failure MUST unwind partially acquired resources and remain observable to the master rather than appearing only as an unexplained process exit."
+    },
+    "FR-013": {
+      "title": "Shutdown MUST preserve the accepted ownership order and timeout for tunnel, player listener and streams, session worker, and desktop adapter and MUST remain safe after partial startup or repeated calls."
+    },
+    "FR-014": {
+      "title": "The player listener MUST expose only the bundled static player resources and the generated public player service and MUST expose no Wails runtime, private desktop bridge, health, reflection, generic capability discovery, or native operation."
+    },
+    "FR-015": {
+      "title": "The public service MUST preserve `fallout.terminal.player.v1.PlayerService`, every accepted procedure cardinality and meaning, same-origin binary protobuf transport, request limits, authentication boundary, player URL and port, revision ordering, replay, concurrency, cancellation, and reconnect behavior."
+    },
+    "FR-016": {
+      "title": "The final candidate MUST retain generated ConnectRPC as the only public player protocol and MUST NOT reintroduce the removed WebSocket protocol or a compatibility route."
+    },
+    "FR-017": {
+      "title": "Four to seven simultaneous browser players MUST continue to converge through character selection, authoritative snapshots and streamed revisions, navigation, hacking, reconnect, and sound behavior under the feature-005 authority rules."
+    },
+    "FR-018": {
+      "title": "Public projections, descriptors, errors, and generated player code MUST continue to expose zero desktop capabilities, credentials, native paths, runtime status, secret words, private candidates, future outcomes, or other private state."
+    },
+    "FR-019": {
+      "title": "Every private desktop operation in the accepted feature-005 inventory MUST remain available with its exact validation, cancellation, eligibility, redacted error, result semantics, and JavaScript-visible value or object shape."
+    },
+    "FR-020": {
+      "title": "`frontend/src/desktop-api.js` MUST remain the only runtime-neutral facade used by the master UI and MUST absorb Wails v3 generated namespace or module-path changes without leaking them to UI consumers."
+    },
+    "FR-021": {
+      "title": "Existing versioned private protobuf contracts and explicit adapters MUST continue to govern every application-owned bridge request, result, status, and event without becoming canonical mutable domain state."
+    },
+    "FR-022": {
+      "title": "The Wails bridge MUST NOT carry protobuf binary, Base64, ProtoJSON, a serialized protobuf envelope, or a generic map or dispatcher."
+    },
+    "FR-023": {
+      "title": "A protobuf schema change MUST occur only for a separately specified real application-contract semantic change and MUST NOT be justified solely by Wails binding metadata or namespace changes."
+    },
+    "FR-024": {
+      "title": "The event names `server-info`, `client-count`, `hack-state`, and `coordination-state` and their JavaScript-visible payload shapes MUST remain exact."
+    },
+    "FR-025": {
+      "title": "Every desktop event subscription MUST return one idempotent release function that releases exactly one underlying runtime listener and prevents callbacks after release."
+    },
+    "FR-026": {
+      "title": "Every desktop event subscriber MUST receive current initial runtime, server, client, hacking, and coordination state without polling, missed initial state, duplicate effects, or a stale snapshot overwriting a newer event."
+    },
+    "FR-027": {
+      "title": "The generated Wails v3 desktop binding inventory MUST contain every required private operation and zero lifecycle methods, generic dispatchers, arbitrary filesystem, process, environment, or browser primitives, or public player procedures."
+    },
+    "FR-028": {
+      "title": "`Start` and `Shutdown` MUST remain internal lifecycle operations and MUST NOT appear in generated desktop bindings, while `CopyDemo` MUST remain a private operation with its accepted explicit-copy semantics and no newly introduced UI control."
+    },
+    "FR-029": {
+      "title": "All Wails v3 Go module, CLI, frontend runtime, and frontend plugin versions MUST be concrete, mutually compatible, documented, lockfile-recorded, and verified without any reproducible command resolving `latest`."
+    },
+    "FR-030": {
+      "title": "A developer with the documented pinned prerequisites MUST be able to run `go run ./cmd/build dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor."
+    },
+    "FR-031": {
+      "title": "A clean checkout MUST deterministically generate Wails bindings and protobuf code, build both browser applications, run applicable tests, build the native application, and package the supported target without an undeclared manual prerequisite."
+    },
+    "FR-032": {
+      "title": "Clean binding and protobuf generation MUST be reproducible across two consecutive runs and MUST leave no unexplained tracked diff or manually edited generated file."
+    },
+    "FR-033": {
+      "title": "Two consecutive clean native builds with identical inputs MUST complete successfully without relying on stale generated output, a development server, a network-time package lookup, or a separately started process."
+    },
+    "FR-034": {
+      "title": "Existing Go, race, frontend, player, Playwright, Buf generation, drift, breaking, and relevant platform tests MUST pass unchanged or be deliberately adapted for Wails v3 without reducing their assertions."
+    },
+    "FR-035": {
+      "title": "The personal-use package MUST be a self-contained local or ad-hoc-signed macOS 13+ arm64 `.app` that launches without Go, Node, npm, Vite, Wails, a development server, or internet access."
+    },
+    "FR-036": {
+      "title": "The packaged application MUST contain and load the master assets, Wails generated bindings, generated player client, player assets, fonts, sounds, and read-only bundled demonstration session."
+    },
+    "FR-037": {
+      "title": "The packaged application MUST start the player listener once and release it and any owned ngrok process on normal quit and handled partial startup within the accepted shutdown timeout."
+    },
+    "FR-038": {
+      "title": "Developer ID signing, hardened runtime, notarization, stapling, DMG creation, and Gatekeeper-without-bypass MUST be required only for an explicitly selected public-release candidate and MUST be recorded as `NOT RUN` when credentials are unavailable."
+    },
+    "FR-039": {
+      "title": "Before code cutover, rollback evidence MUST record the immutable accepted Wails v2 source commit `f1084b3df8b5630862bdf7a0f347b599156653ef` as the canonical source rollback."
+    },
+    "FR-040": {
+      "title": "If an accepted Wails v2 baseline application is built, rollback evidence MUST record its exact executable, SHA-256 digest, build provenance, and acceptance status."
+    },
+    "FR-041": {
+      "title": "Before final cutover, the owner MUST be able to return to the recorded Wails v2 source or accepted artifact without transforming session-v1 or player-config-v1 data."
+    },
+    "FR-042": {
+      "title": "Temporary v2/v3 coexistence MUST be limited to the migration branch, have a named owner and expiry at cutover, include a removal task, and MUST NOT become a permanent runtime flag or dual implementation."
+    },
+    "FR-043": {
+      "title": "Rollback triggers MUST include session corruption or loss, bridge capability or payload drift, master or player parity loss, startup or shutdown leaks, public-access regression, missing packaged assets, unhandled beta-runtime crashes, and package or signature failure."
+    },
+    "FR-044": {
+      "title": "Wails v2 MUST remain the accepted production fallback until every required parity, security, persistence, lifecycle, generation, build, package, soak, and rollback gate for the selected profile passes."
+    },
+    "FR-045": {
+      "title": "Final cutover MUST remove every active Wails v2 import, CLI installation path, v2 command, generated binding dependency, runtime global, obsolete configuration, and permanent dual-runtime implementation while preserving historical completed specifications as history."
+    },
+    "FR-046": {
+      "title": "Final acceptance MUST include one representative long-running local master/player soak, and the authenticated-ngrok soak MUST run only when credentials and connectivity exist or otherwise be recorded as `NOT RUN` without serving as passing public-mode evidence."
+    },
+    "FR-047": {
+      "title": "Multi-window, mobile, system tray, updater, new desktop capabilities, persistence-format migration, public RPC redesign, ConnectRPC replacement, Wails-driven protobuf changes, new platforms, and mandatory public distribution MUST remain outside this migration."
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 35,
+    "projectedTasks": 60,
+    "scopeSignal": "larger",
+    "verdict": "oversized"
+  },
+  "context": [
+    "baseline: main at f1084b3df8b5630862bdf7a0f347b599156653ef",
+    "governance: constitution 3.2.0 and completed specs 001-005",
+    "area: root Wails composition and internal/platform desktop adapters",
+    "area: frontend/src/desktop-api.js private operations and named events",
+    "area: generated ConnectRPC player service, browser client, persistence, startup, shutdown, tooling, and macOS packaging",
+    "constraint: preserve accepted product contracts while replacing only runtime, bridge integration, tooling, and packaging"
+  ],
+  "intent": "Replace the Wails v2 desktop host with a pinned Wails v3 runtime while preserving the complete accepted master, player, persistence, security, lifecycle, and packaging experience.",
+  "expectations": [
+    "No product redesign or gameplay change",
+    "No new desktop capabilities, multi-window UI, mobile support, system tray, or updater",
+    "No persistence-format migration",
+    "No public RPC redesign, ConnectRPC replacement, WebSocket compatibility, or Wails-driven protobuf change",
+    "No Intel, universal, Windows, Linux, iOS, or Android target",
+    "No mandatory public distribution; signing and notarization remain conditional"
+  ],
+  "decisions": [
+    {
+      "decision": "Pin Wails Go module, wails3 CLI, @wailsio/runtime, and its Vite plugin to exact v3.0.0-beta.8 artifacts",
+      "why": "Immutable tag/runtime/npm inspection proves compatibility despite release-label drift; floating beta inputs cannot reproduce acceptance",
+      "rejected": [
+        "wait for GA",
+        "matching labels without inspection",
+        "floating latest/ranges"
+      ]
+    },
+    {
+      "decision": "Compose one Wails application first, inject a narrow platform capability, then register an internal lifecycle service and exact 25-method desktop service",
+      "why": "Late registration breaks the brownfield construction cycle without globals and prevents lifecycle/helper exposure",
+      "rejected": [
+        "register the composition root",
+        "package globals",
+        "spread Wails into domain packages"
+      ]
+    },
+    {
+      "decision": "Preserve the four-event listener-first snapshot protocol and render the existing startupError without a protobuf phase change",
+      "why": "This preserves feature-005 shapes while closing the verified master-UI startup observability gap",
+      "rejected": [
+        "DomReady-only replay",
+        "silent framework exit",
+        "new serialized phase solely for Wails"
+      ]
+    },
+    {
+      "decision": "Use a standard-library-only repository Go command with build/bin output and copy all resources before final signature",
+      "why": "Go is already required and can order protobuf, player, bindings, master, packaging, resources, and signing deterministically without adding Task or Make",
+      "rejected": [
+        "Wails Taskfiles",
+        "Make orchestration",
+        "mutate a signed bundle"
+      ]
+    },
+    {
+      "decision": "Remove both the 60-minute local and 30-minute authenticated-ngrok soak workloads from acceptance",
+      "why": "Explicit USER-SOAK-DECISION on 2026-08-15",
+      "rejected": "Rerunning either long-duration soak against the final candidate"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Produced a checkpointed brownfield Wails v3 beta.8 migration plan with version research, unchanged-data model, exact desktop bridge/events/lifecycle/build-package contracts, and an evidence-first quickstart.",
+      "key_finding": "The baseline retains startupError in RuntimeStatus but does not render fatal startup failure in the master UI; the plan closes this through the existing facade/status contract without protobuf drift.",
+      "risks": [
+        "Wails v3 remains prerelease with open blockers",
+        "lifecycle abort semantics can hide application failures",
+        "generated surface or event readiness can drift",
+        "resource insertion/signing order can invalidate the final bundle"
+      ]
+    },
+    "implement": {
+      "summary": "Completed the Wails v3 migration with both long-duration soak workloads retired as historical non-gating evidence; all remaining required gates pass and conditional release signing is honestly NOT RUN.",
+      "key_finding": "The final personal-use bundle identity 7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57 remained unchanged across all final smoke and soak runs.",
+      "risks": [
+        "Wails v3.0.0-beta.8 remains prerelease",
+        "Developer ID/notary/DMG gates were NOT RUN because no signing identity was installed"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Planning baseline matches latest fetched main",
+      "result": "HEAD, main, origin/main, and FETCH_HEAD all f1084b3df8b5630862bdf7a0f347b599156653ef",
+      "command": "git fetch origin main plus rev-parse"
+    },
+    {
+      "what": "Selected Wails beta.8 compatibility matrix",
+      "result": "Go tag commit 81a1499 and npm gitHead 86b39da differ only by runtime package metadata version bump; exact beta.8 set selected",
+      "warnings": "Wails v3 remains prerelease with open release blockers"
+    },
+    {
+      "what": "Planning artifact structural validation",
+      "result": "8 required plan/design artifacts have valid relative links, final newlines, and no unresolved template markers",
+      "command": "local Python link/template validation plus git diff --check"
+    },
+    {
+      "what": "T024 native one-window persistence journey",
+      "command": "go run ./cmd/build dev; native New/Open dialogs and generated facade operations",
+      "result": "PASS — session and player configuration persisted and reopened in one window",
+      "warnings": [
+        "temporary acceptance files remain under /private/tmp"
+      ]
+    },
+    {
+      "what": "T032 native lifecycle trigger matrix",
+      "command": "normal close; Cmd+Q; handled dev interrupt; occupied port; missing ngrok binary; process/listener checks",
+      "result": "PASS — actionable states and owned cleanup inside five seconds",
+      "warnings": [
+        "public tunnel failure used a deliberately missing local binary, not a real ngrok endpoint"
+      ]
+    },
+    {
+      "what": "T066 canonical Wails v2 source and temporary rollback build",
+      "result": "PASS",
+      "command": "git clone --no-hardlinks . /private/tmp/fallout-t066-v2-20260814; checkout f1084b3d; go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform darwin/arm64",
+      "warnings": "Temporary artifact failed acceptance and is not canonical."
+    },
+    {
+      "what": "T066 corrected v2 hack boundary",
+      "result": "PASS — four players reached the hack board; typed Guess RPC observed; attempts changed 4→3; master ForceHackSuccess accepted",
+      "command": "node /private/tmp/fallout-t066-v2-drill.mjs plus native AX control",
+      "warnings": [
+        "navigation/reconnect did not finish because the temporary continuation marker arrived after the harness deadline"
+      ]
+    },
+    {
+      "what": "Final automated verification matrix",
+      "result": "PASS — tool/protobuf/binding/reproducibility/gofmt/vet/test/race and 21 Playwright tests passed",
+      "command": "scripts/tool-modules-check.sh; scripts/proto-check.sh; scripts/wails-bindings-check.sh; scripts/reproducible-build-check.sh; go vet ./...; go test ./...; go test -race ./...; npm test --prefix tests/browser"
+    },
+    {
+      "what": "Final candidate native parity",
+      "result": "PASS — one-window version-1 persistence and 4–7-player journey with 32 actions, 3 reconnects, 80 sound requests, clean interrupt",
+      "command": "go run ./cmd/build dev plus /private/tmp/fallout-t037-native.mjs"
+    },
+    {
+      "what": "Final personal-use package identity",
+      "result": "PASS — verified arm64/macOS 13 package and offline generated-Connect smoke; identity unchanged",
+      "command": "go run ./cmd/build package; scripts/verify-macos-app.sh; scripts/hash-macos-app.sh",
+      "warnings": "Canonical bundle-manifest SHA-256 7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57"
+    },
+    {
+      "what": "Final exact-bundle local soak",
+      "result": "PASS — 60.67 minutes, seven players, 53 accepted/26 rejected actions, 3 reconnects, 2 save/reopens, RSS medians 118640/131968/122128 KiB, unchanged identity and clean quit",
+      "command": "APP_PID=46826 node /private/tmp/fallout-t067-soak.mjs"
+    },
+    {
+      "what": "Final exact-bundle authenticated public soak",
+      "result": "PASS — 30.61 minutes, HTTP 401 anonymous rejection, 20 accepted/10 rejected actions, 2 reconnects, controlled tunnel loss preserved local HTTP 200, credential deleted",
+      "command": "node /private/tmp/fallout-t067-public-soak.mjs"
+    },
+    {
+      "what": "Final rollback and cutover",
+      "result": "PASS — canonical v2 rollback drill opened unchanged version-1 safety copies; immutable candidate paths matched 56ac18c and final cutover scan found no active v2 surface",
+      "command": "rollback drill; frozen-path git diff; scripts/wails-v3-cutover-check.sh"
+    },
+    {
+      "what": "Developer ID release profile",
+      "result": "NOT RUN — 0 valid signing identities; preflight stopped before build/sign/upload",
+      "command": "security find-identity -v -p codesigning; scripts/build-macos.sh --preflight"
+    },
+    {
+      "what": "Acceptance-scope artifact consistency",
+      "command": "git diff --check; task-ID and unchecked-task scans",
+      "result": "PASS — 81 unique task lines, zero unchecked tasks, and no whitespace errors",
+      "warnings": [
+        "Superseded soak wording remains struck through and historical by design"
+      ]
+    },
+    {
+      "what": "Frozen runtime candidate and package identity",
+      "command": "git diff candidate with acceptance-artifact exclusions; scripts/hash-macos-app.sh build/bin/Fallout Terminal.app",
+      "result": "PASS — no runtime input drift from 02582af74b1ea63faa040ffe7e79a96f16d154d6; canonical bundle 7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57",
+      "warnings": []
+    },
+    {
+      "what": "Migration contract and final cutover scans",
+      "command": "scripts/wails-v3-contract-check.sh; scripts/wails-v3-cutover-check.sh",
+      "result": "PASS — pins, tool isolation, schema stability, 25-method bindings, and zero active v2/dual-runtime surface",
+      "warnings": []
+    },
+    {
+      "what": "Conditional public-release prerequisites",
+      "command": "security find-identity -v -p codesigning; scripts/build-macos.sh --preflight",
+      "result": "NOT RUN — zero valid signing identities and DEVELOPER_ID_APPLICATION unavailable",
+      "warnings": [
+        "Developer ID, notarization, staple, DMG, and Gatekeeper gates remain conditional and were not represented as passing"
+      ]
+    }
+  ],
+  "currentTask": "T078",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added a read-only Wails v3 contract preflight with fixture-backed checks for qualified commands, exact pins, isolated tool modules, and unchanged runtime-status schema",
+      "files": [
+        "scripts/wails-v3-contract-check.sh"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Created the feature-006 rollback record with the immutable Wails v2 source, empty artifact evidence, explicit triggers, ownership, expiry, and data-safe drill procedure",
+      "files": [
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added the isolated Wails CLI module with one wails3 tool directive, exact beta.8 parent pin, Go 1.26, and verified tidy checksums",
+      "files": [
+        "tools/wails/go.mod",
+        "tools/wails/go.sum"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added the isolated Buf module with one CLI tool directive, exact v1.72.0 parent pin, Go 1.26, and verified tidy checksums",
+      "files": [
+        "tools/buf/go.mod",
+        "tools/buf/go.sum"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added the isolated protoc-gen-go module with one generator tool directive, exact protobuf v1.36.11 parent pin, Go 1.26, and verified checksums",
+      "files": [
+        "tools/protoc-gen-go/go.mod",
+        "tools/protoc-gen-go/go.sum"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added the isolated protoc-gen-connect-go module with one generator tool directive, exact Connect v1.20.0 parent pin, Go 1.26, and verified checksums",
+      "files": [
+        "tools/protoc-gen-connect-go/go.mod",
+        "tools/protoc-gen-connect-go/go.sum"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Removed root tool directives and Buf/tool-only dependency closure, retained application dependencies, and proved all four isolated modules verify without root module drift",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added a fixture-backed verifier for one-tool modules, exact direct pins, explicit Go versions, root module isolation, and forbidden global or bare tool commands",
+      "files": [
+        "scripts/tool-modules-check.sh"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Pinned the Wails v3 beta.8 application module alongside the bounded v2 fallback and locked @wailsio/runtime beta.8 with a verified official Vite plugin export",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "frontend/package.json",
+        "frontend/package-lock.json"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Added beta.8-derived root/common/Darwin Taskfiles and v3 config with preserved product metadata, macOS 13 arm64 settings, qualified CLI commands, and build/bin output",
+      "files": [
+        "Taskfile.yml",
+        "build/config.yml",
+        "build/Taskfile.yml",
+        "build/common/Taskfile.yml",
+        "build/darwin/Taskfile.yml"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Migrated Buf and Go protobuf generators to isolated root-invoked modules with root-relative templates, public-only ES filtering, deterministic regeneration, drift rejection, and root module hash protection",
+      "files": [
+        "scripts/proto-generate.sh",
+        "scripts/proto-check.sh",
+        "scripts/proto-breaking.sh",
+        "scripts/proto-drift-test.sh",
+        "proto/buf.gen.go.yaml",
+        "proto/buf.gen.es.yaml"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added parallel table-driven platform tests for isolated tool ownership, zero root tools, exact Wails Go/npm pins, beta.8 build-asset ownership, supported output/profile, and one root dev command",
+      "files": [
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Introduced a narrow late-registration host seam, an internal Wails lifecycle adapter, and a dedicated forwarding desktop service containing only the accepted 25 operations while leaving App unbound",
+      "files": [
+        "wails_host.go",
+        "desktop_service.go",
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Replaced the old core-method check with an exact reflection inventory for the dedicated 25-method desktop service and explicit lifecycle, generic, native, and player capability exclusions",
+      "files": [
+        "app_contract_test.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Added explicit feature-005 RuntimeStatus descriptor compatibility tests and frozen schema/revision/baseline digests; the preflight now rejects phase serialization or any drift in those artifacts",
+      "files": [
+        "app_contract_test.go",
+        "internal/platform/assets_test.go",
+        "scripts/wails-v3-contract-check.sh"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Made lifecycle phase safely observable only inside Go and added local-ready/failed tests proving master status projects existing serverInfo/startupError fields with no serialized phase",
+      "files": [
+        "app.go",
+        "app_contract.go",
+        "app_contract_test.go",
+        "app_test.go"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Replaced the master asset assertion with Wails v3 application/service/window/asset seam checks while retaining separate embedded master/player filesystems and player resource validation",
+      "files": [
+        "wails_host.go",
+        "internal/platform/assets_test.go",
+        "production_resources_test.go"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Added pure Wails v3 application/window option tests for master asset serving, empty pre-composition services, one-window source composition, accepted title/dimensions/dark background, and macOS last-window quit",
+      "files": [
+        "wails_host.go",
+        "wails_host_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added injected dialog/browser seams and table-driven tests for titles, JSON filters, defaults, alias/create policy, nearest ancestors, cancel/error behavior, application lifetime, and HTTP(S)-only URLs",
+      "files": [
+        "internal/platform/desktop.go",
+        "internal/platform/desktop_test.go"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Replaced wails.Run/options.App with v3 application creation, master assets, post-composition lifecycle/desktop registration, exactly one accepted window, and host.Run",
+      "files": [
+        "main.go",
+        "wails_host.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Replaced Wails v2 global dialog and browser calls with injected Wails v3 application managers while preserving dialog defaults, cancellation results, URL validation, and side-effect-free path fallback.",
+      "files": [
+        "internal/platform/desktop.go",
+        "internal/platform/paths.go",
+        "main.go",
+        "production_resources_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Verified and locked the exact 25-operation desktop service as transparent same-name forwards into the core application contract, preserving explicit session, player-config, coordination, terminal, hack, demo-copy, save, and URL semantics with no generic or native capability.",
+      "files": [
+        "desktop_service.go",
+        "app.go",
+        "app_contract.go",
+        "app_contract_test.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Locked persistence compatibility through the desktop facade: explicit session paths and compatible unknown fields survive saves, player-config v1 remains strict and non-mutating on unknown fields, explicit demo-copy behavior remains covered, and the newest accepted revision is durable and reflected in status.",
+      "files": [
+        "app_test.go",
+        "internal/session/service.go",
+        "internal/session/service_test.go",
+        "internal/playerconfig/service.go",
+        "internal/playerconfig/service_test.go",
+        "sessions/demo.json",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Added table-driven Wails lifecycle tests for non-aborting application failures, application-lifetime startup context, fresh bounded shutdown context, partial acquisition unwind, and repeat shutdown safety.",
+      "files": [
+        "wails_host_test.go"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Extended core and tunnel regression coverage for status-visible phases, invalid tunnel acquisition ownership, failed first-stop retry, reverse cleanup continuation, bounded contexts, and redacted failures.",
+      "files": [
+        "app_test.go",
+        "internal/tunnel/service_test.go"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Implemented bounded core acquisition under the Wails lifecycle service while retaining the application lifetime and treating core-owned status-visible startup failures as non-aborting host outcomes.",
+      "files": [
+        "wails_host.go",
+        "app.go",
+        "wails_host_test.go",
+        "app_test.go"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Marked tunnel ownership immediately after acquisition, clearing it only after successful validation cleanup, and retained failed cleanup ownership for a later shutdown retry while preserving local-ready status.",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "internal/tunnel/service.go",
+        "internal/tunnel/service_test.go"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Implemented fresh five-second background shutdown contexts and retryable reverse cleanup that continues through tunnel, player, session worker, and desktop failures without double-clearing process state.",
+      "files": [
+        "wails_host.go",
+        "app.go",
+        "wails_host_test.go",
+        "app_test.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Removed retained v2 startup, DomReady, and shutdown context shims; events and desktop now receive the stable application-lifetime context while player and tunnel acquisition use bounded child contexts.",
+      "files": [
+        "main.go",
+        "app.go",
+        "app_test.go",
+        "internal/platform/desktop.go",
+        "wails_host.go"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Strengthened public descriptor, source/bundle, route, CSP, and transport isolation checks to reject Wails runtime imports, private/persistence schemas, generic carriers, and legacy WebSocket surfaces from the generated player.",
+      "files": [
+        "internal/platform/assets_test.go",
+        "internal/player/handler_test.go",
+        "internal/player/http_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added and passed a generated ConnectRPC browser journey for four through seven distinct players covering 32 mixed valid navigations, rejected observer actions, authoritative convergence, three reconnects, replay-cue suppression, sound-safe operation, and private-field isolation.",
+      "files": [
+        "tests/browser/connectrpc-player.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Preserved independent client/dist embedding and same-origin generated PlayerService serving while the Wails v3 host composes only frontendAssets for the native master window.",
+      "files": [
+        "main.go",
+        "production_resources.go",
+        "internal/player/server.go",
+        "production_resources_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Ran and recorded the generated-player gate: all four Go subsystem suites passed; browser dependencies installed cleanly; Playwright reported 18 passed and one credential-gated public test skipped, including a passing 4–7-player local parity journey.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added and passed deterministic double-generation, exact 25-method and four-event inventory, byte-content comparison, and forbidden lifecycle/native/generic/player surface checks.",
+      "files": [
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Added passing Playwright facade tests with structural generated-service/event doubles for explicit calls, normalization, four-event races, listener-first snapshot, event precedence, exact-once release, pending callback suppression, and hot disposal.",
+      "files": [
+        "tests/browser/desktop-api.spec.mjs",
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/playwright.config.mjs"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Extended private adapter tests for exact detached status/result/cancel/error JSON shapes, Go-only lifecycle phase, four typed manager events, and the exact transparent 25-operation surface.",
+      "files": [
+        "app_contract_test.go",
+        "app_test.go",
+        "wails_host_test.go"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Registered the exact four typed Wails v3 events and replaced retained-context runtime.EventsEmit with an injected application event manager.",
+      "files": [
+        "wails_host.go",
+        "main.go",
+        "app.go",
+        "wails_host_test.go"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Generated only the registered 25-method desktop service and supporting typed models/events into frontend/bindings, and configured the exact official beta.8 runtime Vite plugin.",
+      "files": [
+        "frontend/bindings",
+        "build/config.yml",
+        "frontend/vite.config.js"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Removed frontend/wailsjs and window.go/window.runtime discovery, replacing them with explicit generated v3 service and runtime imports that fail production builds when bindings are absent.",
+      "files": [
+        "frontend/src/desktop-api.js",
+        "frontend/wailsjs",
+        "frontend/bindings"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Implemented all-four-listeners-before-snapshot readiness, independent newer-event precedence, event.data unwrapping, local URL retention, exact-once release, pending callback suppression, hot disposal, and no DomReady dependency.",
+      "files": [
+        "frontend/src/desktop-api.js",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Rendered starting, ready-local, ready-public, warning, and failed master presentation from existing serverInfo, startupError, and tunnelError fields with actionable redacted messages and no serialized lifecycle phase.",
+      "files": [
+        "frontend/src/master.js",
+        "frontend/src/master.css",
+        "frontend/src/index.html"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Enforced that master.js consumes only window.desktopAPI, lifecycle presentation uses existing fields, and no CopyDemo, global runtime, generic, or native UI capability enters source or production bundles.",
+      "files": [
+        "frontend/src/master.js",
+        "frontend/src/index.html",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Ran and recorded binding, facade, event, Go adapter, frontend build, source, and production-bundle verification with exact 25-method/four-event inventory and three passing browser facade cases.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Executed the native one-window persistence journey through generated Wails v3 bindings: created session and player configuration with native dialogs, persisted roster, terminal text, and tree changes, interrupted cleanly, then reopened and verified the same state in one window.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "/private/tmp/fallout-t024-native-20260814.json",
+        "/private/tmp/fallout-t024-players-20260814.json"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Executed native lifecycle acceptance: normal close, Cmd+Q, handled repository-development interrupt, exclusive occupied-port partial startup, missing-tunnel local fallback, and repeated cleanup all produced actionable state and released owned process/listener resources inside five seconds.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Fixed the post-broadcast tree-header refresh and passed the packaged native 4–7-player parity journey with 32 accepted actions, three reconnects, typed sound traffic, single-listener ownership, and clean shutdown; public mode remains NOT RUN without real credentials.",
+      "files": [
+        "frontend/src/master.js",
+        "internal/platform/assets_test.go",
+        "specs/006-wails-v3-migration/quickstart.md",
+        "/private/tmp/fallout-t037-native.mjs"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Added and passed a repository-state-preserving reproducibility check that runs the complete Go build graph twice and compares generated contracts, Wails bindings, both frontend bundles, and the native binary.",
+      "files": [
+        "scripts/reproducible-build-check.sh"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Updated macOS CI to cache the root and all isolated tool-module sums, generate Wails bindings before the master build, install browser dependencies before Playwright, and execute pin/tool/root-module drift guards.",
+      "files": [
+        ".github/workflows/wails-macos.yml"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Passed both direct locked frontend builds, two direct protobuf generations, two complete native builds through the reproducibility check, and the isolated tool-module guard; recorded exact local outcomes.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Added focused package assertions for resource validity and packaged Contents/Resources resolution, arm64/macOS 13 output, resource-before-compile/sign order, offline assets, entitlements, and canonical identity verification.",
+      "files": [
+        "production_resources_test.go",
+        "internal/platform/assets_test.go",
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Removed the obsolete bindings-only production resource bypass after focused tests, clean beta.8 binding generation, and a complete package build passed with the real validator; added deterministic packaged/development resource-root tests.",
+      "files": [
+        "main.go",
+        "production_resources.go",
+        "production_resources_bindings.go",
+        "production_resources_test.go"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Added a race-aware canonical app-bundle manifest hash with mutation self-tests and a macOS package verifier covering architecture, metadata, deployment target, resources, entitlements, offline assets, final signature, and sign-order proof; both passed on the packaged app.",
+      "files": [
+        "scripts/hash-macos-app.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Passed the packaged offline personal-use smoke with one native master window, one port-3690 listener, HTTP 200, nine generated Connect requests, no WebSocket or external requests, and immediate clean quit; recorded public and Developer ID gates as NOT RUN without prerequisites.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "/private/tmp/fallout-t061-offline.mjs"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Added rollback assertions for the exact source identity, blank optional artifact digest discipline, pre-removal provenance, owner/expiry, trigger ownership, safety-copy drill procedure, and immutable historical-document separation.",
+      "files": [
+        "internal/platform/startup_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Added and self-tested the comprehensive cutover scanner for active v2/dual runtime code, dependencies, obsolete artifacts, generated globals, floating/global commands, bundles, CI/scripts, active links, and immutable historical evidence.",
+      "files": [
+        "scripts/wails-v3-cutover-check.sh",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Completed the rollback record with verified canonical v2 source, honest blank optional-artifact identity, explicit pre-removal provenance, owner/expiry, owned trigger table, data-safe worktree procedure, and real-result evidence fields.",
+      "files": [
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Repointed active acceptance, release, and rollback links to feature 006 and explicitly retained feature 001 plus the Electron rollback record only as immutable historical evidence.",
+      "files": [
+        "README.md"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Passed the canonical Wails v2 rollback drill with version-1 safety-copy reopen, four-player typed hacking, navigation, reconnect, sound traffic, and clean resource release",
+      "files": [
+        "docs/wails-v3-migration-rollback.md",
+        "specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Passed the 60-minute seven-player local soak with RSS thresholds and two durable save/reopen cycles, plus the 30-minute authenticated-ngrok workload with authorization, reconnect, controlled-loss, local-fallback, and cleanup evidence",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Removed the active Wails v2 dependency, checksums, wails.json, obsolete post-build hook, and stale v2-oriented tests; verified the v3-only module, binding, source, bundle, script, CI, and documentation surface",
+      "files": [
+        "go.mod",
+        "go.sum",
+        "wails.json",
+        "build/darwin/postbuild.sh",
+        "internal/platform/startup_test.go",
+        "README.md"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Committed BUG-001 source and operating docs as clean build candidate 896d208c8b99ece1db31d5daf52c5d8fbd6762bc, captured exact pins, and recorded the frozen identity in both acceptance records",
+      "files": [
+        "README.md",
+        "docs/wails-v3-migration-rollback.md",
+        "specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Passed frozen-candidate tooling, Buf format/lint/build, deterministic protobuf, drift, breaking-fixture, graph-isolation, and generated-tree checks with zero root-module drift",
+      "files": [
+        "tools/*/go.mod",
+        "tools/*/go.sum",
+        "proto",
+        "internal/gen",
+        "client/gen",
+        "scripts/proto-*.sh",
+        "scripts/tool-modules-check.sh"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Passed two clean Wails beta.8 binding generations with byte-identical output, exactly 25 allowlisted methods, four events, no forbidden surface, and no tracked drift",
+      "files": [
+        "frontend/bindings",
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Passed locked clean frontend/player builds, two byte-reproducible complete native graphs, bundle/source scans, and cutover checks with zero repository drift",
+      "files": [
+        "frontend/dist",
+        "client/dist",
+        "frontend/bindings",
+        "scripts/reproducible-build-check.sh",
+        "scripts/wails-v3-cutover-check.sh"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "Passed zero-output gofmt, go vet ./..., and go test ./... after scoping the package sign-order assertion to the package graph",
+      "files": [
+        "internal/platform/startup_test.go",
+        "main.go",
+        "app.go",
+        "wails_host.go",
+        "desktop_service.go",
+        "internal"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "Passed go test -race ./... across lifecycle, player streams, session worker, tunnel, event, platform, and build orchestration packages",
+      "files": [
+        "app.go",
+        "wails_host.go",
+        "internal/player",
+        "internal/session",
+        "internal/tunnel",
+        "internal/platform",
+        "internal/buildtool"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Installed browser-test dependencies cleanly and passed 21 Playwright tests covering 4-7 players, authority, replay, reconnect, overflow, sound, privacy, and facade/events; one credential-gated ngrok test skipped",
+      "files": [
+        "tests/browser",
+        "client/dist",
+        "frontend/dist"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Reran final-candidate native local acceptance with development bundle identity and project Dock icon, preserved-session reload, 4-7 player harness, production-package immutability, and clean interrupt shutdown",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        "internal/buildtool/buildtool.go",
+        "build/darwin/Info.dev.plist"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Ran the canonical macOS app hash self-test twice with identical passing output; file-content, mode, symlink, addition, and removal sensitivity passed with zero tracked hash/verification-script drift",
+      "files": [
+        "scripts/hash-macos-app.sh",
+        "scripts/verify-macos-app.sh"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Built and verified the unchanged final-candidate personal-use arm64 app, passed v3 cutover, reproduced the canonical bundle manifest, completed offline one-window/one-listener/generated-Connect smoke, and cleanly quit with identity unchanged",
+      "files": [
+        "build/bin/Fallout Terminal.app",
+        "specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Retired the mandatory 60-minute local soak from acceptance and retained prior results only as historical non-gating evidence",
+      "files": [
+        "specs/006-wails-v3-migration/spec.md",
+        "specs/006-wails-v3-migration/plan.md",
+        "specs/006-wails-v3-migration/tasks.md",
+        "specs/006-wails-v3-migration/quickstart.md",
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Retired the 30-minute authenticated-ngrok workload; confirmed Developer ID/notary/DMG release gates remain NOT RUN because zero signing identities are installed and release preflight lacks DEVELOPER_ID_APPLICATION",
+      "files": [
+        "specs/006-wails-v3-migration/spec.md",
+        "specs/006-wails-v3-migration/plan.md",
+        "specs/006-wails-v3-migration/tasks.md",
+        "specs/006-wails-v3-migration/quickstart.md",
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Reconciled candidate 02582af, exact pins, package identity, release NOT RUN reason, rollback, BUG-001, and USER-SOAK-DECISION; verified all runtime inputs unchanged and passed contract/cutover scans",
+      "files": [
+        "specs/006-wails-v3-migration/spec.md",
+        "specs/006-wails-v3-migration/plan.md",
+        "specs/006-wails-v3-migration/tasks.md",
+        "specs/006-wails-v3-migration/quickstart.md",
+        "docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Added BUG-001 regression coverage for development plist/icon assembly, bundle launch, and production-package isolation; focused tests fail on the current bare-executable graph as intended",
+      "files": [
+        "internal/buildtool/buildtool_test.go",
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Changed dev/run to assemble build/dev/Fallout Terminal.app with Info.dev.plist, generated project icon, bundled demo, dedicated bundle identifier, and inner-bundle launch while leaving the production package untouched",
+      "files": [
+        "internal/buildtool/buildtool.go",
+        "build/darwin/Info.dev.plist"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Verified the real root dev launch uses the development bundle/plist/icon, shows the project Dock icon, owns one listener, shuts down cleanly, and leaves the production bundle digest unchanged",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        ".gitignore"
+      ]
+    }
+  },
+  "concerns": null
+}

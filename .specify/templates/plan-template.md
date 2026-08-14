@@ -167,9 +167,9 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 | Go domain/services | `go test ./...` | [Focused scenario if needed] | [Result] |
 | Concurrent runtime | `go test -race ./...` when affected | [Stress/reconnect scenario] | [Result] |
 | Go quality | `gofmt -l .` and `go vet ./...` | N/A | No formatting paths; vet succeeds |
-| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `wails dev` + [game-master journey] | [Result] |
+| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `go run ./cmd/build dev` + [game-master journey] | [Result] |
 | Player browser(s) | `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected | [Multi-client/audio/reconnect journey] | [Result] |
-| Unsigned package | `wails build -clean -platform darwin/arm64` when affected | [Packaged `.app` smoke] | [Result] |
+| Unsigned package | `go run ./cmd/build package` when affected | [Packaged `.app` smoke] | [Result] |
 | Signed release/ngrok | [Configured preflight or N/A] | [Credential-dependent journey] | [Result or explicitly unavailable] |
 
 ## Project-Specific Complexity Factors

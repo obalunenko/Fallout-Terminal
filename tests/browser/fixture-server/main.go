@@ -81,7 +81,7 @@ func run() error {
 		},
 	)
 
-	for _, name := range []string{"Mara", "Boone"} {
+	for _, name := range []string{"Mara", "Boone", "Arcade", "Cass", "Veronica", "Raul", "Lily"} {
 		if _, err := service.AddCharacter(name); err != nil {
 			return err
 		}
@@ -93,6 +93,18 @@ func run() error {
 		return err
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /__fixture/desktop-api", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprint(response, `<!doctype html><meta charset="utf-8">
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>
+<script type="module" src="/__fixture/desktop-api.js"></script>`)
+	})
+	mux.HandleFunc("GET /__fixture/desktop-api.js", func(response http.ResponseWriter, request *http.Request) {
+		http.ServeFile(response, request, "../../frontend/src/desktop-api.js")
+	})
+	mux.HandleFunc("GET /__fixture/desktop-bindings.js", func(response http.ResponseWriter, request *http.Request) {
+		http.ServeFile(response, request, "fixtures/desktop-bindings.js")
+	})
 	mux.HandleFunc("POST /__fixture/reset", func(response http.ResponseWriter, _ *http.Request) {
 		if _, err := service.EndBroadcast(); err != nil {
 			http.Error(response, err.Error(), http.StatusConflict)

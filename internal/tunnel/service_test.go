@@ -210,6 +210,22 @@ func TestServiceSuccessReturnsPublicInfoWithoutCredentialsOrTrafficPolicy(t *tes
 
 }
 
+func TestServiceFailedFirstStopCanBeRetriedAfterProcessExit(t *testing.T) {
+	t.Parallel()
+
+	config := serviceConfig(t.TempDir())
+	runner := newServiceProcessRunner()
+	runner.stdout = `{"msg":"started tunnel","url":"https://fallout.example"}` + "\n"
+	runner.handle.terminateErr = errors.New("temporary terminate failure")
+	service := NewService(config, runner, ServiceOptions{})
+
+	_, err := service.Start(t.Context())
+	require.NoError(t, err)
+	require.ErrorContains(t, service.Stop(t.Context()), "temporary terminate failure")
+	require.NoError(t, service.Stop(t.Context()))
+	require.Equal(t, 1, runner.handle.terminateCalls())
+}
+
 func serviceConfig(policyParent string) Config {
 	return Config{
 		Enabled:        true,
@@ -289,12 +305,13 @@ func (runner *serviceProcessRunner) waitStarted(t *testing.T) {
 }
 
 type serviceProcessHandle struct {
-	done      chan struct{}
-	once      sync.Once
-	mu        sync.Mutex
-	err       error
-	terminate int
-	kill      int
+	done         chan struct{}
+	once         sync.Once
+	mu           sync.Mutex
+	err          error
+	terminate    int
+	kill         int
+	terminateErr error
 }
 
 func newServiceProcessHandle() *serviceProcessHandle {
@@ -313,7 +330,7 @@ func (process *serviceProcessHandle) Terminate() error {
 	process.terminate++
 	process.mu.Unlock()
 	process.exit(nil)
-	return nil
+	return process.terminateErr
 }
 
 func (process *serviceProcessHandle) Kill() error {

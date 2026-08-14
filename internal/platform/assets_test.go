@@ -17,7 +17,7 @@ import (
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1"
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
-	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
+	privatev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -164,6 +164,36 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 			"schema revision = %s, want %s; run scripts/proto-generate.sh after schema edits", got, want)
 	}
 
+}
+
+func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
+	t.Parallel()
+
+	descriptor := (&privatev1.RuntimeStatus{}).ProtoReflect().Descriptor()
+	wantFields := []string{
+		"server_info", "client_count", "hack_state", "startup_error",
+		"save_state", "requested_revision", "saved_revision", "coordination_state",
+	}
+	gotFields := make([]string, 0, descriptor.Fields().Len())
+	for index := range descriptor.Fields().Len() {
+		gotFields = append(gotFields, string(descriptor.Fields().Get(index).Name()))
+	}
+	require.Equal(t, wantFields, gotFields)
+	require.Nil(t, descriptor.Fields().ByName("phase"))
+	require.Zero(t, descriptor.ParentFile().Enums().Len())
+
+	root := assetRepositoryRoot(t)
+	wantDigests := map[string]string{
+		"proto/fallout/terminal/private/v1/runtime.proto": "41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741",
+		"proto/schema-revision.txt":                       "e2e1f53725c02255cbdac9b83dedc8ccb22abfb13f58541032b3abaf43e8e2cf",
+		"proto/compatibility-baseline.binpb":              "af0f7c7ce8e7e1215f6b4436d35d69b40032e563d20e93d6919b027737a1f1c9",
+	}
+	for relative, want := range wantDigests {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		require.NoError(t, err)
+		got := sha256.Sum256(raw)
+		require.Equal(t, want, hex.EncodeToString(got[:]), relative)
+	}
 }
 
 func checkEnumZeroValues(t *testing.T, enums protoreflect.EnumDescriptors) {
@@ -527,10 +557,10 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 	facade := read("frontend/src/desktop-api.js")
 	app := read("app.go")
 	for _, required := range []string{
-		"requestTerminalActivation: 'RequestTerminalActivation'",
-		"requestTerminalClear: 'RequestTerminalClear'",
-		"updateLiveTerminal: 'UpdateLiveTerminal'",
-		"forceHackSuccess: 'ForceHackSuccess'",
+		"requestTerminalActivation: desktopService.RequestTerminalActivation",
+		"requestTerminalClear: desktopService.RequestTerminalClear",
+		"updateLiveTerminal: desktopService.UpdateLiveTerminal",
+		"forceHackSuccess: desktopService.ForceHackSuccess",
 	} {
 		assert.Falsef(t, !strings.Contains(facade, required),
 			"master desktop facade is missing coordinator-owned command %q", required)
@@ -1079,7 +1109,7 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		`id="btnHackSuccess"`,
 		"desktopAPI.forceHackSuccess()",
 		"h.solved || h.failed",
-		"forceHackSuccess: 'ForceHackSuccess'",
+		"forceHackSuccess: desktopService.ForceHackSuccess",
 		"func (app *App) ForceHackSuccess() CommandResult",
 	} {
 		assert.Falsef(t, !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required),
@@ -1123,7 +1153,7 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		`id="btnResetFailedHack"`,
 		`ПОВТОРИТЬ ВЗЛОМ`,
 		`desktopAPI.resetFailedHack(`,
-		`resetFailedHack: 'ResetFailedHack'`,
+		`resetFailedHack: desktopService.ResetFailedHack`,
 		`func (app *App) ResetFailedHack(`,
 		`ResetFailedHack`,
 	} {
@@ -1413,6 +1443,22 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 			"active production frontend is missing runtime-neutral facade contract %q", required)
 
 	}
+	adapterSource := string(adapter)
+	masterSource := string(master)
+	for _, forbidden := range []string{"window.go", "window.runtime", "frontend/wailsjs", "../wailsjs", "CopyDemo", "copyDemo"} {
+		assert.NotContains(t, activeSource, forbidden,
+			"active production frontend exposes legacy/global or unauthored capability %q", forbidden)
+	}
+	assert.Contains(t, adapterSource, "import * as desktopService from '../bindings/")
+	assert.Contains(t, adapterSource, "import { Events } from '@wailsio/runtime'")
+	assert.NotContains(t, masterSource, "@wailsio/runtime")
+	assert.NotContains(t, masterSource, "desktopService.")
+	assert.Contains(t, masterSource, "const desktopAPI = window.desktopAPI")
+	for _, presentation := range []string{"ready-local", "ready-public", "warning", "failed", "startupError", "tunnelError"} {
+		assert.Contains(t, masterSource, presentation,
+			"master startup presentation is missing existing-status projection %q", presentation)
+	}
+	assert.NotContains(t, masterSource, "status.phase")
 }
 
 func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
@@ -1453,8 +1499,7 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 		"//go:embed all:client/dist\nvar playerSource embed.FS",
 		`fs.Sub(frontendSource, "frontend/dist")`,
 		`fs.Sub(playerSource, "client/dist")`,
-		"Assets: frontendAssets",
-		"composeApplication(playerAssets)",
+		"composeApplication(host, playerAssets)",
 	}
 	for _, fragment := range requiredFragments {
 		assert.Falsef(t, !strings.Contains(source, fragment),
@@ -1466,6 +1511,23 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	assert.False(t, strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
 		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist"),
 		"master and remote-player assets share one embed directive; their serving boundaries must remain separate")
+
+	hostRaw, err := os.ReadFile(filepath.Join(root, "wails_host.go"))
+	require.NoError(t, err)
+	hostSource := string(hostRaw)
+	for _, fragment := range []string{
+		"application.New(wailsApplicationOptions(frontendAssets))",
+		"Handler: application.AssetFileServerFS(frontendAssets)",
+		"ApplicationShouldTerminateAfterLastWindowClosed: true",
+		"host.Window.NewWithOptions(masterWindowOptions())",
+		"host.RegisterService(application.NewService(newWailsLifecycleService(core)))",
+		"host.RegisterService(application.NewService(newDesktopService(core)))",
+	} {
+		assert.Contains(t, hostSource, fragment)
+	}
+	assert.NotContains(t, hostSource, "playerAssets")
+	assert.NotContains(t, hostSource, "PlayerService")
+	assert.Equal(t, 1, strings.Count(hostSource, "host.Window.NewWithOptions("))
 
 	viteConfig, err := os.ReadFile(filepath.Join(root, "frontend", "vite.config.js"))
 	if err != nil {
@@ -1538,6 +1600,68 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 	assert.False(t, !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`),
 		"production does not embed only the complete built player application")
 
+}
+
+func TestMacOSPackageVerificationCoversResourcesSignatureAndCanonicalIdentity(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	verifyRaw, err := os.ReadFile(filepath.Join(root, "scripts", "verify-macos-app.sh"))
+	require.NoError(t, err)
+	verify := string(verifyRaw)
+	for _, required := range []string{
+		"Contents/MacOS/Fallout Terminal",
+		"Contents/Info.plist",
+		"Contents/Resources",
+		"lipo -archs",
+		"LSMinimumSystemVersion",
+		"LC_BUILD_VERSION",
+		"icon.icns",
+		"sessions/demo.json",
+		"codesign -d --entitlements",
+		"codesign --verify --deep --strict",
+		"TestPackagePlanCompletesResourcesBeforeFinalSignature",
+		"hash-macos-app.sh",
+	} {
+		assert.Contains(t, verify, required)
+	}
+
+	hashRaw, err := os.ReadFile(filepath.Join(root, "scripts", "hash-macos-app.sh"))
+	require.NoError(t, err)
+	hashSource := string(hashRaw)
+	for _, required := range []string{"LC_ALL=C sort -z", "stat -f '%Lp'", "shasum -a 256", "readlink", "bundle inventory changed while hashing", "--self-test"} {
+		assert.Contains(t, hashSource, required)
+	}
+}
+
+func TestActiveWailsV3DocumentsStaySeparateFromHistoricalEvidence(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	readmeRaw, err := os.ReadFile(filepath.Join(root, "README.md"))
+	require.NoError(t, err)
+	readme := string(readmeRaw)
+	assert.Contains(t, readme, "specs/006-wails-v3-migration/quickstart.md")
+	assert.Contains(t, readme, "docs/wails-v3-migration-rollback.md")
+	assert.Contains(t, readme, "неизменяемые исторические evidence")
+	assert.Contains(t, readme, "specs/001-wails-v2-migration/")
+	assert.Contains(t, readme, "docs/wails-migration-rollback.md")
+
+	scannerRaw, err := os.ReadFile(filepath.Join(root, "scripts", "wails-v3-cutover-check.sh"))
+	require.NoError(t, err)
+	scanner := string(scannerRaw)
+	for _, required := range []string{
+		"active Go source contains v2 or dual-runtime code",
+		"application module still resolves Wails v2",
+		"frontend source/generated/bundle contains a v2 global or dual-runtime fallback",
+		"active command/documentation uses v2, global, or floating Wails resolution",
+		"historical Wails v2 spec is missing",
+		"historical Electron-to-Wails rollback record is missing",
+		"git -C \"${repository_root}\" diff --exit-code -- specs/001-wails-v2-migration docs/wails-migration-rollback.md",
+		"go -C \"${repository_root}\" list -m all",
+	} {
+		assert.Contains(t, scanner, required)
+	}
 }
 
 func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
@@ -1682,6 +1806,13 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 			"master asset is missing terminal-switch resolution contract %q", fragment)
 
 	}
+	startBroadcast := strings.Index(masterJS, "btnStartBroadcast.addEventListener")
+	require.NotEqual(t, -1, startBroadcast, "master asset is missing the start-broadcast handler")
+	endBroadcast := strings.Index(masterJS[startBroadcast:], "btnEndBroadcast.addEventListener")
+	require.NotEqual(t, -1, endBroadcast, "master asset is missing the end-broadcast handler")
+	startBroadcastHandler := masterJS[startBroadcast : startBroadcast+endBroadcast]
+	assert.Contains(t, startBroadcastHandler, "renderTreeHeader()",
+		"start-broadcast success must refresh terminal controls after authoritative broadcast state changes")
 	for _, fragment := range []string{
 		`id="playerConfigStatus"`,
 		`id="btnOpenPlayerConfig"`,
@@ -1751,6 +1882,7 @@ func TestPlayerBundleImportsOnlyPublicGeneratedContractsAndNoGenericPrivateCarri
 		for _, forbidden := range []string{
 			"fallout/terminal/private", "fallout/terminal/persistence", "protojson", "base64",
 			"genericdispatch", "generic-dispatch", "forcehacksuccess", "resetfailedhack",
+			"@wailsio/runtime", "wailsjs", "window.desktopapi", "window.runtime", "websocket(",
 		} {
 			assert.Falsef(t, strings.Contains(source, forbidden),
 				"%s imports or carries private desktop semantic %q", relative, forbidden)
@@ -1766,7 +1898,7 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 	paths := []string{
 		"client/client.js", "client/sound.js", "client/index.html",
 		"internal/player", "internal/testutil/testdata", "tests/browser/fixture-server",
-		"go.mod", "README.md", "docs",
+		"README.md", "docs",
 	}
 	legacyIdentifiers := []string{
 		"SESSION_HELLO", "CHARACTER_SELECT", "NAV_ACTION", "HACK_GUESS", "HACK_PATTERN",
@@ -1817,6 +1949,16 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 				"active player surface %s retains a generic message dispatcher", candidate)
 
 		}
+	}
+
+	moduleRaw, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	require.NoError(t, err)
+	module := string(moduleRaw)
+	assert.False(t, regexp.MustCompile(`(?m)^\s*github\.com/coder/websocket\s+v\S+\s*$`).MatchString(module),
+		"the application must not directly depend on the removed public WebSocket transport")
+	if strings.Contains(module, "github.com/coder/websocket") {
+		assert.Contains(t, module, "github.com/coder/websocket v1.8.14 // indirect",
+			"only Wails v3's pinned private runtime transitive dependency may retain coder/websocket")
 	}
 	{
 

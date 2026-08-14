@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	controlservice "github.com/obalunenko/Fallout-Terminal/internal/control"
@@ -51,6 +53,69 @@ func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
 	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.Port != 3690 || status.StartupError != "",
 		"runtime status = %#v", status)
 
+}
+
+func TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild(t *testing.T) {
+	t.Parallel()
+
+	lifetime := context.WithValue(t.Context(), lifecycleContextKey{}, "lifetime")
+	player := &contextCapturingPlayer{info: domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"}}
+	desktop := &contextCapturingDesktop{}
+	events := &contextCapturingEvents{}
+	app := NewAppWithDependencies(AppDependencies{
+		Player: player, Desktop: desktop, Events: events, StartupTimeout: time.Minute,
+	})
+
+	require.NoError(t, app.Start(lifetime))
+	require.Same(t, lifetime, app.contextSnapshot())
+	require.Same(t, lifetime, desktop.readyContext)
+	require.Same(t, lifetime, events.context)
+	require.Equal(t, "lifetime", player.startContext.Value(lifecycleContextKey{}))
+	require.NoError(t, player.contextErrAtStart)
+	_, bounded := player.startContext.Deadline()
+	require.True(t, bounded, "player acquisition must receive the startup-timeout child")
+}
+
+func TestLifecyclePhaseStaysGoOnlyWhileStatusProjectsActionableState(t *testing.T) {
+	t.Parallel()
+
+	t.Run("local ready", func(t *testing.T) {
+		t.Parallel()
+		app := NewAppWithDependencies(AppDependencies{
+			Player: &recordingPlayerServer{recorder: &callRecorder{}, info: domain.ServerInfo{
+				IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
+			}},
+			Events:  &recordingEventSink{recorder: &callRecorder{}},
+			Desktop: &recordingDesktop{recorder: &callRecorder{}},
+		})
+		require.Equal(t, "constructed", app.lifecyclePhase())
+		require.NoError(t, app.Start(t.Context()))
+		require.Equal(t, "ready-local", app.lifecyclePhase())
+
+		status := app.GetRuntimeStatus()
+		require.NotNil(t, status.ServerInfo)
+		require.Equal(t, "http://127.0.0.1:3690", status.ServerInfo.URL)
+		require.Empty(t, status.StartupError)
+		raw, err := json.Marshal(status)
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), `"phase"`)
+	})
+
+	t.Run("failed startup", func(t *testing.T) {
+		t.Parallel()
+		app := NewAppWithDependencies(AppDependencies{
+			Player: &recordingPlayerServer{recorder: &callRecorder{}, startErr: errors.New("listener occupied")},
+		})
+		require.Error(t, app.Start(t.Context()))
+		require.Equal(t, "failed", app.lifecyclePhase())
+
+		status := app.GetRuntimeStatus()
+		require.Nil(t, status.ServerInfo)
+		require.Contains(t, status.StartupError, "listener occupied")
+		routed := routeRuntimeStatus(status)
+		require.Equal(t, status.StartupError, routed.StartupError)
+		require.Nil(t, routed.ServerInfo)
+	})
 }
 
 func TestPlayerConfigCommandsAssociateBeforeInstallingRoster(t *testing.T) {
@@ -127,6 +192,61 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara",
 		"persisted roster after first add = %#v", persisted.Roster)
 
+}
+
+func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision(t *testing.T) {
+	t.Parallel()
+
+	fileSystem := testutil.NewFakeFileSystem()
+	target := "/Campaigns/vault-13/session.json"
+	fileSystem.SeedFile(target, []byte(`{
+  "version": 1,
+  "name": "before",
+  "campaignNote": {"keep": true},
+  "terminals": [{
+    "id": "terminal-1",
+    "name": "Overseer",
+    "hackLevel": 0,
+    "introText": "",
+    "terminalNote": 13,
+    "root": {"id":"root","type":"folder","name":"ROOT","children":[]}
+  }]
+}`))
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Users/test/Documents/Fallout Terminal/Sessions",
+			BundledDemo:      "/Applications/Fallout Terminal.app/Contents/Resources/sessions/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	app := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+
+	opened := app.OpenSession()
+	require.True(t, opened.OK)
+	require.Equal(t, target, opened.FilePath)
+	require.NotNil(t, opened.Session)
+
+	for revision := uint64(1); revision <= 3; revision++ {
+		edited := *opened.Session
+		edited.Name = fmt.Sprintf("revision-%d", revision)
+		result := app.SaveSession(edited)
+		require.True(t, result.OK, "revision %d: %#v", revision, result)
+		require.Equal(t, revision, result.RequestedRevision)
+		require.GreaterOrEqual(t, result.SavedRevision, revision)
+	}
+
+	written, ok := fileSystem.File(target)
+	require.True(t, ok)
+	require.Contains(t, string(written), `"campaignNote"`)
+	require.Contains(t, string(written), `"terminalNote"`)
+	decoded, err := domain.DecodeSession(written)
+	require.NoError(t, err)
+	require.Equal(t, "revision-3", decoded.Name)
+	status := app.GetRuntimeStatus()
+	require.Equal(t, uint64(3), status.RequestedRevision)
+	require.Equal(t, uint64(3), status.SavedRevision)
 }
 
 func TestApplicationStartsProtectedTunnelAfterLocalReadinessAndPublishesBothAddresses(t *testing.T) {
@@ -235,6 +355,38 @@ func TestApplicationRejectsUnsafeTunnelAddressAndStopsAcquiredTunnel(t *testing.
 
 		})
 	}
+}
+
+func TestInvalidTunnelStopFailureRetainsOwnershipForShutdownRetry(t *testing.T) {
+	t.Parallel()
+
+	recorder := &callRecorder{}
+	tunnel := &retryingTunnel{
+		recorder: recorder,
+		info:     domain.ServerInfo{URL: "http://unsafe.example", Tunnel: true},
+		stopErrs: []error{errors.New("temporary terminate failure"), nil},
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: &recordingSessionService{recorder: recorder},
+		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
+			IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
+		}},
+		Tunnel: tunnel, TunnelEnabled: true,
+		Events:  &recordingEventSink{recorder: recorder},
+		Desktop: &recordingDesktop{recorder: recorder},
+	})
+
+	require.NoError(t, app.Start(t.Context()))
+	require.Equal(t, "ready-local", app.lifecyclePhase())
+	require.Equal(t, 1, tunnel.stopCalls)
+	require.Equal(t, tunnelAddressFailureMessage, app.GetRuntimeStatus().StartupError)
+
+	recorder.Reset()
+	require.NoError(t, app.Shutdown(t.Context()))
+	require.Equal(t, 2, tunnel.stopCalls)
+	require.Equal(t, []string{"tunnel:stop", "player:stop", "session:shutdown", "desktop:close"}, recorder.Calls())
+	require.NoError(t, app.Shutdown(t.Context()))
+	require.Equal(t, 2, tunnel.stopCalls)
 }
 
 func TestApplicationUnwindsPartialStartup(t *testing.T) {
@@ -1166,47 +1318,6 @@ func TestTerminalSwitchBridgeRejectsInvalidAndStaleDecisionButKeepsTrustedForceS
 
 func appStringPointer(value string) *string { return &value }
 
-func TestDOMReadyReplaysCurrentBridgeEvents(t *testing.T) {
-	recorder := &callRecorder{}
-	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{Events: events})
-	app.serverInfo = &domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"}
-	app.clientCount = 5
-	app.hackState = &domain.PublicHackState{Level: 3, AttemptsMax: 4, AttemptsLeft: 2}
-
-	app.domReady(t.Context())
-	{
-
-		got, want := recorder.Calls(), []string{"event:server-info", "event:client-count", "event:hack-state", "event:coordination-state"}
-		require.Falsef(t, !cmp.Equal(got, want),
-			"DOM-ready events = %v, want %v", got, want)
-	}
-
-	records := events.Records()
-	{
-		info, ok := records[0].Payload.(domain.ServerInfo)
-		require.Falsef(t, !ok || info.Port != 3690,
-			"server-info payload = %#v", records[0].Payload)
-	}
-	{
-
-		count, ok := records[1].Payload.(int)
-		require.Falsef(t, !ok || count != 5,
-			"client-count payload = %#v", records[1].Payload)
-	}
-	{
-
-		hackState, ok := records[2].Payload.(*domain.PublicHackState)
-		require.Falsef(t, !ok || hackState == nil || hackState.AttemptsLeft != 2,
-			"hack-state payload = %#v", records[2].Payload)
-	}
-
-	coordinationState, ok := records[3].Payload.(*domain.MasterCoordinationState)
-	require.Falsef(t, records[3].Name != coordinationStateEvent || !ok || coordinationState != nil,
-		"coordination-state payload = %#v, want nil replay without coordinator", records[3].Payload)
-
-}
-
 func TestOpenURLAllowsOnlyHTTPAndHTTPS(t *testing.T) {
 	browser := &testutil.FakeBrowser{}
 	app := NewAppWithDependencies(AppDependencies{Browser: browser})
@@ -1508,6 +1619,38 @@ type callRecorder struct {
 	mu    sync.Mutex
 	calls []string
 }
+
+type contextCapturingPlayer struct {
+	info              domain.ServerInfo
+	startContext      context.Context
+	contextErrAtStart error
+}
+
+func (player *contextCapturingPlayer) Start(ctx context.Context) (domain.ServerInfo, error) {
+	player.startContext = ctx
+	player.contextErrAtStart = ctx.Err()
+	return player.info, nil
+}
+
+func (*contextCapturingPlayer) Stop(context.Context) error { return nil }
+
+type contextCapturingDesktop struct {
+	readyContext context.Context
+}
+
+func (desktop *contextCapturingDesktop) Ready(ctx context.Context) error {
+	desktop.readyContext = ctx
+	return nil
+}
+
+func (*contextCapturingDesktop) Close(context.Context) error { return nil }
+
+type contextCapturingEvents struct {
+	context context.Context
+}
+
+func (events *contextCapturingEvents) SetContext(ctx context.Context) { events.context = ctx }
+func (*contextCapturingEvents) Emit(string, any) error                { return nil }
 
 func (r *callRecorder) Add(call string) {
 	r.mu.Lock()
@@ -1965,6 +2108,28 @@ func (server *recordingPlayerServer) PublishHack() {
 type recordingTunnel struct {
 	recorder *callRecorder
 	info     domain.ServerInfo
+}
+
+type retryingTunnel struct {
+	recorder  *callRecorder
+	info      domain.ServerInfo
+	stopErrs  []error
+	stopCalls int
+}
+
+func (tunnel *retryingTunnel) Start(context.Context) (domain.ServerInfo, error) {
+	tunnel.recorder.Add("tunnel:start")
+	return tunnel.info, nil
+}
+
+func (tunnel *retryingTunnel) Stop(context.Context) error {
+	tunnel.recorder.Add("tunnel:stop")
+	index := tunnel.stopCalls
+	tunnel.stopCalls++
+	if index < len(tunnel.stopErrs) {
+		return tunnel.stopErrs[index]
+	}
+	return nil
 }
 
 type invalidPublicTunnel struct {

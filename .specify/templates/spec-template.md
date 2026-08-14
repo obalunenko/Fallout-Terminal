@@ -117,7 +117,7 @@ Mark material ambiguity inline, for example:
 - **Go tests**: [Affected packages and observable behavior, or N/A]
 - **Race testing**: [Affected concurrent services and required command, or N/A]
 - **Browser tests**: [Playwright journey under `tests/browser/`, or N/A]
-- **Interactive verification**: [Affected `wails dev` master/player journey]
+- **Interactive verification**: [Affected `go run ./cmd/build dev` master/player journey]
 - **Packaging/release verification**: [arm64 app, signing/notarization, or N/A]
 
 No numeric coverage threshold or repository-wide linter is currently defined.

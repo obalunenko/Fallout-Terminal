@@ -23,6 +23,8 @@ function uid(prefix) {
 // ── DOM refs ──────────────────────────────────────────────
 const startScreen      = document.getElementById('startScreen');
 const startStatus      = document.getElementById('startStatus');
+const btnOpenSession   = document.getElementById('btnOpenSession');
+const btnNewSession    = document.getElementById('btnNewSession');
 const mainLayout        = document.getElementById('mainLayout');
 const sessionFileLabel  = document.getElementById('sessionFileLabel');
 const serverUrlEl       = document.getElementById('serverUrl');
@@ -80,9 +82,40 @@ let latestRenderedSave = 0;
 let newestDurableRevision = 0;
 let coordinationCommandPending = false;
 let pendingTerminalSwitch = null;
+let startupStatus = null;
+
+function renderStartupPresentation(status) {
+  startupStatus = status && typeof status === 'object' ? status : {};
+  const info = startupStatus.serverInfo && typeof startupStatus.serverInfo === 'object'
+    ? startupStatus.serverInfo
+    : null;
+  const startupError = typeof startupStatus.startupError === 'string' ? startupStatus.startupError : '';
+  const tunnelError = typeof info?.tunnelError === 'string' ? info.tunnelError : '';
+  const fatal = !info && Boolean(startupError);
+
+  btnOpenSession.disabled = fatal;
+  btnNewSession.disabled = fatal;
+  if (fatal) {
+    startStatus.dataset.state = 'failed';
+    startStatus.textContent = `ЗАПУСК НЕ ЗАВЕРШЁН: ${startupError}`;
+  } else if (info?.tunnel && info.url) {
+    startStatus.dataset.state = 'ready-public';
+    startStatus.textContent = `ГОТОВО · ПУБЛИЧНЫЙ И ЛОКАЛЬНЫЙ ДОСТУП${info.localUrl ? ` · ${info.localUrl}` : ''}`;
+  } else if (info) {
+    const warning = tunnelError || startupError;
+    startStatus.dataset.state = warning ? 'warning' : 'ready-local';
+    startStatus.textContent = warning
+      ? `ЛОКАЛЬНЫЙ РЕЖИМ ГОТОВ · ПУБЛИЧНЫЙ ДОСТУП НЕДОСТУПЕН: ${warning}`
+      : `ЛОКАЛЬНЫЙ РЕЖИМ ГОТОВ · ${info.localUrl || info.url}`;
+  } else {
+    startStatus.dataset.state = 'starting';
+    startStatus.textContent = 'ЗАПУСК ЛОКАЛЬНОГО СЕРВЕРА…';
+  }
+}
 
 // ── Server info / connection count ─────────────────────────
 desktopAPI.onServerInfo((info) => {
+  renderStartupPresentation({ ...(startupStatus || {}), serverInfo: info });
   const publicUrl = info.tunnel && info.url ? info.url : '';
   const localUrl = info.localUrl || (!info.tunnel ? info.url : '');
   const tunnelUnavailable = info.tunnel && !publicUrl;
@@ -129,6 +162,7 @@ desktopAPI.onCoordinationState((coordination) => {
     renderHackStatus();
   }
 });
+void desktopAPI.getRuntimeStatus().then(renderStartupPresentation);
 serverUrlEl.addEventListener('click', async () => {
   const requestedUrl = serverUrl;
   if (!requestedUrl) return;
@@ -143,7 +177,7 @@ serverUrlEl.addEventListener('click', async () => {
 });
 
 // ── Start screen: open / new session ───────────────────────
-document.getElementById('btnOpenSession').addEventListener('click', async () => {
+btnOpenSession.addEventListener('click', async () => {
   const res = await desktopAPI.openSession();
   if (!res.ok) {
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
@@ -152,7 +186,7 @@ document.getElementById('btnOpenSession').addEventListener('click', async () => 
   await loadSession(res.session, res.filePath);
 });
 
-document.getElementById('btnNewSession').addEventListener('click', async () => {
+btnNewSession.addEventListener('click', async () => {
   const res = await desktopAPI.newSession();
   if (!res.ok) {
     if (res.error) startStatus.textContent = 'Ошибка: ' + res.error;
@@ -994,6 +1028,7 @@ btnStartBroadcast.addEventListener('click', async () => {
   state.coordination = result.state || state.coordination;
   setCoordinationStatus('ТРАНСЛЯЦИЯ ЗАПУЩЕНА');
   renderCoordination();
+  renderTreeHeader();
 });
 
 btnEndBroadcast.addEventListener('click', () => {

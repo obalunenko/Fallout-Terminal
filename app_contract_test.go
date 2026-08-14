@@ -1,13 +1,19 @@
 package main
 
 import (
+	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"reflect"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	privatev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
+	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/testing/prototest"
 )
 
@@ -62,6 +68,28 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 	require.Empty(t, terminalSwitchChoiceFromPrivate(privatev1.TerminalSwitchChoice_TERMINAL_SWITCH_CHOICE_UNSPECIFIED))
 }
 
+func TestRuntimeStatusDescriptorRemainsFeature005Compatible(t *testing.T) {
+	t.Parallel()
+
+	descriptor := (&privatev1.RuntimeStatus{}).ProtoReflect().Descriptor()
+	require.Equal(t, "fallout.terminal.private.v1.RuntimeStatus", string(descriptor.FullName()))
+
+	wantFields := []string{
+		"server_info", "client_count", "hack_state", "startup_error",
+		"save_state", "requested_revision", "saved_revision", "coordination_state",
+	}
+	gotFields := make([]string, 0, descriptor.Fields().Len())
+	for index := range descriptor.Fields().Len() {
+		field := descriptor.Fields().Get(index)
+		gotFields = append(gotFields, string(field.Name()))
+		require.Equal(t, protoreflect.FieldNumber(index+1), field.Number())
+	}
+	require.Equal(t, wantFields, gotFields)
+	require.Nil(t, descriptor.Fields().ByName("phase"))
+	require.Nil(t, descriptor.Fields().ByJSONName("phase"))
+	require.Zero(t, descriptor.ParentFile().Enums().Len())
+}
+
 func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *testing.T) {
 	controller := domain.LogicalSessionID("session-1")
 	terminal := "terminal-1"
@@ -88,17 +116,96 @@ func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *test
 	require.Equal(t, CoordinationCommandResult{OK: true, State: state}, routeCoordinationResult(CoordinationCommandResult{OK: true, State: state}))
 }
 
-func TestEveryBoundAppMethodAndNativeEventHasPrivateSemanticRegistration(t *testing.T) {
-	methods := []string{
+func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.T) {
+	requiredMethods := []string{
 		"GetRuntimeStatus", "NewSession", "OpenSession", "CopyDemo", "SaveSession", "LoadReferencedPlayerConfig", "NewPlayerConfig", "OpenPlayerConfig",
 		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ForceHackSuccess", "ResetFailedHack",
 		"AddCharacter", "RenameCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
 		"StartBroadcast", "EndBroadcast", "OpenURL",
 	}
-	appType := reflect.TypeOf((*App)(nil))
-	for _, name := range methods {
-		_, ok := appType.MethodByName(name)
-		require.True(t, ok, "missing bound App method %s", name)
+	serviceType := reflect.TypeOf((*desktopService)(nil))
+	actualMethods := make([]string, 0, serviceType.NumMethod())
+	for index := range serviceType.NumMethod() {
+		actualMethods = append(actualMethods, serviceType.Method(index).Name)
 	}
+	require.Len(t, actualMethods, 25)
+	require.ElementsMatch(t, requiredMethods, actualMethods)
+
+	for _, forbidden := range []string{
+		"Start", "Shutdown", "ServiceStartup", "ServiceShutdown",
+		"Dispatch", "Call", "Capabilities", "Reflect",
+		"ReadFile", "WriteFile", "Exec", "Environment", "OpenDialog", "Browser",
+		"PlayerService", "Subscribe", "SelectCharacter", "Navigate", "Guess", "ActivatePattern", "SoundManifest",
+	} {
+		require.NotContains(t, actualMethods, forbidden)
+	}
+
 	require.Equal(t, []string{"server-info", "client-count", "hack-state", "coordination-state"}, []string{serverInfoEvent, clientCountEvent, hackStateEvent, coordinationStateEvent})
+}
+
+func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
+	t.Parallel()
+
+	file, err := parser.ParseFile(token.NewFileSet(), "desktop_service.go", nil, 0)
+	require.NoError(t, err)
+
+	forwarded := make(map[string]string)
+	for _, declaration := range file.Decls {
+		method, ok := declaration.(*ast.FuncDecl)
+		if !ok || method.Recv == nil || method.Name.Name == "newDesktopService" {
+			continue
+		}
+		require.Len(t, method.Body.List, 1, "%s must remain a transparent forward", method.Name.Name)
+		returned, ok := method.Body.List[0].(*ast.ReturnStmt)
+		require.True(t, ok, "%s must return the core result directly", method.Name.Name)
+		require.Len(t, returned.Results, 1, "%s must return exactly one core call", method.Name.Name)
+		call, ok := returned.Results[0].(*ast.CallExpr)
+		require.True(t, ok, "%s must return a core call", method.Name.Name)
+		selector, ok := call.Fun.(*ast.SelectorExpr)
+		require.True(t, ok, "%s must call an explicit core method", method.Name.Name)
+		core, ok := selector.X.(*ast.SelectorExpr)
+		require.True(t, ok, "%s must call through service.core", method.Name.Name)
+		service, ok := core.X.(*ast.Ident)
+		require.True(t, ok)
+		require.Equal(t, "service", service.Name)
+		require.Equal(t, "core", core.Sel.Name)
+		forwarded[method.Name.Name] = selector.Sel.Name
+	}
+
+	require.Len(t, forwarded, 25)
+	for exposed, core := range forwarded {
+		require.Equal(t, exposed, core, "%s must not translate into an authored capability", exposed)
+	}
+}
+
+func TestDetachedDesktopResultShapesPreserveCancellationErrorsAndStatusFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		value any
+		keys  []string
+	}{
+		{"runtime status", RuntimeStatus{}, []string{"serverInfo", "clientCount", "hackState", "saveState", "requestedRevision", "savedRevision", "coordinationState"}},
+		{"command", CommandResult{Error: "safe"}, []string{"ok", "error"}},
+		{"session cancellation", sessionservice.SessionResult{Canceled: true}, []string{"ok", "canceled"}},
+		{"save", sessionservice.SaveResult{Error: "safe"}, []string{"ok", "error", "requestedRevision"}},
+		{"player config cancellation", PlayerConfigCommandResult{Canceled: true}, []string{"ok", "canceled", "state"}},
+		{"coordination", CoordinationCommandResult{Error: "safe"}, []string{"ok", "error", "state"}},
+		{"terminal switch", TerminalSwitchCommandResult{Error: "safe"}, []string{"ok", "error", "state"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := json.Marshal(test.value)
+			require.NoError(t, err)
+			var fields map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(raw, &fields))
+			actual := make([]string, 0, len(fields))
+			for key := range fields {
+				actual = append(actual, key)
+			}
+			require.ElementsMatch(t, test.keys, actual)
+			require.NotContains(t, fields, "phase")
+		})
+	}
 }

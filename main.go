@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -12,10 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	controlservice "github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
@@ -28,8 +24,9 @@ import (
 	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 )
 
-// Wails runs the configured frontend build before production compilation. The
-// checked-in .keep keeps ordinary Go tooling compile-safe on a clean checkout.
+// The repository-owned Go build command prepares the frontend before production
+// compilation. The checked-in .keep keeps ordinary Go tooling compile-safe on a
+// clean checkout.
 //
 //go:embed all:frontend/dist
 var frontendSource embed.FS
@@ -50,30 +47,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	app, err := composeApplication(playerAssets)
+	host := newWailsApplication(frontendAssets)
+	core, err := composeApplication(host, playerAssets)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := wails.Run(&options.App{
-		Title:            "Fallout Terminal — Master Control",
-		Width:            1200,
-		Height:           780,
-		MinWidth:         900,
-		MinHeight:        600,
-		BackgroundColour: options.NewRGB(11, 13, 10),
-		AssetServer: &assetserver.Options{
-			Assets: frontendAssets,
-		},
-		OnStartup:  app.startup,
-		OnDomReady: app.domReady,
-		OnShutdown: app.shutdown,
-		Bind:       []interface{}{app},
-	}); err != nil {
+	registerWailsServices(host, core)
+	newMasterWindow(host)
+	if err := host.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func composeApplication(playerAssets fs.FS) (*App, error) {
+func composeApplication(host *application.App, playerAssets fs.FS) (*App, error) {
 	locations, err := platform.DefaultSessionLocations(applicationResourceRoot())
 	if err != nil {
 		return nil, err
@@ -82,8 +68,8 @@ func composeApplication(playerAssets fs.FS) (*App, error) {
 		return nil, err
 	}
 	runtimeConfig := defaultApplicationConfig(locations)
-	desktop := platform.NewDesktop(nil)
-	events := &wailsEventSink{}
+	desktop := platform.NewDesktop(nil, host.Dialog, host.Browser)
+	events := newWailsEventSink(host.Event)
 	live := liveservice.New(nil, nil)
 	playerConfigs := playerconfigservice.NewService(
 		playerconfigservice.NewStorage(nil), desktop, locations.DocumentsDefault,
@@ -270,37 +256,20 @@ func (configurationErrorTunnel) Stop(context.Context) error {
 
 func applicationResourceRoot() string {
 	executable, err := os.Executable()
-	if err == nil {
-		macOSDirectory := filepath.Dir(executable)
-		if filepath.Base(macOSDirectory) == "MacOS" && filepath.Base(filepath.Dir(macOSDirectory)) == "Contents" {
-			return filepath.Join(filepath.Dir(macOSDirectory), "Resources")
-		}
-	}
 	workingDirectory, err := os.Getwd()
-	if err == nil {
+	if err != nil {
+		workingDirectory = ""
+	}
+	return applicationResourceRootFor(executable, workingDirectory)
+}
+
+func applicationResourceRootFor(executable, workingDirectory string) string {
+	macOSDirectory := filepath.Dir(executable)
+	if filepath.Base(macOSDirectory) == "MacOS" && filepath.Base(filepath.Dir(macOSDirectory)) == "Contents" {
+		return filepath.Join(filepath.Dir(macOSDirectory), "Resources")
+	}
+	if workingDirectory != "" {
 		return workingDirectory
 	}
 	return filepath.Dir(executable)
-}
-
-type wailsEventSink struct {
-	mu  sync.RWMutex
-	ctx context.Context
-}
-
-func (sink *wailsEventSink) SetContext(ctx context.Context) {
-	sink.mu.Lock()
-	sink.ctx = ctx
-	sink.mu.Unlock()
-}
-
-func (sink *wailsEventSink) Emit(name string, payload any) error {
-	sink.mu.RLock()
-	ctx := sink.ctx
-	sink.mu.RUnlock()
-	if ctx == nil {
-		return errors.New("Wails event runtime is not ready")
-	}
-	wailsruntime.EventsEmit(ctx, name, payload)
-	return nil
 }

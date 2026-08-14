@@ -147,6 +147,8 @@ func restoreContentNodeShape(node *domain.ContentNode, template domain.ContentNo
 }
 
 func runtimeStatusToPrivate(status RuntimeStatus) *privatev1.RuntimeStatus {
+	// Lifecycle phase is intentionally not serialized. Existing server-info and
+	// startup-error fields are the complete master-visible startup projection.
 	result := &privatev1.RuntimeStatus{
 		ClientCount: uint32(max(status.ClientCount, 0)), SaveState: status.SaveState,
 		RequestedRevision: status.RequestedRevision,

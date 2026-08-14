@@ -1,9 +1,15 @@
 name: Wails macOS
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches:
+      - '*'
+
 
 permissions:
   contents: read
@@ -15,7 +21,6 @@ concurrency:
 env:
   GO_VERSION: 1.26.x
   NODE_VERSION: 20.19.0
-  WAILS_VERSION: v2.13.0
 
 jobs:
   go-quality:
@@ -31,7 +36,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
 
       - name: Run Go tests with race detector
         run: go test -race ./...
@@ -47,6 +57,18 @@ jobs:
       - name: Check out clean source
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -58,6 +80,9 @@ jobs:
 
       - name: Install locked frontend dependencies
         run: npm ci --prefix frontend
+
+      - name: Generate deterministic Wails bindings
+        run: go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean -d frontend/bindings ./...
 
       - name: Build frontend
         run: npm run build --prefix frontend
@@ -81,7 +106,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -117,7 +147,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -152,13 +187,22 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
+
+      - name: Verify exact isolated tool pins and root-module drift guards
+        run: |
+          scripts/tool-modules-check.sh
+          scripts/tool-modules-check.sh --self-test
+          scripts/wails-v3-contract-check.sh
+          scripts/wails-v3-contract-check.sh --self-test
 
       - name: Verify repository-root startup configuration
-        run: >-
-          go test ./internal/platform
-          -run '^(TestWailsOwnsTheWholeDevelopmentStartup|TestQuickstartHasOneRepositoryRootStartupCommand)$'
-          -count=1
+        run: go test ./internal/buildtool ./internal/platform -run '^(TestBuildPlanHasOneOrderedOwnerAndNoTaskfileTool|TestPackagePlanCompletesResourcesBeforeFinalSignature|TestWailsV3PinsAndGoBuildToolAreOwnedAndExact|TestWailsV3QuickstartHasOneRootDevelopmentCommand)$' -count=1
 
   unsigned-arm64-app:
     name: Unsigned Apple Silicon app
@@ -181,7 +225,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            tools/buf/go.sum
+            tools/protoc-gen-connect-go/go.sum
+            tools/protoc-gen-go/go.sum
+            tools/wails/go.sum
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -197,13 +246,8 @@ jobs:
           npm ci --prefix frontend
           npm ci --prefix client
 
-      - name: Install pinned Wails CLI
-        run: |
-          go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
-          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
-
       - name: Build clean unsigned arm64 application
-        run: wails build -clean -platform darwin/arm64
+        run: go run ./cmd/build package
 
       - name: Verify Apple Silicon application gate
         shell: bash

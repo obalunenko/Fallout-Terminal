@@ -1,17 +1,19 @@
 <!--
 Sync Impact Report
-- Version change: 3.0.0 -> 3.1.0
+- Version change: 3.3.1 -> 3.3.2
 - Modified principles: None
 - Added principles: None
-- Added sections: None
+- Added sections:
+  - Go Development Tool Modules
 - Removed sections: None
 - Expanded guidance:
-  - Dependency Rules now govern test-only assertion and protobuf comparison dependencies.
-  - Testing and Quality Gates now require Testify assertions, table-driven Go tests where cases
-    share a test flow, `testing.T.Context` for test-scoped contexts, and protobuf-aware `cmp`
-    comparisons using helpers from `google.golang.org/protobuf/testing`.
-  - Development Workflow now makes those Go test conventions part of planned verification.
-- Follow-up TODOs: None
+  - Repository development, build, and packaging orchestration uses the already-required Go
+    toolchain and standard library; Taskfile, Make, and global Wails CLI installation are prohibited.
+  - The exact pinned Wails CLI remains isolated and is invoked only where Wails-specific generation
+    is required.
+- Follow-up TODOs:
+  - Complete feature 006 reproducible-build, CI, package verification, and native acceptance tasks
+    against `go run ./cmd/build ...`.
 -->
 # Fallout Terminal Constitution
 
@@ -23,32 +25,44 @@ synchronizes authoritative content and state with browser-based player clients. 
 state uses the portable version-1 JSON session document; live terminal, navigation, hacking,
 connection, startup, and tunnel state is owned by the running application.
 
-The production architecture is a Go 1.26 modular monolith built with Wails v2.13.0. The root Go
-module owns application composition, the trusted desktop bridge, and the embedded player server.
-`frontend/` is the Vite-built browser-JavaScript game-master interface, `client/` is the separately
-embedded browser-JavaScript player interface, and `internal/` contains the application services,
-domain logic, adapters, and platform integrations. Node.js is build, code-generation, and browser-
-test tooling, not an application runtime. The supported deployment profile is macOS 13+ on Apple
-Silicon (`arm64`).
+The production architecture is a Go 1.26 modular monolith whose accepted desktop runtime MUST be
+an exactly pinned Wails major-version implementation. The accepted baseline is Wails v2.13.0.
+Feature 006 is a bounded migration from that baseline to Wails v3; Wails v3 becomes the production
+runtime only after feature 006's defined parity, package, and rollback gates pass. Until then,
+Wails v2.13.0 remains the production runtime and Wails v3 remains a migration candidate.
 
-The Electron-to-Wails migration is complete. Wails is the production desktop runtime, not a
-migration candidate. Legacy Electron source and behavior are not active runtime boundaries,
-compatibility targets, or behavioral oracles. The documented Electron rollback record MUST be
-preserved only as historical documentation and MUST NOT govern current feature behavior,
-architecture, dependencies, acceptance, or release decisions.
+The root Go module owns application composition, the trusted desktop bridge, and the embedded
+player server. `frontend/` is the Vite-built browser-JavaScript game-master interface, `client/` is
+the separately embedded browser-JavaScript player interface, and `internal/` contains application
+services, domain logic, adapters, and platform integrations. Node.js is build, code-generation,
+and browser-test tooling, not an application runtime. The supported deployment profile is macOS
+13+ on Apple Silicon (`arm64`).
+
+The Electron-to-Wails migration is complete. Legacy Electron source and behavior are not active
+runtime boundaries, compatibility targets, or behavioral oracles. The documented Electron rollback
+record MUST be preserved only as historical documentation and MUST NOT govern current behavior,
+architecture, dependencies, acceptance, rollback, or release decisions. Feature 006 MUST create a
+separate Wails v2 rollback record from the accepted pre-migration `main` commit and, when an
+accepted executable is produced, its digest. The Electron record MUST NOT substitute for that
+Wails v2 rollback reference.
 
 ## Core Principles
 
-### I. Govern the Current Production Architecture
+### I. Govern the Accepted Desktop Runtime
 
-- Root `main.go` and `app.go` own application composition, lifecycle, native dialogs,
-  filesystem-backed persistence, player-server startup, Wails integration, and optional tunnel
-  startup.
-- `frontend/` MUST access privileged desktop operations only through explicitly registered,
-  narrow Wails bridge methods and runtime events. It MUST NOT gain direct filesystem, process, or
-  environment access.
+- The Wails v3 architecture MUST use explicit application, service, window, event, dialog,
+  browser, asset, and lifecycle APIs. Root `main.go` and `app.go` own their composition and also
+  compose filesystem-backed persistence, player-server startup, and optional tunnel startup.
+- Wails application objects, services, windows, events, dialogs, browser integration, asset
+  servers, lifecycle hooks, generated bindings, and `@wailsio/runtime` imports MUST remain platform
+  adapters or composition concerns. Domain, control, session, player-configuration, live, and
+  player services MUST remain independent of Wails.
+- `frontend/` MUST access privileged desktop operations only through one narrow, explicitly
+  registered desktop service and named events. Wails v3 generated bindings and
+  `@wailsio/runtime` MAY implement this private transport. They MUST NOT expose a generic
+  dispatcher or arbitrary filesystem, process, or environment access.
 - `client/` owns the browser player experience and MUST operate without Wails, native desktop, or
-  filesystem APIs.
+  filesystem APIs and MUST have no path to desktop capabilities.
 - `internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, and
   `internal/control/` own domain, navigation, hacking, live-state, and coordination behavior.
   Their canonical logic MUST remain transport-independent and server-authoritative.
@@ -77,11 +91,14 @@ observable or serialized structured contract, including:
 Generated Go and ECMAScript types and explicit boundary adapters MUST implement those contracts.
 Application code MUST NOT maintain handwritten duplicates of transport DTOs.
 
-Third-party manifests and schemas are outside this rule and MUST NOT be duplicated in protobuf.
-This exclusion includes `wails.json`, `package.json`, Buf configuration, GitHub Actions workflows,
-and macOS plist files. Non-serializable dependency-injection values, including `fs.FS`, callbacks,
-interfaces, and process handles, likewise MUST remain native implementation values rather than
-protobuf fields.
+Third-party and tool-native manifests, schemas, and metadata are outside this rule and MUST NOT be
+duplicated in protobuf. This exclusion includes repository Go build orchestration, package
+manifests, npm and Go lockfiles, framework-generated binding metadata, Buf configuration, GitHub
+Actions workflows, and macOS plist files. The exclusion covers tool orchestration and metadata,
+not application-owned structured desktop requests, results, events, runtime statuses, or
+serializable configuration values. Non-serializable dependency-injection values, including
+`fs.FS`, callbacks, interfaces, application or window objects, and process handles, likewise MUST
+remain native implementation values rather than protobuf fields.
 
 Static HTML, CSS, fonts, sounds, images, and other assets MAY use normal HTTP delivery because they
 are resources, not RPC contracts. Asset delivery MUST NOT be used to bypass protobuf governance for
@@ -116,9 +133,12 @@ ngrok listener MUST NEVER expose native dialogs, arbitrary file access, external
 secret words, or any equivalent trusted capability or secret state.
 
 The private Wails bridge MAY remain the transport for trusted desktop-only operations, but every
-structured request, result, event, and runtime-status payload crossing it MUST have a protobuf-
-defined contract and an explicit adapter. The bridge MUST expose only narrow registered operations
-and MUST NOT expose a generic RPC dispatcher.
+structured request, result, event, runtime-status payload, and serializable configuration value
+crossing it MUST have a protobuf-defined contract and an explicit adapter. The master frontend
+MUST reach privileged operations only through one narrow, explicitly registered desktop service
+and named events. Wails v3 generated bindings and `@wailsio/runtime` MAY implement that transport,
+but the bridge MUST NOT expose a generic dispatcher, arbitrary filesystem, process, or environment
+access, or any player-facing route to desktop capabilities.
 
 Browser-controlled values, file references, runtime commands, and external URLs MUST be validated
 again at the privileged Go boundary. Content Security Policy MUST remain restrictive, and external
@@ -176,16 +196,31 @@ Temporary coexistence MUST have a bounded migration plan, an owner, parity crite
 gate. Permanent dual protocols are prohibited unless an explicit, separately specified
 compatibility requirement identifies the consumers, duration, verification, and retirement policy.
 
+For feature 006, temporary Wails v2/v3 coexistence is permitted only on its migration branch. The
+plan MUST name an owner, make coexistence expire at cutover, define parity criteria, and record an
+immutable Wails v2 rollback reference based on the accepted pre-migration `main` commit and, when
+produced, its accepted executable digest. The final production source MUST contain no active Wails
+v2 import, CLI or configuration path, generated binding, or dual-runtime switch. Completed
+historical specifications MUST retain their original target and MUST NOT be rewritten as though
+they had targeted Wails v3.
+
 ## Dependency Rules
 
-- Root `main.go` and `app.go` MAY depend on Wails v2.13.0, generated contract packages, and internal
-  application services because they are composition and privileged bridge boundaries.
+- Root composition and `internal/platform/` adapters MAY depend on
+  `github.com/wailsapp/wails/v3` because they are the Wails v3 composition and platform boundaries.
+  During feature 006 only, the migration branch MAY also retain the exactly pinned Wails v2.13.0
+  dependency under the bounded coexistence rule. No other `internal/` package MAY import Wails v2
+  or v3.
 - Protobuf schema modules are upstream contract dependencies. Generated Go and ECMAScript outputs
   MUST depend only on pinned generators and runtimes and MUST be consumed through explicit boundary
   adapters.
+- `internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, `internal/control/`,
+  `internal/session/`, `internal/playerconfig/`, and `internal/player/` MUST remain independent of
+  Wails. Their existing permitted domain, protobuf-adapter, ConnectRPC, HTTP, and asset dependencies
+  remain governed by the package-specific rules below.
 - `internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, and
-  `internal/control/` MUST remain independent of Wails, ConnectRPC, HTTP handlers, generated
-  protobuf types as mutable state owners, and browser code.
+  `internal/control/` MUST also remain independent of ConnectRPC, HTTP handlers, generated protobuf
+  types as mutable state owners, and browser code.
 - `internal/session/` and `internal/playerconfig/` MAY depend on domain models and protobuf-defined
   contract types through explicit JSON adapters; protobuf definitions MUST NOT replace the portable
   version-1 JSON persistence format.
@@ -193,23 +228,79 @@ compatibility requirement identifies the consumers, duration, verification, and 
   narrow application-service interfaces. It MUST NOT depend on the master frontend or expose
   private game-master services.
 - `internal/platform/` contains Wails and platform adapters. `internal/tunnel/` contains optional
-  public-process integration. Neither package owns domain rules, and only serializable
-  application-owned configuration crossing a boundary belongs in protobuf.
-- `frontend/` MAY call only narrow registered Wails bindings and consume runtime events. Every
-  structured bridge payload MUST originate from a protobuf schema and pass through an explicit
-  adapter; a generic dispatch surface is prohibited.
+  public-process integration and MUST NOT import Wails. Neither package owns domain rules, and only
+  serializable application-owned configuration crossing a boundary belongs in protobuf.
+- `frontend/` MAY call only the narrow registered desktop service through generated Wails bindings
+  and consume named events through `@wailsio/runtime`. Every structured bridge payload MUST
+  originate from a protobuf schema and pass through an explicit adapter; a generic dispatch surface
+  is prohibited.
 - `client/` MAY use browser APIs, generated ECMAScript Connect clients, server-streaming responses,
   and static HTTP assets. It MUST NOT depend on Wails, filesystem APIs, private services, or
   handwritten RPC envelopes.
-- Third-party manifests, tool configuration, and non-serializable injected dependencies MUST remain
-  native to their owning tools or language and MUST NOT acquire parallel protobuf definitions.
+- Repository Go build orchestration, package manifests, plist files, framework-generated binding
+  metadata, other third-party tool configuration, and non-serializable injected dependencies MUST
+  remain native to their owning tools or language and MUST NOT acquire parallel protobuf
+  definitions.
 - Go test assertions MUST use `github.com/stretchr/testify/assert` or
   `github.com/stretchr/testify/require`. Tests involving protobuf messages or descriptors MUST use
   `github.com/google/go-cmp/cmp` with the appropriate helpers under
   `google.golang.org/protobuf/testing`. These test-only dependencies MUST remain out of production
   package APIs.
 - Every runtime, generator, or build dependency MUST have a concrete need recorded in the plan and
-  be pinned reproducibly in `go.mod`, Buf configuration, or the appropriate npm lockfile.
+  be pinned reproducibly in its owning production module, isolated Go development-tool module,
+  Buf configuration, or appropriate npm lockfile. Feature 006 MUST use mutually compatible exact
+  versions for the `github.com/wailsapp/wails/v3` runtime module, the isolated `wails3` tool module,
+  and the `@wailsio/runtime` npm package and its Vite plugin subpath. All owning `go.mod`, `go.sum`,
+  and npm package lockfiles MUST be committed. Reproducible builds and CI MUST reject `@latest`,
+  floating prerelease versions, uncommitted tool-module resolution, and any unrecorded Go-module,
+  CLI, or frontend-runtime version mismatch.
+
+## Go Development Tool Modules
+
+Every Go executable used for repository development, generation, validation, build, packaging, or
+release automation MUST be declared and executed as a repository-owned Go tool. This includes Buf,
+Wails, protobuf and Connect generators, and any future Go-based command introduced into the
+development workflow. Operating-system tools and non-Go tools remain governed by their native
+installation and lock mechanisms.
+
+- Each Go development tool MUST have one independent module at `tools/<tool>/`, containing its own
+  `go.mod` and committed `go.sum`. A tool module MUST declare exactly one direct tool command with a
+  Go `tool` directive; unrelated tool commands MUST NOT share that module.
+- Tool modules MUST pin exact module versions and an explicit Go language version. They MUST NOT
+  use pseudo-install scripts, floating versions, `@latest`, or depend on whichever executable is
+  first on `PATH`.
+- Repository commands MUST invoke a third-party tool through its owning module from the repository
+  root, using `go tool -modfile=tools/<tool>/go.mod <command> ...` directly or from the checked-in
+  standard-library-only `cmd/build` command. Taskfiles and Makefiles are prohibited build entry
+  points. Development documentation, code-generation scripts, CI, and release automation MUST NOT
+  use `go install` or a globally installed Go tool as their executable source.
+- First-party orchestration in `cmd/build` and `internal/buildtool` MAY live in the root application
+  module because it is repository source rather than a separately versioned executable dependency;
+  it MUST use only the Go standard library and invoke versioned third-party tools through their
+  isolated modules.
+- The root application `go.mod` MUST contain production/runtime dependencies only and MUST contain
+  no `tool` directive or tool block. It MUST NOT contain a `require`, `replace`, or other module
+  entry whose only purpose is to build, install, pin, or execute a development tool. The root
+  `go.sum` MUST NOT gain entries solely from resolving development tools.
+- A module used by both application code and a development tool MAY appear in the root application
+  module only when application packages actually require it at runtime or compile time. Its
+  application version is governed independently from the tool module. When a product runtime and
+  its CLI share an upstream project, the runtime remains pinned in the application module and the
+  CLI remains independently pinned in its `tools/<tool>/` module.
+- Running, downloading, tidying, or upgrading a tool through `tools/<tool>/go.mod` MUST NOT modify
+  the root `go.mod` or root `go.sum`. Tool checksums and transitive tool dependencies belong only to
+  that tool's `go.sum` and module graph.
+- Each tool module MUST be tidied, reproducible, and verified independently. A tool-version change
+  MUST update that module's `go.mod` and `go.sum`, compatibility research where applicable, every
+  coupled runtime/frontend pin, and the generated or acceptance evidence affected by the change.
+- CI MUST verify the expected set of tool modules, exact direct tool declarations, committed sums,
+  zero `tool` directives and zero tool-only dependency entries in the root `go.mod`, no root module
+  drift after tool resolution, and absence of global-install or unqualified Go-tool invocations in
+  active scripts and documentation.
+
+This isolation prevents generator and build dependencies from polluting the product module, makes
+the invoked executable part of the repository's reviewed dependency graph, and lets tools evolve
+independently without sacrificing deterministic local and CI behavior.
 
 ## Testing and Quality Gates
 
@@ -246,11 +337,20 @@ Applicable commands MUST succeed before a change is considered complete:
   session, stream, startup, or tunnel behavior.
 - `npm ci --prefix frontend` and `npm run build --prefix frontend` succeed for frontend, bridge,
   embedding, generated ECMAScript, or packaging changes.
+- `npm ci --prefix client` and `npm run build --prefix client` succeed for player-client,
+  embedding, asset, or packaging changes.
 - `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` succeed for affected player
   journeys when the required local environment is available.
-- `wails dev` passes affected interactive master/player journeys.
-- A clean `wails build -clean -platform darwin/arm64` produces a self-contained application for
-  packaging-sensitive changes.
+- `go run ./cmd/build dev` is the sole repository-root development entry
+  and passes affected interactive master/player journeys without a separately started frontend or
+  player server.
+- `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` succeeds and produces
+  no unexplained working-tree drift; both generated bindings and protobuf generation remain
+  deterministic and MUST NOT be edited manually.
+- `go run ./cmd/build build` succeeds after both `frontend/` and `client/`
+  production builds succeed.
+- `go run ./cmd/build package` succeeds and
+  produces a self-contained macOS Apple Silicon application for packaging-sensitive changes.
 - Release candidates pass signing, hardened-runtime, notarization, stapling, DMG, and Gatekeeper
   checks when release credentials are available.
 
@@ -269,10 +369,13 @@ Schema and RPC changes MUST additionally verify:
 - version-1 JSON round trips, established field names, defaults, and preservation of compatible
   unknown JSON fields for session-contract changes.
 
-CI MUST enforce Buf formatting/linting, generation drift, and generated-code compilation when
-protobuf schemas are present, and MUST add the breaking-change gate when a protobuf baseline exists.
+CI MUST invoke Buf and every other Go-based development command through its owning `tools/<tool>`
+module. It MUST enforce Buf formatting/linting, generation drift, and generated-code compilation
+when protobuf schemas are present, and MUST add the breaking-change gate when a protobuf baseline
+exists.
 The GitHub Actions workflow MUST continue to enforce its configured Go test, Go vet, frontend clean-
-build, startup-contract, and unsigned arm64 packaging gates. Native-dialog, audio, public-tunnel,
+build, player-client clean-build, startup-contract, exact Wails pin-consistency, clean Wails v3
+binding-generation, and unsigned arm64 packaging gates. Native-dialog, audio, public-tunnel,
 multi-browser, and signed-release checks MAY remain documented manual gates where reliable
 automation or credentials are unavailable; unavailable checks MUST be reported, not claimed.
 
@@ -289,8 +392,11 @@ owned-resource shutdown.
 3. Update versioned protobuf schemas first, identifying RPC cardinality, presence, variants, stable
    field numbers, compatibility, and any version-1 JSON adapter impact before implementation.
 4. Plan every affected producer, consumer, adapter, state owner, persistence rule, security
-   boundary, generated artifact, cutover, rollback of the feature change, and parity gate.
-5. Regenerate pinned Go and ECMAScript code deterministically; never edit generated files.
+   boundary, generated artifact, cutover, rollback of the feature change, parity gate, package
+   gate, and dependency-pin consistency gate. Feature 006 MUST identify its coexistence owner,
+   expiry, parity criteria, and immutable Wails v2 rollback reference.
+5. Regenerate pinned Go and ECMAScript code deterministically through the isolated
+   `tools/<tool>` modules; never edit generated files or install a global Go tool.
 6. Implement the smallest coherent vertical slice. Keep generated types at boundaries, domain logic
    transport-independent, mutations unary, live updates server-streamed, and private capabilities
    outside the public player service.
@@ -298,10 +404,15 @@ owned-resource shutdown.
    governed assertion, table-driven, `t.Context()`, and protobuf-comparison conventions. Run all
    applicable Buf, generation-drift, breaking-change, streaming, privilege-separation, and
    session-compatibility gates, and record unavailable checks.
-8. Prove parity, then remove superseded transports, dependencies, fixtures, tests, and active
-   documentation unless a separate compatibility requirement explicitly retains them.
+8. Prove parity and pass package and rollback gates, then remove superseded transports,
+   dependencies, fixtures, tests, and active documentation unless a separate compatibility
+   requirement explicitly retains them. Feature 006 cutover MUST remove every active Wails v2
+   import, CLI or configuration path, generated binding, and dual-runtime switch before Wails v3
+   becomes the production runtime.
 9. Update README, schema documentation, fixtures, compatibility specifications, and historical
-   records when setup, operation, or governed behavior changes.
+   records when setup, operation, or governed behavior changes. Development, generation, CI,
+   packaging, and release commands MUST continue to resolve every Go tool through its checked-in
+   isolated module.
 
 ## Governance
 
@@ -325,4 +436,4 @@ MUST reject unrecorded exceptions, manually edited generated files, schema-break
 public capability leakage, generic bridge dispatchers, and permanent dual protocols without an
 explicit compatibility requirement.
 
-**Version**: 3.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-13
+**Version**: 3.3.2 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-14

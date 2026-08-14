@@ -1,78 +1,62 @@
 'use strict';
 
-// Prefer Wails' generated App module when it exists. The glob deliberately
-// tolerates a pre-generation checkout so `npm run build` remains usable while
-// Wails still replaces the fallback with generated bindings in real builds.
-const generatedAppModules = typeof import.meta.glob === 'function'
-  ? import.meta.glob('../wailsjs/go/main/App.js', { eager: true })
-  : {};
-const generatedAppBindings = Object.values(generatedAppModules)[0];
+import { Events } from '@wailsio/runtime';
+import * as desktopService from '../bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js';
 
 const APP_METHODS = Object.freeze({
-  getRuntimeStatus: 'GetRuntimeStatus',
-  newSession: 'NewSession',
-  openSession: 'OpenSession',
-  saveSession: 'SaveSession',
-  loadReferencedPlayerConfig: 'LoadReferencedPlayerConfig',
-  newPlayerConfig: 'NewPlayerConfig',
-  openPlayerConfig: 'OpenPlayerConfig',
-  requestTerminalActivation: 'RequestTerminalActivation',
-  updateLiveTerminal: 'UpdateLiveTerminal',
-  requestTerminalClear: 'RequestTerminalClear',
-  resolveTerminalSwitch: 'ResolveTerminalSwitch',
-  forceHackSuccess: 'ForceHackSuccess',
-  resetFailedHack: 'ResetFailedHack',
-  addCharacter: 'AddCharacter',
-  renameCharacter: 'RenameCharacter',
-  deleteCharacter: 'DeleteCharacter',
-  renameLogicalSession: 'RenameLogicalSession',
-  assignCharacter: 'AssignCharacter',
-  releaseCharacter: 'ReleaseCharacter',
-  moveCharacter: 'MoveCharacter',
-  setActiveController: 'SetActiveController',
-  startBroadcast: 'StartBroadcast',
-  endBroadcast: 'EndBroadcast',
-  openUrl: 'OpenURL',
+  getRuntimeStatus: desktopService.GetRuntimeStatus,
+  newSession: desktopService.NewSession,
+  openSession: desktopService.OpenSession,
+  saveSession: desktopService.SaveSession,
+  loadReferencedPlayerConfig: desktopService.LoadReferencedPlayerConfig,
+  newPlayerConfig: desktopService.NewPlayerConfig,
+  openPlayerConfig: desktopService.OpenPlayerConfig,
+  requestTerminalActivation: desktopService.RequestTerminalActivation,
+  updateLiveTerminal: desktopService.UpdateLiveTerminal,
+  requestTerminalClear: desktopService.RequestTerminalClear,
+  resolveTerminalSwitch: desktopService.ResolveTerminalSwitch,
+  forceHackSuccess: desktopService.ForceHackSuccess,
+  resetFailedHack: desktopService.ResetFailedHack,
+  addCharacter: desktopService.AddCharacter,
+  renameCharacter: desktopService.RenameCharacter,
+  deleteCharacter: desktopService.DeleteCharacter,
+  renameLogicalSession: desktopService.RenameLogicalSession,
+  assignCharacter: desktopService.AssignCharacter,
+  releaseCharacter: desktopService.ReleaseCharacter,
+  moveCharacter: desktopService.MoveCharacter,
+  setActiveController: desktopService.SetActiveController,
+  startBroadcast: desktopService.StartBroadcast,
+  endBroadcast: desktopService.EndBroadcast,
+  openUrl: desktopService.OpenURL,
 });
 
 const DISPOSE = Symbol.for('fallout-terminal.desktop-api.dispose');
 const subscriptions = new Set();
+const eventSubscriptions = new Map();
+const requiredEvents = Object.freeze([
+  ['server-info', 'serverInfo'],
+  ['client-count', 'clientCount'],
+  ['hack-state', 'hackState'],
+  ['coordination-state', 'coordinationState'],
+]);
 
-function appBindings() {
-  // Generated methods are thin wrappers around this exact narrow namespace;
-  // the fallback exists only until the generator has populated frontend/wailsjs.
-  const bindings = generatedAppBindings ?? window.go?.main?.App;
-  if (!bindings) {
-    throw new Error('Wails App bindings are unavailable');
-  }
-  return bindings;
-}
-
-function invoke(method, ...args) {
+function invoke(binding, ...args) {
   try {
-    const binding = appBindings()[method];
-    if (typeof binding !== 'function') {
-      throw new Error(`Wails App.${method} binding is unavailable`);
-    }
+    if (typeof binding !== 'function') throw new Error('Wails desktop binding is unavailable');
     return Promise.resolve(binding(...args));
   } catch (error) {
     return Promise.reject(error);
   }
 }
 
-function command(method, ...args) {
-  return invoke(method, ...args).catch((error) => ({
+function command(binding, ...args) {
+  return invoke(binding, ...args).catch((error) => ({
     ok: false,
     error: error instanceof Error ? error.message : String(error),
   }));
 }
 
-const TERMINAL_SWITCH_STATUSES = new Set([
-  'activated',
-  'cleared',
-  'decision-required',
-  'cancelled',
-]);
+const TERMINAL_SWITCH_STATUSES = new Set(['activated', 'cleared', 'decision-required', 'cancelled']);
 
 function normalizeSwitchCommandResult(result) {
   const value = result && typeof result === 'object' ? result : {};
@@ -84,12 +68,11 @@ function normalizeSwitchCommandResult(result) {
   const state = value.state && typeof value.state === 'object' ? value.state : null;
   let error = typeof value.error === 'string' ? value.error : '';
   if (!ok && !error) error = 'Terminal switch command failed';
-
   return Object.freeze({ ok, error, status, switchId, state });
 }
 
-function switchCommand(method, ...args) {
-  return command(method, ...args).then(normalizeSwitchCommandResult);
+function switchCommand(binding, ...args) {
+  return command(binding, ...args).then(normalizeSwitchCommandResult);
 }
 
 function normalizePlayerConfigResult(result) {
@@ -104,97 +87,101 @@ function normalizePlayerConfigResult(result) {
   return Object.freeze({ ok, canceled, error, config, session, state });
 }
 
-function playerConfigCommand(method, ...args) {
-  return command(method, ...args).then(normalizePlayerConfigResult);
-}
-
-let runtimeStatusPromise;
-function runtimeStatus() {
-  runtimeStatusPromise ??= command(APP_METHODS.getRuntimeStatus);
-  return runtimeStatusPromise;
+function playerConfigCommand(binding, ...args) {
+  return command(binding, ...args).then(normalizePlayerConfigResult);
 }
 
 let latestServerInfo = null;
 
 function normalizeServerInfo(payload) {
   if (!payload || typeof payload !== 'object') return null;
-
   const url = typeof payload.url === 'string' ? payload.url : '';
   const tunnel = Boolean(payload.tunnel);
   const previousLocalUrl = latestServerInfo?.localUrl
     || (latestServerInfo && !latestServerInfo.tunnel ? latestServerInfo.url : '');
   const suppliedLocalUrl = typeof payload.localUrl === 'string' ? payload.localUrl : '';
-  const localUrl = suppliedLocalUrl || (!tunnel ? url : previousLocalUrl);
-
   latestServerInfo = Object.freeze({
     ip: typeof payload.ip === 'string' ? payload.ip : '',
     port: Number.isInteger(payload.port) ? payload.port : 0,
     url,
-    localUrl,
+    localUrl: suppliedLocalUrl || (!tunnel ? url : previousLocalUrl),
     tunnel,
     tunnelError: typeof payload.tunnelError === 'string' ? payload.tunnelError : '',
   });
   return latestServerInfo;
 }
 
-function subscribe(eventName, statusField, callback, project = (payload) => payload) {
-  if (typeof callback !== 'function') {
-    throw new TypeError(`${eventName} listener must be a function`);
-  }
+function unwrapEvent(event) {
+  return event && typeof event === 'object' && Object.hasOwn(event, 'data') ? event.data : event;
+}
 
-  let active = true;
-  let eventReceived = false;
-  let releaseRuntime = () => {};
+let runtimeStatusPromise = null;
 
-  const listener = (payload) => {
-    if (!active) return;
-    const projected = project(payload);
-    if (statusField === 'serverInfo' && projected == null) return;
-    eventReceived = true;
-    callback(projected);
-  };
-
-  const eventsOn = window.runtime?.EventsOn;
-  if (typeof eventsOn === 'function') {
-    const release = eventsOn(eventName, listener);
-    if (typeof release === 'function') {
-      releaseRuntime = release;
+function beginStatusSnapshotWhenReady() {
+  if (runtimeStatusPromise || !requiredEvents.every(([name]) => eventSubscriptions.has(name))) return;
+  runtimeStatusPromise = command(APP_METHODS.getRuntimeStatus);
+  void runtimeStatusPromise.then((status) => {
+    if (!status || status.ok === false) return;
+    for (const [eventName, field] of requiredEvents) {
+      for (const subscription of eventSubscriptions.get(eventName) ?? []) {
+        if (!subscription.active || subscription.eventReceived) continue;
+        subscription.deliver(status[field]);
+      }
     }
-  }
-
-  // domReady can emit before this module is evaluated. Replaying the status
-  // snapshot fills that gap, but never overwrites a newer event.
-  void runtimeStatus().then((status) => {
-    if (!active || eventReceived || !status || status.ok === false) return;
-    const payload = status[statusField];
-    if (statusField === 'serverInfo' && payload == null) return;
-    const projected = project(payload);
-    if (statusField === 'serverInfo' && projected == null) return;
-    callback(projected);
   });
+}
+
+function subscribe(eventName, statusField, callback, project = (payload) => payload) {
+  if (typeof callback !== 'function') throw new TypeError(`${eventName} listener must be a function`);
+
+  const bucket = eventSubscriptions.get(eventName) ?? new Set();
+  eventSubscriptions.set(eventName, bucket);
+  const subscription = {
+    active: true,
+    eventReceived: false,
+    released: false,
+    deliver(payload) {
+      if (!this.active) return;
+      const projected = project(payload);
+      if (statusField === 'serverInfo' && projected == null) return;
+      callback(projected);
+    },
+    releaseRuntime: () => {},
+  };
+  subscription.releaseRuntime = Events.On(eventName, (event) => {
+    if (!subscription.active) return;
+    subscription.eventReceived = true;
+    subscription.deliver(unwrapEvent(event));
+  });
+  bucket.add(subscription);
 
   const unsubscribe = () => {
-    if (!active) return;
-    active = false;
+    if (!subscription.active) return;
+    subscription.active = false;
+    bucket.delete(subscription);
     subscriptions.delete(unsubscribe);
-    releaseRuntime();
+    if (!subscription.released) {
+      subscription.released = true;
+      subscription.releaseRuntime();
+    }
   };
   subscriptions.add(unsubscribe);
+  beginStatusSnapshotWhenReady();
   return unsubscribe;
 }
 
 const previousFacade = window.desktopAPI;
-if (typeof previousFacade?.[DISPOSE] === 'function') {
-  previousFacade[DISPOSE]();
-}
+if (typeof previousFacade?.[DISPOSE] === 'function') previousFacade[DISPOSE]();
 
 const desktopAPI = {
   onServerInfo: (callback) => subscribe('server-info', 'serverInfo', callback, normalizeServerInfo),
   onClientCount: (callback) => subscribe('client-count', 'clientCount', callback),
   onHackState: (callback) => subscribe('hack-state', 'hackState', callback),
   onCoordinationState: (callback) => subscribe('coordination-state', 'coordinationState', callback),
-  // Deliberately perform no privileged browser operation here. App.OpenURL
-  // parses and validates the final HTTP(S) URL immediately before opening it.
+  getRuntimeStatus: () => {
+    beginStatusSnapshotWhenReady();
+    return runtimeStatusPromise ?? command(APP_METHODS.getRuntimeStatus);
+  },
   openUrl: (url) => command(APP_METHODS.openUrl, url),
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),

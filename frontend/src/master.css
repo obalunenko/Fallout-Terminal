@@ -77,6 +77,11 @@ button {
   font-size: 12px;
   white-space: pre-wrap;
 }
+.start-status[data-state="starting"] { color: #d0a63a; }
+.start-status[data-state="ready-local"],
+.start-status[data-state="ready-public"] { color: #9fe89a; }
+.start-status[data-state="warning"],
+.start-status[data-state="failed"] { color: #ff9a7a; }
 
 /* ── Layout ──────────────────────────────────────────── */
 .layout { height: 100%; display: flex; flex-direction: column; }

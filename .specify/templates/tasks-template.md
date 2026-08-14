@@ -8,7 +8,7 @@ description: "Task list template for Fallout Terminal feature implementation"
 
 **Prerequisites**: `plan.md` and `spec.md`; include `research.md`, `data-model.md`, `contracts/`, and `quickstart.md` when the plan requires them
 
-**Testing**: Colocated Go tests and Playwright browser journeys are configured. Include focused automated tests for changed behavior, race testing for affected concurrent services, and concrete `wails dev` journeys for native/browser interaction. Packaging and credential-dependent checks apply only when their surfaces change and the required environment is available.
+**Testing**: Colocated Go tests and Playwright browser journeys are configured. Include focused automated tests for changed behavior, race testing for affected concurrent services, and concrete `go run ./cmd/build dev` journeys for native/browser interaction. Packaging and credential-dependent checks apply only when their surfaces change and the required environment is available.
 
 **Organization**: Group tasks by prioritized user story so each story remains independently implementable and verifiable.
 
@@ -79,7 +79,7 @@ setup tasks unless the approved feature actually introduces those changes.
 
 - [ ] T011 [P] [US1] Add focused Go tests in [exact package/test path]
 - [ ] T012 [P] [US1] Add or update a Playwright journey in `tests/browser/[exact].spec.mjs` when player behavior changes
-- [ ] T013 [US1] Document the `wails dev` master/player journey in `specs/[###-feature]/quickstart.md`
+- [ ] T013 [US1] Document the `go run ./cmd/build dev` master/player journey in `specs/[###-feature]/quickstart.md`
 
 ### Implementation for User Story 1
 
@@ -141,8 +141,8 @@ setup tasks unless the approved feature actually introduces those changes.
 - [ ] T033 Run `go test -race ./...` when concurrent runtime behavior changes
 - [ ] T034 Run `npm ci --prefix frontend` and `npm run build --prefix frontend` when the master UI, bridge, embedding, or package changes
 - [ ] T035 Run `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected browser journeys are available
-- [ ] T036 Run `wails dev` and complete the documented master/player smoke journeys
-- [ ] T037 Run `wails build -clean -platform darwin/arm64` for packaging-sensitive changes when the required macOS environment is available
+- [ ] T036 Run `go run ./cmd/build dev` and complete the documented master/player smoke journeys
+- [ ] T037 Run `go run ./cmd/build package` for packaging-sensitive changes when the required macOS environment is available
 - [ ] T038 Run the approved ngrok or signing/notarization/DMG gates when affected and credentials are available; otherwise record them as unavailable
 - [ ] T039 Update `README.md`, contracts, fixtures, and CI configuration when setup, operation, protocol, or user-visible workflows changed
 
