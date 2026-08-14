@@ -9,23 +9,54 @@ fail() {
   return 1
 }
 
+list_scan_files() {
+  local scan_root="$1"
+
+  if git -C "$scan_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$scan_root" ls-files -co --exclude-standard -z
+  else
+    find "$scan_root" -type f -print0
+  fi
+}
+
+scan_files() {
+  local scan_root="$1"
+  local pattern="$2"
+  local exclude_tests="${3:-false}"
+  local file
+  local relative_file
+  local file_matches
+
+  while IFS= read -r -d '' file; do
+    if [[ "$file" = /* ]]; then
+      relative_file="${file#"$scan_root"/}"
+    else
+      relative_file="$file"
+      file="$scan_root/$file"
+    fi
+
+    case "$relative_file" in
+      scripts/wails-v3-contract-check.sh|scripts/tool-modules-check.sh|specs/*|docs/wails-migration-rollback.md|node_modules/*|frontend/node_modules/*|client/node_modules/*|tests/browser/node_modules/*)
+        continue
+        ;;
+    esac
+    if [[ "$exclude_tests" == true && "$relative_file" == *_test.go ]]; then
+      continue
+    fi
+
+    file_matches="$(LC_ALL=C grep -IEn "$pattern" "$file" 2>/dev/null || true)"
+    while IFS= read -r match; do
+      [[ -n "$match" ]] && printf '%s:%s\n' "$relative_file" "$match"
+    done <<<"$file_matches"
+  done < <(list_scan_files "$scan_root")
+}
+
 scan_unqualified_commands() {
   local scan_root="$1"
   local matches
 
-  matches="$(rg -n --hidden \
-    -g '!scripts/wails-v3-contract-check.sh' \
-    -g '!scripts/tool-modules-check.sh' \
-    -g '!specs/**' \
-    -g '!docs/wails-migration-rollback.md' \
-    -g '!**/*_test.go' \
-    -g '!node_modules/**' \
-    -g '!frontend/node_modules/**' \
-    -g '!client/node_modules/**' \
-    -g '!tests/browser/node_modules/**' \
-    '(^|[[:space:]`;&|])(wails3|wails)[[:space:]]+(dev|build|package|generate)([[:space:]]|$)' \
-    "$scan_root" || true)"
-  matches="$(printf '%s\n' "$matches" | rg -v 'go tool -modfile=tools/wails/go\.mod wails3 ' || true)"
+  matches="$(scan_files "$scan_root" '(^|[[:space:]`;&|])(wails3|wails)[[:space:]]+(dev|build|package|generate)([[:space:]]|$)' true)"
+  matches="$(printf '%s\n' "$matches" | grep -Ev 'go tool -modfile=tools/wails/go\.mod wails3 ' || true)"
   [[ -z "$matches" ]] || {
     printf '%s\n' "$matches" >&2
     fail 'active files contain an unqualified Wails command'
@@ -36,17 +67,7 @@ scan_floating_versions() {
   local scan_root="$1"
   local matches
 
-  matches="$(rg -n --hidden \
-    -g '!scripts/wails-v3-contract-check.sh' \
-    -g '!scripts/tool-modules-check.sh' \
-    -g '!specs/**' \
-    -g '!docs/wails-migration-rollback.md' \
-    -g '!node_modules/**' \
-    -g '!frontend/node_modules/**' \
-    -g '!client/node_modules/**' \
-    -g '!tests/browser/node_modules/**' \
-    '(@wailsio/[A-Za-z0-9_./-]+"?[[:space:]]*:[[:space:]]*"(latest|\^|~|\*)|github\.com/wailsapp/wails(/v3)?@latest|go[[:space:]]+install[[:space:]]+github\.com/wailsapp/wails[^[:space:]]*@latest)' \
-    "$scan_root" || true)"
+  matches="$(scan_files "$scan_root" '(@wailsio/[A-Za-z0-9_./-]+"?[[:space:]]*:[[:space:]]*"(latest|\^|~|\*)|github\.com/wailsapp/wails(/v3)?@latest|go[[:space:]]+install[[:space:]]+github\.com/wailsapp/wails[^[:space:]]*@latest)')"
   [[ -z "$matches" ]] || {
     printf '%s\n' "$matches" >&2
     fail 'active files contain a floating Wails version'
@@ -66,18 +87,7 @@ scan_build_orchestration() {
     return 1
   }
 
-  forbidden_commands="$(rg -n --hidden \
-    -g '!scripts/wails-v3-contract-check.sh' \
-    -g '!scripts/tool-modules-check.sh' \
-    -g '!specs/**' \
-    -g '!docs/wails-migration-rollback.md' \
-    -g '!**/*_test.go' \
-    -g '!node_modules/**' \
-    -g '!frontend/node_modules/**' \
-    -g '!client/node_modules/**' \
-    -g '!tests/browser/node_modules/**' \
-    'wails3[[:space:]]+(dev|build|package|task)([[:space:]]|$)' \
-    "$scan_root" || true)"
+  forbidden_commands="$(scan_files "$scan_root" 'wails3[[:space:]]+(dev|build|package|task)([[:space:]]|$)' true)"
   [[ -z "$forbidden_commands" ]] || {
     printf '%s\n' "$forbidden_commands" >&2
     fail 'active files bypass the repository-owned Go build command'
@@ -90,12 +100,12 @@ scan_root_module() {
 
   [[ -f "$root_module" ]] || fail 'root go.mod is missing'
 
-  if rg -n '^tool[[:space:]]*(\(|[^[:space:]])' "$root_module"; then
+  if grep -En '^tool[[:space:]]*(\(|[^[:space:]])' "$root_module"; then
     fail 'root application go.mod contains a tool declaration'
     return 1
   fi
 
-  if rg -n '^[[:space:]]*(github\.com/bufbuild/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)([[:space:]]|$)' "$root_module"; then
+  if grep -En '^[[:space:]]*(github\.com/bufbuild/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)([[:space:]]|$)' "$root_module"; then
     fail 'root application go.mod contains a tool-only dependency'
     return 1
   fi
@@ -106,7 +116,7 @@ scan_lifecycle_schema() {
   local runtime_schema="$scan_root/proto/fallout/terminal/private/v1/runtime.proto"
 
   [[ -f "$runtime_schema" ]] || fail 'private runtime schema is missing'
-  if rg -n '(LifecyclePhase|lifecycle_phase|lifecyclePhase|^[[:space:]]*(optional[[:space:]]+)?(string|int32|int64|uint32|uint64|[A-Za-z_][A-Za-z0-9_.]*)[[:space:]]+phase[[:space:]]*=)' "$runtime_schema"; then
+  if grep -En '(LifecyclePhase|lifecycle_phase|lifecyclePhase|^[[:space:]]*(optional[[:space:]]+)?(string|int32|int64|uint32|uint64|[A-Za-z_][A-Za-z0-9_.]*)[[:space:]]+phase[[:space:]]*=)' "$runtime_schema"; then
     fail 'private runtime schema contains a serialized lifecycle phase'
   fi
 
