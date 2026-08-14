@@ -3,7 +3,7 @@
   "specName": "wails v3 migration",
   "branch": "006-wails-v3-migration",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -548,9 +548,176 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-14T12:10:46.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:13:22.370Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:14:03.169Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:16:41.650Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:24:53.529Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:25:18.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:25:44.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:42:12.218Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:42:36.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:44:20.799Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T14:07:35.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T17:12:17.300Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T17:14:01.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T17:16:03.697Z"
     }
   ],
-  "last_action": "halted at T066 — corrected v2 Guess RPC passed, but harness marker timeout left navigation/reconnect incomplete; no process/listener remains",
+  "last_action": "completed all 73 implementation tasks; final candidate 56ac18c and canonical bundle 7672ac4679 passed every required gate; Developer ID release gates honestly NOT RUN",
   "coverage": {
     "FR-001": {
       "title": "The migration MUST replace the accepted Wails v2 desktop runtime with Wails v3 without intentionally changing gameplay, persistence, security, visual presentation, public network behavior, or user workflows."
@@ -768,11 +935,11 @@
       ]
     },
     "implement": {
-      "summary": "Completed and journaled T024 and T032; halted at T037 after the integrated native four-player case exposed a stale disabled terminal-activation control.",
-      "key_finding": "The broadcast success handler does not refresh the tree header that owns terminal activation.",
+      "summary": "Completed all 73 tasks for the Wails v3 beta.8 migration. Frozen candidate 56ac18c passed deterministic generation/builds, Go/race/Playwright, native parity, rollback, exact-bundle offline/package, 60-minute local and 30-minute authenticated public qualification, and final v2 cutover scans.",
+      "key_finding": "The final personal-use bundle identity 7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57 remained unchanged across all final smoke and soak runs.",
       "risks": [
-        "Integrated 4–7-player parity remains unverified",
-        "US5 and later dependent phases must not advance"
+        "Wails v3.0.0-beta.8 remains prerelease",
+        "Developer ID/notary/DMG gates were NOT RUN because no signing identity was installed"
       ]
     }
   },
@@ -821,9 +988,45 @@
       "warnings": [
         "navigation/reconnect did not finish because the temporary continuation marker arrived after the harness deadline"
       ]
+    },
+    {
+      "what": "Final automated verification matrix",
+      "result": "PASS — tool/protobuf/binding/reproducibility/gofmt/vet/test/race and 21 Playwright tests passed",
+      "command": "scripts/tool-modules-check.sh; scripts/proto-check.sh; scripts/wails-bindings-check.sh; scripts/reproducible-build-check.sh; go vet ./...; go test ./...; go test -race ./...; npm test --prefix tests/browser"
+    },
+    {
+      "what": "Final candidate native parity",
+      "result": "PASS — one-window version-1 persistence and 4–7-player journey with 32 actions, 3 reconnects, 80 sound requests, clean interrupt",
+      "command": "go run ./cmd/build dev plus /private/tmp/fallout-t037-native.mjs"
+    },
+    {
+      "what": "Final personal-use package identity",
+      "result": "PASS — verified arm64/macOS 13 package and offline generated-Connect smoke; identity unchanged",
+      "command": "go run ./cmd/build package; scripts/verify-macos-app.sh; scripts/hash-macos-app.sh",
+      "warnings": "Canonical bundle-manifest SHA-256 7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57"
+    },
+    {
+      "what": "Final exact-bundle local soak",
+      "result": "PASS — 60.67 minutes, seven players, 53 accepted/26 rejected actions, 3 reconnects, 2 save/reopens, RSS medians 118640/131968/122128 KiB, unchanged identity and clean quit",
+      "command": "APP_PID=46826 node /private/tmp/fallout-t067-soak.mjs"
+    },
+    {
+      "what": "Final exact-bundle authenticated public soak",
+      "result": "PASS — 30.61 minutes, HTTP 401 anonymous rejection, 20 accepted/10 rejected actions, 2 reconnects, controlled tunnel loss preserved local HTTP 200, credential deleted",
+      "command": "node /private/tmp/fallout-t067-public-soak.mjs"
+    },
+    {
+      "what": "Final rollback and cutover",
+      "result": "PASS — canonical v2 rollback drill opened unchanged version-1 safety copies; immutable candidate paths matched 56ac18c and final cutover scan found no active v2 surface",
+      "command": "rollback drill; frozen-path git diff; scripts/wails-v3-cutover-check.sh"
+    },
+    {
+      "what": "Developer ID release profile",
+      "result": "NOT RUN — 0 valid signing identities; preflight stopped before build/sign/upload",
+      "command": "security find-identity -v -p codesigning; scripts/build-macos.sh --preflight"
     }
   ],
-  "currentTask": "T069",
+  "currentTask": "T078",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1362,23 +1565,95 @@
         "docs/wails-v3-migration-rollback.md",
         "specs/006-wails-v3-migration/quickstart.md"
       ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Passed isolated tool, Buf format/lint/build/generation, protobuf drift/breaking-fixture, root graph-isolation, and generated-output drift gates",
+      "files": [
+        "internal/gen",
+        "client/gen",
+        "proto",
+        "scripts"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Passed two clean Wails binding generations with byte-identical output, exact 25-method/four-event inventory, forbidden-surface scans, and zero candidate drift",
+      "files": [
+        "frontend/bindings",
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Completed locked clean client/frontend installs and production builds; reproducible-build-check passed with byte-identical protobuf, player, bindings, master, and native outputs and zero tracked drift.",
+      "files": [
+        "client/dist frontend/dist frontend/bindings"
+      ]
+    },
+    "T073": {
+      "status": "DONE",
+      "did": "gofmt reported no files; go vet ./... and go test ./... passed against candidate 56ac18c, including loopback/process integration packages.",
+      "files": [
+        "README.md internal/platform"
+      ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "go test -race ./... passed all packages and real lifecycle integrations with no detected races.",
+      "files": [
+        "app.go wails_host.go internal/player internal/session internal/tunnel internal/platform"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Locked Playwright install completed; full suite passed 21 tests with only the credential-gated real-ngrok test skipped for the separate T077 run.",
+      "files": [
+        "tests/browser client"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Final candidate native dev rerun passed one-window/session persistence, occupied-port/handled-interrupt lifecycle, and local 4–7-player journeys; exact safety-copy hashes remained unchanged and cleanup left no app or listener.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md /private/tmp/fallout-t066-rerun-20260814/session-v1.json"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Canonical macOS app hash self-test passed twice with identical output and verified sensitivity to content, mode, symlink, addition, and removal changes; hash and verification scripts retained zero drift.",
+      "files": [
+        "scripts/hash-macos-app.sh scripts/verify-macos-app.sh"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Built final personal-use arm64 package; verify-macos-app and cutover checks passed; canonical manifest 7672ac4679... remained unchanged across offline one-PID/one-listener generated-Connect smoke and clean quit.",
+      "files": [
+        "build/bin/Fallout Terminal.app specs/006-wails-v3-migration/quickstart.md"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Exact T079 bundle 7672ac4679... passed a 60.67-minute seven-player local workload with 53 accepted/26 rejected actions, 3 reconnects, 2 native save/reopens, RSS medians 118640/131968/122128 KiB, unchanged identity, and clean process/listener release.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md /private/tmp/fallout-t067-result.json"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Exact final bundle passed 30.61-minute authenticated ngrok soak with seven players, HTTP 401 anonymous rejection, 20 accepted/10 rejected actions, 2 reconnects, controlled tunnel loss/local fallback, unchanged identity, cleanup, and deleted temp credential; Developer ID/notary/DMG gates recorded NOT RUN because 0 valid identities were installed.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md /private/tmp/fallout-t067-public-result.json"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Verified README and every frozen build path identical to candidate 56ac18c; reconciled exact pins, all automated/native/soak/rollback/package results, honest Developer ID NOT RUN reason, bundle identity, and final cutover PASS using only evidence/workflow files.",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md docs/wails-v3-migration-rollback.md"
+      ]
     }
   },
-  "concerns": [
-    {
-      "note": "T037 FAIL: after Start Broadcast succeeds, btnStartBroadcast refreshes renderCoordination but not renderTreeHeader, leaving the native terminal-activation button disabled; four integrated players connect and select characters but receive no terminal rows, so 4–7 parity cannot complete.",
-      "step": "implement",
-      "kind": "blocking acceptance failure"
-    },
-    {
-      "note": "T066 rollback drill FAIL: four distinct v2 players reached the hack board, but the attempted interaction emitted no observed typed HackGuess/HackPattern request; the required journey stopped before navigation, reconnect, and session reopen.",
-      "step": "implement",
-      "kind": "rollback-drill"
-    },
-    {
-      "note": "T066 remains incomplete after corrected RPC observation because tool latency delayed the temporary continuation marker past the harness deadline; this is an evidence-harness failure, not an observed v2 product regression.",
-      "step": "implement",
-      "kind": "rollback-drill infrastructure"
-    }
-  ]
+  "concerns": null
 }

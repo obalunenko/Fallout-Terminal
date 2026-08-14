@@ -48,20 +48,20 @@ Evidence-only commits record the frozen candidate but do not redefine it.
 
 | Field | Value |
 | --- | --- |
-| Build candidate commit | `658071b7011197c4f229f6a5b1f109de2764fd69` |
+| Build candidate commit | `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` |
 | Wails Go/runtime/CLI pin | `github.com/wailsapp/wails/v3 v3.0.0-beta.8`; isolated `wails3` tool at the same parent-module version |
 | Frontend runtime/plugin pin | `@wailsio/runtime` `3.0.0-beta.8`, including `@wailsio/runtime/plugins/vite` |
 | Personal-use app path | `build/bin/Fallout Terminal.app` |
 | Canonical bundle-manifest SHA-256 |  |
 | Cutover result | `NOT RUN` |
-| Cutover timestamp/environment | Build candidate frozen 2026-08-14T16:09:18+04:00 on macOS arm64; final acceptance pending Phase 11 |
+| Cutover timestamp/environment | Build candidate frozen 2026-08-14T16:18:53+04:00 on macOS arm64; final acceptance pending Phase 11 |
 
 The pre-removal qualification worktree was branch `006-wails-v3-migration`,
 based on commit `bcb207704657a92f9902f4ac04ef11765b18f031`. Its migration changes and
 evidence were intentionally uncommitted during the rollback drill and soak, so
 that base commit remains provenance only—not the build candidate and not an
 accepted artifact identity. T069 froze the first v2-free clean commit,
-`658071b7011197c4f229f6a5b1f109de2764fd69`, as the immutable build candidate.
+`56ac18c0587c4f30cdb3a50e7bb49e7694506a36`, as the immutable build candidate.
 
 ## Rollback Triggers
 
@@ -117,12 +117,12 @@ accepted artifact identity. T069 froze the first v2-free clean commit,
 | --- | --- | --- | --- |
 | Pre-removal 60-minute local soak | Pre-removal feature-006 worktree based on `bcb207704657a92f9902f4ac04ef11765b18f031`; packaged app PID 63116 | `PASS` | 60.67 minutes; seven players; 57 accepted operations; 28 rejected observer attempts; three reconnects; two durable version-1 save/reopen cycles; 90 convergence checks; RSS medians 117936/128432/121312 KiB; one listener; 0.014s cleanup |
 | Pre-removal authenticated-ngrok soak | Same pre-removal worktree; app PID 2695; owned ngrok PID 2700; configured protected endpoint | `PASS` | 32.01 minutes; seven players; unauthenticated HTTP 401; 20 accepted operations; 10 rejected observer attempts; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; 0.020s final cleanup; temporary credential deleted |
-| Final-candidate native journeys |  | `NOT RUN` |  |
-| Final personal-use package/offline smoke |  | `NOT RUN` |  |
-| Final-candidate 60-minute local soak |  | `NOT RUN` |  |
-| Final authenticated-ngrok soak |  | `NOT RUN` |  |
-| Developer ID/notary/staple/DMG/Gatekeeper |  | `NOT RUN` |  |
-| Final active-v2/cutover scan |  | `NOT RUN` |  |
+| Final-candidate native journeys | Candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` | `PASS` | One native dev app/window/listener; unchanged version-1 session/config reopen; 4–7 players, 32 actions, three reconnects, 80 sound requests; handled interrupt cleanup |
+| Final personal-use package/offline smoke | Canonical bundle `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57` | `PASS` | Package verification and cutover scan passed; offline generated-Connect smoke made nine RPCs and zero external requests; hash unchanged after quit |
+| Final-candidate 60-minute local soak | Same canonical bundle; app PID 46826 | `PASS` | 60.67 minutes; seven players; 53 accepted/26 rejected actions; three reconnects; two durable save/reopens; 84 convergence checks; RSS medians 118640/131968/122128 KiB; clean quit; hash unchanged |
+| Final authenticated-ngrok soak | Same canonical bundle; app PID 83847; owned ngrok PID 83853 | `PASS` | 30.61 minutes; seven players; unauthenticated HTTP 401; 20 accepted/10 rejected actions; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; credential deleted; hash unchanged |
+| Developer ID/notary/staple/DMG/Gatekeeper | No release artifact produced | `NOT RUN` | `security find-identity` found 0 valid identities; release preflight stopped before build/sign/upload because `DEVELOPER_ID_APPLICATION` was unavailable |
+| Final active-v2/cutover scan | Candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` | `PASS` | No active v2, dual-runtime, floating-tool, generated-global, dependency, bundle, script, CI, or operating-document surface remained |
 
 Wails v3 is accepted only after every required non-conditional gate is `PASS`
 against the frozen v2-free build candidate and its recorded personal-use

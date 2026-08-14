@@ -4,7 +4,7 @@ This document describes the implementation target. It is not evidence that comma
 
 ## Candidate Identity
 
-- [x] Candidate Git SHA recorded: `658071b7011197c4f229f6a5b1f109de2764fd69`
+- [x] Candidate Git SHA recorded: `56ac18c0587c4f30cdb3a50e7bb49e7694506a36`
 - [x] Baseline rollback source verified: `f1084b3df8b5630862bdf7a0f347b599156653ef`
 - [x] Go module pin is exactly `github.com/wailsapp/wails/v3 v3.0.0-beta.8`
 - [x] `tools/wails/go.mod` declares only `tool github.com/wailsapp/wails/v3/cmd/wails3` and pins `github.com/wailsapp/wails/v3 v3.0.0-beta.8`, with its own committed `go.sum`
@@ -15,7 +15,7 @@ This document describes the implementation target. It is not evidence that comma
 - [x] Frontend runtime is exactly `@wailsio/runtime` `3.0.0-beta.8`, including the Vite plugin subpath
 - [x] Go/npm locks and CI/release pins agree; no Wails `latest`, caret, tilde, or unbounded range exists
 
-Candidate freeze: `658071b7011197c4f229f6a5b1f109de2764fd69`, committed 2026-08-14T16:09:18+04:00 from a clean v2-free worktree. Later evidence-only commits do not redefine this build identity.
+Candidate freeze: `56ac18c0587c4f30cdb3a50e7bb49e7694506a36`, committed 2026-08-14T16:18:53+04:00 after restoring the established historical-evidence marker required by the documentation contract. Later evidence-only commits do not redefine this build identity.
 
 ## Clean Setup
 
@@ -33,10 +33,10 @@ scripts/proto-check.sh
 go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 ```
 
-- [ ] Setup completed from a clean checkout
-- [ ] `go tool -modfile=tools/wails/go.mod wails3 version` identified beta.8
-- [ ] Locked installs made no unexplained manifest/lock changes
-- [ ] Protobuf check and clean binding generation succeeded
+- [x] Setup completed from a clean checkout
+- [x] `go tool -modfile=tools/wails/go.mod wails3 version` identified beta.8
+- [x] Locked installs made no unexplained manifest/lock changes
+- [x] Protobuf check and clean binding generation succeeded
 
 ## Local Development
 
@@ -46,11 +46,11 @@ From the repository root, run exactly one development command:
 go run ./cmd/build dev
 ```
 
-- [ ] Exactly one master window opened with title `Fallout Terminal — Master Control`
-- [ ] Initial size 1200×780, minimum 900×600, and accepted dark presentation were observed
-- [ ] Local player URL appeared and only one player listener was present
-- [ ] Master generated calls and all four event subscriptions were usable before ready presentation
-- [ ] Stopping development released the listener and any owned tunnel process within five seconds
+- [x] Exactly one master window opened with title `Fallout Terminal — Master Control`
+- [x] Initial size 1200×780, minimum 900×600, and accepted dark presentation were observed
+- [x] Local player URL appeared and only one player listener was present
+- [x] Master generated calls and all four event subscriptions were usable before ready presentation
+- [x] Stopping development released the listener and any owned tunnel process within five seconds
 
 Do not separately run Vite, the player listener, or a tunnel supervisor for the one-command acceptance check.
 
@@ -72,10 +72,10 @@ go test ./...
 go test -race ./...
 ```
 
-- [ ] gofmt: `________` — expected no paths
-- [ ] vet: `________`
-- [ ] tests: `________`
-- [ ] race: `________`
+- [x] gofmt: `PASS` — no paths
+- [x] vet: `PASS`
+- [x] tests: `PASS`
+- [x] race: `PASS`
 
 ### Contracts and deterministic generation
 
@@ -88,12 +88,12 @@ go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 
 Run clean Wails binding generation a second time and compare the complete generated tree/inventory using the repository-provided deterministic-binding check introduced by implementation.
 
-- [ ] Buf format/lint and deterministic protobuf generation passed
-- [ ] Compatibility baseline, negative fixtures, and public/private graph isolation passed
-- [ ] Two clean Wails binding generations were identical
-- [ ] Binding inventory contained exactly the 25 accepted operations
-- [ ] `Start`, `Shutdown`, lifecycle/generic/native/player procedures were absent
-- [ ] Generated master imports used only the v3 `frontend/bindings` path
+- [x] Buf format/lint and deterministic protobuf generation passed
+- [x] Compatibility baseline, negative fixtures, and public/private graph isolation passed
+- [x] Two clean Wails binding generations were identical
+- [x] Binding inventory contained exactly the 25 accepted operations
+- [x] `Start`, `Shutdown`, lifecycle/generic/native/player procedures were absent
+- [x] Generated master imports used only the v3 `frontend/bindings` path
 
 ### Locked frontend builds
 
@@ -105,10 +105,10 @@ go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...
 npm run build --prefix frontend
 ```
 
-- [ ] Player clean production build passed independently of Wails bindings
-- [ ] Master clean production build passed only after binding generation
-- [ ] No CDN or application-runtime package download exists in either bundle
-- [ ] No `window.go`, `window.runtime`, `frontend/wailsjs`, Electron global, or privileged production fallback exists
+- [x] Player clean production build passed independently of Wails bindings
+- [x] Master clean production build passed only after binding generation
+- [x] No CDN or application-runtime package download exists in either bundle
+- [x] No `window.go`, `window.runtime`, `frontend/wailsjs`, Electron global, or privileged production fallback exists
 
 #### Reproducible root-build checkpoint — 2026-08-14
 
@@ -133,10 +133,10 @@ npm ci --prefix tests/browser
 npm test --prefix tests/browser
 ```
 
-- [ ] All generated ConnectRPC Playwright journeys passed
-- [ ] Four-, five-, six-, and seven-client scenarios passed
-- [ ] Reconnect, replay, concurrency, slow/overflow, and cancellation cases passed
-- [ ] Sound manifest/playback and public/private isolation passed
+- [x] All generated ConnectRPC Playwright journeys passed
+- [x] Four-, five-, six-, and seven-client scenarios passed
+- [x] Reconnect, replay, concurrency, slow/overflow, and cancellation cases passed
+- [x] Sound manifest/playback and public/private isolation passed
 
 #### T036 generated-player verification — 2026-08-14
 
@@ -150,13 +150,13 @@ npm test --prefix tests/browser
 
 Record representative create/open/edit/copy/save behavior using safety-copy data.
 
-- [ ] New/open/save session and ordered revision behavior matched baseline
-- [ ] Bundled demo stayed read-only until explicit copy; `CopyDemo` added no new UI control
-- [ ] New/open/referenced player configuration behavior matched baseline
-- [ ] All roster, controller, broadcast, terminal-switch, live-update, and hack operations matched baseline
-- [ ] Cancel/error/redaction/result shapes matched `contracts/desktop-bridge.md`
-- [ ] Dialog titles, JSON filters, directories/filenames, aliases, creation policy, and cancel-as-empty matched
-- [ ] Only absolute HTTP(S) external URLs opened; invalid schemes failed safely
+- [x] New/open/save session and ordered revision behavior matched baseline
+- [x] Bundled demo stayed read-only until explicit copy; `CopyDemo` added no new UI control
+- [x] New/open/referenced player configuration behavior matched baseline
+- [x] All roster, controller, broadcast, terminal-switch, live-update, and hack operations matched baseline
+- [x] Cancel/error/redaction/result shapes matched `contracts/desktop-bridge.md`
+- [x] Dialog titles, JSON filters, directories/filenames, aliases, creation policy, and cancel-as-empty matched
+- [x] Only absolute HTTP(S) external URLs opened; invalid schemes failed safely
 - [x] Application-owned listener/desktop startup failure produced actionable master state
 - [x] Tunnel failure preserved the local URL and showed a credential-free error
 
@@ -175,15 +175,22 @@ Record representative create/open/edit/copy/save behavior using safety-copy data
 - `PASS` — T037 integrated packaged-native local 4–7-player journey. The stale activation control was fixed by refreshing the tree header after `StartBroadcast`; a focused asset-contract regression test and `go run ./cmd/build build` passed. One clean `build/bin/Fallout Terminal.app` instance opened safety copies of the demo session and a seven-character roster, started the broadcast, enabled `СДЕЛАТЬ АКТИВНЫМ`, and activated terminal `t_demo1`. Real port-3690 clients then grew incrementally from four through seven simultaneous players with distinct opaque recognition handles and distinct characters. Controller/observer roles remained isolated, observers emitted no mutations, 32 navigation/back actions were accepted across four rounds per player count, three reload reconnects retained their handles, browser storage contained only the recognition token, and 80 typed `SoundManifest` requests were observed without WebSocket fallback. Exactly one application PID and one listener existed during the run; Cmd+Q left neither process nor listener immediately afterward. The temporary acceptance harness was `/private/tmp/fallout-t037-native.mjs`.
 - `NOT RUN` — T037 real authenticated public mode; no selected public endpoint or real ngrok credentials were available. This conditional result is not represented as a pass.
 
+#### Final-candidate native rerun — 2026-08-14
+
+- `PASS` — candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` launched through `NGROK_ENABLED=0 go run ./cmd/build dev` with exactly one master window, one app PID, and one port-3690 listener after exact cleanup of a deliberately observed occupied-port partial-startup instance.
+- `PASS` — the supplied `/private/tmp/fallout-t066-rerun-20260814/session-v1.json` reopened with both terminals, referenced seven-character player configuration, and `Vault Dweller` visible. A master-WebView reload followed by reopening the same file rendered the same data; session SHA-256 `0c448064f81665c4d99f0ccf721270227027fc28cc163693a664ebcaa129a36f` and player-config SHA-256 `07d5d888c58d65c6a3b8769988081215e299bbdf5a206e64d5639e5a5eff06b7` were unchanged.
+- `PASS` — the native local 4–7-player harness completed 32 accepted navigation/back actions, three retained-handle reconnects, seven distinct opaque handles and characters, zero observer mutation requests, and 80 typed sound-manifest requests.
+- `PASS` — a handled interrupt stopped the supervised app; immediate checks found no Fallout Terminal process and no port-3690 listener.
+
 ## Event and Readiness Acceptance
 
-- [ ] Exact events `server-info`, `client-count`, `hack-state`, and `coordination-state` were observed
-- [ ] All four listeners registered before the initial status snapshot applied
-- [ ] A newer event won over an older snapshot independently for each field
-- [ ] Every listener released its underlying subscription exactly once
-- [ ] Release during pending snapshot/callback and repeated release produced no late callback
-- [ ] No duplicate effect resulted from any window-ready signal plus snapshot/event initialization
-- [ ] Existing `startupError` was rendered without a protobuf phase/schema change
+- [x] Exact events `server-info`, `client-count`, `hack-state`, and `coordination-state` were observed
+- [x] All four listeners registered before the initial status snapshot applied
+- [x] A newer event won over an older snapshot independently for each field
+- [x] Every listener released its underlying subscription exactly once
+- [x] Release during pending snapshot/callback and repeated release produced no late callback
+- [x] No duplicate effect resulted from any window-ready signal plus snapshot/event initialization
+- [x] Existing `startupError` was rendered without a protobuf phase/schema change
 
 ## Personal-Use macOS Package
 
@@ -200,15 +207,15 @@ build/bin/Fallout Terminal.app
 
 Inspect the final, already signed bundle. Use the repository's implementation-time package verification command/script for the complete inventory; do not modify the bundle after this point.
 
-- [ ] App exists at the established path
-- [ ] Executable is arm64 and minimum OS is macOS 13.0
-- [ ] Identifier/name/version/comments/copyright metadata are correct
-- [ ] Production plist, entitlements, and icon are present/correct
-- [ ] Master and player assets, generated player client, fonts, and sounds are present
-- [ ] `Contents/Resources/sessions/demo.json` is present with accepted read-only behavior
-- [ ] Final personal-use signature is valid and no resource was copied after signing
-- [ ] With external network unavailable, one app launch served master and local player successfully
-- [ ] Exactly one listener existed while running and quit released all owned resources within five seconds
+- [x] App exists at the established path
+- [x] Executable is arm64 and minimum OS is macOS 13.0
+- [x] Identifier/name/version/comments/copyright metadata are correct
+- [x] Production plist, entitlements, and icon are present/correct
+- [x] Master and player assets, generated player client, fonts, and sounds are present
+- [x] `Contents/Resources/sessions/demo.json` is present with accepted read-only behavior
+- [x] Final personal-use signature is valid and no resource was copied after signing
+- [x] With external network unavailable, one app launch served master and local player successfully
+- [x] Exactly one listener existed while running and quit released all owned resources within five seconds
 
 #### Personal-use package checkpoint — 2026-08-14
 
@@ -217,6 +224,13 @@ Inspect the final, already signed bundle. Use the repository's implementation-ti
 - `PASS` — offline personal-use smoke. One packaged application PID presented exactly one native window titled `Fallout Terminal — Master Control` and owned exactly one TCP listener on port 3690. A local generated Connect player received HTTP 200, hid its connection overlay, rendered the idle terminal, made nine typed RPC requests with WebSocket disabled, and made zero requests outside `http://127.0.0.1:3690`. Cmd+Q left no application process or listener immediately afterward.
 - `NOT RUN` — authenticated public/ngrok trust behavior; no real selected public endpoint or credentials were available.
 - `NOT RUN` — Developer ID, notarization, staple, DMG, and Gatekeeper trust gates; no installed release identity or selected notary profile was supplied. The passing ad-hoc personal-use signature is not represented as Developer ID evidence.
+
+#### Final-candidate personal-use package — 2026-08-14
+
+- `PASS` — candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` produced `build/bin/Fallout Terminal.app`; `scripts/verify-macos-app.sh` and `scripts/wails-v3-cutover-check.sh` both passed.
+- `PASS` — canonical bundle-manifest SHA-256 before smoke: `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57`.
+- `PASS` — the exact package launched with one PID and one listener; a local generated Connect client received HTTP 200, made nine typed RPC requests, made zero external requests, and used no WebSocket fallback. Cmd+Q released both process and listener.
+- `PASS` — canonical bundle-manifest SHA-256 after smoke remained `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57`.
 
 ## Local Mode and Soak
 
@@ -231,6 +245,13 @@ Inspect the final, already signed bundle. Use the repository's implementation-ti
 - Result: `PASS`
   Duration/environment/evidence: `60.67 minutes on 2026-08-14, macOS arm64; seven distinct players; 57 accepted navigation/hack operations; 28 rejected observer attempts; three retained-identity reconnects; two version-1 autosave/master-WebView-reopen cycles; 90 authoritative convergence checks; 192 typed sound requests; one listener throughout; cleanup in 0.014s. RSS samples (KiB): 15m [117936,117936,117952,117936,117936], 30m [128448,128432,128432,128416,128432], 60m [121312,121312,121328,121312,121312]. Both later medians did not exceed 125% of RSS15. Machine-readable evidence: /private/tmp/fallout-t067-result.json.`
 
+#### T080 final-package local soak — 2026-08-14
+
+- `PASS` — canonical bundle-manifest SHA-256 before and after the workload remained `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57`.
+- `PASS` — exact package PID `46826` ran for `60.67` minutes with seven distinct players, 53 accepted navigation/hack actions, 26 rejected observer attempts, three retained-handle reconnects, two native version-1 save/master-WebView-reopen cycles, 84 authoritative convergence checks, one typed hack request, 192 typed sound requests, and exactly one listener throughout.
+- `PASS` — RSS15 samples `[118656,118640,118640,118656,118640]` KiB (median `118640`), RSS30 `[132000,131968,131952,131968,131952]` KiB (median `131968`), and RSS60 `[122144,122128,122128,122144,122128]` KiB (median `122128`). Both later medians did not exceed 125% of RSS15, so `rssGrowthFailed=false`.
+- `PASS` — Cmd+Q released the application process and port-3690 listener; machine-readable evidence is `/private/tmp/fallout-t067-result.json`.
+
 ## Conditional Public Mode
 
 Run only with real ngrok credentials/connectivity. If unavailable, write `NOT RUN` and the reason; do not count it as public-mode passing evidence.
@@ -242,6 +263,13 @@ Run only with real ngrok credentials/connectivity. If unavailable, write `NOT RU
 - [x] / [ ] `PASS` — controlled tunnel loss preserved usable local play, credentials/private fields stayed isolated, and final cleanup released owned resources within five seconds
 - Result/reason: `PASS — 32.01 minutes on 2026-08-14 through the configured authenticated https://fallout-terminal.ngrok.app endpoint; seven distinct players, HTTP 401 without credentials, 20 accepted operations, 10 rejected observer attempts, two retained-identity reconnects, 32 convergence checks, 72 sound requests, and zero observer mutations. Terminating only owned ngrok PID 2700 removed the tunnel while app PID 2695 continued returning local HTTP 200; final app/listener/tunnel cleanup completed in 0.020s. The temporary Basic Auth password file was mode 0600, never printed or persisted in application/session/public evidence, and was deleted after the run. Machine-readable evidence: /private/tmp/fallout-t067-public-result.json.`
 
+#### T077 final-package authenticated public soak — 2026-08-14
+
+- `PASS` — canonical bundle-manifest SHA-256 before and after the public workload remained `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57`.
+- `PASS` — exact package PID `83847` and owned ngrok PID `83853` served the configured `https://fallout-terminal.ngrok.app` endpoint for `30.61` minutes. Seven distinct authenticated players completed 20 accepted actions, 10 rejected observer attempts, two retained-handle reconnects, 32 convergence checks, and 72 typed sound requests with zero observer mutations; an unauthenticated request returned HTTP 401.
+- `PASS` — terminating only ngrok PID `83853` made the public endpoint return HTTP 404 while the same app PID continued serving local HTTP 200. Final Cmd+Q released the app/listener/guardian resources.
+- `PASS` — the temporary Basic Auth password file used mode 0600, was never printed or persisted in application/session/public evidence, and was deleted after the run. Machine-readable evidence: `/private/tmp/fallout-t067-public-result.json`.
+
 ## Conditional Developer ID Release
 
 Run only for an explicitly selected public candidate with real installed identity and notary credentials.
@@ -251,12 +279,12 @@ scripts/build-macos.sh --preflight
 scripts/build-macos.sh
 ```
 
-- [ ] / [ ] `NOT RUN` — Developer ID replacement signature and hardened runtime
-- [ ] / [ ] `NOT RUN` — app notarization and staple
-- [ ] / [ ] `NOT RUN` — signed/notarized/stapled DMG
-- [ ] / [ ] `NOT RUN` — Gatekeeper checks without bypass
-- [ ] / [ ] `NOT RUN` — final SHA-256 and credential-redacted evidence
-- Result/reason: `________________________________`
+- [ ] / [x] `NOT RUN` — Developer ID replacement signature and hardened runtime
+- [ ] / [x] `NOT RUN` — app notarization and staple
+- [ ] / [x] `NOT RUN` — signed/notarized/stapled DMG
+- [ ] / [x] `NOT RUN` — Gatekeeper checks without bypass
+- [ ] / [x] `NOT RUN` — final Developer ID app and DMG SHA-256 evidence
+- Result/reason: `NOT RUN — security find-identity -v -p codesigning reported 0 valid identities. scripts/build-macos.sh --preflight stopped before any build/sign/upload because DEVELOPER_ID_APPLICATION was not set to an installed identity. Therefore Developer ID signing, hardened runtime verification, notary submission/staple, signed DMG creation, Gatekeeper, and their artifact digests were unavailable; the passing personal-use ad-hoc bundle is not represented as release-trust evidence.`
 
 ## Cutover Scan
 
@@ -264,13 +292,13 @@ Do not remove Wails v2 or run the final cutover scan until the required local so
 
 Run the implementation-provided source/generated/dependency/bundle/documentation scans plus a clean rebuild after v2 removal.
 
-- [ ] No Wails v2 import or module dependency remains
-- [ ] No v2 CLI command, `wails.json`, post-build hook, generated assumption, or runtime global remains active
-- [ ] No permanent v2/v3 feature flag or dual desktop implementation remains
-- [ ] No forbidden lifecycle/generic/native/player method appears in generated bindings
-- [ ] Active README, CI, scripts, and rollback instructions use the exact isolated `go tool -modfile=tools/wails/go.mod wails3 ...` commands
-- [ ] Historical completed specs and `docs/wails-migration-rollback.md` remain intact and labeled as history
-- [ ] Full required matrix and personal-use package gates passed against final cutover source
+- [x] No Wails v2 import or module dependency remains
+- [x] No v2 CLI command, `wails.json`, post-build hook, generated assumption, or runtime global remains active
+- [x] No permanent v2/v3 feature flag or dual desktop implementation remains
+- [x] No forbidden lifecycle/generic/native/player method appears in generated bindings
+- [x] Active README, CI, scripts, and rollback instructions use the exact isolated `go tool -modfile=tools/wails/go.mod wails3 ...` commands
+- [x] Historical completed specs and `docs/wails-migration-rollback.md` remain intact and labeled as history
+- [x] Full required matrix and personal-use package gates passed against final cutover source
 
 ## Rollback Drill
 
@@ -297,16 +325,16 @@ Use `docs/wails-v3-migration-rollback.md` after it is created. Work only on safe
 
 | Gate group | Result (`PASS`/`FAIL`/`NOT RUN`) | Evidence |
 |---|---|---|
-| Exact pins and clean setup |  |  |
-| Go and contract gates |  |  |
-| Bindings/facade/events |  |  |
-| Both frontends/player journeys |  |  |
-| Lifecycle/platform |  |  |
-| Personal-use package |  |  |
-| Local soak |  |  |
-| Rollback drill |  |  |
-| Public ngrok (conditional) |  |  |
-| Developer ID/notary/DMG (conditional) |  |  |
-| Final v2 cutover scans |  |  |
+| Exact pins and clean setup | `PASS` | Candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36`; Wails v3 beta.8 and isolated tool pins verified with locked installs and zero drift |
+| Go and contract gates | `PASS` | gofmt/vet/test/race, protobuf format/lint/generate/drift/breaking, and graph-isolation gates passed |
+| Bindings/facade/events | `PASS` | Two identical generations; exactly 25 methods/four events; facade ordering/release tests passed |
+| Both frontends/player journeys | `PASS` | Reproducible builds passed; Playwright 21 passed with only the separately executed real-ngrok case skipped |
+| Lifecycle/platform | `PASS` | Final native T024/T032/T037 rerun passed one-window, persistence, failure, 4–7-player, and cleanup journeys |
+| Personal-use package | `PASS` | Verified arm64/macOS 13 app; offline smoke; canonical manifest `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57` |
+| Local soak | `PASS` | Exact final bundle passed 60.67 minutes; RSS medians 118640/131968/122128 KiB; identity unchanged |
+| Rollback drill | `PASS` | Canonical v2 source `f1084b3df8b5630862bdf7a0f347b599156653ef` opened and exercised unchanged version-1 safety copies |
+| Public ngrok (conditional) | `PASS` | Exact final bundle passed 30.61 minutes, HTTP 401 anonymous rejection, two reconnects, controlled loss/local fallback |
+| Developer ID/notary/DMG (conditional) | `NOT RUN` | No installed Developer ID identity; preflight stopped before build/sign/upload |
+| Final v2 cutover scans | `PASS` | Final cutover check passed with no active v2, dual-runtime, floating-tool, stale-binding, or bundle surface |
 
 Wails v3 becomes accepted production only when every required non-conditional row passes against the same final source and pin set. Conditional rows may be `NOT RUN` only when their release profile was not selected or real external prerequisites were unavailable.
