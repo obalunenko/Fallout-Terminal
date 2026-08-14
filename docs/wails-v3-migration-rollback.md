@@ -113,6 +113,8 @@ accepted artifact identity. T069 froze the first v2-free clean commit,
 
 ## Qualification and Final Evidence
 
+BUG-001 replacement build candidate: `896d208c8b99ece1db31d5daf52c5d8fbd6762bc`, committed 2026-08-14T23:57:28+04:00 with Wails Go/CLI/frontend runtime `3.0.0-beta.8`, Buf `1.72.0`, protobuf Go `1.36.11`, and Connect `1.20.0`. Rows below that still name candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` are superseded pending their reopened final-matrix reruns.
+
 | Gate | Candidate/artifact identity | Result | Evidence/reason |
 | --- | --- | --- | --- |
 | Pre-removal 60-minute local soak | Pre-removal feature-006 worktree based on `bcb207704657a92f9902f4ac04ef11765b18f031`; packaged app PID 63116 | `PASS` | 60.67 minutes; seven players; 57 accepted operations; 28 rejected observer attempts; three reconnects; two durable version-1 save/reopen cycles; 90 convergence checks; RSS medians 117936/128432/121312 KiB; one listener; 0.014s cleanup |

@@ -4,7 +4,7 @@ This document describes the implementation target. It is not evidence that comma
 
 ## Candidate Identity
 
-- [x] Candidate Git SHA recorded: `56ac18c0587c4f30cdb3a50e7bb49e7694506a36`
+- [x] Candidate Git SHA recorded: `896d208c8b99ece1db31d5daf52c5d8fbd6762bc`
 - [x] Baseline rollback source verified: `f1084b3df8b5630862bdf7a0f347b599156653ef`
 - [x] Go module pin is exactly `github.com/wailsapp/wails/v3 v3.0.0-beta.8`
 - [x] `tools/wails/go.mod` declares only `tool github.com/wailsapp/wails/v3/cmd/wails3` and pins `github.com/wailsapp/wails/v3 v3.0.0-beta.8`, with its own committed `go.sum`
@@ -15,7 +15,7 @@ This document describes the implementation target. It is not evidence that comma
 - [x] Frontend runtime is exactly `@wailsio/runtime` `3.0.0-beta.8`, including the Vite plugin subpath
 - [x] Go/npm locks and CI/release pins agree; no Wails `latest`, caret, tilde, or unbounded range exists
 
-Candidate freeze: `56ac18c0587c4f30cdb3a50e7bb49e7694506a36`, committed 2026-08-14T16:18:53+04:00 after restoring the established historical-evidence marker required by the documentation contract. Later evidence-only commits do not redefine this build identity.
+Candidate freeze: `896d208c8b99ece1db31d5daf52c5d8fbd6762bc`, committed 2026-08-14T23:57:28+04:00 with the BUG-001 development application identity/icon correction. Exact pins remain Wails Go/CLI/frontend runtime `3.0.0-beta.8`, Buf `1.72.0`, protobuf Go `1.36.11`, and Connect `1.20.0`. Later evidence-only commits do not redefine this build identity. Final evidence below that names the earlier `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` candidate is superseded until its corresponding reopened task is rerun against this freeze.
 
 ## Clean Setup
 
