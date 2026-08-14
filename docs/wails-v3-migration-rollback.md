@@ -42,26 +42,26 @@ invent or prefill an artifact digest.
 
 ## Candidate and Cutover Identity
 
-These fields remain empty until the v2-free source, active operating
-documentation, pins, and locks are committed and the working tree is clean.
-Evidence-only commits may record the frozen candidate but must not redefine it.
+These fields were recorded only after the v2-free source, active operating
+documentation, pins, and locks were committed and the working tree was clean.
+Evidence-only commits record the frozen candidate but do not redefine it.
 
 | Field | Value |
 | --- | --- |
-| Build candidate commit |  |
-| Wails Go/runtime/CLI pin |  |
-| Frontend runtime/plugin pin |  |
+| Build candidate commit | `658071b7011197c4f229f6a5b1f109de2764fd69` |
+| Wails Go/runtime/CLI pin | `github.com/wailsapp/wails/v3 v3.0.0-beta.8`; isolated `wails3` tool at the same parent-module version |
+| Frontend runtime/plugin pin | `@wailsio/runtime` `3.0.0-beta.8`, including `@wailsio/runtime/plugins/vite` |
 | Personal-use app path | `build/bin/Fallout Terminal.app` |
 | Canonical bundle-manifest SHA-256 |  |
 | Cutover result | `NOT RUN` |
-| Cutover timestamp/environment |  |
+| Cutover timestamp/environment | Build candidate frozen 2026-08-14T16:09:18+04:00 on macOS arm64; final acceptance pending Phase 11 |
 
-The pre-removal qualification worktree is branch `006-wails-v3-migration`,
+The pre-removal qualification worktree was branch `006-wails-v3-migration`,
 based on commit `bcb207704657a92f9902f4ac04ef11765b18f031`. Its migration changes and
-evidence are intentionally uncommitted during the rollback drill and soak, so
-that base commit is provenance only—not the build candidate and not an accepted
-artifact identity. T069 records the first v2-free clean commit as the immutable
-build candidate.
+evidence were intentionally uncommitted during the rollback drill and soak, so
+that base commit remains provenance only—not the build candidate and not an
+accepted artifact identity. T069 froze the first v2-free clean commit,
+`658071b7011197c4f229f6a5b1f109de2764fd69`, as the immutable build candidate.
 
 ## Rollback Triggers
 

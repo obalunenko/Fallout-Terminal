@@ -4,16 +4,18 @@ This document describes the implementation target. It is not evidence that comma
 
 ## Candidate Identity
 
-- [ ] Candidate Git SHA recorded: `________________`
-- [ ] Baseline rollback source verified: `f1084b3df8b5630862bdf7a0f347b599156653ef`
-- [ ] Go module pin is exactly `github.com/wailsapp/wails/v3 v3.0.0-beta.8`
-- [ ] `tools/wails/go.mod` declares only `tool github.com/wailsapp/wails/v3/cmd/wails3` and pins `github.com/wailsapp/wails/v3 v3.0.0-beta.8`, with its own committed `go.sum`
-- [ ] `tools/buf/go.mod` declares only `tool github.com/bufbuild/buf/cmd/buf` and pins `github.com/bufbuild/buf v1.72.0`, with its own committed `go.sum`
-- [ ] `tools/protoc-gen-go/go.mod` declares only `tool google.golang.org/protobuf/cmd/protoc-gen-go` and pins `google.golang.org/protobuf v1.36.11`, with its own committed `go.sum`
-- [ ] `tools/protoc-gen-connect-go/go.mod` declares only `tool connectrpc.com/connect/cmd/protoc-gen-connect-go` and pins `connectrpc.com/connect v1.20.0`, with its own committed `go.sum`
-- [ ] Root `go.mod` and `go.sum` contain no tool declaration, tool-only dependency, or tool-only checksum
-- [ ] Frontend runtime is exactly `@wailsio/runtime` `3.0.0-beta.8`, including the Vite plugin subpath
-- [ ] Go/npm locks and CI/release pins agree; no Wails `latest`, caret, tilde, or unbounded range exists
+- [x] Candidate Git SHA recorded: `658071b7011197c4f229f6a5b1f109de2764fd69`
+- [x] Baseline rollback source verified: `f1084b3df8b5630862bdf7a0f347b599156653ef`
+- [x] Go module pin is exactly `github.com/wailsapp/wails/v3 v3.0.0-beta.8`
+- [x] `tools/wails/go.mod` declares only `tool github.com/wailsapp/wails/v3/cmd/wails3` and pins `github.com/wailsapp/wails/v3 v3.0.0-beta.8`, with its own committed `go.sum`
+- [x] `tools/buf/go.mod` declares only `tool github.com/bufbuild/buf/cmd/buf` and pins `github.com/bufbuild/buf v1.72.0`, with its own committed `go.sum`
+- [x] `tools/protoc-gen-go/go.mod` declares only `tool google.golang.org/protobuf/cmd/protoc-gen-go` and pins `google.golang.org/protobuf v1.36.11`, with its own committed `go.sum`
+- [x] `tools/protoc-gen-connect-go/go.mod` declares only `tool connectrpc.com/connect/cmd/protoc-gen-connect-go` and pins `connectrpc.com/connect v1.20.0`, with its own committed `go.sum`
+- [x] Root `go.mod` and `go.sum` contain no tool declaration, tool-only dependency, or tool-only checksum
+- [x] Frontend runtime is exactly `@wailsio/runtime` `3.0.0-beta.8`, including the Vite plugin subpath
+- [x] Go/npm locks and CI/release pins agree; no Wails `latest`, caret, tilde, or unbounded range exists
+
+Candidate freeze: `658071b7011197c4f229f6a5b1f109de2764fd69`, committed 2026-08-14T16:09:18+04:00 from a clean v2-free worktree. Later evidence-only commits do not redefine this build identity.
 
 ## Clean Setup
 
