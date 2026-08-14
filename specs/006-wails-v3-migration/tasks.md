@@ -8,12 +8,13 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-BUNDLE-IDENTITY-2026-08-14] Added canonical bundle hashing and froze active documentation before candidate capture.
 **Bugfix**: 2026-08-14 — [USER-BUILD-TOOL-DECISION] Replaced the Taskfile build model with a standard-library-only Go command and prohibited a Make/Task installation.
 **Bugfix**: 2026-08-14 — [BUG-001] Updated from bugfix patch; reopened development icon ownership, implementation, native verification, candidate capture, and the required final matrix.
+**Bugfix**: 2026-08-15 — [USER-SOAK-DECISION] Updated from bugfix patch; retired the 60-minute local and 30-minute authenticated-ngrok soak gates and removed both workloads from the final execution dependency chain.
 
 **Input**: Design documents from `/specs/006-wails-v3-migration/`
 
 **Prerequisites**: `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, and constitution 3.3.2
 
-**Testing**: This migration explicitly requires focused automated tests, deterministic generation, race testing, Playwright journeys, macOS package inspection, manual native journeys, soak, and rollback evidence. Tests use Testify, table-driven cases, `t.Context()`, and protobuf-aware comparison conventions.
+**Testing**: This migration explicitly requires focused automated tests, deterministic generation, race testing, Playwright journeys, macOS package inspection, manual native journeys, and rollback evidence. Prior soak results are historical and non-gating. Tests use Testify, table-driven cases, `t.Context()`, and protobuf-aware comparison conventions.
 
 **Organization**: Tasks are grouped by prioritized user story after shared setup and foundations. Constitution 3.3.2 supersedes older direct-CLI examples: third-party Go development tools are isolated under `tools/<tool>/`, invoked through their owning modules, and absent from the application `go.mod`; first-party orchestration is the standard-library-only `cmd/build` command.
 
@@ -196,7 +197,7 @@
 
 ## Phase 10: User Story 7 — Cut Over Safely with Immutable Wails v2 Rollback (Priority: P2)
 
-**Goal**: Prove rollback without data conversion, complete pre-removal parity/qualification-soak evidence, and remove every active Wails v2 path only after required gates pass.
+**Goal**: Prove rollback without data conversion, complete required parity evidence, retain any prior soak results as historical/non-gating, and remove every active Wails v2 path only after required gates pass.
 
 **Independent Test**: Verify the canonical v2 SHA, use safety copies for an actual rollback source/artifact journey, restore unchanged version-1 data, then scan final source/dependencies/bindings/bundle/docs for zero active v2 or dual-runtime path.
 
@@ -205,8 +206,8 @@
 - [x] T064 [US7] Complete actual candidate identity, rollback procedure, safety-copy steps, owner/expiry, trigger table, and evidence fields without inventing a v2 artifact hash in `docs/wails-v3-migration-rollback.md`
 - [x] T065 [US7] Update active Wails v2 operating links in `README.md` to point to `specs/006-wails-v3-migration/quickstart.md` and `docs/wails-v3-migration-rollback.md`, treating `specs/001-wails-v2-migration/` and `docs/wails-migration-rollback.md` as immutable historical evidence rather than edit targets
 - [x] T066 [US7] Perform the source or genuinely accepted-artifact rollback drill with safety copies and record actual version-1 master/player results in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`
-- [x] T067 [US7] Run the pre-removal qualification soak using the complete required 60-minute local workload with 4–7 players, 25 mixed operations, three reconnects, two save/reopen cycles, navigation, hacking, coordination, sound, convergence/revision checks, one listener, five `ps -o rss= -p <APP_PID>` samples ten seconds apart at minutes 15/30/60, failure when both later medians exceed 125% of the 15-minute median, and five-second post-quit cleanup; with real credentials/connectivity run the pre-removal 30-minute authenticated-ngrok qualification workload with 4–7 players, 15 mixed public operations, two reconnects, one unauthorized rejection, controlled tunnel-loss/local-fallback proof, convergence, isolation, and five-second cleanup, recording `PASS`, `FAIL`, or `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`; these qualification results permit v2 removal but do not replace T080 local and T077 public final-candidate reruns
-- [x] T068 [US7] Only after T066–T067 and every other required parity/package gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
+- [x] T067 [US7] ~~Run the pre-removal qualification soak using the complete required 60-minute local workload and 30-minute authenticated-ngrok workload, with final-candidate T080/T077 reruns.~~ Preserve both completed workloads as historical, non-gating evidence in `specs/006-wails-v3-migration/quickstart.md`; no long-duration soak rerun is required
+- [x] T068 [US7] Only after T066 and every other required parity/package gate passes, remove Wails v2 imports/dependency, `wails.json`, v2 post-build hook, v2 generated/global assumptions, obsolete workaround, and every temporary dual path from `main.go`, `internal/platform/desktop.go`, `go.mod`, `go.sum`, `wails.json`, `build/darwin/postbuild.sh`, and `frontend/src/desktop-api.js`
 - [x] T069 [US7] ⚠️ Reopened — After the BUG-001 correction and T054 evidence, commit all prior evidence separately; complete and commit `README.md` and every active operating document with the v2-free application/configuration source; require empty `git status --porcelain`; capture a new `BUILD_CANDIDATE_SHA=$(git rev-parse HEAD)` and the exact pin set; and only then record that identity in `docs/wails-v3-migration-rollback.md` and `specs/006-wails-v3-migration/quickstart.md`; before T070 and every later final task verify every tracked path except result/status fields in those two evidence files remains identical to the build candidate, never redefine it with an evidence-only commit, and commit a new candidate plus restart the final sequence at T070 if any frozen tracked path needs correction (reopened — BUG-001; depends on T054)
 
 **Checkpoint**: Rollback is real and data-compatible; the provisional candidate has zero active Wails v2 path or permanent switch and is ready for the one authoritative final matrix; unavailable external checks are never represented as passes.
@@ -220,17 +221,17 @@
 - [x] T070 ⚠️ Reopened — Run `scripts/tool-modules-check.sh`, isolated Buf format/lint/build/generation, `scripts/proto-drift-test.sh`, `scripts/proto-breaking.sh --all-fixtures`, graph-isolation checks, and `git diff --exit-code -- internal/gen client/gen`, leaving zero root-module or generated drift (reopened — BUG-001 candidate restart)
 - [x] T071 ⚠️ Reopened — Run two clean Wails binding generations plus `scripts/wails-bindings-check.sh`, leaving identical content/inventory, the exact allowlisted surface, and zero unexplained tracked drift in `frontend/bindings` (reopened — BUG-001 candidate restart)
 - [x] T072 ⚠️ Reopened — Run locked clean installs and production builds for `frontend/` and `client/`, then `scripts/reproducible-build-check.sh` and bundle scans for zero CDN/runtime download, v2 global, private generated JavaScript, privileged fallback, stale binding, or root-module drift in `frontend/dist/` and `client/dist/` (reopened — BUG-001 candidate restart)
-- [ ] T073 ⚠️ Reopened — Run `gofmt -l .`, `go vet ./...`, and `go test ./...`, fixing only migration-caused failures in `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, and affected packages under `internal/` (reopened — BUG-001 candidate restart)
-- [ ] T074 ⚠️ Reopened — Run `go test -race ./...` and resolve migration-caused lifecycle, stream, session-worker, event, or process ownership races in `app.go`, `wails_host.go`, `internal/player/`, `internal/session/`, `internal/tunnel/`, and `internal/platform/` (reopened — BUG-001 candidate restart)
-- [ ] T075 ⚠️ Reopened — Run `npm ci --prefix tests/browser` followed by the complete Playwright suite in `tests/browser/`, preserving all feature-005 multi-client, authority, replay, reconnect, overflow, sound, and privacy assertions (reopened — BUG-001 candidate restart)
-- [ ] T076 ⚠️ Reopened — Against the unchanged new v2-free build candidate, rerun `go run ./cmd/build dev` launch/stop; verify SC-023 through the running development plist/application identity and project-owned Dock/application-switcher icon without production-package mutation; then repeat the T024 one-window/persistence, T032 lifecycle-trigger, and T037 local 4–7-player journeys, recording BUG-001 and runtime/native results in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001)
-- [ ] T081 ⚠️ Reopened — Run `scripts/hash-macos-app.sh --self-test`, verify repeated identical output and sensitivity to file, mode, symlink, addition, and removal changes, and leave zero tracked drift in `scripts/hash-macos-app.sh` and `scripts/verify-macos-app.sh` (reopened — BUG-001 candidate restart)
-- [ ] T079 ⚠️ Reopened — Build the final personal-use macOS arm64 package from the unchanged build candidate, run `scripts/verify-macos-app.sh` and `scripts/wails-v3-cutover-check.sh`, calculate its canonical bundle-manifest SHA-256 with `scripts/hash-macos-app.sh`, repeat offline launch/one-listener/master-player-smoke/clean-quit against `build/bin/Fallout Terminal.app`, verify the same identity afterward, and record package results plus personal-use bundle identity in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001 candidate restart)
-- [ ] T080 ⚠️ Reopened — Verify the unchanged T079 canonical bundle-manifest SHA-256 with `scripts/hash-macos-app.sh`, execute the complete T067 60-minute local workload and RSS thresholds against `build/bin/Fallout Terminal.app`, verify the same identity afterward, and record local-soak results against that exact personal-use bundle identity in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001 candidate restart)
-- [ ] T077 ⚠️ Reopened — Against the same unchanged build candidate and with real prerequisites, verify the T079 canonical bundle-manifest SHA-256 with `scripts/hash-macos-app.sh` before and after the complete T067 30-minute authenticated-ngrok workload, then run `scripts/build-macos.sh` Developer ID/notary/staple/DMG/Gatekeeper gates and record a distinct canonical bundle-manifest digest for each Developer ID app plus a distinct file SHA-256 for each DMG/profile; otherwise record each unavailable conditional result as `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001 candidate restart)
-- [ ] T078 ⚠️ Reopened — Verify `README.md` and every frozen tracked path remain identical to the new `BUILD_CANDIDATE_SHA`, reconcile the immutable build candidate SHA, exact pins, commands, automated/manual results, `NOT RUN` reasons, artifact identities, final-candidate soak, rollback, cutover status, and BUG-001 result without modifying those frozen paths, update only result/status fields in `specs/006-wails-v3-migration/quickstart.md` and `docs/wails-v3-migration-rollback.md`, then rerun `scripts/wails-v3-cutover-check.sh`; if any frozen path requires correction, commit a new candidate and restart at T070 (reopened — BUG-001 candidate restart)
+- [x] T073 ⚠️ Reopened — Run `gofmt -l .`, `go vet ./...`, and `go test ./...`, fixing only migration-caused failures in `main.go`, `app.go`, `wails_host.go`, `desktop_service.go`, and affected packages under `internal/` (reopened — BUG-001 candidate restart)
+- [x] T074 ⚠️ Reopened — Run `go test -race ./...` and resolve migration-caused lifecycle, stream, session-worker, event, or process ownership races in `app.go`, `wails_host.go`, `internal/player/`, `internal/session/`, `internal/tunnel/`, and `internal/platform/` (reopened — BUG-001 candidate restart)
+- [x] T075 ⚠️ Reopened — Run `npm ci --prefix tests/browser` followed by the complete Playwright suite in `tests/browser/`, preserving all feature-005 multi-client, authority, replay, reconnect, overflow, sound, and privacy assertions (reopened — BUG-001 candidate restart)
+- [x] T076 ⚠️ Reopened — Against the unchanged new v2-free build candidate, rerun `go run ./cmd/build dev` launch/stop; verify SC-023 through the running development plist/application identity and project-owned Dock/application-switcher icon without production-package mutation; then repeat the T024 one-window/persistence, T032 lifecycle-trigger, and T037 local 4–7-player journeys, recording BUG-001 and runtime/native results in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001)
+- [x] T081 ⚠️ Reopened — Run `scripts/hash-macos-app.sh --self-test`, verify repeated identical output and sensitivity to file, mode, symlink, addition, and removal changes, and leave zero tracked drift in `scripts/hash-macos-app.sh` and `scripts/verify-macos-app.sh` (reopened — BUG-001 candidate restart)
+- [x] T079 ⚠️ Reopened — Build the final personal-use macOS arm64 package from the unchanged build candidate, run `scripts/verify-macos-app.sh` and `scripts/wails-v3-cutover-check.sh`, calculate its canonical bundle-manifest SHA-256 with `scripts/hash-macos-app.sh`, repeat offline launch/one-listener/master-player-smoke/clean-quit against `build/bin/Fallout Terminal.app`, verify the same identity afterward, and record package results plus personal-use bundle identity in `specs/006-wails-v3-migration/quickstart.md` (reopened — BUG-001 candidate restart)
+- [x] T080 ⚠️ Reopened — Retire the mandatory 60-minute final-package local-soak gate per USER-SOAK-DECISION, preserve prior results only as historical non-gating evidence, and remove this run from final acceptance in `spec.md`, `plan.md`, `tasks.md`, `specs/006-wails-v3-migration/quickstart.md`, and `docs/wails-v3-migration-rollback.md` (reopened — BUG-001 candidate restart; retired by USER-SOAK-DECISION)
+- [x] T077 ⚠️ Reopened — Run only the conditional `scripts/build-macos.sh` Developer ID/notary/staple/DMG/Gatekeeper gates with real release prerequisites and record a distinct canonical bundle-manifest digest for each Developer ID app plus a distinct file SHA-256 for each DMG/profile; otherwise record each unavailable conditional result as `NOT RUN` in `specs/006-wails-v3-migration/quickstart.md`. The 30-minute authenticated-ngrok workload is retired and requires no rerun (reopened — BUG-001 candidate restart; authenticated-ngrok workload retired by USER-SOAK-DECISION)
+- [x] T078 ⚠️ Reopened — Verify `README.md` plus every application, build, generated, lock, active operating, and package input remains identical to `BUILD_CANDIDATE_SHA`; reconcile the immutable candidate SHA, exact pins, commands, automated/manual results, `NOT RUN` release reasons, artifact identities, historical non-gating soak records, rollback, cutover status, BUG-001, and USER-SOAK-DECISION; then rerun `scripts/wails-v3-cutover-check.sh`. The explicit acceptance-scope patch may change `spec.md`, `plan.md`, `tasks.md`, Companion context, quickstart results, and rollback results without redefining the unchanged runtime candidate (reopened — BUG-001 candidate restart; reconciled after USER-SOAK-DECISION)
 
-**Checkpoint**: Every required gate, including clean browser tests, final native journeys, root development launch, package smoke, and local soak, is tied to one clean committed build candidate SHA/pin set and canonical profile-specific artifact identities; conditional evidence is honest; no test or contract assertion was weakened to obtain acceptance. Any frozen tracked-path change during the final sequence invalidates later evidence and restarts Phase 11 at T070 against a new build candidate. Evidence-only result/status changes require the final T078 documentation/cutover rescan but do not redefine or rebuild the unchanged candidate.
+**Checkpoint**: Every required gate, including clean browser tests, final native journeys, root development launch, and package smoke, is tied to one clean committed build candidate SHA/pin set and canonical profile-specific artifact identities; conditional release evidence is honest; both retired soak workloads are non-gating. Any application, build, generated, lock, active operating, or package-input change during the final sequence invalidates later evidence and restarts Phase 11 at T070 against a new build candidate. The explicit USER-SOAK-DECISION artifact patch and result/status changes require the final T078 consistency/cutover rescan but do not redefine or rebuild the unchanged runtime candidate.
 
 ---
 
@@ -271,7 +272,7 @@ Phase 2 isolated pins + host/service/status foundation
 - T024, T032, and T037 run only after T041–T046 complete, so no final native journey can pass through a v2/global binding fallback or before readiness behavior exists.
 - US5 requires the integrated P1 checkpoint; US6 requires the stable build graph; US7 requires all parity and personal-package gates.
 - BUG-001 correction order is T047 → T048 → T054 → T069 → the existing sequential T070–T078 final matrix; the development identity is not a package artifact and must not mutate the production `.app`.
-- Within US7, T066 rollback and T067 soak must pass before T068 removes v2; T069 then records the provisional v2-free candidate and hands it to the authoritative Phase 11 matrix without accepting it.
+- Within US7, T066 rollback must pass before T068 removes v2; both completed T067 soak workloads are historical and non-gating. T069 then records the provisional v2-free candidate and hands it to the authoritative Phase 11 matrix without accepting it.
 - Final cross-cutting verification runs only after the cutover candidate contains no active v2 implementation.
 
 ### User-story completion order
@@ -284,7 +285,7 @@ Phase 2 isolated pins + host/service/status foundation
 | US4 — bridge/events | Phase 2 | exact 25 methods/four events pass generation, shape, race, release, and forbidden-surface checks |
 | US5 — reproducible development | integrated P1 checkpoint | isolated tools and one ordered root graph produce repeatable clean generations/builds and launch the project-owned macOS development identity/icon without mutating the production package |
 | US6 — personal package | US5 | final pre-sign resource inventory and ad-hoc arm64 app pass offline smoke |
-| US7 — rollback/cutover | US1–US6 | rollback drill and soak are recorded, then final source scans contain zero active v2/dual path |
+| US7 — rollback/cutover | US1–US6 | rollback drill and applicable release-profile result are recorded, then final source scans contain zero active v2/dual path; long-duration soaks are not gates |
 
 ## Parallel Opportunities
 
@@ -313,11 +314,11 @@ Phase 2 isolated pins + host/service/status foundation
 
 - T047 build-graph tests can precede graph implementation while documentation work stays sequential with final commands.
 - T055 package tests can run independently before Darwin task changes.
-- T062 rollback assertions and T063 cutover scanner can run in parallel; T066 rollback and T067 soak precede T068 final removal, and T069 follows it.
+- T062 rollback assertions and T063 cutover scanner can run in parallel; T066 rollback precedes T068 final removal, all T067 soak evidence is historical/non-gating, and T069 follows cutover.
 
 ### Final verification
 
-- Final verification executes in file order as T070 → T071 → T072 → T073 → T074 → T075 → T076 → T081 → T079 → T080 → T077 → T078: tool/protobuf state → Wails bindings → locked frontend builds → Go tests → race tests → clean Playwright install/suite → final native journeys → bundle-hash preflight → package/offline smoke → local soak → conditional public soak/release → evidence reconciliation/final documentation scan. Only subcommands explicitly proven to use disjoint immutable inputs may run concurrently within one task.
+- Final verification executes in file order as T070 → T071 → T072 → T073 → T074 → T075 → T076 → T081 → T079 → T077 → T078: tool/protobuf state → Wails bindings → locked frontend builds → Go tests → race tests → clean Playwright install/suite → final native journeys → bundle-hash preflight → package/offline smoke → conditional release-signing checks → evidence reconciliation/final documentation scan. T080 is an administrative retirement of the removed local-soak gate, and T077 no longer includes an authenticated-ngrok workload. Only subcommands explicitly proven to use disjoint immutable inputs may run concurrently within one task.
 
 ## Implementation Strategy
 
@@ -326,14 +327,14 @@ Phase 2 isolated pins + host/service/status foundation
 1. Complete Phase 1 so tool isolation and design contracts are consistent.
 2. Complete Phase 2 so the host, exact service surface, unchanged runtime-status contract, and build skeleton compile.
 3. Complete the US1–US4 implementation slices, then run T024, T032, and T037 only at the integrated P1 native-acceptance checkpoint.
-4. Do not designate the MVP production-ready; Wails v2 remains fallback until every P1, package, soak, and rollback gate passes.
+4. Do not designate the MVP production-ready; Wails v2 remains fallback until every P1, package, rollback, and selected-profile release gate passes. Long-duration local and authenticated-ngrok soaks are not acceptance gates.
 
 ### Incremental delivery
 
 1. Prove master behavior (US1), lifecycle ownership (US2), player parity (US3), and bridge/events (US4) as attributable P1 checkpoints.
 2. Freeze those behaviors before completing deterministic build orchestration (US5).
 3. Package and inspect the personal-use app (US6) without invoking unavailable public trust gates.
-4. Perform rollback/soak, remove v2, rebuild, and cut over only after the complete required matrix passes (US7).
+4. Perform rollback, remove v2, rebuild, and cut over only after the complete required matrix passes (US7); retain prior soak runs as historical evidence only.
 
 ## Notes
 

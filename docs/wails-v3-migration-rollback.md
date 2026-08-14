@@ -2,7 +2,10 @@
 
 This record governs the bounded Wails v2-to-v3 migration in feature 006. The
 accepted pre-migration Wails v2 source remains the production fallback until
-every required personal-use parity, package, soak, and rollback gate passes.
+every required personal-use parity, package, and rollback gate passes. The
+60-minute local and 30-minute authenticated-ngrok soak workloads were removed
+from acceptance by USER-SOAK-DECISION on 2026-08-15; any completed soak result
+below is historical and non-gating.
 The Electron-to-Wails record in `docs/wails-migration-rollback.md` is immutable
 historical evidence and is not a rollback authority for this migration.
 
@@ -48,20 +51,23 @@ Evidence-only commits record the frozen candidate but do not redefine it.
 
 | Field | Value |
 | --- | --- |
-| Build candidate commit | `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` |
+| Build candidate commit | `02582af74b1ea63faa040ffe7e79a96f16d154d6` |
 | Wails Go/runtime/CLI pin | `github.com/wailsapp/wails/v3 v3.0.0-beta.8`; isolated `wails3` tool at the same parent-module version |
 | Frontend runtime/plugin pin | `@wailsio/runtime` `3.0.0-beta.8`, including `@wailsio/runtime/plugins/vite` |
 | Personal-use app path | `build/bin/Fallout Terminal.app` |
-| Canonical bundle-manifest SHA-256 |  |
-| Cutover result | `NOT RUN` |
-| Cutover timestamp/environment | Build candidate frozen 2026-08-14T16:18:53+04:00 on macOS arm64; final acceptance pending Phase 11 |
+| Canonical bundle-manifest SHA-256 | `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57` |
+| Cutover result | `PASS` |
+| Cutover timestamp/environment | Candidate frozen 2026-08-15T00:16:45+04:00 on macOS arm64; final matrix passed, with both long-duration soak workloads removed from acceptance by USER-SOAK-DECISION |
 
 The pre-removal qualification worktree was branch `006-wails-v3-migration`,
 based on commit `bcb207704657a92f9902f4ac04ef11765b18f031`. Its migration changes and
 evidence were intentionally uncommitted during the rollback drill and soak, so
 that base commit remains provenance only—not the build candidate and not an
-accepted artifact identity. T069 froze the first v2-free clean commit,
-`56ac18c0587c4f30cdb3a50e7bb49e7694506a36`, as the immutable build candidate.
+accepted artifact identity. T069 initially froze a v2-free candidate; after
+BUG-001 and the package-order test correction,
+`02582af74b1ea63faa040ffe7e79a96f16d154d6` became the immutable runtime build
+candidate. The later USER-SOAK-DECISION changes acceptance artifacts only and
+does not redefine that runtime identity.
 
 ## Rollback Triggers
 
@@ -117,14 +123,14 @@ BUG-001 replacement build candidate: `02582af74b1ea63faa040ffe7e79a96f16d154d6`,
 
 | Gate | Candidate/artifact identity | Result | Evidence/reason |
 | --- | --- | --- | --- |
-| Pre-removal 60-minute local soak | Pre-removal feature-006 worktree based on `bcb207704657a92f9902f4ac04ef11765b18f031`; packaged app PID 63116 | `PASS` | 60.67 minutes; seven players; 57 accepted operations; 28 rejected observer attempts; three reconnects; two durable version-1 save/reopen cycles; 90 convergence checks; RSS medians 117936/128432/121312 KiB; one listener; 0.014s cleanup |
-| Pre-removal authenticated-ngrok soak | Same pre-removal worktree; app PID 2695; owned ngrok PID 2700; configured protected endpoint | `PASS` | 32.01 minutes; seven players; unauthenticated HTTP 401; 20 accepted operations; 10 rejected observer attempts; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; 0.020s final cleanup; temporary credential deleted |
-| Final-candidate native journeys | Candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` | `PASS` | One native dev app/window/listener; unchanged version-1 session/config reopen; 4–7 players, 32 actions, three reconnects, 80 sound requests; handled interrupt cleanup |
+| Historical pre-removal 60-minute local soak (non-gating) | Pre-removal feature-006 worktree based on `bcb207704657a92f9902f4ac04ef11765b18f031`; packaged app PID 63116 | `HISTORICAL PASS` | 60.67 minutes; seven players; 57 accepted operations; 28 rejected observer attempts; three reconnects; two durable version-1 save/reopen cycles; 90 convergence checks; RSS medians 117936/128432/121312 KiB; one listener; 0.014s cleanup; retained for history only |
+| Historical pre-removal authenticated-ngrok soak (non-gating) | Same pre-removal worktree; app PID 2695; owned ngrok PID 2700; configured protected endpoint | `HISTORICAL PASS` | 32.01 minutes; seven players; unauthenticated HTTP 401; 20 accepted operations; 10 rejected observer attempts; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; 0.020s final cleanup; temporary credential deleted |
+| Final-candidate native journeys | Candidate `02582af74b1ea63faa040ffe7e79a96f16d154d6` | `PASS` | One native dev app/window/listener with project-owned identity/icon; unchanged version-1 session/config reopen; 4–7 players, 32 actions, three reconnects, 80 sound requests; handled interrupt cleanup |
 | Final personal-use package/offline smoke | Canonical bundle `7672ac4679ddb9dbfe0d1e93118f3f15250117caa59040ef6cb8fc6965365a57` | `PASS` | Package verification and cutover scan passed; offline generated-Connect smoke made nine RPCs and zero external requests; hash unchanged after quit |
-| Final-candidate 60-minute local soak | Same canonical bundle; app PID 46826 | `PASS` | 60.67 minutes; seven players; 53 accepted/26 rejected actions; three reconnects; two durable save/reopens; 84 convergence checks; RSS medians 118640/131968/122128 KiB; clean quit; hash unchanged |
-| Final authenticated-ngrok soak | Same canonical bundle; app PID 83847; owned ngrok PID 83853 | `PASS` | 30.61 minutes; seven players; unauthenticated HTTP 401; 20 accepted/10 rejected actions; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; credential deleted; hash unchanged |
+| Historical final-candidate 60-minute local soak (non-gating) | Earlier canonical bundle; app PID 46826 | `HISTORICAL PASS` | 60.67 minutes; seven players; 53 accepted/26 rejected actions; three reconnects; two durable save/reopens; 84 convergence checks; RSS medians 118640/131968/122128 KiB; clean quit; hash unchanged; no rerun required |
+| Historical final authenticated-ngrok soak (non-gating) | Earlier canonical bundle; app PID 83847; owned ngrok PID 83853 | `HISTORICAL PASS` | 30.61 minutes; seven players; unauthenticated HTTP 401; 20 accepted/10 rejected actions; two reconnects; 32 convergence checks; controlled tunnel loss preserved local HTTP 200; credential deleted; hash unchanged; no rerun required |
 | Developer ID/notary/staple/DMG/Gatekeeper | No release artifact produced | `NOT RUN` | `security find-identity` found 0 valid identities; release preflight stopped before build/sign/upload because `DEVELOPER_ID_APPLICATION` was unavailable |
-| Final active-v2/cutover scan | Candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` | `PASS` | No active v2, dual-runtime, floating-tool, generated-global, dependency, bundle, script, CI, or operating-document surface remained |
+| Final active-v2/cutover scan | Candidate `02582af74b1ea63faa040ffe7e79a96f16d154d6` plus the USER-SOAK-DECISION acceptance-artifact patch | `PASS` | No active v2, dual-runtime, floating-tool, generated-global, dependency, bundle, script, CI, or operating-document surface remained |
 
 Wails v3 is accepted only after every required non-conditional gate is `PASS`
 against the frozen v2-free build candidate and its recorded personal-use
