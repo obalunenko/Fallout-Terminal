@@ -113,7 +113,7 @@ accepted artifact identity. T069 froze the first v2-free clean commit,
 
 ## Qualification and Final Evidence
 
-BUG-001 replacement build candidate: `896d208c8b99ece1db31d5daf52c5d8fbd6762bc`, committed 2026-08-14T23:57:28+04:00 with Wails Go/CLI/frontend runtime `3.0.0-beta.8`, Buf `1.72.0`, protobuf Go `1.36.11`, and Connect `1.20.0`. Rows below that still name candidate `56ac18c0587c4f30cdb3a50e7bb49e7694506a36` are superseded pending their reopened final-matrix reruns.
+BUG-001 replacement build candidate: `02582af74b1ea63faa040ffe7e79a96f16d154d6`, committed 2026-08-15T00:16:45+04:00 with Wails Go/CLI/frontend runtime `3.0.0-beta.8`, Buf `1.72.0`, protobuf Go `1.36.11`, and Connect `1.20.0`. Candidate `896d208c8b99ece1db31d5daf52c5d8fbd6762bc` was abandoned after the full Go gate exposed test-only package-order drift, and the final sequence restarted at T070. Rows below that still name an earlier candidate are superseded pending their reopened final-matrix reruns.
 
 | Gate | Candidate/artifact identity | Result | Evidence/reason |
 | --- | --- | --- | --- |
