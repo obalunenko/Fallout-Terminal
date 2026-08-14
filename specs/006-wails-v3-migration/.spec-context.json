@@ -3,7 +3,7 @@
   "specName": "wails v3 migration",
   "branch": "006-wails-v3-migration",
   "currentStep": "implement",
-  "status": "completed",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -715,6 +715,41 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-14T17:16:03.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-14T19:45:28.340Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:46:31.698Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:47:41.003Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T19:56:41.337Z",
+      "reopened": true
     }
   ],
   "last_action": "completed all 73 implementation tasks; final candidate 56ac18c and canonical bundle 7672ac4679 passed every required gate; Developer ID release gates honestly NOT RUN",
@@ -1026,7 +1061,7 @@
       "command": "security find-identity -v -p codesigning; scripts/build-macos.sh --preflight"
     }
   ],
-  "currentTask": "T078",
+  "currentTask": "T054",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1652,6 +1687,30 @@
       "did": "Verified README and every frozen build path identical to candidate 56ac18c; reconciled exact pins, all automated/native/soak/rollback/package results, honest Developer ID NOT RUN reason, bundle identity, and final cutover PASS using only evidence/workflow files.",
       "files": [
         "specs/006-wails-v3-migration/quickstart.md docs/wails-v3-migration-rollback.md"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Added BUG-001 regression coverage for development plist/icon assembly, bundle launch, and production-package isolation; focused tests fail on the current bare-executable graph as intended",
+      "files": [
+        "internal/buildtool/buildtool_test.go",
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Changed dev/run to assemble build/dev/Fallout Terminal.app with Info.dev.plist, generated project icon, bundled demo, dedicated bundle identifier, and inner-bundle launch while leaving the production package untouched",
+      "files": [
+        "internal/buildtool/buildtool.go",
+        "build/darwin/Info.dev.plist"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Verified the real root dev launch uses the development bundle/plist/icon, shows the project Dock icon, owns one listener, shuts down cleanly, and leaves the production bundle digest unchanged",
+      "files": [
+        "specs/006-wails-v3-migration/quickstart.md",
+        ".gitignore"
       ]
     }
   },

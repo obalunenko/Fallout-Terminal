@@ -52,8 +52,8 @@ func Plan(action string, applicationArguments []string) ([]Step, error) {
 	case "build":
 		return append(preparePlan(), buildSteps()...), nil
 	case "dev", "run":
-		steps := append(preparePlan(), buildSteps()...)
-		return append(steps, commandStep("run application", filepath.Join("build", "bin", applicationName), applicationArguments...)), nil
+		steps := append(preparePlan(), developmentSteps()...)
+		return append(steps, commandStep("run development application", developmentExecutable(), applicationArguments...)), nil
 	case "package":
 		return append(preparePlan(), packageSteps()...), nil
 	default:
@@ -77,6 +77,33 @@ func buildSteps() []Step {
 		{Name: "create binary output directory", Operation: makeDirectory, Path: filepath.Join("build", "bin"), Mode: 0o755},
 		compileStep(filepath.Join("build", "bin", applicationName)),
 	}
+}
+
+func developmentSteps() []Step {
+	app := developmentBundle()
+	contents := filepath.Join(app, "Contents")
+	macOS := filepath.Join(contents, "MacOS")
+	resources := filepath.Join(contents, "Resources")
+	executable := filepath.Join(macOS, applicationName)
+
+	return []Step{
+		{Name: "remove previous development application bundle", Operation: removeTree, Path: app},
+		{Name: "create development application executable directory", Operation: makeDirectory, Path: macOS, Mode: 0o755},
+		{Name: "create development bundled session directory", Operation: makeDirectory, Path: filepath.Join(resources, "sessions"), Mode: 0o755},
+		{Name: "install development application metadata", Operation: copyFile, Source: filepath.Join("build", "darwin", "Info.dev.plist"), Destination: filepath.Join(contents, "Info.plist"), Mode: 0o644},
+		commandStep("install development application icon", "go", "tool", "-modfile=tools/wails/go.mod", "wails3", "generate", "icons", "-input", filepath.Join("build", "appicon.png"), "-macfilename", filepath.Join(resources, "icon.icns"), "-windowsfilename", filepath.Join(resources, "icon.ico")),
+		{Name: "install development bundled demo", Operation: copyFile, Source: filepath.Join("sessions", "demo.json"), Destination: filepath.Join(resources, "sessions", "demo.json"), Mode: 0o444},
+		compileStep(executable),
+		{Name: "make development application executable", Operation: changeMode, Path: executable, Mode: 0o755},
+	}
+}
+
+func developmentBundle() string {
+	return filepath.Join("build", "dev", applicationName+".app")
+}
+
+func developmentExecutable() string {
+	return filepath.Join(developmentBundle(), "Contents", "MacOS", applicationName)
 }
 
 func packageSteps() []Step {
@@ -163,8 +190,11 @@ func execute(ctx context.Context, root string, step Step) error {
 		if err != nil {
 			return err
 		}
-		expected := filepath.Join(filepath.Clean(root), "build", "bin", applicationName+".app")
-		if target != expected {
+		allowed := map[string]struct{}{
+			filepath.Join(filepath.Clean(root), "build", "bin", applicationName+".app"): {},
+			filepath.Join(filepath.Clean(root), developmentBundle()):                    {},
+		}
+		if _, ok := allowed[target]; !ok {
 			return fmt.Errorf("refusing to remove unexpected path %q", target)
 		}
 		return os.RemoveAll(target)

@@ -8,6 +8,7 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-2026-08-14] Aligned active Wails commands with constitution 3.3.1, reaffirmed the unchanged feature-005 runtime-status contract, and made soak acceptance measurable.
 **Bugfix**: 2026-08-14 — [ANALYZE-CUTOVER-2026-08-14] Made cutover evidence ordering, historical immutability, RSS sampling, and the conditional public-soak workload deterministic.
 **Bugfix**: 2026-08-14 — [USER-BUILD-TOOL-DECISION] Aligned the feature with constitution 3.3.2 and replaced Taskfile orchestration with the already-required Go toolchain.
+**Bugfix**: 2026-08-14 — [BUG-001] Clarified that the root development launch must use the project-owned macOS application identity and icon rather than a generic executable identity.
 
 ## Source of Truth and Scope
 
@@ -31,6 +32,7 @@ The migration starts now against one concrete, verified-compatible set of exact 
 
 - Q: Does startup observability require a new serialized lifecycle phase? → A: No. Internal phase remains host-owned and test-observable; the master derives starting, ready-local, ready-public, and failed presentation from the existing feature-005 runtime-status fields and renders the existing `startupError` without a protobuf or native-shape change.
 - Q: How are repository-owned Go development tools invoked? → A: Each tool has one isolated `tools/<tool>/` module, repository commands use `go tool -modfile=tools/<tool>/go.mod <command>`, and the root application module contains no tool declaration or tool-only dependency.
+- Q: How must the macOS development command preserve the application icon? → A: The repository-owned `dev`/`run` graph must assemble and launch a development application identity that consumes `build/darwin/Info.dev.plist` and the icon generated from `build/appicon.png`; it must remain distinct from, and must not overwrite or qualify as, the signed personal-use package.
 
 ## User Scenarios & Testing
 
@@ -123,6 +125,7 @@ A developer installs documented pinned prerequisites and uses one repository-roo
 3. **Given** two consecutive clean builds, **When** their inputs and selected profile are identical, **Then** both complete from the root without an undeclared development server, manually prebuilt asset, or floating `latest` resolution.
 4. **Given** the repository verification suite, **When** it is adapted for Wails v3, **Then** existing assertions are preserved or strengthened rather than removed or weakened to obtain a pass.
 5. **Given** the pinned Wails v3 Go, CLI, frontend runtime, and plugin versions, **When** their compatibility is checked, **Then** all recorded versions are exact, mutually compatible, and consistent across source, lockfiles, documentation, automation, and generated output.
+6. **Given** the repository-owned development command on macOS, **When** the native host appears in the Dock and application switcher, **Then** macOS identifies it as Fallout Terminal and displays the project-owned icon generated from `build/appicon.png`, not the generic executable icon.
 
 ---
 
@@ -222,7 +225,7 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **FR-027**: The generated Wails v3 desktop binding inventory MUST contain every required private operation and zero lifecycle methods, generic dispatchers, arbitrary filesystem, process, environment, or browser primitives, or public player procedures.
 - **FR-028**: `Start` and `Shutdown` MUST remain internal lifecycle operations and MUST NOT appear in generated desktop bindings, while `CopyDemo` MUST remain a private operation with its accepted explicit-copy semantics and no newly introduced UI control.
 - **FR-029**: Planning MUST select one concrete, mutually compatible, verified Wails v3 beta set for the Go module, CLI, frontend runtime, and frontend plugin, record every exact version in source and lockfiles, proceed without waiting for general availability, and permit no active source or CI command to name or resolve `@latest`.
-- **FR-030**: A developer with the documented pinned prerequisites MUST be able to run `go run ./cmd/build dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor.
+- **FR-030**: A developer with the documented pinned prerequisites MUST be able to run `go run ./cmd/build dev` once from the repository root to start the complete development system without separately starting a frontend, player listener, or tunnel supervisor. On macOS, the launched development host MUST consume `build/darwin/Info.dev.plist` and the icon generated from `build/appicon.png` through a repository-owned application identity so the Dock and application switcher do not show a generic executable icon.
 - **FR-031**: The repository MUST use a standard-library-only Go build command, explicit pinned Wails binding generation, and project-owned build assets so a clean checkout deterministically generates Wails bindings and protobuf code, builds both the `frontend/` and `client/` Vite applications and embedded resources, runs applicable tests, builds the native application, and packages the supported target without Taskfile, Make, or another undeclared manual prerequisite.
 - **FR-032**: Clean binding and protobuf generation MUST be reproducible across two consecutive runs and MUST leave no unexplained tracked diff or manually edited generated file.
 - **FR-033**: Two consecutive clean native builds with identical inputs MUST complete successfully without relying on stale generated output, a development server, a network-time package lookup, or a separately started process.
@@ -278,6 +281,7 @@ Before final cutover, the owner can return to one immutable accepted Wails v2 so
 - **SC-020**: Final source, dependency, binding, configuration, command, bundle, test, and active-documentation scans find zero active `github.com/wailsapp/wails/v2` import, v2 CLI installation, v2 `wails` command where `wails3` is required, v2 `frontend/wailsjs` dependency, v2 runtime global, obsolete v2 configuration, or permanent dual-runtime code.
 - **SC-021**: Final public-listener inspection finds exactly one generated `fallout.terminal.player.v1.PlayerService` surface and zero Wails, private desktop, legacy WebSocket, health, reflection, or generic capability-discovery exposure.
 - **SC-022**: Any candidate exhibiting session corruption, bridge drift, master or player parity loss, lifecycle leakage, public-access regression, missing package assets, an unhandled beta-runtime crash, or package/signature failure is recorded as failed and does not replace the Wails v2 fallback.
+- **SC-023**: One `go run ./cmd/build dev` launch on macOS resolves to a repository-owned development application identity whose metadata references a non-empty generated `icon.icns`; native inspection confirms the running Dock/application-switcher item displays the Fallout Terminal icon rather than the generic executable icon, and the production package path and signature remain unchanged.
 
 ## Assumptions
 

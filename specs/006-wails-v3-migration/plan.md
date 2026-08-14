@@ -6,6 +6,7 @@
 **Bugfix**: 2026-08-14 — [ANALYZE-FINAL-CANDIDATE-2026-08-14] Added clean browser-test installation, final-candidate native/soak reruns, and non-self-referential evidence identity.
 **Bugfix**: 2026-08-14 — [ANALYZE-ATTRIBUTABLE-CANDIDATE-2026-08-14] Required a clean committed build candidate and separated final native, package, and soak attribution.
 **Bugfix**: 2026-08-14 — [ANALYZE-BUNDLE-IDENTITY-2026-08-14] Defined a canonical app-bundle digest and made final active documentation verification-only.
+**Bugfix**: 2026-08-14 — [BUG-001] Updated from bugfix patch; clarified development application metadata/icon ownership and verification.
 
 **Branch**: `006-wails-v3-migration` | **Date**: 2026-08-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/006-wails-v3-migration/spec.md`
@@ -162,6 +163,8 @@ The lifecycle service maps Wails startup into the existing bounded core startup.
 
 `internal/platform` wraps Wails v3 managers for dialogs, browser, and event emission while preserving all defaults/cancel/validation semantics. The repository Go command replaces active `wails.json` orchestration; its graph builds player, generates bindings, builds master, packages, copies all resources, then signs. Output remains `build/bin/Fallout Terminal.app`.
 
+For `dev` and `run` on macOS, the same Go graph assembles a separate repository-owned development application identity, installs `build/darwin/Info.dev.plist`, generates `icon.icns` from `build/appicon.png`, and launches the executable from that identity. Development assembly must not overwrite, mutate, sign, or serve as acceptance evidence for `build/bin/Fallout Terminal.app`; the production package path and final-signature ordering remain unchanged.
+
 ## Bounded Migration Checkpoints
 
 Each checkpoint must leave an attributable test/evidence boundary. Do not collapse these into one commit.
@@ -195,6 +198,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 ### Checkpoint 3 — Complete v3 build graph and personal-use package
 
 - Make protobuf verification, player build, binding generation, and master build explicit nonrecursive prerequisites for dev/build/package.
+- Make `dev` and `run` assemble and launch the project-owned macOS development identity with the development plist and icon, while keeping it isolated from the personal-use package.
 - Replace v2 post-build resources with pre-sign bundle assembly; preserve resource-root behavior.
 - Package macOS 13 arm64 at the established path and inspect all assets/metadata/entitlements/icon/signature.
 - Add and test one canonical bundle-manifest SHA-256 procedure using byte-sorted bundle-relative paths, entry type, POSIX mode, regular-file content digest, and symlink target while excluding timestamps and host-specific extended attributes.
@@ -244,7 +248,7 @@ Each checkpoint must leave an attributable test/evidence boundary. Do not collap
 | Frontends | `npm ci` and production build for both `frontend/` and `client/`; bundle scans | visual master/player parity | only v3 master binding path; no CDN/runtime download; player independent of Wails |
 | Player | clean `npm ci --prefix tests/browser` followed by all feature-005 Go/Playwright gates: 4–7 clients, reconnect, replay, concurrency, overflow, sound manifest/playback, privacy | local journeys; credential-gated public journey | zero protocol/behavior/privacy regression; public unavailable evidence is `NOT RUN` |
 | Startup/shutdown | lifecycle unit/host integration, occupied port, adapter/event failure, tunnel fallback/invalid URL, partial/repeat/timeout triggers | close, Cmd+Q, dev interrupt | failure actionable; local fallback; reverse cleanup within 5s; no leaks |
-| Build graph | clean Go-plan source assertions, protobuf→player→bindings→master ordering, two clean native builds | `go run ./cmd/build dev` from clean setup | one root dev command; no recursion/race/stale output/floating lookup |
+| Build graph | clean Go-plan source assertions, protobuf→player→bindings→master ordering, two clean native builds, and `dev`/`run` development-plist/icon ownership without production-package mutation | `go run ./cmd/build dev` from clean setup; inspect the running macOS application identity and Dock/application-switcher icon | one root dev command; no recursion/race/stale output/floating lookup; project-owned icon instead of a generic executable icon |
 | Personal package | `go run ./cmd/build package`; architecture/plist/minimum/entitlements/icon/resource/signature scans; canonical bundle-manifest digest | offline single launch, one listener, master/player smoke, clean quit | final ad-hoc signed macOS 13 arm64 app at established path with stable before/after bundle identity |
 | Public release | release-script preflight and credential-backed sign/notary/staple/DMG/Gatekeeper only when available | public ngrok soak and installed package check | real evidence required; otherwise explicitly `NOT RUN` |
 | Soak/rollback | source/hash/data-safety assertions; v2/v3 forbidden scans | pre-removal qualification and final v2-free-candidate 60-minute local workloads with median-RSS sampling; conditional final-candidate 30-minute authenticated-ngrok workload with authorization/fallback checks; rollback drill using safety copies | rollback and qualification soak pass before v2 removal; the same required local workload passes against the final build candidate; exact thresholds and actual results are tied to the applicable candidate; no simulated pass |
@@ -269,4 +273,4 @@ PASS after the 2026-08-14 reconciliation. The contracts keep Wails at governed b
 
 ## Complexity Tracking
 
-No constitution violation requires justification. The separate lifecycle and desktop services, narrow platform capability, explicit event readiness state, and dependency-free Go build graph are the minimum structures needed to enforce existing ownership and exposure rules.
+No constitution violation requires justification. The separate lifecycle and desktop services, narrow platform capability, explicit event readiness state, dependency-free Go build graph, and development-only macOS application identity are the minimum structures needed to enforce existing ownership, exposure, and visual-parity rules. The development identity is build output, not a second development workflow or distribution profile.

@@ -98,7 +98,24 @@ func TestWailsV3PinsAndGoBuildToolAreOwnedAndExact(t *testing.T) {
 		{"cmd/build/main.go", []string{"buildtool.Run", "dev|build|package|run|prepare"}},
 		{"internal/buildtool/buildtool.go", []string{"scripts", "proto-check.sh", "tools/wails/go.mod", "frontend/bindings", "GOARCH", "arm64", "13.0", `applicationName+".app"`}},
 		{"build/darwin/Info.plist", []string{"com.vaulttec.fallout-terminal", "13.0", "icon.icns"}},
+		{"build/darwin/Info.dev.plist", []string{"com.vaulttec.fallout-terminal", "13.0", "icon.icns"}},
 		{"build/darwin/entitlements.plist", []string{"com.apple.security.network.server"}},
+	}
+
+	icon, err := os.Stat(filepath.Join(root, "build", "appicon.png"))
+	require.NoError(t, err)
+	assert.True(t, icon.Mode().IsRegular())
+	assert.Positive(t, icon.Size(), "the development application icon source must not be empty")
+
+	buildSource := readAcceptanceDocument(t, filepath.Join(root, "internal", "buildtool", "buildtool.go"))
+	for _, required := range []string{
+		`filepath.Join("build", "dev", applicationName+".app")`,
+		`filepath.Join("build", "darwin", "Info.dev.plist")`,
+		`Name: "install development application metadata"`,
+		`commandStep("install development application icon"`,
+		`commandStep("run development application"`,
+	} {
+		assert.Contains(t, buildSource, required)
 	}
 	for _, file := range files {
 		t.Run(file.path, func(t *testing.T) {
