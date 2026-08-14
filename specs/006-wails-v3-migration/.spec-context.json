@@ -750,6 +750,42 @@
       "by": "ai",
       "at": "2026-08-14T19:56:41.337Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:04:25.507Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:05:35.660Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:05:48.998Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T20:15:28.983Z",
+      "reopened": true
     }
   ],
   "last_action": "completed all 73 implementation tasks; final candidate 56ac18c and canonical bundle 7672ac4679 passed every required gate; Developer ID release gates honestly NOT RUN",
@@ -1061,7 +1097,7 @@
       "command": "security find-identity -v -p codesigning; scripts/build-macos.sh --preflight"
     }
   ],
-  "currentTask": "T054",
+  "currentTask": "T072",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1594,7 +1630,7 @@
     },
     "T069": {
       "status": "DONE",
-      "did": "Committed the v2-free migration, froze clean build candidate 658071b7011197c4f229f6a5b1f109de2764fd69 with exact beta.8 pins, and recorded it in a separate two-file evidence commit",
+      "did": "Committed BUG-001 source and operating docs as clean build candidate 896d208c8b99ece1db31d5daf52c5d8fbd6762bc, captured exact pins, and recorded the frozen identity in both acceptance records",
       "files": [
         "README.md",
         "docs/wails-v3-migration-rollback.md",
@@ -1603,17 +1639,20 @@
     },
     "T070": {
       "status": "DONE",
-      "did": "Passed isolated tool, Buf format/lint/build/generation, protobuf drift/breaking-fixture, root graph-isolation, and generated-output drift gates",
+      "did": "Passed frozen-candidate tooling, Buf format/lint/build, deterministic protobuf, drift, breaking-fixture, graph-isolation, and generated-tree checks with zero root-module drift",
       "files": [
+        "tools/*/go.mod",
+        "tools/*/go.sum",
+        "proto",
         "internal/gen",
         "client/gen",
-        "proto",
-        "scripts"
+        "scripts/proto-*.sh",
+        "scripts/tool-modules-check.sh"
       ]
     },
     "T071": {
       "status": "DONE",
-      "did": "Passed two clean Wails binding generations with byte-identical output, exact 25-method/four-event inventory, forbidden-surface scans, and zero candidate drift",
+      "did": "Passed two clean Wails beta.8 binding generations with byte-identical output, exactly 25 allowlisted methods, four events, no forbidden surface, and no tracked drift",
       "files": [
         "frontend/bindings",
         "scripts/wails-bindings-check.sh"
@@ -1621,9 +1660,13 @@
     },
     "T072": {
       "status": "DONE",
-      "did": "Completed locked clean client/frontend installs and production builds; reproducible-build-check passed with byte-identical protobuf, player, bindings, master, and native outputs and zero tracked drift.",
+      "did": "Passed locked clean frontend/player builds, two byte-reproducible complete native graphs, bundle/source scans, and cutover checks with zero repository drift",
       "files": [
-        "client/dist frontend/dist frontend/bindings"
+        "frontend/dist",
+        "client/dist",
+        "frontend/bindings",
+        "scripts/reproducible-build-check.sh",
+        "scripts/wails-v3-cutover-check.sh"
       ]
     },
     "T073": {

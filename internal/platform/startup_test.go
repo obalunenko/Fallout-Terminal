@@ -175,9 +175,14 @@ func TestGoPackageOutputDeploymentTargetAndFinalSignOrderAreExplicit(t *testing.
 	assert.Contains(t, metadata, "<string>13.0</string>")
 	assert.Contains(t, metadata, "<string>icon.icns</string>")
 
-	installDemo := strings.Index(buildSource, `Name: "install bundled demo"`)
-	compile := strings.Index(buildSource, `compileStep(executable)`)
-	sign := strings.Index(buildSource, `commandStep("sign completed application bundle"`)
+	packageStart := strings.Index(buildSource, "func packageSteps() []Step {")
+	require.NotEqual(t, -1, packageStart)
+	packageEnd := strings.Index(buildSource[packageStart:], "\nfunc compileStep(")
+	require.NotEqual(t, -1, packageEnd)
+	packageSource := buildSource[packageStart : packageStart+packageEnd]
+	installDemo := strings.Index(packageSource, `Name: "install bundled demo"`)
+	compile := strings.Index(packageSource, `compileStep(executable)`)
+	sign := strings.Index(packageSource, `commandStep("sign completed application bundle"`)
 	require.NotEqual(t, -1, installDemo)
 	require.NotEqual(t, -1, compile)
 	require.NotEqual(t, -1, sign)
