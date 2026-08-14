@@ -21,20 +21,20 @@ check_tool_module() {
 
   [[ -f "$module_file" ]] || { fail "missing tools/$directory/go.mod"; return 1; }
   [[ -s "$sum_file" ]] || { fail "missing or empty tools/$directory/go.sum"; return 1; }
-  rg -q '^go[[:space:]]+[0-9]+\.[0-9]+([.][0-9]+)?$' "$module_file" || {
+  grep -Eq '^go[[:space:]]+[0-9]+\.[0-9]+([.][0-9]+)?$' "$module_file" || {
     fail "tools/$directory/go.mod has no explicit Go version"
     return 1
   }
-  tool_count="$(rg -c '^tool[[:space:]]+' "$module_file" || true)"
+  tool_count="$(grep -Ec '^tool[[:space:]]+' "$module_file" || true)"
   [[ "$tool_count" == 1 ]] || {
     fail "tools/$directory/go.mod must declare exactly one tool"
     return 1
   }
-  rg -q "^tool[[:space:]]+${command_package//\//\\/}$" "$module_file" || {
+  grep -Eq "^tool[[:space:]]+${command_package//\//\\/}$" "$module_file" || {
     fail "tools/$directory/go.mod does not own $command_package"
     return 1
   }
-  rg -q "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}$" "$module_file" || {
+  grep -Eq "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}$" "$module_file" || {
     fail "tools/$directory/go.mod does not directly pin $parent_module $version"
     return 1
   }
@@ -45,29 +45,54 @@ check_root_module() {
   local root_module="$scan_root/go.mod"
 
   [[ -f "$root_module" ]] || { fail 'root go.mod is missing'; return 1; }
-  if rg -n '^tool[[:space:]]*(\(|[^[:space:]])|github\.com/bufbuild/buf|github\.com/wailsapp/wails/v3/cmd/wails3|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go' "$root_module"; then
+  if grep -En '^tool[[:space:]]*(\(|[^[:space:]])|github\.com/bufbuild/buf|github\.com/wailsapp/wails/v3/cmd/wails3|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go' "$root_module"; then
     fail 'root application go.mod contains a tool declaration or tool-only dependency'
     return 1
   fi
 }
 
+list_scan_files() {
+  local scan_root="$1"
+
+  if git -C "$scan_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$scan_root" ls-files -co --exclude-standard -z
+  else
+    find "$scan_root" -type f -print0
+  fi
+}
+
 check_active_commands() {
   local scan_root="$1"
-  local matches
+  local file
+  local relative_file
+  local file_matches
+  local matches=''
+  local forbidden_pattern='(go[[:space:]]+install[[:space:]]+(github\.com/wailsapp/wails|github\.com/bufbuild/buf/cmd/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)|go[[:space:]]+tool[[:space:]]+(wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)|(^|[[:space:]`;&|])(wails3|buf)[[:space:]]+(dev|build|package|generate|format|lint|breaking)([[:space:]]|$))'
+  local allowed_pattern='go tool -modfile=tools/(wails|buf|protoc-gen-go|protoc-gen-connect-go)/go\.mod (wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)'
 
-  matches="$(rg -n --hidden \
-    -g '!scripts/tool-modules-check.sh' \
-    -g '!specs/**' \
-    -g '!docs/wails-migration-rollback.md' \
-    -g '!node_modules/**' \
-    -g '!frontend/node_modules/**' \
-    -g '!client/node_modules/**' \
-    -g '!tests/browser/node_modules/**' \
-    '(go[[:space:]]+install[[:space:]]+(github\.com/wailsapp/wails|github\.com/bufbuild/buf/cmd/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)|go[[:space:]]+tool[[:space:]]+(wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)|(^|[[:space:]`;&|])(wails3|buf)[[:space:]]+(dev|build|package|generate|format|lint|breaking)([[:space:]]|$))' \
-    "$scan_root" || true)"
-  matches="$(printf '%s\n' "$matches" | rg -v 'go tool -modfile=tools/(wails|buf|protoc-gen-go|protoc-gen-connect-go)/go\.mod (wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)' || true)"
+  while IFS= read -r -d '' file; do
+    if [[ "$file" = /* ]]; then
+      relative_file="${file#"$scan_root"/}"
+    else
+      relative_file="$file"
+      file="$scan_root/$file"
+    fi
+
+    case "$relative_file" in
+      scripts/tool-modules-check.sh|specs/*|docs/wails-migration-rollback.md|node_modules/*|frontend/node_modules/*|client/node_modules/*|tests/browser/node_modules/*)
+        continue
+        ;;
+    esac
+
+    file_matches="$(LC_ALL=C grep -IEn "$forbidden_pattern" "$file" 2>/dev/null || true)"
+    file_matches="$(printf '%s\n' "$file_matches" | grep -Ev "$allowed_pattern" || true)"
+    if [[ -n "$file_matches" ]]; then
+      matches+="${relative_file}:${file_matches}"$'\n'
+    fi
+  done < <(list_scan_files "$scan_root")
+
   [[ -z "$matches" ]] || {
-    printf '%s\n' "$matches" >&2
+    printf '%s' "$matches" >&2
     fail 'active files contain a global, bare, or root-module Go tool invocation'
     return 1
   }
