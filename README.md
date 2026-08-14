@@ -24,13 +24,21 @@
 - Node.js 20.19+ и npm;
 - бинарник ngrok — только если нужен публичный доступ.
 
-Отдельно устанавливать `task`, `make` или Wails CLI не требуется. Репозиторная Go-команда вызывает закреплённый Wails v3 CLI только для Wails-специфичной генерации bindings и иконок через изолированный `tools/wails/go.mod`.
+Отдельно устанавливать `task`, `make` или Wails CLI не требуется: `make` входит в Xcode Command Line Tools, а репозиторная Go-команда вызывает закреплённый Wails v3 CLI только для Wails-специфичной генерации bindings и иконок через изолированный `tools/wails/go.mod`.
 
 ```bash
 go tool -modfile=tools/wails/go.mod wails3 version
 ```
 
 Frontend-зависимости отдельно устанавливать не требуется: репозиторная Go-команда выполняет locked `npm ci`, проверяет protobuf, генерирует bindings, собирает оба frontend-приложения и Go-приложение.
+
+Для повседневной разработки в корне проекта доступен `Makefile`. Он не дублирует граф сборки, а вызывает репозиторную Go-команду и существующие проверочные скрипты. Список целей:
+
+```bash
+make help
+```
+
+Основные команды: `make dev`, `make build`, `make package`, `make test`, `make test-race` и `make check`. Аргументы приложения можно передать через `APP_ARGS`, например `make run APP_ARGS='--help'`.
 
 ## Запуск всей системы одной командой
 

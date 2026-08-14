@@ -53,12 +53,12 @@ if [[ -e proto/toolchain.env || -e scripts/ensure-protoc.sh ]]; then
   printf 'standalone protoc distribution metadata remains in the repository\n' >&2
   exit 1
 fi
-if rg -n 'ensure-protoc\.sh|proto/toolchain\.env|libprotoc 35\.0|protoc v7\.35\.0' scripts/proto-generate.sh .github/workflows/wails-macos.yml; then
+if grep -En 'ensure-protoc\.sh|proto/toolchain\.env|libprotoc 35\.0|protoc v7\.35\.0' scripts/proto-generate.sh .github/workflows/wails-macos.yml; then
   printf 'an active generation or CI path still requires standalone protoc\n' >&2
   exit 1
 fi
 
-if rg -n 'fallout/terminal/(private|persistence|config)/' proto/fallout/terminal/player client/gen; then
+if grep -ERn 'fallout/terminal/(private|persistence|config)/' proto/fallout/terminal/player client/gen; then
   printf 'the public descriptor or browser graph imports a non-public contract\n' >&2
   exit 1
 fi
@@ -72,7 +72,7 @@ go test ./internal/session ./internal/playerconfig
 go test ./internal/platform -run '^TestProtobuf'
 go test . -run '^TestPrivate'
 npm run build --prefix client
-if rg -n 'fallout\.terminal\.(private|persistence|config)|internal/gen/fallout/terminal/(private|persistence|config)' client/dist; then
+if grep -ERn 'fallout\.terminal\.(private|persistence|config)|internal/gen/fallout/terminal/(private|persistence|config)' client/dist; then
   printf 'the browser bundle contains a private contract reference\n' >&2
   exit 1
 fi
