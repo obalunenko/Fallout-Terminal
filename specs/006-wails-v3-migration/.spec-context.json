@@ -540,6 +540,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-14T12:07:48.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T12:10:46.506Z"
     }
   ],
   "last_action": "halted at T066 — corrected v2 Guess RPC passed, but harness marker timeout left navigation/reconnect incomplete; no process/listener remains",
@@ -815,7 +823,7 @@
       ]
     }
   ],
-  "currentTask": "T068",
+  "currentTask": "T069",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1344,6 +1352,15 @@
         "build/darwin/postbuild.sh",
         "internal/platform/startup_test.go",
         "README.md"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Committed the v2-free migration, froze clean build candidate 658071b7011197c4f229f6a5b1f109de2764fd69 with exact beta.8 pins, and recorded it in a separate two-file evidence commit",
+      "files": [
+        "README.md",
+        "docs/wails-v3-migration-rollback.md",
+        "specs/006-wails-v3-migration/quickstart.md"
       ]
     }
   },
