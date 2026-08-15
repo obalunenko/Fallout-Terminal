@@ -1,0 +1,1072 @@
+{
+  "workflow": "companion",
+  "specName": "embedded ngrok access",
+  "branch": "develop",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-14T21:40:15.965Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T21:45:49.522Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-14T22:01:53.776Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T22:10:54.474Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T22:18:36.889Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T22:19:12.876Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-14T22:23:08.251Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-14T22:32:20.251Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-14T22:32:25.735Z"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "title": "Packaged UI is the only user path to configure, start, stop, and monitor public access",
+      "tasks": [
+        "T016",
+        "T017",
+        "T018",
+        "T019",
+        "T020",
+        "T021",
+        "T022",
+        "T023",
+        "T024",
+        "T025",
+        "T026",
+        "T027",
+        "T028",
+        "T034",
+        "T039",
+        "T040",
+        "T041",
+        "T077",
+        "T080"
+      ]
+    },
+    "FR-002": {
+      "title": "Settings accept a personal ngrok account token",
+      "tasks": [
+        "T013",
+        "T016",
+        "T017",
+        "T018",
+        "T019",
+        "T022",
+        "T027"
+      ]
+    },
+    "FR-003": {
+      "title": "Reserved domain is optional; empty requests a random HTTPS URL",
+      "tasks": [
+        "T014",
+        "T029",
+        "T030",
+        "T031",
+        "T034",
+        "T037",
+        "T038",
+        "T039",
+        "T040",
+        "T041",
+        "T079"
+      ]
+    },
+    "FR-004": {
+      "title": "Player username defaults to players and remains editable",
+      "tasks": [
+        "T013",
+        "T017",
+        "T019",
+        "T026",
+        "T027"
+      ]
+    },
+    "FR-005": {
+      "title": "Generated passwords contain at least 128 bits of entropy",
+      "tasks": [
+        "T013",
+        "T019",
+        "T027"
+      ]
+    },
+    "FR-006": {
+      "title": "Account token and player password use distinct secret references",
+      "tasks": [
+        "T009",
+        "T013",
+        "T015",
+        "T019",
+        "T021",
+        "T022"
+      ]
+    },
+    "FR-007": {
+      "title": "Production stores both secrets only in macOS Keychain",
+      "tasks": [
+        "T015",
+        "T021",
+        "T028",
+        "T072",
+        "T080"
+      ]
+    },
+    "FR-008": {
+      "title": "Only versioned non-secret settings and opaque presence hints persist in Application Support",
+      "tasks": [
+        "T005",
+        "T014",
+        "T020",
+        "T023",
+        "T028"
+      ]
+    },
+    "FR-009": {
+      "title": "Secrets never appear on forbidden persistence, contract, event, log, diagnostic, argument, fixture, or frontend surfaces",
+      "tasks": [
+        "T004",
+        "T006",
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T018",
+        "T022",
+        "T024",
+        "T025",
+        "T026",
+        "T027",
+        "T028",
+        "T050",
+        "T072"
+      ]
+    },
+    "FR-010": {
+      "title": "Shipped artifacts contain no shared developer credentials",
+      "tasks": [
+        "T001",
+        "T002",
+        "T003",
+        "T018",
+        "T068",
+        "T069",
+        "T070",
+        "T071",
+        "T072",
+        "T075",
+        "T076",
+        "T077",
+        "T078"
+      ]
+    },
+    "FR-011": {
+      "title": "Stored secrets cannot be read back through UI or private operations",
+      "tasks": [
+        "T016",
+        "T017",
+        "T022",
+        "T025",
+        "T027"
+      ]
+    },
+    "FR-012": {
+      "title": "Stored secrets support presence, replacement, and deletion only",
+      "tasks": [
+        "T013",
+        "T016",
+        "T017",
+        "T019",
+        "T022",
+        "T027"
+      ]
+    },
+    "FR-013": {
+      "title": "Generated player password has one-time explicit Copy presentation",
+      "tasks": [
+        "T013",
+        "T017",
+        "T019",
+        "T027"
+      ]
+    },
+    "FR-014": {
+      "title": "Transient secret inputs and results are cleared promptly",
+      "tasks": [
+        "T013",
+        "T016",
+        "T017",
+        "T018",
+        "T019",
+        "T025",
+        "T027"
+      ]
+    },
+    "FR-015": {
+      "title": "Relaunch restores non-secret settings and secret presence only",
+      "tasks": [
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T020",
+        "T021",
+        "T022",
+        "T023",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-016": {
+      "title": "Public access starts from the running UI without restart",
+      "tasks": [
+        "T034",
+        "T038",
+        "T039",
+        "T040",
+        "T041"
+      ]
+    },
+    "FR-017": {
+      "title": "UI exposes redacted stopped, starting, ready, stopping, and error states",
+      "tasks": [
+        "T006",
+        "T009",
+        "T016",
+        "T017",
+        "T027",
+        "T029",
+        "T034",
+        "T040",
+        "T049",
+        "T053",
+        "T058"
+      ]
+    },
+    "FR-018": {
+      "title": "Empty domain startup returns a random HTTPS address",
+      "tasks": [
+        "T030",
+        "T031",
+        "T034",
+        "T037",
+        "T041",
+        "T079"
+      ]
+    },
+    "FR-019": {
+      "title": "Configured reserved domain is exact or fails clearly",
+      "tasks": [
+        "T030",
+        "T031",
+        "T034",
+        "T037",
+        "T040",
+        "T041",
+        "T079"
+      ]
+    },
+    "FR-020": {
+      "title": "Public URL is published only after endpoint and authorization readiness",
+      "tasks": [
+        "T029",
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T037",
+        "T038",
+        "T039",
+        "T040"
+      ]
+    },
+    "FR-021": {
+      "title": "Application boundary protects all public static and ConnectRPC requests with Basic Auth",
+      "tasks": [
+        "T032",
+        "T035",
+        "T036",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ]
+    },
+    "FR-022": {
+      "title": "Exact external Host and authorization activate atomically before URL publication",
+      "tasks": [
+        "T029",
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T037",
+        "T038",
+        "T039",
+        "T040",
+        "T073",
+        "T079"
+      ]
+    },
+    "FR-023": {
+      "title": "Unknown external Hosts are fail-closed throughout lifecycle transitions",
+      "tasks": [
+        "T032",
+        "T035",
+        "T036",
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T073",
+        "T079"
+      ]
+    },
+    "FR-024": {
+      "title": "Basic Auth preserves incremental non-empty Subscribe streaming",
+      "tasks": [
+        "T030",
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T046",
+        "T073",
+        "T079"
+      ]
+    },
+    "FR-025": {
+      "title": "Authenticated public players retain gameplay, sound, convergence, and reconnect",
+      "tasks": [
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T046",
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T079"
+      ]
+    },
+    "FR-026": {
+      "title": "Public access forwards to the existing authoritative server on port 3690",
+      "tasks": [
+        "T030",
+        "T033",
+        "T036",
+        "T037",
+        "T038",
+        "T039"
+      ]
+    },
+    "FR-027": {
+      "title": "Local and LAN access remain unauthenticated",
+      "tasks": [
+        "T032",
+        "T035",
+        "T036",
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T080"
+      ]
+    },
+    "FR-028": {
+      "title": "Public-access failures do not break local play",
+      "tasks": [
+        "T033",
+        "T041",
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T080"
+      ]
+    },
+    "FR-029": {
+      "title": "Start and stop are idempotent, cancellable, and time-bounded",
+      "tasks": [
+        "T009",
+        "T029",
+        "T038",
+        "T047",
+        "T051",
+        "T061",
+        "T065"
+      ]
+    },
+    "FR-030": {
+      "title": "Active settings changes deny and stop old public acceptance before replacement",
+      "tasks": [
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054"
+      ]
+    },
+    "FR-031": {
+      "title": "Replacement URL stays hidden until replacement authorization is ready",
+      "tasks": [
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054"
+      ]
+    },
+    "FR-032": {
+      "title": "Stop, reconfigure, failure, and quit invalidate stale URLs before endpoint close",
+      "tasks": [
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054",
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T065",
+        "T066",
+        "T067"
+      ]
+    },
+    "FR-033": {
+      "title": "Quit and failure cleanup release endpoints and resources within five seconds",
+      "tasks": [
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T065",
+        "T066",
+        "T067",
+        "T073",
+        "T078",
+        "T080"
+      ]
+    },
+    "FR-034": {
+      "title": "Cancelled or superseded completions cannot mutate current state",
+      "tasks": [
+        "T009",
+        "T029",
+        "T038",
+        "T047",
+        "T051",
+        "T061",
+        "T065"
+      ]
+    },
+    "FR-035": {
+      "title": "Session JSON v1 and player-config v1 remain unchanged",
+      "tasks": [
+        "T004",
+        "T005",
+        "T007",
+        "T008",
+        "T014",
+        "T020",
+        "T082"
+      ]
+    },
+    "FR-036": {
+      "title": "Existing local play, broadcast, roles, and authoritative state remain compatible",
+      "tasks": [
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T046",
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T082"
+      ]
+    },
+    "FR-037": {
+      "title": "Legacy external ngrok executable production path is removed after parity",
+      "tasks": [
+        "T068",
+        "T069",
+        "T070",
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075",
+        "T076",
+        "T077",
+        "T078",
+        "T083"
+      ]
+    },
+    "FR-038": {
+      "title": "Shipped application has exactly one public-access production mechanism",
+      "tasks": [
+        "T068",
+        "T070",
+        "T071",
+        "T072",
+        "T073",
+        "T074",
+        "T075",
+        "T076",
+        "T077",
+        "T078",
+        "T080",
+        "T083"
+      ]
+    },
+    "FR-039": {
+      "title": "Only a narrow test or development injection seam may remain over the SDK runtime",
+      "tasks": [
+        "T010",
+        "T011",
+        "T012",
+        "T030",
+        "T031",
+        "T037",
+        "T068",
+        "T069",
+        "T075"
+      ]
+    },
+    "FR-040": {
+      "title": "Required packaged profile remains macOS 13 or later on arm64",
+      "tasks": [
+        "T064",
+        "T069",
+        "T070",
+        "T071",
+        "T073",
+        "T078",
+        "T080"
+      ]
+    },
+    "FR-041": {
+      "title": "Distribution, signing, notarization, and plan limits remain conditional external gates",
+      "tasks": [
+        "T031",
+        "T079",
+        "T080",
+        "T081",
+        "T082",
+        "T083"
+      ]
+    },
+    "FR-042": {
+      "title": "Verification includes unit, race, integration, browser, and packaged tests",
+      "tasks": [
+        "T013",
+        "T014",
+        "T015",
+        "T016",
+        "T017",
+        "T018",
+        "T029",
+        "T030",
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T042",
+        "T043",
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T055",
+        "T056",
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T082"
+      ]
+    },
+    "FR-043": {
+      "title": "Automated leak checks prove zero secrets on every forbidden surface",
+      "tasks": [
+        "T018",
+        "T050",
+        "T068",
+        "T072",
+        "T073",
+        "T078",
+        "T082",
+        "T083"
+      ]
+    },
+    "FR-044": {
+      "title": "Packaged macOS smoke covers double-click secure setup, lifecycle, and local fallback",
+      "tasks": [
+        "T064",
+        "T069",
+        "T070",
+        "T073",
+        "T078",
+        "T080"
+      ]
+    },
+    "FR-045": {
+      "title": "Real external-service verification is explicit opt-in with user credentials",
+      "tasks": [
+        "T031",
+        "T043",
+        "T079",
+        "T080",
+        "T081",
+        "T082"
+      ]
+    },
+    "FR-046": {
+      "title": "Deterministic fakes are never claimed as real endpoint proof",
+      "tasks": [
+        "T031",
+        "T041",
+        "T043",
+        "T046",
+        "T079",
+        "T080",
+        "T081",
+        "T082"
+      ]
+    },
+    "FR-047": {
+      "title": "Unexpected process termination makes the previous public URL unusable",
+      "tasks": [
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T065",
+        "T066",
+        "T067",
+        "T080"
+      ]
+    },
+    "FR-048": {
+      "title": "First launch after unexpected termination begins stopped and preserves local mode",
+      "tasks": [
+        "T062",
+        "T064",
+        "T066",
+        "T067",
+        "T080"
+      ]
+    },
+    "FR-049": {
+      "title": "Packaged UX never requires or downloads an external ngrok CLI",
+      "tasks": [
+        "T068",
+        "T069",
+        "T070",
+        "T071",
+        "T073",
+        "T075",
+        "T076",
+        "T077",
+        "T078",
+        "T079",
+        "T080",
+        "T083"
+      ]
+    },
+    "FR-050": {
+      "title": "Manual player passwords require at least eight characters without composition rules",
+      "tasks": [
+        "T013",
+        "T017",
+        "T019",
+        "T027"
+      ]
+    },
+    "FR-051": {
+      "title": "Application imposes no Basic Auth rate limit or lockout",
+      "tasks": [
+        "T032",
+        "T042",
+        "T045",
+        "T079"
+      ]
+    },
+    "FR-052": {
+      "title": "New UI secrets cross only a narrow private mutation boundary",
+      "tasks": [
+        "T004",
+        "T006",
+        "T013",
+        "T016",
+        "T019",
+        "T022",
+        "T025",
+        "T027",
+        "T050",
+        "T072"
+      ]
+    },
+    "FR-053": {
+      "title": "Only the one-time generated-password private result may contain a secret",
+      "tasks": [
+        "T004",
+        "T006",
+        "T013",
+        "T016",
+        "T017",
+        "T018",
+        "T019",
+        "T022",
+        "T025",
+        "T027",
+        "T072"
+      ]
+    },
+    "SC-001": {
+      "title": "At least 95 percent of valid starts become ready within the specified bound",
+      "tasks": [
+        "T029",
+        "T030",
+        "T031",
+        "T038",
+        "T041",
+        "T079"
+      ]
+    },
+    "SC-002": {
+      "title": "Zero unauthorized or unknown-Host requests succeed across all public lifecycle states",
+      "tasks": [
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054",
+        "T073",
+        "T079"
+      ]
+    },
+    "SC-003": {
+      "title": "All public player journeys preserve incremental streaming and reconnect",
+      "tasks": [
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T046",
+        "T073",
+        "T079"
+      ]
+    },
+    "SC-004": {
+      "title": "Local gameplay remains available through every simulated public-access failure",
+      "tasks": [
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T080"
+      ]
+    },
+    "SC-005": {
+      "title": "One hundred shutdown trials release resources within five seconds",
+      "tasks": [
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T065",
+        "T066",
+        "T067",
+        "T073",
+        "T078",
+        "T080"
+      ]
+    },
+    "SC-006": {
+      "title": "One hundred concurrent lifecycle trials converge to the latest valid intent",
+      "tasks": [
+        "T047",
+        "T048",
+        "T049",
+        "T050",
+        "T051",
+        "T052",
+        "T053",
+        "T054"
+      ]
+    },
+    "SC-007": {
+      "title": "Secret leak scans find zero forbidden disclosures",
+      "tasks": [
+        "T018",
+        "T050",
+        "T072",
+        "T073",
+        "T078",
+        "T082",
+        "T083"
+      ]
+    },
+    "SC-008": {
+      "title": "Double-click packaged macOS smoke needs no Terminal, environment, arguments, or external CLI",
+      "tasks": [
+        "T064",
+        "T069",
+        "T070",
+        "T073",
+        "T078",
+        "T080"
+      ]
+    },
+    "SC-009": {
+      "title": "One hundred save and relaunch trials restore preferences and presence without secret values",
+      "tasks": [
+        "T014",
+        "T015",
+        "T020",
+        "T021",
+        "T028"
+      ]
+    },
+    "SC-010": {
+      "title": "Compatibility and generated-contract gates remain green",
+      "tasks": [
+        "T004",
+        "T005",
+        "T007",
+        "T008",
+        "T042",
+        "T043",
+        "T044",
+        "T045",
+        "T046",
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T082"
+      ]
+    },
+    "SC-011": {
+      "title": "Every unavailable external prerequisite is reported as NOT RUN",
+      "tasks": [
+        "T031",
+        "T079",
+        "T080",
+        "T081",
+        "T082",
+        "T083"
+      ]
+    },
+    "SC-012": {
+      "title": "All manual passwords shorter than eight are rejected without composition constraints",
+      "tasks": [
+        "T013",
+        "T017",
+        "T019",
+        "T027"
+      ]
+    },
+    "SC-013": {
+      "title": "Invalid Basic Auth never locks out subsequent valid authentication",
+      "tasks": [
+        "T032",
+        "T042",
+        "T045",
+        "T079"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 30,
+    "projectedTasks": 36,
+    "scopeSignal": "larger",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: public-access UX, credentials, endpoint lifecycle, player compatibility, and verification",
+    "constraint: Fallout Terminal Constitution v4.0.0 public-access and secret governance",
+    "constraint: completed feature artifacts remain unchanged"
+  ],
+  "intent": "Enable a game master to publish protected ngrok access from the packaged app while preserving local play and secret safety.",
+  "expectations": [
+    "No project-owned relay service or support for providers other than ngrok.",
+    "No shared developer account or automatic ngrok account registration.",
+    "No replacement of Basic Auth with player OAuth.",
+    "No Windows or Linux support.",
+    "No game-data format changes.",
+    "No changes to local broadcast semantics, player roles, or authoritative game behavior.",
+    "No public app-store or marketplace release.",
+    "No simulated evidence for unavailable external release gates."
+  ],
+  "decisions": [
+    {
+      "decision": "Do not add application-level Basic Auth rate limiting or account lockout.",
+      "why": "User selected provider-side throttling only during clarify.",
+      "rejected": "Per-source or global application throttling."
+    },
+    {
+      "decision": "Pin golang.ngrok.com/ngrok/v2 at v2.1.4 and use one explicit Agent/Forward runtime.",
+      "why": "It is the current stable official embedded SDK, forwards to the existing player server, and removes CLI/PATH ownership.",
+      "rejected": "External ngrok CLI, DefaultAgent environment auth, older or floating SDK versions."
+    },
+    {
+      "decision": "Keep Basic Auth at the application HTTP boundary and do not add ngrok Traffic Policy auth.",
+      "why": "Header-only application auth is directly testable and does not buffer the ConnectRPC streaming response; edge policy lacks independent non-buffering proof.",
+      "rejected": "Edge-only auth or dual edge/application auth."
+    },
+    {
+      "decision": "Pin github.com/keybase/go-keychain at v0.0.1 behind a scoped SecretStore adapter with isolated dev/prod service names.",
+      "why": "It calls native Security.framework without shell commands and supports exact presence/update/delete semantics behind deterministic fakes.",
+      "rejected": "security CLI wrappers, plaintext/encrypted Application Support storage, shared dev/prod Keychain namespace."
+    },
+    {
+      "decision": "Persist a separate version-1 public-access.json with only non-secret preferences and reconcile Keychain presence at runtime.",
+      "why": "This preserves session/player-config v1 and gives atomic private recovery without trusting stale presence hints.",
+      "rejected": "Game-data fields, secret values in config, or presence hints as authority."
+    },
+    {
+      "decision": "Use a monotonic generation plus settings revision and a dynamic player policy with external default deny.",
+      "why": "The current static exact-host check is fail-open for unknown Hosts and cannot reject stale start/reconfigure completion.",
+      "rejected": "Static PublicAccess configuration or a boolean started flag."
+    },
+    {
+      "decision": "Load saved preferences at launch but require explicit UI Start on every run.",
+      "why": "The approved packaged UX forbids implicit public exposure and stale endpoint restoration.",
+      "rejected": "Auto-start from enabled preference or legacy env/args."
+    },
+    {
+      "decision": "Remove CLI/env/process configuration after embedded parity and retain only constructor/test-harness injection through the same SDK manager.",
+      "why": "This preserves deterministic and opt-in automation without a second production mechanism.",
+      "rejected": "NGROK_BIN, process runner fallback, or packaged environment/argument switches."
+    },
+    {
+      "decision": "Add a new private public_access.proto and leave frozen runtime.proto/server-info compatibility intact.",
+      "why": "A separate typed snapshot/event carries lifecycle and presence without weakening the existing Wails v3 digest gate or exposing secrets.",
+      "rejected": "Adding secret/status fields to public player contracts or overloading frozen RuntimeStatus."
+    },
+    {
+      "decision": "Host alone is insufficient to classify direct local/LAN ingress on the shared forwarded listener; authoritative pinned-provider behavior is required before implementation and a real Host-override probe runs when prerequisites exist.",
+      "why": "Prevents a remote Host override from bypassing application-level Basic Auth through the local/LAN allowance.",
+      "rejected": "Relying on deterministic fakes, untrusted forwarding headers, or moving Basic Auth to Traffic Policy without streaming proof."
+    },
+    {
+      "decision": "Full embedded-only package, security, reproducibility, leak, lifecycle, and rollback gates run before CLI source deletion and rerun after deletion.",
+      "why": "Satisfies constitution cutover ordering and catches packaging regressions on both the rollback candidate and final tree.",
+      "rejected": "Deleting the CLI after only package preflight and qualifying the package afterward."
+    },
+    {
+      "decision": "Root composition and internal/tunnel own temporary coexistence; it expires at same-feature T075 removal after an immutable pre-removal reference and clean rollback rebuild are recorded.",
+      "why": "Makes bounded migration ownership, expiry, rollback evidence, and removal gate explicit.",
+      "rejected": "A selectable dual-runtime production switch or reuse of completed feature artifacts as rollback proof."
+    }
+  ],
+  "approach": "Embed the exactly pinned official ngrok Go SDK behind a provider-neutral endpoint interface, with a generation-aware manager that activates an exact player Host policy before publishing any URL. Persist only non-secret preferences atomically, keep both secrets in macOS Keychain behind scoped-use interfaces, expose typed private protobuf/Wails operations, then delete the CLI runtime after parity.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Designed the pinned embedded SDK/Keychain cutover, generation-aware lifecycle, atomic Host/Auth policy, typed desktop contracts, secure settings UX, migration, and full verification matrix.",
+      "key_finding": "Current middleware treats every nonmatching valid Host as local, so fail-closed dynamic Host policy is a foundational security change, not merely an SDK runner swap."
+    },
+    "tasks": {
+      "summary": "83 test-first tasks across 9 dependency-ordered phases, with authoritative Host-ingress gating, full pre-removal package and rollback proof, CLI removal, and post-removal requalification."
+    }
+  }
+}
