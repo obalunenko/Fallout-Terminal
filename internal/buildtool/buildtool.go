@@ -63,8 +63,8 @@ func Plan(action string, applicationArguments []string) ([]Step, error) {
 
 func preparePlan() []Step {
 	return []Step{
-		commandStep("verify protobuf and generated clients", filepath.Join("scripts", "proto-check.sh")),
 		commandStep("install locked player dependencies", "npm", "ci", "--prefix", "client"),
+		commandStep("verify protobuf and generated clients", filepath.Join("scripts", "proto-check.sh")),
 		commandStep("build player frontend", "npm", "run", "build", "--prefix", "client"),
 		commandStep("generate Wails bindings", "go", "tool", "-modfile=tools/wails/go.mod", "wails3", "generate", "bindings", "-clean", "-d", "frontend/bindings", "./..."),
 		commandStep("install locked master dependencies", "npm", "ci", "--prefix", "frontend"),

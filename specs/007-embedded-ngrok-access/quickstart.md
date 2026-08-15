@@ -342,6 +342,49 @@ Evidence paths: `internal/tunnel/manager.go`, `internal/tunnel/manager_test.go`,
 `scripts/verify-macos-app.sh`, `tests/browser/connectrpc-player.spec.mjs`, and
 `build/bin/Fallout Terminal.app`.
 
+### 2026-08-16 — Immutable checkpoint rollback drill (T074, FAIL)
+
+- User-approved checkpoint commit:
+  `558c84780687c2de81b4457216f397865b68939e` (`feat: checkpoint embedded ngrok public access`).
+  The primary worktree was clean immediately after the commit. T073 package digest:
+  `c25868f31ec25e78e5d385bc6c8a2cbdbcaa0ab9073e85c83babe1494f7a9318`.
+- `PASS` — `/tmp/fallout-terminal-007-rollback.DEiePK` was created as a detached task-owned
+  worktree. `git worktree list --porcelain`, `git rev-parse HEAD`, and
+  `git status --porcelain=v1 --untracked-files=all` proved the exact 40-hex checkpoint identity and
+  an initially clean checkout.
+- `FAIL` — the first required canonical command, `go run ./cmd/build build`, stopped in
+  `verify protobuf and generated clients` before any package build. Exact non-secret cause:
+  `Cannot find module './client/node_modules/@bufbuild/protoc-gen-es/package.json'` followed by
+  `protoc-gen-es version is ; expected 2.13.0`. The clean worktree has no `client/node_modules`, and
+  the canonical graph currently verifies protobuf before its later locked player dependency
+  install. Node reported version `v26.7.0`; no credential or secret was read or printed.
+- `NOT RUN` — canonical package build, packaged app verification, rollback digest calculation, and
+  byte-for-byte comparison were not reached after the mandatory build failure.
+- Per the task contract, the unvalidated detached worktree is preserved for inspection and was not
+  removed. T074 remains incomplete; T075 CLI deletion is forbidden. Installing dependencies by hand
+  inside the drill would not satisfy the exact canonical-command proof and was not used as a
+  workaround.
+
+### 2026-08-16 — Clean-build order correction and T073 requalification
+
+- `PASS` — test-first canonical-order regression. The focused buildtool suite was first observed
+  RED for `prepare`, `build`, `dev`, `run`, and `package`, because locked player dependency install
+  followed protobuf verification. `preparePlan` now runs exactly `npm ci --prefix client` before
+  `scripts/proto-check.sh` for every action; protobuf generation, version enforcement, build
+  ownership, and all later nodes are unchanged. The complete `internal/buildtool` suite passed.
+- `PASS` — direct `go run ./cmd/build build` began with `install locked player dependencies`, then
+  completed protobuf verification/generation, player build, bindings, master build, and native
+  compilation without any manual dependency installation.
+- `PASS` — empty `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, and
+  `scripts/secret-leak-check.sh` on the corrected candidate.
+- `PASS` — `scripts/reproducible-build-check.sh`; both corrected canonical package runs installed
+  locked player dependencies before protobuf verification, produced zero repository drift, passed
+  package inspection, and reproduced the T073 digest byte-for-byte:
+  `c25868f31ec25e78e5d385bc6c8a2cbdbcaa0ab9073e85c83babe1494f7a9318`.
+- The failed checkpoint `558c84780687c2de81b4457216f397865b68939e` remains immutable and its
+  unvalidated detached worktree remains preserved. It is historical failed evidence and cannot
+  satisfy T074; a new user-authorized checkpoint and clean detached drill are required.
+
 ### 2026-08-15 — Historical US2 source-bound checkpoint that triggered BUG-001
 
 - Build identity: Darwin 25.5.0 arm64, Go 1.26.5; base commit

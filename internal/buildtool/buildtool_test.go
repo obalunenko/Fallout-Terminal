@@ -14,8 +14,8 @@ func TestBuildPlanHasOneOrderedOwnerAndNoTaskfileTool(t *testing.T) {
 	require.NoError(t, err)
 
 	wantNames := []string{
-		"verify protobuf and generated clients",
 		"install locked player dependencies",
+		"verify protobuf and generated clients",
 		"build player frontend",
 		"generate Wails bindings",
 		"install locked master dependencies",
@@ -32,6 +32,29 @@ func TestBuildPlanHasOneOrderedOwnerAndNoTaskfileTool(t *testing.T) {
 	}
 	got := steps[len(steps)-1].Arguments
 	assert.Equal(t, filepath.Join("build", "bin", applicationName), got[len(got)-2])
+}
+
+func TestPreparePlanInstallsLockedPlayerToolBeforeProtobufVerificationForEveryAction(t *testing.T) {
+	for _, action := range []string{"prepare", "build", "dev", "run", "package"} {
+		t.Run(action, func(t *testing.T) {
+			steps, err := Plan(action, nil)
+			require.NoError(t, err)
+
+			positions := make(map[string]int, len(steps))
+			for index, step := range steps {
+				positions[step.Name] = index
+			}
+			installIndex, hasInstall := positions["install locked player dependencies"]
+			verifyIndex, hasVerify := positions["verify protobuf and generated clients"]
+			require.True(t, hasInstall)
+			require.True(t, hasVerify)
+			assert.Less(t, installIndex, verifyIndex)
+			assert.Equal(t, "npm", steps[installIndex].Program)
+			assert.Equal(t, []string{"ci", "--prefix", "client"}, steps[installIndex].Arguments)
+			assert.Equal(t, filepath.Join("scripts", "proto-check.sh"), steps[verifyIndex].Program)
+			assert.Empty(t, steps[verifyIndex].Arguments)
+		})
+	}
 }
 
 func TestDevelopmentPlansAssembleAndLaunchOwnedApplicationIdentity(t *testing.T) {
@@ -142,8 +165,8 @@ func TestPackagePlanPreservesCanonicalFrontendAndOfflineResourceOwnership(t *tes
 		positions[step.Name] = index
 	}
 	ordered := []string{
-		"verify protobuf and generated clients",
 		"install locked player dependencies",
+		"verify protobuf and generated clients",
 		"build player frontend",
 		"generate Wails bindings",
 		"install locked master dependencies",

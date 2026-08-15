@@ -2336,7 +2336,11 @@
       "note": "T067 remains incomplete after resumed attempt: packaged normal close still exceeded five seconds; System Events is denied by macOS Accessibility (-25211), and direct Apple Event variants did not provide passing interactive-close evidence. T068+ not started.",
       "step": "implement",
       "kind": "mandatory-gate-failure"
+    },
+    {
+      "note": "T074 FAIL: clean detached checkpoint build cannot resolve client/node_modules/@bufbuild/protoc-gen-es because canonical build verifies protobuf before locked client install; rollback worktree /tmp/fallout-terminal-007-rollback.DEiePK preserved and T075 forbidden.",
+      "step": "implement"
     }
   ],
-  "last_action": "Stopped at unchecked T067 after resumed packaged normal-close gate exceeded five seconds; exact credential-free diagnostics are recorded in quickstart.md"
+  "last_action": "T074 FAIL — clean checkpoint build missing locked protoc-gen-es before protobuf verification; preserved detached worktree; T075 not started"
 }
