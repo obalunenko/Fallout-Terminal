@@ -3,7 +3,7 @@
   "specName": "embedded ngrok access",
   "branch": "develop",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -658,6 +658,93 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-15T15:36:02.168Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:26:02.578Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:30:04.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:32:10.168Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:35:06.890Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:45:42.734Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:46:42.252Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T080",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:47:45.894Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T081",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T21:48:15.524Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T082",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T22:08:48.908Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T083",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-15T22:10:21.309Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-15T22:10:21.455Z"
     }
   ],
   "coverage": {
@@ -683,6 +770,12 @@
         "T041",
         "T077",
         "T080"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-002": {
@@ -695,6 +788,12 @@
         "T019",
         "T022",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-003": {
@@ -711,6 +810,12 @@
         "T040",
         "T041",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-004": {
@@ -721,6 +826,12 @@
         "T019",
         "T026",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-005": {
@@ -729,6 +840,12 @@
         "T013",
         "T019",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-006": {
@@ -740,6 +857,12 @@
         "T019",
         "T021",
         "T022"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-007": {
@@ -750,6 +873,12 @@
         "T028",
         "T072",
         "T080"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-008": {
@@ -760,6 +889,12 @@
         "T020",
         "T023",
         "T028"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-009": {
@@ -781,6 +916,12 @@
         "T028",
         "T050",
         "T072"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-010": {
@@ -799,6 +940,12 @@
         "T076",
         "T077",
         "T078"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-011": {
@@ -809,6 +956,12 @@
         "T022",
         "T025",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-012": {
@@ -820,6 +973,12 @@
         "T019",
         "T022",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-013": {
@@ -829,6 +988,12 @@
         "T017",
         "T019",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-014": {
@@ -841,6 +1006,12 @@
         "T019",
         "T025",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-015": {
@@ -856,6 +1027,12 @@
         "T023",
         "T027",
         "T028"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-016": {
@@ -866,6 +1043,12 @@
         "T039",
         "T040",
         "T041"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-017": {
@@ -882,6 +1065,12 @@
         "T049",
         "T053",
         "T058"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go",
+        "internal/platform/keychain_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
       ]
     },
     "FR-018": {
@@ -893,6 +1082,12 @@
         "T037",
         "T041",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-019": {
@@ -905,6 +1100,12 @@
         "T040",
         "T041",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-020": {
@@ -920,6 +1121,12 @@
         "T038",
         "T039",
         "T040"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-021": {
@@ -932,6 +1139,12 @@
         "T043",
         "T044",
         "T045"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-022": {
@@ -949,6 +1162,12 @@
         "T040",
         "T073",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-023": {
@@ -970,6 +1189,12 @@
         "T053",
         "T073",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-024": {
@@ -983,6 +1208,12 @@
         "T046",
         "T073",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-025": {
@@ -1000,6 +1231,12 @@
         "T059",
         "T060",
         "T079"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-026": {
@@ -1011,6 +1248,12 @@
         "T037",
         "T038",
         "T039"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-027": {
@@ -1026,6 +1269,12 @@
         "T059",
         "T060",
         "T080"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-028": {
@@ -1040,6 +1289,12 @@
         "T059",
         "T060",
         "T080"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-029": {
@@ -1052,6 +1307,12 @@
         "T051",
         "T061",
         "T065"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-030": {
@@ -1065,6 +1326,12 @@
         "T052",
         "T053",
         "T054"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-031": {
@@ -1078,6 +1345,12 @@
         "T052",
         "T053",
         "T054"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-032": {
@@ -1098,6 +1371,12 @@
         "T065",
         "T066",
         "T067"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-033": {
@@ -1113,6 +1392,12 @@
         "T073",
         "T078",
         "T080"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-034": {
@@ -1125,6 +1410,12 @@
         "T051",
         "T061",
         "T065"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-035": {
@@ -1137,6 +1428,12 @@
         "T014",
         "T020",
         "T082"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-036": {
@@ -1154,6 +1451,12 @@
         "T059",
         "T060",
         "T082"
+      ],
+      "tests": [
+        "internal/tunnel/manager_test.go",
+        "app_test.go",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "internal/player/stream_test.go"
       ]
     },
     "FR-037": {
@@ -1171,6 +1474,12 @@
         "T077",
         "T078",
         "T083"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-038": {
@@ -1188,6 +1497,12 @@
         "T078",
         "T080",
         "T083"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-039": {
@@ -1202,6 +1517,12 @@
         "T068",
         "T069",
         "T075"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-040": {
@@ -1214,6 +1535,12 @@
         "T073",
         "T078",
         "T080"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-041": {
@@ -1225,6 +1552,12 @@
         "T081",
         "T082",
         "T083"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-042": {
@@ -1255,6 +1588,12 @@
         "T063",
         "T064",
         "T082"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-043": {
@@ -1268,6 +1607,12 @@
         "T078",
         "T082",
         "T083"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-044": {
@@ -1279,6 +1624,12 @@
         "T073",
         "T078",
         "T080"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-045": {
@@ -1290,6 +1641,12 @@
         "T080",
         "T081",
         "T082"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-046": {
@@ -1303,6 +1660,12 @@
         "T080",
         "T081",
         "T082"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-047": {
@@ -1316,6 +1679,12 @@
         "T066",
         "T067",
         "T080"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-048": {
@@ -1326,6 +1695,12 @@
         "T066",
         "T067",
         "T080"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-049": {
@@ -1343,6 +1718,12 @@
         "T079",
         "T080",
         "T083"
+      ],
+      "tests": [
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/verify-macos-app.sh",
+        "internal/buildtool/buildtool_test.go"
       ]
     },
     "FR-050": {
@@ -1352,6 +1733,10 @@
         "T017",
         "T019",
         "T027"
+      ],
+      "tests": [
+        "internal/tunnel/secret_test.go",
+        "tests/browser/public-access-settings.spec.mjs"
       ]
     },
     "FR-051": {
@@ -1361,6 +1746,10 @@
         "T042",
         "T045",
         "T079"
+      ],
+      "tests": [
+        "internal/player/public_stream_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-052": {
@@ -1376,6 +1765,11 @@
         "T027",
         "T050",
         "T072"
+      ],
+      "tests": [
+        "scripts/secret-leak-check.sh",
+        "tests/browser/desktop-api.spec.mjs",
+        "tests/browser/public-access-settings.spec.mjs"
       ]
     },
     "FR-053": {
@@ -1392,6 +1786,11 @@
         "T025",
         "T027",
         "T072"
+      ],
+      "tests": [
+        "scripts/secret-leak-check.sh",
+        "tests/browser/desktop-api.spec.mjs",
+        "tests/browser/public-access-settings.spec.mjs"
       ]
     },
     "SC-001": {
@@ -1653,6 +2052,11 @@
       "decision": "Stop at T037 without a dialer, Host-trust, alternate-source, privileged-interface, or second-server fallback",
       "why": "The approved source-bound security acceptance failed and the implementation guardrails require fail-closed behavior",
       "rejected": "Default SDK dialer, Host-only classification, privileged lo0 alias mutation, alternate source, and second player server"
+    },
+    {
+      "decision": "Require Go 1.26.6 as the root module minimum",
+      "why": "Official govulncheck found five reachable standard-library vulnerabilities in Go 1.26.5, all fixed by 1.26.6",
+      "rejected": "Shipping the reproducible Go 1.26.5 candidate with applicable unresolved advisories"
     }
   ],
   "approach": "Embed the exactly pinned official ngrok Go SDK behind a provider-neutral endpoint interface, with a generation-aware manager that activates an exact player Host policy before publishing any URL. Persist only non-secret preferences atomically, keep both secrets in macOS Keychain behind scoped-use interfaces, expose typed private protobuf/Wails operations, then delete the CLI runtime after parity.",
@@ -1670,7 +2074,7 @@
       "risks": "Cmd+Q, partial-start, forced-owner-loss, relaunch, cutover, and final qualification remain unverified."
     },
     "implement": {
-      "summary": "Implementation remains stopped at unchecked T067 after a second mandatory packaged normal-close failure.",
+      "summary": "Shipped embedded SDK public access with Keychain-only secrets, Basic Auth protected player access, CLI removal, Go 1.26.6 security requalification, reproducible macOS package, and explicit external NOT RUN evidence",
       "key_finding": "Deterministic close ownership, race, leak, build, signature and package verification pass; packaged interactive normal-close evidence does not.",
       "risks": [
         "Phase 9 cutover is forbidden until T067 passes",
@@ -1679,7 +2083,7 @@
       ]
     }
   },
-  "currentTask": "T073",
+  "currentTask": "T083",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -2286,6 +2690,97 @@
         "internal/tunnel/ngrok_test.go",
         "scripts/verify-macos-app.sh"
       ]
+    },
+    "T074": {
+      "status": "DONE",
+      "did": "Corrected canonical clean-build ordering test-first, created immutable checkpoint ba32d1a57bb0a33227841c6c189939c91dec6bf3, rebuilt build and package in an exact clean detached worktree without manual install, verified byte-equal c25868f31ec25e78e5d385bc6c8a2cbdbcaa0ab9073e85c83babe1494f7a9318 package digest, and removed only the validated worktree.",
+      "files": [
+        "internal/buildtool/buildtool.go",
+        "internal/buildtool/buildtool_test.go",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T075": {
+      "status": "DONE",
+      "did": "Removed the unreachable external ngrok CLI configuration, process/guardian/log-parser runtime and process-only test fakes after rollback qualification; retained only the embedded tunnel contract and port 3690 upstream.",
+      "files": [
+        "main.go",
+        "internal/tunnel/config.go",
+        "internal/tunnel/process.go",
+        "internal/tunnel/process_darwin.go",
+        "internal/tunnel/process_other.go",
+        "internal/tunnel/process_test.go",
+        "internal/tunnel/process_darwin_integration_test.go",
+        "internal/tunnel/service.go",
+        "internal/tunnel/service_test.go",
+        "internal/testutil/fakes.go"
+      ]
+    },
+    "T076": {
+      "status": "DONE",
+      "did": "Rewrote the surviving tunnel service contract tests around the embedded SDK lifecycle and complete fake inventory, covering timeout, cancellation, Done, redaction, concurrent Close, secret clearing, race safety, and Testify/context conventions with no process assertions.",
+      "files": [
+        "internal/tunnel/service_test.go",
+        "internal/platform/test_conventions_test.go"
+      ]
+    },
+    "T077": {
+      "status": "DONE",
+      "did": "Replaced active CLI/PATH/env/shared-domain guidance with packaged UI, personal authtoken, Keychain non-readback, random/reserved URL, Start/Stop/sharing/recovery documentation; provider-neutralized templates, verified thin Make aliases, and removed detector false positives without weakening its self-test.",
+      "files": [
+        "README.md",
+        ".specify/templates/plan-template.md",
+        ".specify/templates/spec-template.md",
+        ".specify/templates/tasks-template.md",
+        "Makefile",
+        "scripts/verify-macos-app.sh",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "T078": {
+      "status": "DONE",
+      "did": "Passed the exact final post-CLI-removal deterministic graph: formatting, locked installs, schema/bindings/license/legacy/leak, vet, full unit/race, both frontend builds, 36 Playwright journeys, reproducible and direct build/package verification, packaged offline lifecycle, and canonical dev static/unary/stream smoke; recorded digest 1992f2fedf2d84e356cc3067383d72d3f4f43abfc2492e2276c949b4358b49a5 and explicit conditional NOT RUN results.",
+      "files": [
+        "specs/007-embedded-ngrok-access/quickstart.md",
+        "build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T079": {
+      "status": "DONE",
+      "did": "Ran the credential-gated real-provider harnesses sequentially; all opt-in prerequisites were absent, so recorded random/reserved/auth/stream/multi-client/reconnect/reconfigure/failure/stale-URL evidence explicitly as NOT RUN without external requests or synthetic upgrades.",
+      "files": [
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T080": {
+      "status": "DONE",
+      "did": "Passed unconditional packaged verification, LaunchServices offline/local fallback, deterministic Keychain behavior, architecture/signature/resources, and five-second lifecycle gates; recorded OS Keychain, public UI/auth/Stop/Quit, no-installed-host-binary, interactive close, and stale-URL portions explicitly NOT RUN without prerequisites or user-deferred evidence.",
+      "files": [
+        "specs/007-embedded-ngrok-access/quickstart.md",
+        "build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T081": {
+      "status": "DONE",
+      "did": "Checked release/provider-plan prerequisite presence without values; recorded Developer ID, hardened runtime distribution signing, notarization, stapling, DMG, Gatekeeper, and provider-plan gates all NOT RUN because identities, profile references, release artifact, token, and reserved-domain opt-in were absent.",
+      "files": [
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T082": {
+      "status": "DONE",
+      "did": "Requalified the post-CLI-removal candidate on Go 1.26.6, disposed all vulnerability findings, and reconciled every success criterion without promoting skipped external evidence",
+      "files": [
+        "go.mod",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T083": {
+      "status": "DONE",
+      "did": "Completed the final source/generated/package/documentation audit, proved one embedded production path, and attached final digests plus explicit FR/SC and NOT RUN evidence",
+      "files": [
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
     }
   },
   "verified": [
@@ -2320,6 +2815,29 @@
       "warnings": [
         "Darwin deployment-target linker warnings remain"
       ]
+    },
+    {
+      "what": "Final post-CLI-removal deterministic quality graph on module-selected Go 1.26.6",
+      "command": "gofmt; locked npm installs; tool/proto/binding/license/legacy/leak; vet; unit; race; frontend builds; full Playwright; reproducibility; direct build/package",
+      "result": "PASS; 36 browser journeys passed and one real-provider journey was explicitly NOT RUN",
+      "warnings": [
+        "test-only SDK objects report macOS 26 while generic tests link for macOS 11; packaged arm64 macOS 13 verifier passed"
+      ]
+    },
+    {
+      "what": "Dated dependency vulnerability review",
+      "command": "govulncheck ./... and npm audit --omit=dev in frontend, client, and tests/browser",
+      "result": "PASS on 2026-08-16; Go 1.26.5 findings GO-2026-6218, GO-2026-6090, GO-2026-6089, GO-2026-5972, GO-2026-5026 resolved by minimum Go 1.26.6; repeat scan and all npm audits found zero vulnerabilities",
+      "warnings": []
+    },
+    {
+      "what": "Final package, canonical dev entrypoint, and packaged local lifecycle",
+      "command": "verify-macos-app; hash-macos-app; go run ./cmd/build dev bounded static/unary/Subscribe smoke; credential-free packaged lifecycle smoke",
+      "result": "PASS; digest dcc6d5af31e996e2db2bf84634521207d5b8922c64b01c65c4642852ed59f023; listener released within five seconds",
+      "warnings": [
+        "interactive red-button/Cmd+W was user-deferred NOT RUN",
+        "real provider and stale-URL probes NOT RUN without opt-in credentials"
+      ]
     }
   ],
   "concerns": [
@@ -2340,7 +2858,11 @@
     {
       "note": "T074 FAIL: clean detached checkpoint build cannot resolve client/node_modules/@bufbuild/protoc-gen-es because canonical build verifies protobuf before locked client install; rollback worktree /tmp/fallout-terminal-007-rollback.DEiePK preserved and T075 forbidden.",
       "step": "implement"
+    },
+    {
+      "note": "Real provider, packaged public UI/no-installed-host-binary, OS Keychain, distribution/notary/provider-plan, stale-URL, and user-deferred interactive close evidence remain explicit NOT RUN; deterministic evidence was not promoted",
+      "step": "implement"
     }
   ],
-  "last_action": "T074 FAIL — clean checkpoint build missing locked protoc-gen-es before protobuf verification; preserved detached worktree; T075 not started"
+  "last_action": "all 83 tasks complete — final Go 1.26.6 candidate dcc6d5af31e996e2db2bf84634521207d5b8922c64b01c65c4642852ed59f023 verified"
 }

@@ -18,6 +18,10 @@ the exact final constitution command sequence executable.
 **Bugfix**: 2026-08-15 — BUG-001 analysis follow-up makes the final sequence clean-checkout safe,
 adds the canonical bounded dev smoke, and assigns vulnerability-review evidence.
 
+**Bugfix**: 2026-08-16 — BUG-002 adds an explicit startup-to-endpoint context ownership handoff and
+safe provider disconnect-code propagation after the embedded SDK forwarder proved dependent on the
+context passed to `Forward`.
+
 ## Summary
 
 Replace the startup-only external ngrok CLI path with one UI-controlled embedded ngrok runtime that
@@ -260,11 +264,17 @@ with correct credentials; without prerequisites it is `NOT RUN`.
 5. Make repeated/concurrent Start and Stop join one intent, make reconfigure close before restart,
    and make stale successes close themselves without publication.
 6. Monitor `Done` and disconnect events; map failures to redacted categories and preserve local/LAN.
+7. Create the SDK forwarder with an endpoint-owned context derived without inheriting startup
+   cancellation. Before commit, a watcher propagates startup cancellation and aborts acquisition;
+   after URL validation and commit, only endpoint `Close` owns cancellation of that context.
+   Capture disconnect events only as fixed application categories plus a strictly validated
+   `ERR_NGROK_<digits>` code, never as raw SDK diagnostic text.
 
 Lifecycle/race tests use 100 schedules, transition probes, timeout/cancellation, partial acquisition,
 late completion, close failure/retry, unexpected `Done`, maximum-one-endpoint assertions, local
-fallback, and shared five-second shutdown budget. SDK integration tests are explicit opt-in and
-report `NOT RUN` without real credentials/connectivity.
+fallback, shared five-second shutdown budget, and a fake forwarder that binds `Done` to the exact
+context supplied to `Forward`. SDK integration tests are explicit opt-in and report `NOT RUN`
+without real credentials/connectivity.
 
 ### 5. Integrate private desktop operations and UX
 
@@ -365,7 +375,7 @@ deletion.
 
 | Layer | Main files | Required proof |
 |---|---|---|
-| Unit | `internal/tunnel/*_test.go`, `internal/player/http_test.go`, `internal/platform/keychain_test.go`, contract tests | validation, state transitions, generation/revision, redaction, stores, ~~Host/Auth~~ **BUG-001** endpoint-policy input, generator, idempotence |
+| Unit | `internal/tunnel/*_test.go`, `internal/player/http_test.go`, `internal/platform/keychain_test.go`, contract tests | validation, state transitions, generation/revision, redaction, stores, ~~Host/Auth~~ **BUG-001** endpoint-policy input, **BUG-002** startup/owned-lifetime handoff, generator, idempotence |
 | Race | `go test -race ./...` plus focused 100-schedule tests | ~~no mixed grant, stale activation~~ **BUG-001** no mixed revision or stale publication, duplicate endpoint, event/order, or stop/reconfigure race |
 | Lifecycle integration | `app_test.go`, `wails_host_test.go`, fake endpoint/store/network/clock | local-first, policy-before-publish, ~~deny-before-close~~ **BUG-001** URL-withdrawal-before-endpoint-close, `Done`, partial startup, five-second cleanup |
 | HTTP/ConnectRPC | real in-process server and protected fixture | all static/RPC paths, ~~exact/unknown/local Host and constant-time auth~~ **BUG-001** endpoint-auth fixture outcomes and local/LAN no-challenge, non-empty streaming, reconnect |
@@ -382,7 +392,8 @@ deletion.
   admission. The ngrok endpoint Basic Auth policy is active before URL publication, while direct
   local/LAN traffic remains outside the endpoint.
 - **SDK cancellation is not cleanup**: always call bounded endpoint close then Agent disconnect; use
-  `Done` only as a signal.
+  `Done` only as a signal. **BUG-002**: the context passed to SDK `Forward` belongs to the acquired
+  endpoint after commit; a completed manager startup operation cannot own or cancel that lifetime.
 - **Go strings cannot be reliably zeroed**: keep provider token inside the shortest SDK adapter
   lifetime, keep Basic password as locked byte buffers, drop all SDK references on stop, and verify
   no observable leaks rather than claiming impossible heap erasure.

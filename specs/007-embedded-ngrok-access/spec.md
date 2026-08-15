@@ -7,6 +7,10 @@ storage, local/LAN availability, one player server, and honest opt-in real-servi
 **Bugfix**: 2026-08-15 — BUG-001 follow-up separates UI publication from provider-adapter
 atomicity and makes conditional startup measurement executable.
 
+**Bugfix**: 2026-08-16 — BUG-002 separates the bounded startup-operation context from the lifetime
+of a committed embedded ngrok endpoint and permits only a validated provider error code alongside
+fixed redacted failure text.
+
 **Feature Directory**: `007-embedded-ngrok-access`  
 **Created**: 2026-08-15  
 **Status**: Approved  
@@ -93,6 +97,9 @@ before returning any player resource.
    Basic Auth Traffic Policy; direct local/LAN access remains independent.
 5. **Given** public access is ready, **When** the game master copies sharing information, **Then**
    the address and username are available while an already stored password is not reconstructed.
+6. **Given** a protected endpoint has been acquired and committed, **When** the bounded startup
+   operation completes and releases its context, **Then** the endpoint remains ready until an
+   explicit stop, reconfigure, provider failure, or application shutdown owns its cleanup.
 
 ---
 
@@ -309,13 +316,17 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-028**: Provider, network, account, domain, secure-store, startup, and endpoint failures MUST
   leave local and LAN play available without an application restart.
 - **FR-029**: Start and stop operations MUST be idempotent, cancellable, and bounded by explicit
-  completion time limits.
+  completion time limits. **BUG-002**: Startup cancellation before endpoint commit MUST abort the
+  acquisition, but completion or cancellation of the already completed startup operation MUST NOT
+  cancel the committed endpoint; its lifetime is owned by the endpoint and explicit cleanup.
 - **FR-030**: Applying settings while public access is active MUST close the old protected endpoint
   before starting the replacement configuration.
 - **FR-031**: A replacement public URL MUST remain hidden until the replacement endpoint and its
   Basic Auth Traffic Policy are ready.
 - **FR-032**: Stop, reconfigure, failure, and quit paths MUST withdraw the published URL and close
-  the owned endpoint; the application MUST NOT present a stale URL as active.
+  the owned endpoint; the application MUST NOT present a stale URL as active. **BUG-002**: An
+  unexpected provider disconnect MAY add only a syntactically validated `ERR_NGROK_<digits>` code
+  to fixed application-owned failure text; raw SDK diagnostics MUST be discarded.
 - **FR-033**: Quit, `Cmd+Q`, repeated shutdown, partial startup, and error cleanup MUST release all
   public endpoints, background work, listeners, and temporary secret material within five seconds.
 - **FR-034**: A completion from a cancelled or superseded lifecycle operation MUST NOT change the
@@ -408,7 +419,8 @@ reconfiguring states, then confirm cleanup completes within the established shut
   responsive-network and valid-account prerequisites, at least 19 MUST reach `ready` or a clear
   terminal error within 15 seconds and all MUST finish within 30 seconds. Without those
   prerequisites the real sample is `NOT RUN`. A separate 100-schedule deterministic gate MUST prove
-  timeout and cancellation behavior but MUST NOT be presented as provider-performance evidence.
+  timeout and cancellation behavior, including the startup-to-owned-endpoint lifetime handoff, but
+  MUST NOT be presented as provider-performance evidence.
 - **SC-002**: In deterministic policy construction and each available real-endpoint acceptance run,
   zero public static resources or player operations succeed through the active ngrok URL without
   correct Basic Auth; direct local/LAN requests remain unaffected.

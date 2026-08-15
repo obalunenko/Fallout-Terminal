@@ -4,7 +4,6 @@ package testutil
 import (
 	"context"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -372,110 +371,6 @@ func (b *FakeBrowser) URLs() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]string(nil), b.urls...)
-}
-
-// ProcessStart records one process start request.
-type ProcessStart struct {
-	Name string
-	Args []string
-}
-
-// FakeProcessRunner returns a configured FakeProcess and records start calls.
-type FakeProcessRunner struct {
-	mu sync.Mutex
-
-	Process  *FakeProcess
-	StartErr error
-	starts   []ProcessStart
-}
-
-// Start records a process request. It returns a fresh FakeProcess when Process
-// has not been configured.
-func (r *FakeProcessRunner) Start(_ context.Context, name string, args ...string) (*FakeProcess, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.starts = append(r.starts, ProcessStart{Name: name, Args: append([]string(nil), args...)})
-	if r.StartErr != nil {
-		return nil, r.StartErr
-	}
-	if r.Process == nil {
-		r.Process = NewFakeProcess()
-	}
-	return r.Process, nil
-}
-
-// StartCalls returns process starts in call order.
-func (r *FakeProcessRunner) StartCalls() []ProcessStart {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := make([]ProcessStart, len(r.starts))
-	for i, call := range r.starts {
-		result[i] = ProcessStart{Name: call.Name, Args: append([]string(nil), call.Args...)}
-	}
-	return result
-}
-
-// FakeProcess is a controllable process handle with deterministic Wait, Signal,
-// and Kill behavior.
-type FakeProcess struct {
-	mu sync.Mutex
-
-	WaitErr   error
-	SignalErr error
-	KillErr   error
-	waited    int
-	signals   []os.Signal
-	killed    int
-}
-
-// NewFakeProcess returns an idle fake process.
-func NewFakeProcess() *FakeProcess {
-	return &FakeProcess{}
-}
-
-// Wait records the call and returns WaitErr immediately.
-func (p *FakeProcess) Wait() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.waited++
-	return p.WaitErr
-}
-
-// Signal records signal and returns SignalErr.
-func (p *FakeProcess) Signal(signal os.Signal) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.signals = append(p.signals, signal)
-	return p.SignalErr
-}
-
-// Kill records the call and returns KillErr.
-func (p *FakeProcess) Kill() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.killed++
-	return p.KillErr
-}
-
-// WaitCalls returns the number of Wait calls.
-func (p *FakeProcess) WaitCalls() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.waited
-}
-
-// Signals returns signals in call order.
-func (p *FakeProcess) Signals() []os.Signal {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return append([]os.Signal(nil), p.signals...)
-}
-
-// KillCalls returns the number of Kill calls.
-func (p *FakeProcess) KillCalls() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.killed
 }
 
 // FakePlayerServer is a typed lifecycle fake. Info may be instantiated with the

@@ -53,7 +53,8 @@ grep -Fq '/System/Library/Frameworks/CoreFoundation.framework/' <<<"${linked_fra
 
 bundled_provider="$(find "${app_path}/Contents" -type f \( -iname 'ngrok' -o -iname 'ngrok.exe' -o -iname 'ngrok-*' \) -print -quit 2>/dev/null || true)"
 [[ -z "${bundled_provider}" ]] || fail 'application bundle contains a provider executable'
-if strings "${executable_path}" | rg -q 'NGROK_BIN|fallout-terminal\.ngrok\.app|tunnel-guardian'; then
+legacy_runtime_markers='NGROK_''BIN|fallout-terminal\.''ngrok\.app|tunnel-''guardian'
+if strings "${executable_path}" | rg -q "${legacy_runtime_markers}"; then
   fail 'application executable contains a legacy CLI, PATH, guardian, or shared-domain runtime marker'
 fi
 

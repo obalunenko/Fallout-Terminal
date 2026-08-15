@@ -249,6 +249,8 @@ func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *t
 		`id="publicAccessSection"`, `for="publicAccessDomain"`, `for="publicAccessUsername"`,
 		`for="publicAccessProviderToken"`, `for="publicAccessPlayerPassword"`,
 		`id="publicAccessProviderToken" type="password"`, `id="publicAccessPlayerPassword" type="password"`,
+		`id="publicAccessGuide"`, `КАК НАСТРОИТЬ ЧЕРЕЗ NGROK`,
+		`СОХРАНИТЬ ДОСТУП`, `ВКЛЮЧИТЬ`, `Basic Auth`,
 		`id="publicAccessStatus" role="status" aria-live="polite"`,
 		`id="publicAccessError" role="alert" aria-live="assertive"`,
 		`id="generatedPasswordDialog"`, `aria-modal="true"`,
@@ -263,6 +265,7 @@ func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *t
 	assert.Contains(t, css, ".public-access")
 	assert.Contains(t, javascript, "generatePlayerPassword")
 	assert.Contains(t, javascript, "public-access-status")
+	assert.Contains(t, read("frontend/src/desktop-api.js"), "Clipboard.SetText")
 }
 
 func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {

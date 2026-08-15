@@ -385,6 +385,250 @@ Evidence paths: `internal/tunnel/manager.go`, `internal/tunnel/manager_test.go`,
   unvalidated detached worktree remains preserved. It is historical failed evidence and cannot
   satisfy T074; a new user-authorized checkpoint and clean detached drill are required.
 
+### 2026-08-16 — Immutable checkpoint rollback drill resumed (T074, PASS)
+
+- User-authorized corrected checkpoint commit:
+  `ba32d1a57bb0a33227841c6c189939c91dec6bf3`
+  (`fix: install player tools before protobuf verification`). The primary working tree was clean
+  immediately after the commit.
+- `PASS` — `/tmp/fallout-terminal-007-rollback-fixed.ycaZYH` was created as a detached task-owned
+  worktree. `git worktree list --porcelain`, `git rev-parse HEAD`, and empty
+  `git status --porcelain=v1 --untracked-files=all` output proved the exact checkpoint identity and
+  clean tracked state.
+- `PASS` — without a preliminary manual install, canonical `go run ./cmd/build build` began with
+  locked player dependency installation and completed protobuf generation, both frontends,
+  bindings, and native compilation. Canonical `go run ./cmd/build package` independently repeated
+  the locked install and completed the full signed package graph.
+- `PASS` — `scripts/verify-macos-app.sh 'build/bin/Fallout Terminal.app'` verified arm64, macOS 13,
+  native frameworks, reviewed resources/notices, signature, and absence of provider executable or
+  PATH runtime. `scripts/hash-macos-app.sh 'build/bin/Fallout Terminal.app'` returned
+  `c25868f31ec25e78e5d385bc6c8a2cbdbcaa0ab9073e85c83babe1494f7a9318`, exactly equal to the
+  requalified T073 digest. The detached checkout remained free of tracked/untracked repository
+  drift after both builds.
+- `PASS` — the exact validated worktree appeared in `git worktree list --porcelain` immediately
+  before cleanup and `git worktree remove /tmp/fallout-terminal-007-rollback-fixed.ycaZYH`
+  completed successfully. The earlier failed worktree at
+  `/tmp/fallout-terminal-007-rollback.DEiePK` remains preserved as recorded failure evidence; it was
+  not confused with or used by this successful drill.
+- T074 now unblocks sequential T075. The checkpoint is a rollback reference only; it does not add a
+  production runtime switch.
+
+### 2026-08-16 — Final post-CLI-removal deterministic candidate (T078, PASS)
+
+- Build identity: base commit `ba32d1a57bb0a33227841c6c189939c91dec6bf3` plus the recorded
+  T075–T077 working-tree cutover. The candidate has one embedded SDK runtime and no external
+  process/config/parser implementation.
+- `PASS` — exact clean-checkout-safe deterministic sequence from section 1, in order: empty
+  `gofmt -l .`; locked `npm ci` in `frontend/`, `client/`, and `tests/browser/`; tool-module,
+  protobuf format/lint/generation/drift/breaking, Wails binding/cutover, dependency/license,
+  strict legacy-runtime, and secret-leak gates; `go vet ./...`; `go test ./...`; and
+  `go test -race ./...`. The negative protobuf drift fixture printed its expected rejection and
+  returned success. The resolved inventory contained 171 modules and 244 module-graph edges.
+- `PASS` — both production frontend builds and the complete Playwright gate:
+  `npm run build --prefix frontend`, `npm run build --prefix client`, and
+  `npm test --prefix tests/browser`. The browser run passed 36 deterministic journeys and skipped
+  exactly one real authenticated public-endpoint journey with explicit `NOT RUN` semantics because
+  no opt-in credentials were provided.
+- `PASS` — `scripts/reproducible-build-check.sh`; its two full package graphs agreed. The separate
+  mandatory `go run ./cmd/build build`, `go run ./cmd/build package`, and
+  `scripts/verify-macos-app.sh "build/bin/Fallout Terminal.app"` also passed. The final verified
+  arm64/macOS-13 ad-hoc bundle contains reviewed notices, native Keychain frameworks, offline
+  resources, no provider executable/PATH runtime, and has canonical bundle-manifest SHA-256
+  `1992f2fedf2d84e356cc3067383d72d3f4f43abfc2492e2276c949b4358b49a5` (17,844 KiB bundle;
+  15,975,824-byte main executable).
+- `PASS` — credential-free packaged lifecycle:
+  `env FALLOUT_PUBLIC_ACCESS_MANUAL_CLOSE_NOT_RUN=1 scripts/public-access-macos-smoke.sh "build/bin/Fallout Terminal.app"`.
+  LaunchServices/double-click semantics reached local mode without Terminal, application arguments,
+  provider credentials, or an installed provider executable. Deferred-close cleanup, Cmd+Q-equivalent
+  cleanup, partial second-instance startup, forced owner loss, offline/local relaunch, and final Quit
+  all met the five-second budget; measured cleanup results were `0s`.
+- `PASS` — separate canonical `go run ./cmd/build dev` master/player smoke with no separately
+  started frontend or player server. The native master window visibly reached
+  `ЛОКАЛЬНЫЙ РЕЖИМ ГОТОВ · http://127.0.0.1:3690`; static `/` and live typed `SoundManifest`
+  returned `200`; a generated Connect client received a non-empty initial `Subscribe` snapshot at
+  revision 1; interrupt released listener 3690 on the first 100ms probe. The in-app Browser backend
+  was unavailable (`[]`), so visual public-settings coverage remains attributable to the passing
+  Playwright settings journeys rather than being misreported as Browser automation.
+- `NOT RUN` — interactive red-button/`Cmd+W` native close remains the user-deferred manual follow-up;
+  the harness reported it explicitly and did not count it as `PASS`.
+- `NOT RUN` — real stale-public-URL probes and all real provider reachability/authentication checks
+  lacked explicit opt-in credentials and a non-secret active URL; no external request was made.
+- Non-blocking diagnostic: Go unit link steps repeated the known SDK object minimum-version warning
+  under their macOS-11 test link target. The authoritative packaged executable verification passed
+  exact arm64 architecture, `LSMinimumSystemVersion=13.0`, Mach-O minimum 13.0, native framework,
+  entitlements, signature, and resource gates.
+
+### 2026-08-16 — Conditional real-provider evidence (T079, NOT RUN)
+
+- Opt-in prerequisite presence check (values were never read or printed):
+  `FALLOUT_NGROK_INTEGRATION`, `FALLOUT_NGROK_AUTHTOKEN`,
+  `FALLOUT_NGROK_RESERVED_DOMAIN`, `FALLOUT_PUBLIC_TEST_URL`,
+  `FALLOUT_PUBLIC_TEST_USERNAME`, and `FALLOUT_PUBLIC_TEST_PASSWORD` were all absent.
+- `NOT RUN` — real random URL startup and the 20-attempt SC-001 sample: no personal token or
+  explicit opt-in was provided.
+- `NOT RUN` — real reserved-domain success, unavailable-domain conflict, invalid token, revoked
+  token, no-network/provider timeout, and disconnect-after-ready recovery: the required personal
+  account/token/domain/network prerequisites were absent.
+- `NOT RUN` — missing, wrong, and correct Basic Auth against real public static, unary, and
+  non-empty incremental `Subscribe` requests: no active public URL or credential opt-in existed.
+- `NOT RUN` — real public multi-client convergence, reconnect, navigation, hacking, sound,
+  stop/reconfigure, failure recovery, and stale-URL probes: no active opted-in endpoint existed.
+- The focused Go harness command
+  `go test ./internal/tunnel -run '^TestEmbeddedNgrokSDKOptInProtectedDirectUpstream$' -count=1 -v`
+  reported `NOT RUN: explicit real-ngrok integration opt-in was not provided` and made no provider
+  request. The focused browser command
+  `npm test --prefix tests/browser -- connectrpc-player.spec.mjs` passed 11 deterministic journeys
+  and skipped exactly the real authenticated endpoint journey. Those deterministic passes are not
+  reported as external evidence.
+
+### 2026-08-16 — Packaged UI/Keychain/public smoke (T080, PARTIAL PASS / public NOT RUN)
+
+- `PASS` — unconditional package verification and credential-free LaunchServices smoke:
+  `scripts/verify-macos-app.sh "build/bin/Fallout Terminal.app"` and
+  `env FALLOUT_PUBLIC_ACCESS_MANUAL_CLOSE_NOT_RUN=1 scripts/public-access-macos-smoke.sh "build/bin/Fallout Terminal.app"`.
+  The exact digest remained
+  `1992f2fedf2d84e356cc3067383d72d3f4f43abfc2492e2276c949b4358b49a5`; architecture,
+  macOS-13 minimum, signature, native frameworks, entitlements, offline resources, absence of a
+  bundled provider executable/PATH lookup, local readiness, partial startup, forced-owner-loss
+  relaunch, Cmd+Q-equivalent cleanup, and the five-second lifecycle budget all passed.
+- `PASS` — deterministic Keychain adapter selection:
+  `go test ./internal/platform -run 'Test.*Keychain' -count=1 -v`. Stable service/account names,
+  attribute-only presence, replace/update/add/delete semantics, scoped read clearing, and
+  locked/denied/unavailable/cancelled redaction passed.
+- `NOT RUN` — real isolated macOS Keychain round-trip because
+  `FALLOUT_KEYCHAIN_INTEGRATION` was absent. The harness reported its explicit skip and no temporary
+  Keychain item was created.
+- `NOT RUN` — packaged UI personal-token save/presence, public Start, authenticated player static
+  and streaming access, Stop, and public Quit because no provider-token opt-in was supplied. The
+  user retained this real packaged public journey for manual completion; deterministic UI/adapter
+  evidence is not promoted to a packaged public `PASS`.
+- `NOT RUN` — literal host-without-installed-provider-binary observation. A provider CLI is present
+  on this development host, so it was not claimed absent or uninstalled. Source/package scans prove
+  that the application has no CLI lookup, subprocess, bundled executable, environment launch path,
+  or runtime download; the actual no-installed-binary public UI journey remains part of the same
+  manual follow-up.
+- `NOT RUN` — interactive red-button/`Cmd+W` and real stale-URL probes remain the separately recorded
+  user-deferred/credential-gated cases. All unconditional local cleanup paths still passed in `0s`.
+
+### 2026-08-16 — Conditional distribution and provider-plan gates (T081, NOT RUN)
+
+- Prerequisite presence check found no `DEVELOPER_ID_APPLICATION` reference, no
+  `NOTARYTOOL_KEYCHAIN_PROFILE` reference, zero installed Developer ID Application identities, and
+  no release DMG. No signing identity or Keychain profile value was printed.
+- `NOT RUN` — Developer ID signing and hardened-runtime distribution signature: no matching identity
+  or configured identity reference was available. The local ad-hoc personal package verification is
+  not reported as Developer ID evidence.
+- `NOT RUN` — Apple notarization, stapling, release DMG construction/stapling, and Gatekeeper release
+  assessment: the Developer ID and notary profile prerequisites were absent, so
+  `scripts/build-macos.sh --preflight` and the mutating release pipeline were not invoked.
+- `NOT RUN` — paid/reserved-domain and provider-account capability gates: no personal provider token,
+  reserved-domain prerequisite, or explicit real-provider opt-in was supplied. No provider API or
+  endpoint request was made.
+
+### 2026-08-16 — Final requalification and vulnerability disposition (T082, PASS)
+
+- Build identity: immutable rollback reference
+  `ba32d1a57bb0a33227841c6c189939c91dec6bf3`; post-CLI-removal working-tree candidate using the
+  module-selected Go 1.26.6 toolchain. `go list -m all` resolved 171 modules and `go mod graph`
+  contained 244 edges. The preserved detached rollback worktree remains registered at
+  `/private/tmp/fallout-terminal-007-rollback.DEiePK`; the immutable commit resolves successfully.
+- `PASS` — the exact clean-checkout-safe sequence in section 1: empty `gofmt -l .`, locked installs
+  in all three npm projects before dependent generation, clean diff check, tool-module, protobuf
+  format/lint/drift/breaking, Wails binding/cutover, dependency/license, strict legacy, secret-leak,
+  vet, full unit, full race, both frontend builds, and full Playwright. Playwright reported 36
+  passed and one explicit credential-gated real-endpoint skip. The negative protobuf drift fixture
+  emitted its expected rejection diagnostic and exited successfully.
+- `PASS` — `scripts/reproducible-build-check.sh` produced two byte-identical inspected packages.
+  Separate direct `go run ./cmd/build build`, `go run ./cmd/build package`, package verification,
+  and bundle hashing reproduced canonical bundle-manifest SHA-256
+  `dcc6d5af31e996e2db2bf84634521207d5b8922c64b01c65c4642852ed59f023`.
+  The bundle is 17,844 KiB and its main executable is 15,975,824 bytes; verifier evidence is arm64,
+  macOS 13.0, native frameworks, reviewed notices, complete resources/entitlements, valid final
+  signature, and no provider executable or PATH runtime.
+- `PASS` — bounded canonical `go run ./cmd/build dev` smoke without a second player/frontend server:
+  local static `/` returned 200, typed `SoundManifest` returned one ambient asset, and `Subscribe`
+  began with a complete snapshot at revision 1. Interrupt released the sole port-3690 listener
+  immediately within the five-second budget.
+- `PASS` — final credential-free packaged lifecycle smoke. Cmd+Q-equivalent quit, partial startup,
+  forced owner loss, local-server preservation, and stopped relaunch completed with zero-second
+  measured cleanup. Interactive red-button/`Cmd+W` remains the user-deferred `NOT RUN`; both real
+  stale-public-URL probes remain credential-gated `NOT RUN`.
+- `PASS` — dated vulnerability review on 2026-08-16. The first official Go vulnerability database
+  scan against Go 1.26.5 found five reachable standard-library advisories: `GO-2026-6218`,
+  `GO-2026-6090`, `GO-2026-6089`, `GO-2026-5972`, and `GO-2026-5026`, all fixed in Go 1.26.6.
+  The root module minimum was raised to 1.26.6; the repeated official `govulncheck ./...` returned
+  `No vulnerabilities found`. Official npm registry audits of the committed `frontend/`, `client/`,
+  and `tests/browser/` lockfiles each returned zero vulnerabilities. No applicable finding remains
+  without disposition.
+- Non-blocking diagnostic: test-only Darwin link steps still warn that SDK objects target macOS 26
+  while the generic test linker targets macOS 11. Unit/race binaries link successfully; the final
+  packaged executable independently passed the authoritative arm64/macOS 13 minimum-version and
+  native-framework verifier.
+
+Success-criteria reconciliation for this candidate:
+
+- `SC-001` — deterministic timeout/cancellation schedules `PASS`; 20 real starts `NOT RUN`.
+- `SC-002` — deterministic static/unary/streaming auth and unaffected local/LAN boundary `PASS`;
+  real-edge portion `NOT RUN`.
+- `SC-003` — deterministic protected browser parity/reconnect `PASS`; real public-address portion
+  `NOT RUN`.
+- `SC-004` — simulated provider/network/token/domain/timeout/secure-store fallback matrix `PASS`.
+- `SC-005` — deterministic 100-schedule shutdown and available packaged cleanup paths `PASS`; real
+  stale-URL probes and deferred interactive close remain `NOT RUN`.
+- `SC-006` — 100 repeated concurrent start/stop/reconfigure schedules `PASS` with one endpoint and
+  no stale publication.
+- `SC-007` — final secret-leak scan `PASS` with zero forbidden secret surfaces.
+- `SC-008` — offline packaged launch/local lifecycle `PASS`; packaged public UI configuration,
+  authenticated access, and no-installed-host-binary observation `NOT RUN`.
+- `SC-009` — deterministic 100-save/relaunch non-secret restoration and non-readback `PASS`.
+- `SC-010` — session JSON v1, player-config v1, local broadcast, roles, authoritative state, and all
+  compatibility gates `PASS` without migration.
+- `SC-011` — evidence labeling `PASS`: all unavailable provider, network, signing, notarization,
+  plan, interactive, and host-prerequisite gates remain explicit `NOT RUN`.
+- `SC-012` — complete password length boundary tests `PASS`.
+- `SC-013` — real-edge reject/retry/no-cooldown acceptance `NOT RUN`; deterministic edge-policy
+  acceptance is not substituted for it.
+
+### 2026-08-16 — Final source/generated/package/documentation audit (T083, PASS)
+
+- `PASS` — production composition contains exactly one tunnel construction:
+  `main.go` creates one `PublicAccessManager` with `NewEmbeddedNgrokService`; the sole provider
+  adapter is `internal/tunnel/ngrok.go`, forwarding only to `http://127.0.0.1:3690`. The surviving
+  `service.go` contains provider-neutral lifecycle interfaces only. The external process/config,
+  Darwin guardian, subprocess lifecycle, log parser, and process-only tests are deleted.
+- `PASS` — strict active source/build/package/documentation scan:
+  `scripts/legacy-public-access-check.sh` found no external provider execution, PATH lookup,
+  `NGROK_BIN`, guardian, log-derived URL, shared token/domain, packaged env/argument instruction,
+  bundled provider executable, runtime download, or second production implementation. Historical
+  migration specs remain history and are not active runtime or operating guidance. README and
+  templates describe UI configuration with a personal token and Keychain storage.
+- `PASS` — final generated/package/security scan: protobuf generation and drift verification retained
+  schema revision `aff02dd5920ecde1e3f682b06201a509dde354e6216d6a8f1ced652b4ab35112`
+  and deterministic contract digest
+  `f712f68df524d04fe1c30754818d6911c6b0c0d48f1b8dad1372b65ef00ab507`;
+  Wails exposes exactly 30 allowlisted desktop methods; dependency/license, secret-leak, package
+  verifier, and diff-whitespace gates passed. Session JSON and player-config remain version 1.
+- Final candidate package digest:
+  `dcc6d5af31e996e2db2bf84634521207d5b8922c64b01c65c4642852ed59f023`.
+  Immutable pre-removal rollback package digest:
+  `c25868f31ec25e78e5d385bc6c8a2cbdbcaa0ab9073e85c83babe1494f7a9318` at commit
+  `ba32d1a57bb0a33227841c6c189939c91dec6bf3`. They intentionally differ because the final candidate
+  removes the legacy implementation and uses the security-patched Go 1.26.6 toolchain.
+- Final FR evidence is attached through the complete `tasks.md` traceability matrix: FR-001–FR-009
+  map to settings/Keychain/private-input/non-readback tests; FR-010–FR-017 to one-server,
+  protobuf/bindings, local/LAN, and version-1 compatibility gates; FR-018–FR-025 to embedded policy,
+  exact upstream, public auth, streaming, browser parity, and reconnect tests; FR-026–FR-036 to
+  failure isolation, lifecycle, concurrency, shutdown, and secret scans; FR-037–FR-044 to CLI
+  removal, canonical build graph, reproducibility, package, docs, and evidence labeling; and
+  FR-045–FR-051 to real-provider/release conditional gates and explicit `NOT RUN` handling. The
+  per-SC disposition immediately above records every SC-001–SC-013 result without upgrading fake or
+  unavailable evidence.
+- Remaining gaps are explicit and unchanged: real provider random/reserved/auth/streaming/failure
+  journeys, packaged public UI with no installed host provider binary, Darwin OS Keychain opt-in,
+  Developer ID/notary/DMG/provider-plan checks, real stale URLs, and the user-deferred interactive
+  red-button/`Cmd+W` close are `NOT RUN`. No deterministic or local result is claimed as those
+  external acceptances.
+
 ### 2026-08-15 — Historical US2 source-bound checkpoint that triggered BUG-001
 
 - Build identity: Darwin 25.5.0 arm64, Go 1.26.5; base commit

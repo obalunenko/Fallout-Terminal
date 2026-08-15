@@ -6,6 +6,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('settings form is labelled, keyboard reachable, and defaults without revealing secrets', async ({ page }) => {
+  const guide = page.locator('#publicAccessGuide');
+  await expect(guide).not.toHaveAttribute('open', '');
+  await guide.getByText('КАК НАСТРОИТЬ ЧЕРЕЗ NGROK').click();
+  await expect(guide).toHaveAttribute('open', '');
+  await expect(guide).toContainText('СОХРАНИТЬ ДОСТУП');
+  await expect(guide).toContainText('Basic Auth');
+
   await expect(page.getByLabel('Зарезервированный домен')).toHaveValue('');
   await expect(page.getByLabel('Имя игрока')).toHaveValue('players');
   await expect(page.getByLabel('Токен ngrok')).toHaveAttribute('type', 'password');
@@ -111,6 +118,19 @@ test('random and reserved ready outcomes are copied without reconstructing saved
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('wanderers');
   await expect(page.locator('#publicAccessPlayerPassword')).toHaveValue('');
   await expect(page.locator('#btnCopyManualPassword')).toBeDisabled();
+});
+
+test('copy falls back to the native runtime when WebView clipboard permission is unavailable', async ({ page }) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) },
+    });
+  });
+
+  await page.locator('#btnCopyPublicUsername').click();
+  await expect(page.locator('#publicAccessCopyStatus')).toHaveText('ИМЯ СКОПИРОВАНО');
+  expect(await page.evaluate(() => __desktopFixture.takeClipboardText())).toBe('players');
 });
 
 test('failed domain state is redacted, URL-free, and rendered as error', async ({ page }) => {

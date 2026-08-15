@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	ngrok "golang.ngrok.com/ngrok/v2"
 )
 
 type fakeNgrokCodedError struct{ code string }
@@ -42,9 +43,10 @@ type fakeSDKAgent struct {
 	disconnectErrs []error
 	disconnectGate chan struct{}
 	disconnects    int
+	trackContext   bool
 }
 
-func (agent *fakeSDKAgent) Forward(_ context.Context, request ngrokForwardRequest) (ngrokForwarder, error) {
+func (agent *fakeSDKAgent) Forward(ctx context.Context, request ngrokForwardRequest) (ngrokForwarder, error) {
 	agent.mu.Lock()
 	agent.request = request
 	gate := agent.forwardGate
@@ -56,6 +58,12 @@ func (agent *fakeSDKAgent) Forward(_ context.Context, request ngrokForwardReques
 	defer agent.mu.Unlock()
 	if agent.forwardErr != nil {
 		return nil, agent.forwardErr
+	}
+	if agent.trackContext && agent.forwarder != nil {
+		go func(forwarder *fakeSDKForwarder) {
+			<-ctx.Done()
+			forwarder.doneOnce.Do(func() { close(forwarder.done) })
+		}(agent.forwarder)
 	}
 	return agent.forwarder, nil
 }
@@ -209,6 +217,22 @@ func TestEmbeddedNgrokEndpointDoneAndIdempotentBoundedCloseDisconnect(t *testing
 	assert.Equal(t, 1, agent.disconnects)
 }
 
+func TestEmbeddedNgrokEndpointLifetimeSurvivesCompletedStartupContext(t *testing.T) {
+	forwarder := newFakeSDKForwarder("https://random.example")
+	agent := &fakeSDKAgent{forwarder: forwarder, trackContext: true}
+	ctx, cancel := context.WithCancel(t.Context())
+	endpoint, err := newNgrokServiceWithFactory(&fakeSDKFactory{agent: agent}).Start(ctx, protectedStartRequest(""))
+	require.NoError(t, err)
+	cancel()
+
+	select {
+	case <-endpoint.Done():
+		t.Fatal("completed startup context stopped the owned endpoint")
+	case <-time.After(25 * time.Millisecond):
+	}
+	require.NoError(t, endpoint.Close(t.Context()))
+}
+
 func TestEmbeddedNgrokEndpointCloseFailureIsRedactedAndRetryable(t *testing.T) {
 	forwarder := newFakeSDKForwarder("https://random.example")
 	forwarder.closeErrs = []error{errors.New("synthetic forwarder close diagnostic")}
@@ -263,11 +287,30 @@ func TestEmbeddedNgrokAdapterFailureMatrixIsStableAndRedacted(t *testing.T) {
 			require.Error(t, err)
 			category, message := redactedPublicAccessFailure(err)
 			assert.Equal(t, test.category, category)
-			assert.Equal(t, test.category.SafeMessage(), message)
+			if coded, ok := test.failure.(fakeNgrokCodedError); ok {
+				assert.Contains(t, message, coded.code)
+			} else {
+				assert.Equal(t, test.category.SafeMessage(), message)
+			}
 			assert.NotContains(t, message, "synthetic")
 			assert.NotContains(t, message, "private.invalid")
 		})
 	}
+}
+
+func TestSDKAgentDisconnectFailureRetainsOnlySafeProviderCode(t *testing.T) {
+	canary := "synthetic-token-canary synthetic-password-canary synthetic-domain-canary.example"
+	agent := &sdkAgent{}
+	agent.handleEvent(&ngrok.EventAgentDisconnected{Error: codedProviderError{
+		code: "ERR_NGROK_123", diagnostic: canary,
+	}})
+
+	failure := agent.Failure()
+	require.Error(t, failure)
+	category, message := redactedPublicAccessFailure(failure)
+	assert.Equal(t, ErrorProviderAuthentication, category)
+	assert.Contains(t, message, "ERR_NGROK_123")
+	assert.NotContains(t, message, "synthetic-")
 }
 
 func TestEmbeddedNgrokStartCancellationAfterLateForwardClosesAcquiredResources(t *testing.T) {

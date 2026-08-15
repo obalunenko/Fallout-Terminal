@@ -407,6 +407,32 @@ button {
 }
 .public-access[hidden] { display: none; }
 .public-access-heading { margin: 0; color: #ffe08a; }
+.public-access-guide {
+  margin: 8px 12px 0;
+  border: 1px solid #3a4a30;
+  background: #0d110a;
+  color: #9fe89a;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.public-access-guide summary {
+  padding: 7px 9px;
+  color: #ffe08a;
+  cursor: pointer;
+  letter-spacing: .5px;
+}
+.public-access-guide[open] summary { border-bottom: 1px solid #253018; }
+.public-access-guide ol {
+  margin: 8px 10px 6px;
+  padding-left: 19px;
+}
+.public-access-guide li { margin-bottom: 5px; }
+.public-access-guide p {
+  margin: 7px 10px 9px;
+  color: #6f9a5f;
+}
+.public-access-guide code,
+.public-access-guide strong { color: #d8ffb8; }
 .public-access-form,
 .public-access-output { padding: 10px 12px; }
 .public-access-form { display: grid; gap: 6px; }

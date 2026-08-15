@@ -1,6 +1,6 @@
 module github.com/obalunenko/Fallout-Terminal
 
-go 1.26
+go 1.26.6
 
 require (
 	connectrpc.com/connect v1.20.0

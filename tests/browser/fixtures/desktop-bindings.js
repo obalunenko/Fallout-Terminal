@@ -21,6 +21,7 @@ const state = globalThis.__desktopFixtureState ??= {
   savePublicAccessPromise: null,
   resolveSavePublicAccess: null,
   pendingSavePublicAccess: null,
+  clipboardText: '',
 };
 
 const durablePublicAccess = (() => {
@@ -77,6 +78,11 @@ globalThis.__desktopFixture = {
     state.publicAccessPromise = null;
   },
   releaseCount(name) { return state.releases.get(name) ?? 0; },
+  takeClipboardText() {
+    const value = state.clipboardText;
+    state.clipboardText = '';
+    return value;
+  },
   deferSavePublicAccess() {
     state.savePublicAccessPromise = new Promise(resolve => { state.resolveSavePublicAccess = resolve; });
   },
@@ -105,6 +111,13 @@ export const Events = {
       listeners.delete(callback);
       state.releases.set(name, (state.releases.get(name) ?? 0) + 1);
     };
+  },
+};
+
+export const Clipboard = {
+  SetText(value) {
+    state.clipboardText = typeof value === 'string' ? value : '';
+    return Promise.resolve();
   },
 };
 

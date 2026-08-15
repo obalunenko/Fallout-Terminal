@@ -6,6 +6,9 @@ source without adding a listener or provider-specific core contract.
 **Bugfix**: 2026-08-15 — BUG-001 removes the unbindable dedicated source and makes endpoint Basic
 Auth part of provider-neutral start input.
 
+**Bugfix**: 2026-08-16 — BUG-002 defines the startup-to-owned-endpoint lifetime handoff and the
+strictly redacted optional disconnect-failure surface.
+
 ## Interfaces
 
 The concrete ngrok SDK is confined to an adapter in `internal/tunnel`. Core lifecycle tests depend
@@ -40,6 +43,9 @@ idempotent/concurrency-safe. A deterministic fake controls start completion, ret
   direct local/LAN service is unaffected.
 - Start is bounded by the manager's 30-second terminal deadline; the 15-second target is measured
   separately and does not shorten correctness cleanup.
+- The context passed to `Start` bounds acquisition only. Cancellation before commit aborts
+  acquisition and cleans partial resources; once `Start` returns a committed endpoint, completion
+  or cancellation of that startup context MUST NOT close `Done` or stop the endpoint.
 - The adapter may return only an acquired, policy-protected endpoint; it emits no UI events itself.
 - Empty reserved domain asks the provider for a random URL. Non-empty domain requests that exact
   HTTPS host and never silently falls back.
@@ -52,9 +58,13 @@ idempotent/concurrency-safe. A deterministic fake controls start completion, ret
 
 - `Done` closing while the endpoint is current and not intentionally stopping signals public
   failure. The manager withdraws URL before cleanup.
+- An adapter MAY expose an internal `Failure() error` extension after `Done`; it may contain only a
+  fixed application category and a validated `ERR_NGROK_<digits>` code. The base provider-neutral
+  interface, status, events, and diagnostics never expose raw SDK error text.
 - `Done` closing for an old generation has no status effect; any remaining endpoint is still closed.
-- Context cancellation causes the manager to call `Close`; cancellation alone is not accepted as
-  proof of endpoint cleanup.
+- Cancellation of an active lifecycle intent causes the manager to call `Close`; cancellation
+  alone is not accepted as proof of endpoint cleanup. Endpoint `Close`, not the completed startup
+  context, owns cancellation of the committed SDK forwarder lifetime.
 - `Close` can be called before Start completes, after `Done`, after partial acquisition, and
   concurrently. Calls join one close result rather than acquiring or leaking another endpoint.
 - Cleanup drops SDK endpoint/agent references, goroutines, credential buffers, and monitor work

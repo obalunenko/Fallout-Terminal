@@ -261,11 +261,12 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 			manager.endpoint = nil
 		}
 		if closeErr != nil {
-			category, _ := redactedPublicAccessFailure(closeErr)
+			category, message := redactedPublicAccessFailure(closeErr)
 			if errors.Is(closeErr, context.DeadlineExceeded) || errors.Is(closeErr, context.Canceled) {
 				category = ErrorShutdownTimeout
 			}
 			manager.status = failedStatus(manager.status, category)
+			manager.status.ErrorMessage = message
 			result := manager.resultLocked(false)
 			manager.mu.Unlock()
 			manager.emit(result.Snapshot)
@@ -352,8 +353,9 @@ func (manager *PublicAccessManager) finishStart(operation *startOperation, endpo
 		return result
 	}
 	if startErr != nil {
-		category, _ := redactedPublicAccessFailure(startErr)
+		category, message := redactedPublicAccessFailure(startErr)
 		manager.status = failedStatus(manager.status, category)
+		manager.status.ErrorMessage = message
 		result := manager.resultLocked(false)
 		manager.mu.Unlock()
 		if endpoint != nil {
@@ -461,11 +463,12 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 	}
 	manager.mu.Lock()
 	if closeErr != nil {
-		category, _ := redactedPublicAccessFailure(closeErr)
+		category, message := redactedPublicAccessFailure(closeErr)
 		if errors.Is(closeErr, context.DeadlineExceeded) || errors.Is(closeErr, context.Canceled) {
 			category = ErrorShutdownTimeout
 		}
 		manager.status = failedStatus(manager.status, category)
+		manager.status.ErrorMessage = message
 		operation.result = manager.resultLocked(false)
 	} else {
 		if manager.endpoint == endpoint {
@@ -671,7 +674,9 @@ func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEn
 	cleanup := &cleanupOperation{done: make(chan struct{})}
 	manager.cleanup = cleanup
 	manager.status.Generation++
-	manager.status = failedStatus(PublicAccessStatus{State: LifecycleFailed, Generation: manager.status.Generation, SettingsRevision: manager.preferences.Revision}, ErrorProviderFailure)
+	category, message := publicAccessEndpointFailure(endpoint)
+	manager.status = failedStatus(PublicAccessStatus{State: LifecycleFailed, Generation: manager.status.Generation, SettingsRevision: manager.preferences.Revision}, category)
+	manager.status.ErrorMessage = message
 	snapshot := manager.snapshotLocked()
 	manager.mu.Unlock()
 	manager.emit(snapshot)
@@ -686,6 +691,18 @@ func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEn
 	}
 	close(cleanup.done)
 	manager.mu.Unlock()
+}
+
+func publicAccessEndpointFailure(endpoint TunnelEndpoint) (ErrorCategory, string) {
+	source, ok := endpoint.(interface{ Failure() error })
+	if !ok {
+		return ErrorProviderFailure, ErrorProviderFailure.SafeMessage()
+	}
+	failure := source.Failure()
+	if failure == nil {
+		return ErrorProviderFailure, ErrorProviderFailure.SafeMessage()
+	}
+	return redactedPublicAccessFailure(failure)
 }
 
 func boundedPublicAccessCleanupContext(parent context.Context) (context.Context, context.CancelFunc) {

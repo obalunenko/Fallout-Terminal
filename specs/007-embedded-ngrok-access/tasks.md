@@ -21,6 +21,10 @@ makes the exact final constitution command sequence explicit without adding or r
 adds canonical dev-smoke ownership, and removes historical evidence from active coverage mappings
 and current-guidance prose.
 
+**Bugfix**: 2026-08-16 — BUG-002 adds a test-first correction for the embedded SDK forwarder's
+context lifetime and safe unexpected-disconnect diagnostics. The corrective tasks preserve the
+completed historical task record and are checked only from actual RED/GREEN/gate evidence.
+
 Every completed task must be journaled through the Companion writer. Do not edit completed feature
 artifacts under `specs/005-connectrpc-protobuf-migration/` or `specs/006-wails-v3-migration/`;
 their records remain historical. Direct `go run ./cmd/build dev|build|package` commands remain
@@ -317,33 +321,60 @@ source, then rerun the gates on the final single-runtime tree without weakening 
 **⟶ Wait for T068–T072, then prove the embedded-only candidate before any deletion:**
 
 - [x] **T073** Run and record contracts/fakes/unit/race/HTTP/non-empty-stream/browser/lifecycle/dependency/license/leak/reproducible-build/full-package/offline-double-click parity against embedded-only composition; block removal unless tests prove the fixed direct `http://127.0.0.1:3690` upstream, Basic Auth Traffic Policy attached before URL publication, secrets Keychain-only with only scoped SDK policy use, local fallback, no provider binary/PATH/download, and cleanup within five seconds · `specs/007-embedded-ngrok-access/quickstart.md`
-- [ ] **T074** After T073 PASS and only after a user-approved checkpoint commit exists, require a clean candidate, record its full 40-hex SHA and T073 package digest, create a detached task-owned temporary worktree at exactly that SHA, run canonical `go run ./cmd/build build` and `go run ./cmd/build package`, verify and hash the packaged app, require its digest to equal the T073 digest byte-for-byte, then remove only the validated worktree and record cleanup; otherwise mark `BLOCKED` and forbid T075 without creating a dual-runtime switch · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T074** After T073 PASS and only after a user-approved checkpoint commit exists, require a clean candidate, record its full 40-hex SHA and T073 package digest, create a detached task-owned temporary worktree at exactly that SHA, run canonical `go run ./cmd/build build` and `go run ./cmd/build package`, verify and hash the packaged app, require its digest to equal the T073 digest byte-for-byte, then remove only the validated worktree and record cleanup; otherwise mark `BLOCKED` and forbid T075 without creating a dual-runtime switch · `specs/007-embedded-ngrok-access/quickstart.md`
 
 **⟶ CLI deletion is blocked until T073 and T074 PASS, then cut over sequentially:**
 
-- [ ] **T075** Delete the already unreachable startup env/argument helpers, inline credentials, hard-coded domain, external process selection, and configuration-error shim plus CLI config/process/guardian/log-parser implementations and their process-only tests only after the full embedded-only package and rollback gates pass · `main.go`, `internal/tunnel/config.go`, `internal/tunnel/process.go`, `internal/tunnel/process_darwin.go`, `internal/tunnel/process_other.go`, `internal/tunnel/process_test.go`, `internal/tunnel/process_darwin_integration_test.go`
-- [ ] **T076** Rewrite surviving tunnel tests around SDK/fake timeout, cancellation, `Done`, diagnostics redaction, concurrent close, and lifecycle parity; reconcile the complete surviving-test inventory after process deletion, remove deleted process-test entries, and rerun Testify, `t.Context()`, and protobuf-aware convention enforcement so no process assertion remains · `internal/tunnel/service_test.go`, `internal/platform/test_conventions_test.go`
-- [ ] **T077** Replace active CLI/PATH/env/default-domain instructions with packaged UI, personal authtoken, Keychain presence/non-readback, random/reserved URL, Start/Stop/sharing/recovery guidance; provider-neutralize active templates and ensure Makefile contains at most thin canonical aliases · `README.md`, `.specify/templates/plan-template.md`, `.specify/templates/spec-template.md`, `.specify/templates/tasks-template.md`, `Makefile`
+- [x] **T075** Delete the already unreachable startup env/argument helpers, inline credentials, hard-coded domain, external process selection, and configuration-error shim plus CLI config/process/guardian/log-parser implementations and their process-only tests only after the full embedded-only package and rollback gates pass · `main.go`, `internal/tunnel/config.go`, `internal/tunnel/process.go`, `internal/tunnel/process_darwin.go`, `internal/tunnel/process_other.go`, `internal/tunnel/process_test.go`, `internal/tunnel/process_darwin_integration_test.go`
+- [x] **T076** Rewrite surviving tunnel tests around SDK/fake timeout, cancellation, `Done`, diagnostics redaction, concurrent close, and lifecycle parity; reconcile the complete surviving-test inventory after process deletion, remove deleted process-test entries, and rerun Testify, `t.Context()`, and protobuf-aware convention enforcement so no process assertion remains · `internal/tunnel/service_test.go`, `internal/platform/test_conventions_test.go`
+- [x] **T077** Replace active CLI/PATH/env/default-domain instructions with packaged UI, personal authtoken, Keychain presence/non-readback, random/reserved URL, Start/Stop/sharing/recovery guidance; provider-neutralize active templates and ensure Makefile contains at most thin canonical aliases · `README.md`, `.specify/templates/plan-template.md`, `.specify/templates/spec-template.md`, `.specify/templates/tasks-template.md`, `Makefile`
 
 **⟶ Wait for T075–T077, then require the legacy scan and every deterministic gate to pass again:**
 
-- [ ] **T078** On the final post-CLI-removal tree, run the exact clean-checkout-safe deterministic command sequence in `quickstart.md`, including locked npm installs before dependent protobuf generation, empty `gofmt -l .` output, protobuf/binding gates, vet, unit/race, clean locked `frontend/` and `client/` builds, full Playwright, reproducibility, direct `go run ./cmd/build build`, package build/verification, offline double-click local fallback, architecture/signature/resource, and five-second lifecycle gates; then run the separate bounded canonical `go run ./cmd/build dev` master/player smoke without a separately started frontend or player server. Require zero CLI source/runtime/documentation path and attach the final deterministic candidate digest. T074's pre-removal package does not satisfy this task · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T078** On the final post-CLI-removal tree, run the exact clean-checkout-safe deterministic command sequence in `quickstart.md`, including locked npm installs before dependent protobuf generation, empty `gofmt -l .` output, protobuf/binding gates, vet, unit/race, clean locked `frontend/` and `client/` builds, full Playwright, reproducibility, direct `go run ./cmd/build build`, package build/verification, offline double-click local fallback, architecture/signature/resource, and five-second lifecycle gates; then run the separate bounded canonical `go run ./cmd/build dev` master/player smoke without a separately started frontend or player server. Require zero CLI source/runtime/documentation path and attach the final deterministic candidate digest. T074's pre-removal package does not satisfy this task · `specs/007-embedded-ngrok-access/quickstart.md`
 
 **⟶ Only after T078 PASS, run conditional external evidence sequentially:**
 
-- [ ] **T079** Run real credential-gated random URL, reserved domain, invalid/revoked token, missing/wrong/correct Basic Auth, static/unary/non-empty incremental `Subscribe`, multi-client/reconnect, stop/reconfigure, failure, and stale URL journeys; record each unavailable prerequisite as `NOT RUN` and never call it deterministic endpoint proof · `specs/007-embedded-ngrok-access/quickstart.md`
-- [ ] **T080** Run packaged `.app` double-click configuration/Keychain/Start/authenticated-player/Stop/Quit smoke with no Terminal, env/args, installed ngrok executable, or PATH dependency, plus unconditional offline local fallback/architecture/signature/resource checks; record public portion `NOT RUN` without credentials · `specs/007-embedded-ngrok-access/quickstart.md`
-- [ ] **T081** Run Developer ID, hardened runtime, notarization, stapling, DMG, Gatekeeper, and provider-plan gates only with real prerequisites and record independent `PASS`/`FAIL`/`NOT RUN` results · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T079** Run real credential-gated random URL, reserved domain, invalid/revoked token, missing/wrong/correct Basic Auth, static/unary/non-empty incremental `Subscribe`, multi-client/reconnect, stop/reconfigure, failure, and stale URL journeys; record each unavailable prerequisite as `NOT RUN` and never call it deterministic endpoint proof · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T080** Run packaged `.app` double-click configuration/Keychain/Start/authenticated-player/Stop/Quit smoke with no Terminal, env/args, installed ngrok executable, or PATH dependency, plus unconditional offline local fallback/architecture/signature/resource checks; record public portion `NOT RUN` without credentials · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T081** Run Developer ID, hardened runtime, notarization, stapling, DMG, Gatekeeper, and provider-plan gates only with real prerequisites and record independent `PASS`/`FAIL`/`NOT RUN` results · `specs/007-embedded-ngrok-access/quickstart.md`
 
 **⟶ Final single-owner validation (no post-implement hook owns it):**
 
-- [ ] **T082** Re-run the exact final clean-checkout-safe `quickstart.md` sequence on the post-CLI-removal tree: install locked npm dependencies before dependent protobuf generation; require empty `gofmt -l .` output; run tool-module, protobuf format/lint/drift/breaking, Wails binding allowlist, dependency/license/legacy/leak, vet, full unit and `go test -race ./...` gates; run locked builds in both `frontend/` and `client/`; run the full Playwright gate; run reproducibility, direct `go run ./cmd/build build`, package build/verification, rollback-reference validation, the separate bounded canonical `go run ./cmd/build dev` master/player smoke, and the dated vulnerability review with explicit `PASS`/`FAIL`/`NOT RUN`; then reconcile every SC without claiming skipped evidence · `specs/007-embedded-ngrok-access/quickstart.md`
-- [ ] **T083** Perform the final source/generated/package/documentation scan, verify only one embedded production path remains, attach final candidate digests and FR/SC evidence, and mark every gap explicitly rather than declaring incomplete external gates passed · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T082** Re-run the exact final clean-checkout-safe `quickstart.md` sequence on the post-CLI-removal tree: install locked npm dependencies before dependent protobuf generation; require empty `gofmt -l .` output; run tool-module, protobuf format/lint/drift/breaking, Wails binding allowlist, dependency/license/legacy/leak, vet, full unit and `go test -race ./...` gates; run locked builds in both `frontend/` and `client/`; run the full Playwright gate; run reproducibility, direct `go run ./cmd/build build`, package build/verification, rollback-reference validation, the separate bounded canonical `go run ./cmd/build dev` master/player smoke, and the dated vulnerability review with explicit `PASS`/`FAIL`/`NOT RUN`; then reconcile every SC without claiming skipped evidence · `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T083** Perform the final source/generated/package/documentation scan, verify only one embedded production path remains, attach final candidate digests and FR/SC evidence, and mark every gap explicitly rather than declaring incomplete external gates passed · `specs/007-embedded-ngrok-access/quickstart.md`
 
 **Final checkpoint**: Feature 007 has exactly one embedded production runtime, no CLI/PATH
 dependency, Keychain-only secrets, no unprotected public window, complete player streaming parity,
 bounded shutdown, immutable rollback evidence, deterministic pre/post-removal package evidence, and
 honest conditional results.
+
+---
+
+## Phase 10: BUG-002 — Preserve the committed embedded endpoint lifetime
+
+**Purpose**: Correct the implementation drift that coupled the acquired ngrok forwarder's ongoing
+lifetime to the manager's bounded startup-operation context, while retaining redacted diagnostics
+and optional local-first behavior.
+
+- [x] **T084** [US2] [BUG-002] Add the RED SDK-adapter regression whose fake forwarder closes
+  `Done` when the exact `Forward` context is canceled; prove a committed endpoint survives normal
+  startup-context completion, and extend disconnect/redaction tests so only validated provider codes
+  can reach manager status · `internal/tunnel/ngrok_test.go`, `internal/tunnel/manager_test.go`,
+  `internal/tunnel/redaction_test.go`
+- [x] **T085** [US2] [BUG-002] Implement an endpoint-owned `Forward` context with pre-commit startup
+  cancellation, post-validation commit, and Close-owned cancellation; capture provider disconnects
+  through a safe failure surface, discard raw SDK diagnostic text, and synchronize the internal
+  lifecycle contract · `internal/tunnel/ngrok.go`, `internal/tunnel/manager.go`,
+  `internal/tunnel/redaction.go`, `specs/007-embedded-ngrok-access/contracts/tunnel-service.md`
+- [x] **T086** [US2] [BUG-002] Run the focused RED/GREEN test, tunnel unit and race suites, tunnel
+  vet, canonical `go run ./cmd/build build`, and the secret-leak gate. Record the real credentialed
+  provider retry as `NOT RUN` because no explicit opt-in credentials were supplied ·
+  `specs/007-embedded-ngrok-access/bugs/BUG-002.md`
+
+**Checkpoint BUG-002**: A successful startup no longer tears down its committed endpoint; early
+cancellation still aborts acquisition, explicit lifecycle cleanup remains the sole endpoint owner,
+and unexpected disconnect status contains no raw provider or secret-bearing diagnostic.
 
 ---
 
@@ -366,25 +397,25 @@ honest conditional results.
 | FR-013 | T013, T017, T019, T027 |
 | FR-014 | T013, T016–T019, T025, T027 |
 | FR-015 | T014–T017, T020–T023, T027–T028 |
-| FR-016 | T034, T038–T041 |
+| FR-016 | T034, T038–T041, T084–T086 |
 | FR-017 | T006, T009, T016–T017, T027, T029, T034, T040, T049, T053, T058 |
 | FR-018 | T034, T037, T041, T079 |
 | FR-019 | T034, T037, T040–T041, T079 |
-| FR-020 | T029, T037–T041 |
+| FR-020 | T029, T037–T041, T084–T086 |
 | FR-021 | T037, T041–T046, T073, T079 |
-| FR-022 | T029, T037–T041, T073 |
+| FR-022 | T029, T037–T041, T073, T084–T086 |
 | FR-023 | T037, T039, T042, T073, T083 |
 | FR-024 | T037, T042–T046, T073, T079 |
 | FR-025 | T042–T046, T055–T060, T079 |
 | FR-026 | T033, T037–T039 |
 | FR-027 | T037, T042, T055–T060, T080 |
 | FR-028 | T033, T041, T055–T060, T080 |
-| FR-029 | T009, T029, T038, T047, T051, T061, T065 |
+| FR-029 | T009, T029, T038, T047, T051, T061, T065, T084–T086 |
 | FR-030 | T047–T054 |
 | FR-031 | T047–T054 |
-| FR-032 | T047–T054, T061–T067 |
+| FR-032 | T047–T054, T061–T067, T084–T086 |
 | FR-033 | T061–T067, T073, T078, T080 |
-| FR-034 | T009, T029, T038, T047, T051, T061, T065 |
+| FR-034 | T009, T029, T038, T047, T051, T061, T065, T084–T086 |
 | FR-035 | T004–T005, T007–T008, T014, T020, T082 |
 | FR-036 | T042–T046, T055–T060, T082 |
 | FR-037 | T068–T078, T083 |
@@ -410,7 +441,7 @@ honest conditional results.
 
 | Success criterion | Task IDs |
 |---|---|
-| SC-001 | T029, T038, T041, T079 |
+| SC-001 | T029, T038, T041, T079, T084–T086 |
 | SC-002 | T037, T042–T046, T047–T054, T073, T079 |
 | SC-003 | T042–T046, T073, T079 |
 | SC-004 | T055–T060, T080 |
@@ -443,6 +474,8 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
               US6 Bounded shutdown T061–T067
                          ↓
               P5 pre-gate/rollback/cutover/requalification T068–T083
+                         ↓
+              BUG-002 lifetime correction T084–T086
 ```
 
 - US3 depends on US2's protected endpoint, but not on US4 UI rotation.
@@ -450,6 +483,7 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
 - US5 depends on US2 endpoint monitoring but can be tested independently of US3 gameplay
   breadth; final acceptance still reruns the complete player journey.
 - US6 depends on the latest manager behavior from US4/US5 so every state and failure path is owned.
+- BUG-002 follows the completed embedded cutover and executes strictly T084 → T085 → T086.
 - CLI deletion T075 is forbidden until the full embedded-only package/security gate T073 and
   user-approved immutable checkpoint/worktree rollback drill T074 pass. If T074 is `BLOCKED`, T075
   cannot start. T078 reruns every deterministic gate on the final tree before conditional external
@@ -471,6 +505,7 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
 8. US6: T061 → T062 → T063 → T064 → T065 → T066 → T067.
 9. P5: T068 → T069 → T070 → T071 → T072 → T073 → T074 → T075 → T076 → T077 → T078 →
    T079 → T080 → T081 → T082 → T083.
+10. BUG-002: T084 → T085 → T086.
 
 ## Parallel Examples
 

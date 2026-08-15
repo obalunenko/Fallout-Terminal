@@ -269,14 +269,25 @@ function publicAccessRevision() {
 
 async function copyTransientText(value, successMessage) {
   if (!value) return false;
+  let copied = false;
   try {
-    await navigator.clipboard.writeText(value);
+    if (typeof navigator.clipboard?.writeText === 'function') {
+      await navigator.clipboard.writeText(value);
+      copied = true;
+    }
+  } catch {
+    // Packaged WebViews may deny the browser Clipboard API. The native Wails
+    // runtime is the bounded fallback and returns no copy of the value.
+  }
+  if (!copied) {
+    copied = await desktopAPI.writeClipboardText(value);
+  }
+  if (copied) {
     publicAccessCopyStatus.textContent = successMessage;
     return true;
-  } catch {
-    publicAccessCopyStatus.textContent = 'НЕ УДАЛОСЬ СКОПИРОВАТЬ';
-    return false;
   }
+  publicAccessCopyStatus.textContent = 'НЕ УДАЛОСЬ СКОПИРОВАТЬ';
+  return false;
 }
 
 function showGeneratedPassword(oneTimeValue) {

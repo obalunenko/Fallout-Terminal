@@ -39,16 +39,42 @@ func (sdkAgentFactory) New(accountToken []byte) (ngrokAgent, error) {
 		return nil, errors.New(ErrorCredentialMissing.SafeMessage())
 	}
 	token := string(accountToken)
-	agent, err := ngrok.NewAgent(ngrok.WithAuthtoken(token), ngrok.WithAutoConnect(false))
+	wrapped := &sdkAgent{}
+	agent, err := ngrok.NewAgent(
+		ngrok.WithAuthtoken(token), ngrok.WithAutoConnect(false), ngrok.WithEventHandler(wrapped.handleEvent),
+	)
 	token = ""
 	if err != nil {
 		return nil, newRedactedPublicAccessError(err)
 	}
-	return &sdkAgent{agent: agent}, nil
+	wrapped.agent = agent
+	return wrapped, nil
 }
 
 type sdkAgent struct {
-	agent ngrok.Agent
+	agent     ngrok.Agent
+	failureMu sync.Mutex
+	failure   error
+}
+
+func (agent *sdkAgent) handleEvent(event ngrok.Event) {
+	disconnected, ok := event.(*ngrok.EventAgentDisconnected)
+	if !ok || disconnected.Error == nil {
+		return
+	}
+	failure := newRedactedPublicAccessError(disconnected.Error)
+	agent.failureMu.Lock()
+	agent.failure = failure
+	agent.failureMu.Unlock()
+}
+
+func (agent *sdkAgent) Failure() error {
+	if agent == nil {
+		return nil
+	}
+	agent.failureMu.Lock()
+	defer agent.failureMu.Unlock()
+	return agent.failure
 }
 
 func (agent *sdkAgent) Forward(ctx context.Context, request ngrokForwardRequest) (ngrokForwarder, error) {
@@ -81,6 +107,54 @@ func (forwarder sdkForwarder) Close(ctx context.Context) error {
 
 type embeddedNgrokService struct {
 	factory ngrokAgentFactory
+}
+
+type embeddedEndpointLifetime struct {
+	startup   context.Context
+	context   context.Context
+	cancel    context.CancelFunc
+	settled   chan struct{}
+	settle    sync.Once
+	mu        sync.Mutex
+	committed bool
+}
+
+func newEmbeddedEndpointLifetime(startup context.Context) *embeddedEndpointLifetime {
+	ctx, cancel := context.WithCancel(context.WithoutCancel(startup))
+	lifetime := &embeddedEndpointLifetime{
+		startup: startup, context: ctx, cancel: cancel, settled: make(chan struct{}),
+	}
+	go func() {
+		select {
+		case <-startup.Done():
+			lifetime.mu.Lock()
+			if !lifetime.committed {
+				lifetime.cancel()
+			}
+			lifetime.mu.Unlock()
+		case <-lifetime.settled:
+		}
+	}()
+	return lifetime
+}
+
+func (lifetime *embeddedEndpointLifetime) Commit() bool {
+	lifetime.mu.Lock()
+	if lifetime.startup.Err() != nil {
+		lifetime.cancel()
+		lifetime.mu.Unlock()
+		lifetime.settle.Do(func() { close(lifetime.settled) })
+		return false
+	}
+	lifetime.committed = true
+	lifetime.mu.Unlock()
+	lifetime.settle.Do(func() { close(lifetime.settled) })
+	return true
+}
+
+func (lifetime *embeddedEndpointLifetime) Abort() {
+	lifetime.cancel()
+	lifetime.settle.Do(func() { close(lifetime.settled) })
 }
 
 func NewEmbeddedNgrokService() TunnelService {
@@ -130,16 +204,18 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 	if err != nil {
 		return nil, newRedactedPublicAccessError(err)
 	}
-	forwarder, err := agent.Forward(ctx, ngrokForwardRequest{
+	lifetime := newEmbeddedEndpointLifetime(ctx)
+	forwarder, err := agent.Forward(lifetime.context, ngrokForwardRequest{
 		UpstreamURL:    request.UpstreamURL,
 		ReservedDomain: reservedDomain,
 		TrafficPolicy:  policy,
 	})
 	if err != nil {
+		lifetime.Abort()
 		_ = agent.Disconnect()
 		return nil, newRedactedPublicAccessError(err)
 	}
-	ownedEndpoint := newEmbeddedNgrokEndpoint(nil, forwarder, agent)
+	ownedEndpoint := newEmbeddedNgrokEndpoint(nil, forwarder, agent, lifetime.cancel)
 	if ctx.Err() != nil {
 		_ = ownedEndpoint.Close(context.Background())
 		return nil, publicAccessCategorizedError{category: ErrorTimeout}
@@ -159,6 +235,10 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 	if err != nil {
 		_ = ownedEndpoint.Close(context.Background())
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
+	}
+	if !lifetime.Commit() {
+		_ = ownedEndpoint.Close(context.Background())
+		return nil, publicAccessCategorizedError{category: ErrorTimeout}
 	}
 	ownedEndpoint.stateMu.Lock()
 	ownedEndpoint.url = parsed
@@ -228,6 +308,8 @@ type embeddedNgrokEndpoint struct {
 	agentDisconnected bool
 	closeAttempt      *embeddedNgrokCloseAttempt
 	done              <-chan struct{}
+	lifetimeCancel    context.CancelFunc
+	cancelOnce        sync.Once
 }
 
 type embeddedNgrokCloseAttempt struct {
@@ -238,10 +320,13 @@ type embeddedNgrokCloseAttempt struct {
 	agentDisconnectError error
 }
 
-func newEmbeddedNgrokEndpoint(publicURL *url.URL, forwarder ngrokForwarder, agent ngrokAgent) *embeddedNgrokEndpoint {
+func newEmbeddedNgrokEndpoint(publicURL *url.URL, forwarder ngrokForwarder, agent ngrokAgent, lifetimeCancel ...context.CancelFunc) *embeddedNgrokEndpoint {
 	endpoint := &embeddedNgrokEndpoint{
 		url: publicURL, forwarder: forwarder, agent: agent,
 		done: forwarder.Done(),
+	}
+	if len(lifetimeCancel) > 0 {
+		endpoint.lifetimeCancel = lifetimeCancel[0]
 	}
 	return endpoint
 }
@@ -268,12 +353,31 @@ func (endpoint *embeddedNgrokEndpoint) Done() <-chan struct{} {
 	return endpoint.done
 }
 
+func (endpoint *embeddedNgrokEndpoint) Failure() error {
+	if endpoint == nil {
+		return nil
+	}
+	endpoint.stateMu.Lock()
+	agent := endpoint.agent
+	endpoint.stateMu.Unlock()
+	source, ok := agent.(interface{ Failure() error })
+	if !ok {
+		return nil
+	}
+	return source.Failure()
+}
+
 func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	if endpoint == nil {
 		return nil
 	}
 	ctx, cancel := boundedPublicAccessCleanupContext(ctx)
 	defer cancel()
+	endpoint.cancelOnce.Do(func() {
+		if endpoint.lifetimeCancel != nil {
+			endpoint.lifetimeCancel()
+		}
+	})
 
 	endpoint.closeMu.Lock()
 	endpoint.stateMu.Lock()
@@ -321,11 +425,15 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	endpoint.stateMu.Unlock()
 	endpoint.closeMu.Unlock()
 	if !complete {
-		category, _ := redactedPublicAccessFailure(errors.Join(attempt.forwarderError, attempt.agentDisconnectError))
+		failure := errors.Join(attempt.forwarderError, attempt.agentDisconnectError)
+		category, _ := redactedPublicAccessFailure(failure)
 		if errors.Is(attempt.forwarderError, context.DeadlineExceeded) || errors.Is(attempt.forwarderError, context.Canceled) {
 			category = ErrorShutdownTimeout
 		}
-		return publicAccessCategorizedError{category: category}
+		if category == ErrorShutdownTimeout {
+			return publicAccessCategorizedError{category: category}
+		}
+		return newRedactedPublicAccessError(failure)
 	}
 	return nil
 }

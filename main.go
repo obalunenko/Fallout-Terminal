@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -252,42 +251,6 @@ func (router *coordinationEffectRouter) Enqueue(effect controlservice.Effect) {
 			app.updateHackState(effect.Live.Hack)
 		}
 	}
-}
-
-func configureTunnel(args []string) (TunnelService, bool) {
-	config, err := tunnelservice.ParseConfig(args, os.LookupEnv)
-	enabled := config.Enabled || publicModeRequested(args)
-	if !enabled {
-		return nil, false
-	}
-	if err != nil {
-		return configurationErrorTunnel{err: err}, true
-	}
-	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true
-}
-
-func publicModeRequested(args []string) bool {
-	if enabled, exists := os.LookupEnv("NGROK_ENABLED"); exists && enabled == "1" {
-		return true
-	}
-	for _, argument := range args {
-		if argument == "--ngrok" {
-			return true
-		}
-	}
-	return false
-}
-
-type configurationErrorTunnel struct {
-	err error
-}
-
-func (tunnel configurationErrorTunnel) Start(context.Context) (domain.ServerInfo, error) {
-	return domain.ServerInfo{}, tunnel.err
-}
-
-func (configurationErrorTunnel) Stop(context.Context) error {
-	return nil
 }
 
 func applicationResourceRoot() string {

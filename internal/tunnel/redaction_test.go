@@ -30,19 +30,29 @@ func TestRedactedPublicAccessFailureMapsStableCategoriesWithoutSDKDiagnostics(t 
 		name     string
 		err      error
 		category ErrorCategory
+		code     string
 	}{
-		{name: "provider authentication code", err: codedProviderError{code: "ERR_NGROK_105", diagnostic: canary}, category: ErrorProviderAuthentication},
-		{name: "reserved domain code", err: codedProviderError{code: "ERR_NGROK_320", diagnostic: canary}, category: ErrorDomainUnavailable},
+		{name: "provider authentication code", err: codedProviderError{code: "ERR_NGROK_105", diagnostic: canary}, category: ErrorProviderAuthentication, code: "ERR_NGROK_105"},
+		{name: "account session limit", err: codedProviderError{code: "ERR_NGROK_108", diagnostic: canary}, category: ErrorProviderAuthentication, code: "ERR_NGROK_108"},
+		{name: "unverified account", err: codedProviderError{code: "ERR_NGROK_123", diagnostic: canary}, category: ErrorProviderAuthentication, code: "ERR_NGROK_123"},
+		{name: "reserved domain code", err: codedProviderError{code: "ERR_NGROK_320", diagnostic: canary}, category: ErrorDomainUnavailable, code: "ERR_NGROK_320"},
+		{name: "invalid policy", err: codedProviderError{code: "ERR_NGROK_9026", diagnostic: canary}, category: ErrorValidation, code: "ERR_NGROK_9026"},
+		{name: "network connectivity", err: codedProviderError{code: "ERR_NGROK_8001", diagnostic: canary}, category: ErrorNetworkUnavailable, code: "ERR_NGROK_8001"},
 		{name: "DNS unavailable", err: &net.DNSError{Err: canary, Name: "synthetic-domain-canary.example"}, category: ErrorNetworkUnavailable},
 		{name: "deadline", err: fmt.Errorf("wrapped: %w", context.DeadlineExceeded), category: ErrorTimeout},
 		{name: "Keychain denied", err: fmt.Errorf("wrapped: %w", ErrSecretStoreDenied), category: ErrorSecretStoreDenied},
-		{name: "unknown provider code", err: codedProviderError{code: "ERR_NGROK_9999", diagnostic: canary}, category: ErrorProviderFailure},
+		{name: "unknown provider code", err: codedProviderError{code: "ERR_NGROK_9999", diagnostic: canary}, category: ErrorProviderFailure, code: "ERR_NGROK_9999"},
+		{name: "unsafe provider code", err: codedProviderError{code: "ERR_NGROK_1 secret", diagnostic: canary}, category: ErrorProviderFailure},
 		{name: "raw provider failure", err: errors.New(canary), category: ErrorProviderFailure},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			category, message := redactedPublicAccessFailure(test.err)
 			assert.Equal(t, test.category, category)
-			assert.Equal(t, test.category.SafeMessage(), message)
+			if test.code == "" {
+				assert.Equal(t, test.category.SafeMessage(), message)
+			} else {
+				assert.Contains(t, message, test.code)
+			}
 			for _, marker := range strings.Fields(canary) {
 				assert.NotContains(t, message, marker)
 			}
@@ -68,7 +78,7 @@ func TestRedactedPublicAccessFailureDropsLongCanariesAndIsConcurrent(t *testing.
 	}
 	workers.Wait()
 	close(results)
-	want := fmt.Sprintf("%d:%s", ErrorDomainUnavailable, ErrorDomainUnavailable.SafeMessage())
+	want := fmt.Sprintf("%d:%s", ErrorDomainUnavailable, "The reserved domain is unavailable for this account (ERR_NGROK_320).")
 	for result := range results {
 		assert.Equal(t, want, result)
 		assert.LessOrEqual(t, len(result), maximumPublicAccessDiagnosticBytes)
@@ -172,7 +182,7 @@ func TestRedactionSurvivesDirectResultStatusEventAndRetryPaths(t *testing.T) {
 	failed := manager.Start(t.Context(), 7)
 	require.False(t, failed.OK)
 	assert.Equal(t, ErrorProviderAuthentication, failed.Snapshot.Status.ErrorCategory)
-	assert.Equal(t, ErrorProviderAuthentication.SafeMessage(), failed.Error)
+	assert.Equal(t, "The provider rejected the account credential (ERR_NGROK_105).", failed.Error)
 	assert.Empty(t, failed.Snapshot.Status.PublicURL)
 	for _, surface := range []string{failed.Error, failed.Snapshot.Status.ErrorMessage, fmt.Sprintf("%#v", failed)} {
 		assert.NotContains(t, surface, "synthetic-token-canary")

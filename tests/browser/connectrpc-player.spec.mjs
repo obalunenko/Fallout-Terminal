@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 const RECOGNITION_KEY = 'fallout-terminal.player-token';
-const NGROK_TEST_URL = process.env.NGROK_TEST_URL;
-const NGROK_TEST_USERNAME = process.env.NGROK_USERNAME;
-const NGROK_TEST_PASSWORD = process.env.NGROK_PASSWORD;
-const NGROK_TEST_FIXTURE = process.env.NGROK_TEST_FIXTURE === '1';
+const PUBLIC_TEST_URL = process.env.FALLOUT_PUBLIC_TEST_URL;
+const PUBLIC_TEST_USERNAME = process.env.FALLOUT_PUBLIC_TEST_USERNAME;
+const PUBLIC_TEST_PASSWORD = process.env.FALLOUT_PUBLIC_TEST_PASSWORD;
+const PUBLIC_TEST_FIXTURE = process.env.FALLOUT_PUBLIC_TEST_FIXTURE === '1';
 const PROTECTED_FIXTURE_URL = 'http://127.0.0.1:34120';
 const PROTECTED_AUTHORIZATION = `Basic ${Buffer.from('players:password-long-enough').toString('base64')}`;
 
@@ -161,15 +161,15 @@ test('protected endpoint keeps five clients converged through navigation, hackin
 
 test.describe('actual authenticated ngrok endpoint', () => {
   test.skip(
-    !NGROK_TEST_URL || !NGROK_TEST_USERNAME || !NGROK_TEST_PASSWORD,
-    'NOT RUN: set NGROK_TEST_URL, NGROK_USERNAME, and NGROK_PASSWORD for the real public streaming acceptance journey',
+    !PUBLIC_TEST_URL || !PUBLIC_TEST_USERNAME || !PUBLIC_TEST_PASSWORD,
+    'NOT RUN: set FALLOUT_PUBLIC_TEST_URL, FALLOUT_PUBLIC_TEST_USERNAME, and FALLOUT_PUBLIC_TEST_PASSWORD for the real public streaming acceptance journey',
   );
 
   test('delivers the first snapshot, dismisses the overlay, and reconnects', async ({ browser }) => {
     const context = await browser.newContext({
       httpCredentials: {
-        username: NGROK_TEST_USERNAME,
-        password: NGROK_TEST_PASSWORD,
+        username: PUBLIC_TEST_USERNAME,
+        password: PUBLIC_TEST_PASSWORD,
       },
     });
     const page = await context.newPage();
@@ -183,7 +183,7 @@ test.describe('actual authenticated ngrok endpoint', () => {
       }
     });
 
-    await page.goto(NGROK_TEST_URL, { waitUntil: 'domcontentloaded' });
+    await page.goto(PUBLIC_TEST_URL, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 20_000 });
     await expect.poll(() => page.evaluate(key => Boolean(localStorage.getItem(key)), RECOGNITION_KEY)).toBe(true);
     await expect(page.locator('#screen')).toBeVisible();
@@ -191,9 +191,9 @@ test.describe('actual authenticated ngrok endpoint', () => {
       await page.locator('#characterOptions button:not([disabled])').first().click();
       await expect(page.locator('#termList')).toBeVisible();
     }
-    if (NGROK_TEST_FIXTURE) {
+    if (PUBLIC_TEST_FIXTURE) {
       await expect(page.locator('#termList')).toBeVisible();
-      const update = await page.request.post(new URL('/__fixture/update', NGROK_TEST_URL).href);
+      const update = await page.request.post(new URL('/__fixture/update', PUBLIC_TEST_URL).href);
       expect(update.status()).toBe(204);
       await expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible();
     }

@@ -39,6 +39,8 @@ func TestConnectRPCMigrationTestConventions(t *testing.T) {
 		"internal/tunnel/ngrok_test.go",
 		"internal/tunnel/ngrok_integration_test.go",
 		"internal/tunnel/redaction_test.go",
+		"internal/tunnel/secret_test.go",
+		"internal/tunnel/settings_test.go",
 		"internal/testutil/public_access_fakes_test.go",
 	}
 	protobufAware := map[string]string{

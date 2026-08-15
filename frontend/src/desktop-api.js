@@ -1,6 +1,6 @@
 'use strict';
 
-import { Events } from '@wailsio/runtime';
+import { Clipboard, Events } from '@wailsio/runtime';
 import * as desktopService from '../bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js';
 
 const APP_METHODS = Object.freeze({
@@ -59,6 +59,17 @@ function command(binding, ...args) {
     ok: false,
     error: error instanceof Error ? error.message : String(error),
   }));
+}
+
+async function writeClipboardText(value) {
+  if (typeof value !== 'string' || value === '') return false;
+  try {
+    if (typeof Clipboard?.SetText !== 'function') return false;
+    await Clipboard.SetText(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const TERMINAL_SWITCH_STATUSES = new Set(['activated', 'cleared', 'decision-required', 'cancelled']);
@@ -312,6 +323,7 @@ const desktopAPI = {
     return runtimeStatusPromise ?? command(APP_METHODS.getRuntimeStatus);
   },
   openUrl: (url) => command(APP_METHODS.openUrl, url),
+  writeClipboardText,
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),
   saveSession: (session) => command(APP_METHODS.saveSession, session),

@@ -350,6 +350,60 @@ func TestPublicAccessManagerUnexpectedDoneWithdrawsBeforeFailedPublication(t *te
 	assert.Equal(t, tunnel.ErrorProviderFailure, status.ErrorCategory)
 }
 
+type diagnosticEndpointFailure struct {
+	code string
+}
+
+func (failure diagnosticEndpointFailure) Error() string {
+	return "synthetic sensitive provider diagnostic"
+}
+func (failure diagnosticEndpointFailure) Code() string { return failure.code }
+
+type diagnosticEndpoint struct {
+	publicURL *url.URL
+	done      chan struct{}
+	failure   error
+}
+
+func (endpoint *diagnosticEndpoint) URL() *url.URL               { return endpoint.publicURL }
+func (endpoint *diagnosticEndpoint) Done() <-chan struct{}       { return endpoint.done }
+func (endpoint *diagnosticEndpoint) Failure() error              { return endpoint.failure }
+func (endpoint *diagnosticEndpoint) Close(context.Context) error { return nil }
+
+type diagnosticTunnelService struct{ endpoint *diagnosticEndpoint }
+
+func (service diagnosticTunnelService) Start(context.Context, tunnel.TunnelStartRequest) (tunnel.TunnelEndpoint, error) {
+	return service.endpoint, nil
+}
+
+func TestPublicAccessManagerUnexpectedDonePublishesOnlySafeNgrokCode(t *testing.T) {
+	publicURL, err := url.Parse("https://public.example")
+	require.NoError(t, err)
+	endpoint := &diagnosticEndpoint{
+		publicURL: publicURL,
+		done:      make(chan struct{}),
+		failure:   diagnosticEndpointFailure{code: "ERR_NGROK_123"},
+	}
+	preferences := tunnel.DefaultPublicAccessPreferences()
+	preferences.Revision = 7
+	secrets := testutil.NewFakeSecretStore()
+	require.NoError(t, secrets.Replace(t.Context(), tunnel.ProviderAccountToken, []byte("synthetic-account-input")))
+	require.NoError(t, secrets.Replace(t.Context(), tunnel.PlayerBasicAuthPassword, []byte("synthetic-player-input")))
+	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
+		Settings: &memorySettings{preferences: preferences}, Secrets: secrets,
+		Tunnel: diagnosticTunnelService{endpoint: endpoint}, UpstreamURL: "http://127.0.0.1:3690",
+	})
+	require.NoError(t, err)
+	manager.Initialize(t.Context())
+	require.True(t, manager.Start(t.Context(), 7).OK)
+	close(endpoint.done)
+	require.Eventually(t, func() bool { return manager.Snapshot().Status.State == tunnel.LifecycleFailed }, time.Second, time.Millisecond)
+	status := manager.Snapshot().Status
+	assert.Equal(t, tunnel.ErrorProviderAuthentication, status.ErrorCategory)
+	assert.Contains(t, status.ErrorMessage, "ERR_NGROK_123")
+	assert.NotContains(t, status.ErrorMessage, "synthetic")
+}
+
 func TestPublicAccessManagerConcurrentReconfigureConvergesWithoutEndpointOverlapAcross100Schedules(t *testing.T) {
 	for schedule := 0; schedule < 100; schedule++ {
 		events := &orderedEvents{}
