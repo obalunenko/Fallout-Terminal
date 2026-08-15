@@ -6,6 +6,7 @@ const NGROK_TEST_USERNAME = process.env.NGROK_USERNAME;
 const NGROK_TEST_PASSWORD = process.env.NGROK_PASSWORD;
 const NGROK_TEST_FIXTURE = process.env.NGROK_TEST_FIXTURE === '1';
 const PROTECTED_FIXTURE_URL = 'http://127.0.0.1:34120';
+const PROTECTED_AUTHORIZATION = `Basic ${Buffer.from('players:password-long-enough').toString('base64')}`;
 
 test.beforeEach(async ({ request, page }) => {
   await page.addInitScript(() => {
@@ -87,10 +88,81 @@ test('protected forwarding authenticates static, unary, and streaming capabiliti
   await context.close();
 });
 
+test('protected endpoint keeps five clients converged through navigation, hacking, sound, update, and reconnect before stale shutdown', async ({ browser, request }) => {
+  const edgeStatus = await request.get(PROTECTED_FIXTURE_URL + '/__fixture/edge/status', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(edgeStatus.status()).toBe(200);
+  expect(await edgeStatus.json()).toEqual({
+    authBoundary: 'fixture-edge',
+    upstream: 'http://127.0.0.1:34119',
+    active: true,
+    authorizationForwarded: false,
+  });
+
+  const context = await browser.newContext({
+    httpCredentials: { username: 'players', password: 'password-long-enough' },
+  });
+  const pages = await Promise.all(Array.from({ length: 5 }, () => context.newPage()));
+  const subscribeCounts = new Map(pages.map(page => [page, 0]));
+  const manifestOrigins = [];
+  for (const page of pages) {
+    page.on('request', request => {
+      if (request.url().endsWith('/Subscribe')) subscribeCounts.set(page, subscribeCounts.get(page) + 1);
+      if (request.url().endsWith('/SoundManifest')) manifestOrigins.push(new URL(request.url()).origin);
+    });
+  }
+
+  await Promise.all(pages.map(page => page.goto(PROTECTED_FIXTURE_URL + '/')));
+  await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden()));
+  const handles = await Promise.all(pages.map(page => page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)));
+  expect(new Set(handles).size).toBe(1);
+  await pages[0].locator('#characterOptions button:not([disabled])').first().click();
+  await Promise.all(pages.map(page => expect(page.locator('#termList')).toBeVisible()));
+
+  await pages[0].locator('.term-row', { hasText: 'DOCS' }).click();
+  await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible()));
+  await expect.poll(() => manifestOrigins.length).toBeGreaterThanOrEqual(5);
+  expect(manifestOrigins.every(origin => origin === PROTECTED_FIXTURE_URL)).toBe(true);
+
+  const update = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/update', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(update.status()).toBe(204);
+  await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible()));
+
+  const hacking = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/hacking', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(hacking.status()).toBe(204);
+  await Promise.all(pages.map(page => expect(page.locator('#hackBoard')).toBeVisible()));
+  const guessTarget = pages[0].locator('#hackColumns [data-target]:not([data-target=""])').first();
+  await expect(guessTarget).toBeVisible();
+  await guessTarget.click();
+  await Promise.all(pages.map(page => expect(page.locator('#hackLog')).not.toHaveText('')));
+
+  const disconnect = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/disconnect', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(disconnect.status()).toBe(204);
+  await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden({ timeout: 5_000 })));
+  await expect.poll(() => Math.min(...subscribeCounts.values()), { timeout: 5_000 }).toBeGreaterThanOrEqual(2);
+
+  const disable = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/disable', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(disable.status()).toBe(204);
+  const stale = await request.get(PROTECTED_FIXTURE_URL + '/', {
+    headers: { Authorization: PROTECTED_AUTHORIZATION },
+  });
+  expect(stale.status()).toBe(410);
+  await context.close();
+});
+
 test.describe('actual authenticated ngrok endpoint', () => {
   test.skip(
     !NGROK_TEST_URL || !NGROK_TEST_USERNAME || !NGROK_TEST_PASSWORD,
-    'set NGROK_TEST_URL, NGROK_USERNAME, and NGROK_PASSWORD for the public streaming acceptance journey',
+    'NOT RUN: set NGROK_TEST_URL, NGROK_USERNAME, and NGROK_PASSWORD for the real public streaming acceptance journey',
   );
 
   test('delivers the first snapshot, dismisses the overlay, and reconnects', async ({ browser }) => {

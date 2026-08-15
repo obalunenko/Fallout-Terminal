@@ -28,12 +28,13 @@ expected="$temporary/expected-methods"
 sed -n 's/^export function \([A-Za-z0-9_]*\)(.*/\1/p' "$service" | LC_ALL=C sort >"$actual"
 printf '%s\n' \
     AddCharacter AssignCharacter CopyDemo DeleteCharacter EndBroadcast ForceHackSuccess \
-    GetRuntimeStatus LoadReferencedPlayerConfig MoveCharacter NewPlayerConfig NewSession \
+    GeneratePlayerPassword GetPublicAccess GetRuntimeStatus LoadReferencedPlayerConfig MoveCharacter NewPlayerConfig NewSession \
     OpenPlayerConfig OpenSession OpenURL ReleaseCharacter RenameCharacter RenameLogicalSession \
     RequestTerminalActivation RequestTerminalClear ResetFailedHack ResolveTerminalSwitch \
-    SaveSession SetActiveController StartBroadcast UpdateLiveTerminal | LC_ALL=C sort >"$expected"
+    SavePublicAccessSettings SaveSession SetActiveController StartBroadcast StartPublicAccess \
+    StopPublicAccess UpdateLiveTerminal | LC_ALL=C sort >"$expected"
 diff -u "$expected" "$actual"
-test "$(wc -l <"$actual" | tr -d ' ')" = 25
+test "$(wc -l <"$actual" | tr -d ' ')" = 30
 
 for forbidden in Start Shutdown ServiceStartup ServiceShutdown Dispatch Call Capabilities \
     ReadFile WriteFile Exec Environment OpenDialog Browser PlayerService Subscribe; do
@@ -45,9 +46,9 @@ test -f "$first/github.com/obalunenko/Fallout-Terminal/desktopservice.js"
 
 event_types="$first/github.com/wailsapp/wails/v3/internal/eventdata.d.ts"
 test -f "$event_types"
-for event in server-info client-count hack-state coordination-state; do
+for event in server-info client-count hack-state coordination-state public-access-status; do
     grep -q "\"$event\"" "$event_types"
 done
-test "$(grep -E '^[[:space:]]+"(server-info|client-count|hack-state|coordination-state)"' "$event_types" | wc -l | tr -d ' ')" = 4
+test "$(grep -E '^[[:space:]]+"(server-info|client-count|hack-state|coordination-state|public-access-status)"' "$event_types" | wc -l | tr -d ' ')" = 5
 
-echo "Wails bindings are deterministic and expose exactly 25 accepted desktop methods."
+echo "Wails bindings are deterministic and expose exactly 30 accepted desktop methods."

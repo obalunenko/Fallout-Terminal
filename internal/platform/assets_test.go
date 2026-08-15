@@ -86,17 +86,23 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	})
 
 	optionalFields := map[protoreflect.FullName]bool{
-		"fallout.terminal.player.v1.PlayerState.broadcast_id":                     true,
-		"fallout.terminal.player.v1.PlayerState.active_terminal_id":               true,
-		"fallout.terminal.player.v1.SubscribeRequest.recognition_handle":          true,
-		"fallout.terminal.player.v1.NavigationState.view_entry_id":                true,
-		"fallout.terminal.player.v1.NavigationState.command_node_id":              true,
-		"fallout.terminal.persistence.v1.Session.player_config":                   true,
-		"fallout.terminal.config.v1.TunnelConfig.policy_parent":                   true,
-		"fallout.terminal.private.v1.CharacterState.logical_session_id":           true,
-		"fallout.terminal.private.v1.LogicalSessionState.character_id":            true,
-		"fallout.terminal.private.v1.BroadcastState.active_controller_session_id": true,
-		"fallout.terminal.private.v1.BroadcastState.active_terminal_id":           true,
+		"fallout.terminal.player.v1.PlayerState.broadcast_id":                          true,
+		"fallout.terminal.player.v1.PlayerState.active_terminal_id":                    true,
+		"fallout.terminal.player.v1.SubscribeRequest.recognition_handle":               true,
+		"fallout.terminal.player.v1.NavigationState.view_entry_id":                     true,
+		"fallout.terminal.player.v1.NavigationState.command_node_id":                   true,
+		"fallout.terminal.persistence.v1.Session.player_config":                        true,
+		"fallout.terminal.config.v1.PublicAccessPreferences.reserved_domain":           true,
+		"fallout.terminal.private.v1.CharacterState.logical_session_id":                true,
+		"fallout.terminal.private.v1.LogicalSessionState.character_id":                 true,
+		"fallout.terminal.private.v1.BroadcastState.active_controller_session_id":      true,
+		"fallout.terminal.private.v1.BroadcastState.active_terminal_id":                true,
+		"fallout.terminal.private.v1.PublicAccessStatus.public_url":                    true,
+		"fallout.terminal.private.v1.PublicAccessStatus.error_message":                 true,
+		"fallout.terminal.private.v1.PublicAccessCommandResult.error":                  true,
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.reserved_domain":  true,
+		"fallout.terminal.private.v1.GeneratedPlayerPasswordResult.error":              true,
+		"fallout.terminal.private.v1.GeneratedPlayerPasswordResult.generated_password": true,
 	}
 	for name := range optionalFields {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
@@ -117,6 +123,8 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 		"fallout.terminal.player.v1.ContentNode.content",
 		"fallout.terminal.player.v1.TerminalPresentation.presentation",
 		"fallout.terminal.persistence.v1.ContentNode.content",
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.provider_token_change",
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.player_password_change",
 	} {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
@@ -185,8 +193,8 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
 		"proto/fallout/terminal/private/v1/runtime.proto": "41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741",
-		"proto/schema-revision.txt":                       "e2e1f53725c02255cbdac9b83dedc8ccb22abfb13f58541032b3abaf43e8e2cf",
-		"proto/compatibility-baseline.binpb":              "af0f7c7ce8e7e1215f6b4436d35d69b40032e563d20e93d6919b027737a1f1c9",
+		"proto/schema-revision.txt":                       "1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06",
+		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
@@ -221,6 +229,40 @@ func checkMessageContractShape(t *testing.T, messages protoreflect.MessageDescri
 
 		}
 	}
+}
+
+func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(relative string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+	html := read("frontend/src/index.html")
+	css := read("frontend/src/master.css")
+	javascript := read("frontend/src/master.js")
+
+	for _, fragment := range []string{
+		`id="publicAccessSection"`, `for="publicAccessDomain"`, `for="publicAccessUsername"`,
+		`for="publicAccessProviderToken"`, `for="publicAccessPlayerPassword"`,
+		`id="publicAccessProviderToken" type="password"`, `id="publicAccessPlayerPassword" type="password"`,
+		`id="publicAccessStatus" role="status" aria-live="polite"`,
+		`id="publicAccessError" role="alert" aria-live="assertive"`,
+		`id="generatedPasswordDialog"`, `aria-modal="true"`,
+	} {
+		assert.Contains(t, html, fragment)
+	}
+	for _, forbidden := range []string{"RevealSecret", "GetSecret", ">REVEAL<", ">ПОКАЗАТЬ ПАРОЛЬ<"} {
+		assert.NotContains(t, html+javascript, forbidden)
+	}
+	assert.Contains(t, html, `id="publicAccessUsername"`)
+	assert.Contains(t, html, `value="players"`)
+	assert.Contains(t, css, ".public-access")
+	assert.Contains(t, javascript, "generatePlayerPassword")
+	assert.Contains(t, javascript, "public-access-status")
 }
 
 func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {

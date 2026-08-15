@@ -3,13 +3,16 @@
 **Bugfix**: 2026-08-15 — ANALYZE-S1 adds a non-serializable trusted ingress route so local/LAN
 bypass never depends on forwarded `Host` behavior.
 
+**Bugfix**: 2026-08-15 — BUG-001 supersedes the player-bound source/Host grant with an ephemeral
+ngrok Basic Auth Traffic Policy after `127.0.0.2` failed to bind on target macOS.
+
 ## Model boundaries
 
 Public-access data is split into four deliberately different lifetimes:
 
 1. versioned non-secret preferences in Application Support;
 2. two independent secrets in macOS Keychain;
-3. one process-local lifecycle snapshot and active HTTP authorization grant;
+3. one process-local lifecycle snapshot and active provider endpoint handle;
 4. narrow ephemeral mutation/generated-password payloads that exist only for one trusted desktop
    call.
 
@@ -50,7 +53,7 @@ temp creation, file sync, atomic rename, and cleanup on every failed path.
 | Ref | Purpose | Keychain account |
 |---|---|---|
 | `ProviderAccountToken` | Authenticates the user's ngrok Agent session. | `ngrok-authtoken` |
-| `PlayerBasicAuthPassword` | Authenticates requests for the active public Host. | `player-basic-auth-password` |
+| `PlayerBasicAuthPassword` | ~~Authenticates requests for the active public Host.~~ **BUG-001** Authenticates requests through the active public endpoint. | `player-basic-auth-password` |
 
 Both use the service selected by bundle profile. The secret value is not a field of any settings,
 status, event, public descriptor, persisted model, or reusable result.
@@ -78,7 +81,7 @@ Protobuf source: `fallout.terminal.private.v1.PublicAccessStatus`.
 | `state` | `PublicAccessLifecycleState` | One of `disabled`, `starting`, `ready`, `stopping`, `failed`; zero is `UNSPECIFIED`. |
 | `generation` | unsigned 64-bit integer | Increases for every start, stop, reconfigure, failure cleanup, or shutdown intent. |
 | `settings_revision` | unsigned 64-bit integer | Revision whose settings the operation uses. |
-| `public_url` | optional string | Present only in `ready`, only after exact-host policy activation. |
+| `public_url` | optional string | Present only in `ready`, only after protected endpoint creation. |
 | `error_category` | enum | Redacted stable category; zero when there is no failure. |
 | `error_message` | optional string | Safe corrective text, never a raw provider/Keychain error. |
 
@@ -94,38 +97,36 @@ and settings revision.
 
 | Current | Trigger | Immediate protected action | Completion |
 |---|---|---|---|
-| `disabled` | Start | Increment generation; remain public-policy deny; enter `starting`. | Current success validates URL, activates exact Host+credentials, then enters `ready`; current failure enters `failed`. |
-| `failed` | Start | Clear redacted error, increment generation, remain deny, enter `starting`. | Same as disabled Start. |
+| `disabled` | Start | Increment generation; enter `starting` without a published URL. | Current success validates an already protected endpoint, then enters `ready`; current failure enters `failed`. |
+| `failed` | Start | Clear redacted error, increment generation, enter `starting`. | Same as disabled Start. |
 | `starting` | Start again | Join/return the same current intent; do not create another endpoint. | Existing operation decides result. |
 | `ready` | Start with same revision | Idempotently return current snapshot. | No provider action. |
-| `starting` or `ready` | Stop | Increment generation, atomically deactivate policy, cancel startup/monitor, enter `stopping`. | Close endpoint/agent; enter `disabled`, URL absent. |
+| `starting` or `ready` | Stop | Increment generation, withdraw URL, cancel startup/monitor, enter `stopping`. | Close endpoint/agent; enter `disabled`, URL absent. |
 | `stopping` | Stop again | Join the same stop under its existing deadline. | Same terminal result; no extended budget. |
-| any active/transition state | Commit changed settings | Increment generation, deactivate policy, cancel and close old endpoint before applying/restarting. | If it was active, start only one replacement generation; otherwise remain `disabled`. |
-| `ready` | Endpoint `Done`/disconnect | If generation is current, deactivate immediately and clear URL. | Bounded close/disconnect; enter `failed`; local/LAN remains ready. |
-| any | Quit/Cmd+Q | Increment generation, deactivate policy first, cancel and close endpoint. | Continue player/session/desktop cleanup within the shared five-second deadline. |
+| any active/transition state | Commit changed settings | Increment generation, withdraw URL, cancel and close old endpoint before applying/restarting. | If it was active, start only one replacement generation; otherwise remain `disabled`. |
+| `ready` | Endpoint `Done`/disconnect | If generation is current, clear URL immediately. | Bounded close/disconnect; enter `failed`; local/LAN remains ready. |
+| any | Quit/Cmd+Q | Increment generation, withdraw URL, cancel and close endpoint. | Continue player/session/desktop cleanup within the shared five-second deadline. |
 
 A completion is stale if either generation or settings revision differs from the current intent, or
 the expected state is no longer `starting`. A stale success closes its acquired endpoint without
-activating policy or publishing a URL. A stale failure cannot overwrite current status.
+publishing a URL. A stale failure cannot overwrite current status.
 
 ### Publication invariant
 
 For every generation the only legal readiness order is:
 
-1. the dedicated SDK source `127.0.0.2` is classified as public, direct local/LAN allow rules exist,
-   and every other ingress/Host combination is denied;
-2. the provider endpoint is acquired with no UI URL;
+1. scoped Keychain values are used to construct the ngrok Basic Auth Traffic Policy in memory;
+2. the provider creates the endpoint with that policy and no UI URL is exposed;
 3. the returned URL passes strict validation;
-4. exact external Host, username, and password become one atomic policy grant;
-5. state changes to `ready` and only then may snapshot/events expose `public_url`.
+4. state changes to `ready` and only then may snapshot/events expose `public_url`.
 
-Stop, reconfigure, provider failure, and quit reverse the security part of this order: policy deny
-first, URL withdrawal second, endpoint close third. Local/LAN rules are never removed by public
-failure.
+Stop, reconfigure, provider failure, and quit withdraw the URL before closing the endpoint. Direct
+local/LAN behavior is outside this endpoint lifecycle and is never changed by public failure.
 
-## PublicAccessGrant
+## ~~PublicAccessGrant~~ Superseded by BUG-001
 
-`PublicAccessGrant` is a process-local player-boundary value, not protobuf and not serializable.
+`PublicAccessGrant` was a process-local player-boundary value. BUG-001 removes it from active
+production because the player server no longer owns public authentication.
 
 | Field | Type | Rule |
 |---|---|---|
@@ -139,31 +140,21 @@ released before static or ConnectRPC handlers run, so a long-lived stream holds 
 Deactivation takes the write lock, swaps to deny, and clears credential buffers after outstanding
 header comparisons finish.
 
-## PublicIngressRoute
+## ~~PublicIngressRoute~~ ProviderEndpointInput (BUG-001)
 
-`PublicIngressRoute` is immutable process-local composition data, not protobuf, JSON, status, or
-provider/user configuration.
+The old source-bound `PublicIngressRoute` is superseded. `ProviderEndpointInput` is ephemeral
+process-local adapter input, not protobuf, JSON, status, or reusable provider/user configuration.
 
 | Field | Value | Rule |
 |---|---|---|
-| `network` | `tcp4` | Prevents an IPv6/default-dialer path from bypassing classification. |
-| `upstream_target` | `127.0.0.1:3690` | The one authoritative player listener; every other target is rejected. |
-| `forwarder_source` | `127.0.0.2` | Dedicated loopback source owned by the SDK upstream dialer and always classified as public. |
+| `upstream_url` | `http://127.0.0.1:3690` | The one authoritative player listener. |
+| `username` | scoped byte buffer | Used only to construct the endpoint Basic Auth policy. |
+| `password` | scoped byte buffer | Used only to construct the endpoint Basic Auth policy. |
 
-Root composition supplies the same `forwarder_source` to the tunnel adapter and player policy
-without making either package depend on the other. The adapter MUST fail startup if it cannot bind
-that source and MUST NOT fall back to a default dialer. The player boundary derives the remote IP
-from the accepted connection's `RemoteAddr`; `X-Forwarded-*`, `Forwarded`, and user-provided headers
-never set or override ingress class.
-
-Local/LAN authorities are a separate immutable allow set built from `localhost`, loopback
-authorities, and actual private/link-local interface authorities for the bound player listener.
-They bypass Basic Auth only on direct ingress whose actual source is loopback/private/link-local,
-is not `forwarder_source`, and whose Host is in the concrete local/LAN allow set. Every
-`forwarder_source` connection is public even when its Host is local/LAN. Host syntax is validated
-for every static and RPC request. The exact active grant Host requires Basic Auth on both dedicated
-public ingress and direct non-local ingress; every other public or unknown external Host receives
-fail-closed denial.
+The adapter attaches the Basic Auth policy while creating the endpoint, clears/drops its scoped
+input after construction, and never renders policy text into diagnostics. The existing player
+listener performs ordinary application routing only. Local/LAN clients connect directly to it and
+therefore do not encounter the ngrok policy; public clients use the ngrok URL and do.
 
 ## Ephemeral private payloads
 
@@ -191,23 +182,28 @@ event. Failure before durable Keychain replacement returns no password.
 ## Settings mutation failure model
 
 There is no false claim of a cross-Keychain/filesystem transaction. Before a mutation of active
-configuration, public acceptance is disabled and the old endpoint is closed. Keychain changes and
-the atomic non-secret file write are individually durable. If a later step fails, the manager stays
-non-public in `failed`, re-queries actual Keychain presence, reports a redacted partial-update
-recovery message, and lets the user retry. It never restarts using a mixture that was not validated
-as one current settings revision.
+configuration, ~~public acceptance is disabled and the old endpoint is closed~~ **BUG-001** the URL
+is withdrawn and the old protected endpoint is closed. Keychain changes and the atomic non-secret
+file write are individually durable. If a later step fails, the manager stays non-public in
+`failed`, re-queries actual Keychain presence, reports a redacted partial-update recovery message,
+and lets the user retry. It never restarts using a mixture that was not validated as one current
+settings revision.
 
 ## Relationships and invariants
 
 - One `PublicAccessPreferences` record references zero or one item of each fixed `SecretRef` only by
   presence hint; it never carries Keychain data.
 - One `PublicAccessStatus` describes at most one owned `TunnelEndpoint`.
-- One ready endpoint maps to exactly one active `PublicAccessGrant` and the existing player server
-  at `http://127.0.0.1:3690`.
-- Every SDK upstream connection uses the one `PublicIngressRoute`; no alternate/default dialer path
-  can reach ready.
+- ~~One ready endpoint maps to exactly one active `PublicAccessGrant` and the existing player server
+  at `http://127.0.0.1:3690`.~~ **BUG-001**: One ready status maps to exactly one owned,
+  policy-protected `TunnelEndpoint` forwarding to the existing player server.
+- ~~Every SDK upstream connection uses the one `PublicIngressRoute`; no alternate/default dialer
+  path can reach ready.~~ **BUG-001**: Every production endpoint uses the exact upstream
+  `http://127.0.0.1:3690`; no custom dialer or alternate upstream can reach ready.
 - There is never more than one production endpoint or provider runtime.
-- `public_url` implies `state=ready` and an active matching policy generation.
-- `state!=ready` implies no published URL and no external Host acceptance.
+- ~~`public_url` implies `state=ready` and an active matching policy generation.~~ **BUG-001**:
+  `public_url` implies `state=ready` and one active matching protected endpoint generation.
+- ~~`state!=ready` implies no published URL and no external Host acceptance.~~ **BUG-001**:
+  `state!=ready` implies no published URL.
 - Provider or secure-store failure never changes local player, broadcast, role, session, or
   player-config state.

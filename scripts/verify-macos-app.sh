@@ -7,6 +7,7 @@ app_path="${1:-${repository_root}/build/bin/Fallout Terminal.app}"
 executable_path="${app_path}/Contents/MacOS/Fallout Terminal"
 plist_path="${app_path}/Contents/Info.plist"
 resources_path="${app_path}/Contents/Resources"
+notices_path="${resources_path}/THIRD_PARTY_NOTICES.md"
 expected_entitlements="${repository_root}/build/darwin/entitlements.plist"
 
 fail() {
@@ -20,7 +21,7 @@ require_command() {
 
 [[ "$#" -le 1 ]] || fail 'usage: scripts/verify-macos-app.sh [APP_PATH]'
 [[ "$(uname -s)" == Darwin ]] || fail 'verification requires macOS'
-for command in codesign lipo otool plutil rg shasum; do
+for command in codesign lipo otool plutil rg shasum strings; do
   require_command "${command}"
 done
 
@@ -42,6 +43,19 @@ binary_minimum="$(otool -l "${executable_path}" | awk '$1 == "cmd" && $2 == "LC_
 [[ -s "${resources_path}/sessions/demo.json" ]] || fail 'bundled demo is missing or empty'
 cmp -s "${repository_root}/sessions/demo.json" "${resources_path}/sessions/demo.json" || fail 'bundled demo differs from the reviewed source resource'
 [[ "$(stat -f '%Lp' "${resources_path}/sessions/demo.json")" == 444 ]] || fail 'bundled demo must be read-only mode 0444'
+[[ -s "${notices_path}" ]] || fail 'third-party notices are missing or empty'
+cmp -s "${repository_root}/THIRD_PARTY_NOTICES.md" "${notices_path}" || fail 'packaged third-party notices differ from the reviewed source inventory'
+[[ "$(stat -f '%Lp' "${notices_path}")" == 444 ]] || fail 'third-party notices must be read-only mode 0444'
+
+linked_frameworks="$(otool -L "${executable_path}")"
+grep -Fq '/System/Library/Frameworks/Security.framework/' <<<"${linked_frameworks}" || fail 'Security.framework linkage is missing'
+grep -Fq '/System/Library/Frameworks/CoreFoundation.framework/' <<<"${linked_frameworks}" || fail 'CoreFoundation.framework linkage is missing'
+
+bundled_provider="$(find "${app_path}/Contents" -type f \( -iname 'ngrok' -o -iname 'ngrok.exe' -o -iname 'ngrok-*' \) -print -quit 2>/dev/null || true)"
+[[ -z "${bundled_provider}" ]] || fail 'application bundle contains a provider executable'
+if strings "${executable_path}" | rg -q 'NGROK_BIN|fallout-terminal\.ngrok\.app|tunnel-guardian'; then
+  fail 'application executable contains a legacy CLI, PATH, guardian, or shared-domain runtime marker'
+fi
 
 entitlements_dump="$(mktemp "${TMPDIR:-/tmp}/fallout-entitlements.XXXXXX")"
 trap 'rm -f "${entitlements_dump}"' EXIT HUP INT TERM
@@ -61,8 +75,11 @@ done
 
 GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/fallout-terminal-go-cache}" \
   go test "${repository_root}/internal/buildtool" -run '^TestPackagePlanCompletesResourcesBeforeFinalSignature$' -count=1 >/dev/null
+GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/fallout-terminal-go-cache}" \
+  go test "${repository_root}/internal/buildtool" -run '^TestPackagePlan' -count=1 >/dev/null
+"${repository_root}/scripts/dependency-license-check.sh" >/dev/null
 codesign --verify --deep --strict --verbose=2 "${app_path}"
 
 bundle_digest="$("${repository_root}/scripts/hash-macos-app.sh" "${app_path}")"
-printf 'Verified personal-use macOS app: arm64, macOS 13.0, complete resources/entitlements, offline assets, final valid signature.\n'
+printf 'Verified personal-use macOS app: arm64, macOS 13.0, native frameworks, reviewed notices, no provider executable/PATH runtime, complete resources/entitlements, offline assets, final valid signature.\n'
 printf 'Canonical bundle-manifest SHA-256: %s\n' "${bundle_digest}"

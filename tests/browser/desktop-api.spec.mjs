@@ -89,3 +89,85 @@ test('release is exact-once, suppresses pending snapshot callbacks, and hot disp
   expect(result.callbacks).toBe(3);
   expect(result.releases).toEqual([1, 1, 1, 1]);
 });
+
+test('public-access facade exposes exactly five methods with secret-free reusable results', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const request = {
+      expectedRevision: 0,
+      enabledPreference: true,
+      reservedDomain: '',
+      username: 'players',
+      replacementProviderToken: 'synthetic-provider-input',
+      replacementPlayerPassword: 'synthetic-player-input',
+    };
+    const saved = await desktopAPI.savePublicAccessSettings(request);
+    const generated = await desktopAPI.generatePlayerPassword({ expectedRevision: saved.snapshot.preferences.revision });
+    const afterGenerated = await desktopAPI.getPublicAccess();
+    const started = await desktopAPI.startPublicAccess({ expectedRevision: afterGenerated.preferences.revision });
+    const stopped = await desktopAPI.stopPublicAccess({ expectedRevision: started.snapshot.preferences.revision });
+    return {
+      request,
+      saved,
+      generated,
+      afterGenerated,
+      started,
+      stopped,
+      methods: __desktopFixture.calls.map(call => call.method).filter(method => method.includes('PublicAccess') || method.includes('PlayerPassword')),
+      retainedCalls: __desktopFixture.calls,
+    };
+  });
+
+  expect(result.methods).toEqual([
+    'SavePublicAccessSettings', 'GeneratePlayerPassword', 'GetPublicAccess',
+    'StartPublicAccess', 'StopPublicAccess',
+  ]);
+  expect(result.request.replacementProviderToken).toBe('');
+  expect(result.request.replacementPlayerPassword).toBe('');
+  expect(result.saved.snapshot.providerTokenPresence).toBe('present');
+  expect(result.saved.snapshot.playerPasswordPresence).toBe('present');
+  expect(result.generated.generatedPassword).toBe('synthetic-one-time-generated-value');
+  expect(result.afterGenerated.generatedPassword).toBeUndefined();
+  expect(JSON.stringify([result.saved, result.afterGenerated, result.started, result.stopped, result.retainedCalls]))
+    .not.toContain('synthetic-one-time-generated-value');
+  expect(JSON.stringify(result.retainedCalls)).not.toContain('synthetic-provider-input');
+  expect(JSON.stringify(result.retainedCalls)).not.toContain('synthetic-player-input');
+});
+
+test('public-access event beats an equal or older snapshot and disposal releases exactly once', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    __desktopFixture.deferPublicAccess();
+    const observed = [];
+    const release = desktopAPI.onPublicAccessStatus(value => observed.push(value));
+    __desktopFixture.emit('public-access-status', {
+      preferences: { version: 1, username: 'players', revision: 3 },
+      providerTokenPresence: 'unknown',
+      playerPasswordPresence: 'present',
+      status: { state: 'stopped', generation: 4, settingsRevision: 3 },
+    });
+    __desktopFixture.resolvePublicAccess({
+      preferences: { version: 1, username: 'players', revision: 2 },
+      providerTokenPresence: 'absent',
+      playerPasswordPresence: 'absent',
+      status: { state: 'stopped', generation: 3, settingsRevision: 2 },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    release();
+    release();
+    return {
+      observed,
+      releaseCount: __desktopFixture.releaseCount('public-access-status'),
+      timeline: __desktopFixture.timeline.map(entry => entry.method),
+    };
+  });
+
+  expect(result.timeline).toEqual(expect.arrayContaining([
+    'event:on:public-access-status', 'GetPublicAccess',
+  ]));
+  expect(result.observed).toHaveLength(1);
+  expect(result.observed[0]).toEqual(expect.objectContaining({
+    providerTokenPresence: 'unknown',
+    status: expect.objectContaining({ generation: 4, settingsRevision: 3 }),
+  }));
+  expect(result.releaseCount).toBe(1);
+});

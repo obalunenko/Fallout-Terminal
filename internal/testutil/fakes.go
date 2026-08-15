@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -16,6 +17,7 @@ type FakeClock struct {
 	mu     sync.Mutex
 	now    time.Time
 	sleeps []time.Duration
+	timers []fakeClockTimer
 }
 
 // NewFakeClock returns a clock initialized to now.
@@ -35,6 +37,7 @@ func (c *FakeClock) Advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.now = c.now.Add(d)
+	c.fireTimersLocked()
 }
 
 // Sleep records d and advances the clock by that duration without blocking.
@@ -43,6 +46,7 @@ func (c *FakeClock) Sleep(d time.Duration) {
 	defer c.mu.Unlock()
 	c.sleeps = append(c.sleeps, d)
 	c.now = c.now.Add(d)
+	c.fireTimersLocked()
 }
 
 // SleepCalls returns a copy of the durations passed to Sleep.
@@ -78,6 +82,8 @@ type FakeFileSystem struct {
 
 	files map[string][]byte
 	dirs  map[string]fs.FileMode
+	modes map[string]fs.FileMode
+	temps int
 
 	ReadErrors   map[string]error
 	WriteErrors  map[string]error
@@ -97,6 +103,7 @@ func NewFakeFileSystem() *FakeFileSystem {
 	return &FakeFileSystem{
 		files:        make(map[string][]byte),
 		dirs:         make(map[string]fs.FileMode),
+		modes:        make(map[string]fs.FileMode),
 		ReadErrors:   make(map[string]error),
 		WriteErrors:  make(map[string]error),
 		RenameErrors: make(map[string]error),
@@ -157,6 +164,10 @@ func (f *FakeFileSystem) Rename(oldPath, newPath string) error {
 	}
 	f.files[newPath] = data
 	delete(f.files, oldPath)
+	if mode, ok := f.modes[oldPath]; ok {
+		f.modes[newPath] = mode
+		delete(f.modes, oldPath)
+	}
 	return nil
 }
 
@@ -208,6 +219,30 @@ func (f *FakeFileSystem) File(path string) ([]byte, bool) {
 	return append([]byte(nil), data...), ok
 }
 
+// Mode returns the most recently applied mode for a fake file or directory.
+func (f *FakeFileSystem) Mode(path string) (fs.FileMode, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ensureMaps()
+	mode, ok := f.modes[path]
+	if !ok {
+		mode, ok = f.dirs[path]
+	}
+	return mode, ok
+}
+
+// Paths returns all fake file paths in stable order.
+func (f *FakeFileSystem) Paths() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	paths := make([]string, 0, len(f.files))
+	for path := range f.files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 // ReadCalls returns paths passed to ReadFile in call order.
 func (f *FakeFileSystem) ReadCalls() []string {
 	f.mu.Lock()
@@ -254,6 +289,9 @@ func (f *FakeFileSystem) ensureMaps() {
 	}
 	if f.dirs == nil {
 		f.dirs = make(map[string]fs.FileMode)
+	}
+	if f.modes == nil {
+		f.modes = make(map[string]fs.FileMode)
 	}
 	if f.ReadErrors == nil {
 		f.ReadErrors = make(map[string]error)

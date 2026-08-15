@@ -42,19 +42,18 @@ message PathConfig {
 }
 
 message TunnelCredentials {
-  string username = 1;
-  string password = 2;
+  // Removed by feature 007: production credentials are Keychain-only and never
+  // part of reusable application configuration.
+  reserved 1, 2;
+  reserved "username", "password";
 }
 
 message TunnelConfig {
-  bool enabled = 1;
-  string binary = 2;
-  string domain = 3;
-  uint32 port = 4;
-  string local_url = 5;
-  int64 startup_timeout_milliseconds = 6;
-  optional string policy_parent = 7;
-  TunnelCredentials credentials = 8;
+  // Removed by feature 007: the external-process tunnel configuration was an
+  // internal startup contract and is replaced by PublicAccessPreferences plus
+  // private, narrow mutation inputs. These numbers and names must never be reused.
+  reserved 1 to 8;
+  reserved "enabled", "binary", "domain", "port", "local_url", "startup_timeout_milliseconds", "policy_parent", "credentials";
 }
 
 message StartupConfig {
@@ -67,12 +66,14 @@ message ShutdownConfig {
 }
 
 message ApplicationConfig {
-  bool tunnel_enabled = 1;
+  // Removed by feature 007 with the startup-only CLI path. Public access starts
+  // only from explicit UI intent and is not serialized in ApplicationConfig.
+  reserved 1, 6;
+  reserved "tunnel_enabled", "tunnel";
   PlayerServerConfig player_server = 2;
   CoordinationConfig coordination = 3;
   BrowserClientConfig browser = 4;
   PathConfig paths = 5;
-  TunnelConfig tunnel = 6;
   StartupConfig startup = 7;
   ShutdownConfig shutdown = 8;
 }

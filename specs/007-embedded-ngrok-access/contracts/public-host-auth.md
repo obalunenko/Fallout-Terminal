@@ -3,6 +3,47 @@
 **Bugfix**: 2026-08-15 — ANALYZE-S1 replaces unresolved Host-only ingress inference with an owned
 source-bound public ingress class.
 
+**Bugfix**: 2026-08-15 — BUG-001 supersedes the source/Host contract with endpoint Basic Auth after
+the required `127.0.0.2` bind failed on target macOS.
+
+## Current contract (BUG-001)
+
+Public authentication is owned by the one ngrok Agent Endpoint, not by `internal/player`.
+
+1. The provider adapter receives scoped account-token, username, and password buffers.
+2. It constructs one in-memory Basic Auth Traffic Policy and attaches it to `Agent.Forward` while
+   the endpoint URL remains private.
+3. The endpoint forwards directly to the existing `http://127.0.0.1:3690` service. It uses no
+   custom source-bound dialer and starts no second player server or proxy.
+4. Only after `Forward` succeeds and its HTTPS URL is validated may lifecycle state become `ready`
+   and expose that URL.
+5. Missing or incorrect public Basic Auth is rejected by ngrok with `401`; correct credentials are
+   forwarded unchanged to the existing static/Connect application.
+6. Direct local/LAN clients connect to the player listener without traversing ngrok and therefore
+   receive no Basic Auth challenge.
+7. The player handler performs no public `RemoteAddr`, forwarding-header, or Host classification.
+
+The Traffic Policy is ephemeral provider configuration. It is never written to disk, protobuf,
+JSON, environment, arguments, events, status, logs, diagnostics, fixtures, or frontend storage.
+The username/password may exist only in the private mutation path, Keychain scoped-use buffers,
+SDK policy construction, and the standard browser Basic Authorization exchange.
+
+Endpoint creation with its policy is the atomic readiness boundary. Stop, reconfigure, failure,
+and quit withdraw the URL and close the endpoint/Agent within the shared deadline. There is no
+separate player-policy activation/deactivation sequence.
+
+Deterministic tests prove policy configuration intent, secret confinement, URL validation,
+lifecycle ordering, and unchanged local behavior without rendering the policy secret. An explicit
+credential-gated real run checks missing/wrong/correct Basic Auth and one non-empty incremental
+`Subscribe`; unavailable prerequisites are `NOT RUN` and do not invalidate deterministic gates.
+
+The threat model is casual personal-game sharing and prevention of accidental entry. It does not
+claim protection against a malicious local process, provider compromise, or deliberate hostile
+protocol manipulation.
+
+<details>
+<summary>Superseded pre-BUG-001 source/Host contract (non-normative history)</summary>
+
 ## Scope
 
 This contract wraps the existing player application's static and generated ConnectRPC handler on
@@ -146,3 +187,5 @@ five-second test condition. A stopped/stale URL must not reconnect successfully.
 Provider, network, account, domain, Keychain, policy activation, or endpoint completion failure
 changes only public status and admission. Local/LAN static, unary, streaming, selection, navigation,
 hacking, sound, and reconnect journeys remain available without Basic Auth or application restart.
+
+</details>

@@ -8,6 +8,20 @@ real ngrok endpoint is externally reachable.
 **Bugfix**: 2026-08-15 — ANALYZE-S1/U1 resolves public-ingress classification independently of
 remote `Host` preservation and makes the pre-removal rollback reference mechanically reproducible.
 
+**Bugfix**: 2026-08-15 — BUG-001 records the target Darwin `EADDRNOTAVAIL` result for unassigned
+`127.0.0.2` and adopts ngrok Agent Endpoint Basic Auth for the personal-game threat model.
+
+## Real SDK acceptance harness decision (2026-08-15)
+
+The real SDK test is strictly opt-in with `FALLOUT_NGROK_INTEGRATION=1`; its account credential and
+optional owned reserved domain are read only by the test process from an external harness. The test
+never logs either value or raw SDK diagnostics. Without explicit opt-in or a non-empty external
+credential it reports `NOT RUN`, and that result is never substituted for deterministic policy,
+streaming, or fake lifecycle evidence. When enabled, the harness uses the existing upstream at
+`127.0.0.1:3690`, probes a random or exact reserved HTTPS endpoint, checks missing/wrong/correct
+Basic Auth plus a non-empty incremental `Subscribe`, and closes the endpoint with a five-second
+context.
+
 ## 1. Embedded ngrok runtime
 
 **Decision**: Add the official `golang.ngrok.com/ngrok/v2` module at exactly `v2.1.4` to the root Go
@@ -19,10 +33,9 @@ authtoken comes only from the scoped `SecretStore` callback and never from
 
 1. `ngrok.NewAgent(ngrok.WithAuthtoken(token), ngrok.WithAutoConnect(false), ...)`;
 2. `Agent.Connect(startContext)`;
-3. create an owned TCP/IPv4 upstream dialer whose local address is the dedicated loopback
-   `127.0.0.2` and whose only target is `127.0.0.1:3690`;
-4. `Agent.Forward(startContext, ngrok.WithUpstream("http://127.0.0.1:3690",
-   ngrok.WithUpstreamDialer(ownedDialer)), endpointOptions...)`;
+3. construct the in-memory Basic Auth Traffic Policy from scoped username/password buffers;
+4. `Agent.Forward(startContext, ngrok.WithUpstream("http://127.0.0.1:3690"),
+   ngrok.WithTrafficPolicy(policy), endpointOptions...)` without a custom upstream dialer;
 5. read and strictly validate `EndpointForwarder.URL()`;
 6. observe `EndpointForwarder.Done()` and provider disconnect events;
 7. on every stop path call bounded `CloseWithContext`, then `Agent.Disconnect`, and drop all SDK
@@ -40,13 +53,10 @@ endpoint release. Cancellation is therefore a trigger for cleanup, not a substit
 distinguish intentional close from unexpected completion and use the SDK disconnect event only
 for redacted classification.
 
-The selected pin also exposes `WithUpstreamDialer`. The owned dialer MUST force `tcp4`, bind its
-source to `127.0.0.2`, reject every destination except `127.0.0.1:3690`, and fail startup rather
-than fall back to the SDK default dialer if binding or validation fails. The existing player
-listener therefore sees every SDK-forwarded connection with the dedicated source address while
-ordinary direct loopback clients use `127.0.0.1`/`::1` and LAN clients use their real LAN source.
-This is a transport-local ingress discriminator; it is never serialized, logged as user data, or
-accepted from forwarding headers.
+~~The selected pin's `WithUpstreamDialer` was to bind `127.0.0.2` as a transport-local ingress
+discriminator.~~ BUG-001 proved this unassigned source cannot bind on the target macOS host without
+privileged interface mutation. The current design uses the ordinary SDK upstream connection and
+does not classify provider traffic inside the player server.
 
 The SDK's declared module requirements at this pin include
 `github.com/jpillora/backoff v1.0.0`, `go.uber.org/multierr v1.11.0`,
@@ -80,11 +90,10 @@ existing player server.
 
 ## 2. Forwarding and ConnectRPC streaming
 
-**Decision**: Configure exactly one SDK forwarder with upstream
-`http://127.0.0.1:3690` through the owned `127.0.0.2` source-bound dialer. Do not create another
-application listener or another Connect service.
-Keep Basic Auth in the existing player HTTP application boundary, ahead of static and ConnectRPC
-routing, and leave the Connect handler and server-streaming `Subscribe` implementation unchanged.
+**Decision (BUG-001)**: Configure exactly one SDK forwarder with upstream
+`http://127.0.0.1:3690` and ngrok Basic Auth Traffic Policy. Do not create another application
+listener or Connect service. Leave the Connect handler and server-streaming `Subscribe`
+implementation unchanged.
 
 Official SDK documentation explicitly supports forwarding to an existing HTTP upstream. At the
 selected pin, the forwarder accepts edge connections and serves/copies them to the configured
@@ -93,10 +102,10 @@ existing non-empty server stream technically compatible, but documentation and s
 not acceptance evidence. Integration and real-network browser tests must prove that a snapshot and
 later update arrive incrementally before `Subscribe` completes, and that reconnect converges.
 
-**Rationale**: The present application Basic Auth middleware inspects request headers and delegates
-the original `http.ResponseWriter`; it does not buffer the response stream. Existing request-body
-size enforcement reads only the bounded request body and is independent of the long-lived response.
-Keeping the generated Connect handler untouched minimizes the streaming risk.
+**Rationale**: Public authentication at the endpoint keeps direct local/LAN traffic unchanged and
+removes the impossible source discriminator. Keeping the generated Connect handler untouched
+minimizes streaming risk; a focused opt-in real test, rather than documentation alone, records
+whether the provider policy preserves non-empty incremental delivery.
 
 **Alternatives considered**:
 
@@ -109,10 +118,17 @@ Keeping the generated Connect handler untouched minimizes the streaming risk.
 
 ## 3. Basic Auth and Traffic Policy
 
-**Decision**: Do not configure ngrok Basic Auth or another request/response Traffic Policy in this
-feature. Application-level Basic Auth remains authoritative for the exact activated public Host and
-covers the page, every static asset, and every ConnectRPC procedure. The application does not add a
-rate limit or lockout.
+**Decision (BUG-001)**: ~~Do not configure ngrok Basic Auth or another request/response Traffic
+Policy.~~ Configure one ngrok Agent Endpoint Basic Auth policy before publication. It covers the
+page, every static asset, and every ConnectRPC procedure forwarded through the public URL. The
+application adds no second authentication authority, rate limit, lockout, or Host/source policy.
+
+The player username/password cross the provider boundary only through the scoped in-memory SDK
+construction call. No policy file, environment value, process argument, log, event, or reusable
+status contains them. Direct local/LAN requests bypass ngrok by topology and remain unauthenticated.
+
+The following pre-BUG-001 source-classification paragraphs are retained as superseded design
+history and are non-normative:
 
 ~~The application MUST NOT infer direct local/LAN ingress from `Host` alone when a request was
 forwarded by the public endpoint. Before implementation, authoritative documentation/source for the
@@ -124,23 +140,23 @@ this property. If authoritative provider behavior does not guarantee it, the sha
 is unsafe and the plan must be revised to add a trustworthy ingress discriminator before any
 endpoint may reach `ready`; Traffic Policy Basic Auth is not an automatic fallback.~~
 
-The application MUST classify ingress before it classifies `Host`. SDK-forwarded connections are
+~~The application MUST classify ingress before it classifies `Host`. SDK-forwarded connections are
 identified only by the owned `tcp4` dialer's dedicated loopback source `127.0.0.2`; that ingress
 class is always public and can never receive local/LAN bypass, even if the remote request reaches
 the upstream with `Host: localhost`, a loopback authority, or a LAN authority. Direct connections
 are eligible for unauthenticated local/LAN admission only when their actual transport source is
 loopback/private/link-local but not the dedicated public source and their normalized authority
-belongs to the concrete local/LAN allow set. Unknown direct or public authorities remain denied.
+belongs to the concrete local/LAN allow set. Unknown direct or public authorities remain denied.~~
 
-This decision does not rely on ngrok preserving, rewriting, or routing a particular `Host`, and it
+~~This decision does not rely on ngrok preserving, rewriting, or routing a particular `Host`, and it
 does not move Basic Auth into Traffic Policy. Deterministic tests MUST prove source binding, target
 restriction, no default-dialer fallback, public classification of every `127.0.0.2` connection,
 local/LAN continuity, and fail-closed behavior when the dedicated source cannot be bound. The
 credential-gated real endpoint probe still records Host overrides and observed upstream source when
 available; `NOT RUN` remains honest lack of real-service evidence but no longer leaves the
-application security discriminator undefined.
+application security discriminator undefined.~~
 
-**Rationale**: The current repository records a streaming-buffering concern for edge policy, and
+**Superseded rationale**: The current repository records a streaming-buffering concern for edge policy, and
 the feature has no independent evidence that an ngrok edge authentication action preserves a
 non-empty, long-lived ConnectRPC server stream at the selected SDK/service version. Moving auth to
 the edge would change the security boundary and could create an untested streaming intermediary.
@@ -148,14 +164,16 @@ Header-only application auth has directly testable semantics and preserves the r
 
 **Alternatives considered**:
 
-- ngrok Traffic Policy Basic Auth: deferred until a separate feature supplies real evidence for
-  non-buffered `Subscribe`, reconnect, every static/RPC path, and equivalent failure behavior.
+- ~~ngrok Traffic Policy Basic Auth: deferred until a separate feature supplies real evidence.~~
+  BUG-001 accepts it for personal sharing and retains one focused opt-in streaming/auth check.
 - Dual edge and application Basic Auth: rejected because it produces two credential authorities and
   can create confusing double challenges.
 - Host-only local/public classification: rejected because a forwarded request can carry a local
   authority unless a separate trusted transport discriminator exists.
-- A second ingress listener/proxy: rejected because the source-bound SDK dialer distinguishes the
-  same authoritative listener without creating a second player server.
+- A second ingress listener/proxy: ~~rejected because the source-bound SDK dialer distinguishes the
+  same authoritative listener without creating a second player server.~~ **BUG-001** retained only
+  as a future fallback if the focused real Traffic Policy test proves streaming incompatibility; it
+  is not part of the current production path.
 - Application lockout/rate limiting: rejected by the approved specification; provider throttling is
   an external condition only.
 
@@ -335,14 +353,18 @@ effects without weakening reproducibility or claiming unavailable release eviden
 
 ## 9. Brownfield cutover conclusion
 
-The present runtime is not a runner swap. It is startup-static, process-owned, and fail-open for an
-unknown syntactically valid external Host. The implementation therefore needs a restartable,
-generation-aware manager and a dynamic player-boundary policy before deleting the CLI path.
+~~The present runtime is not a runner swap. It is startup-static, process-owned, and fail-open for
+an unknown syntactically valid external Host. The implementation therefore needs a restartable,
+generation-aware manager and a dynamic player-boundary policy before deleting the CLI path.~~
+**BUG-001**: The present runtime remains startup-static and process-owned. The cutover needs a
+restartable generation-aware embedded SDK manager, policy-protected endpoint construction, and URL
+withdrawal/endpoint-close sequencing before deleting the CLI path.
 
 The cutover order is:
 
-1. introduce protobuf contracts, stores, Keychain/SDK adapters, policy, state machine, and fakes;
-2. prove policy activation/deactivation order, streaming, local fallback, bounded cleanup, and UI
+1. introduce protobuf contracts, stores, Keychain/SDK adapters, ~~policy~~ **BUG-001** ephemeral
+   endpoint-policy input, state machine, and fakes;
+2. prove protected-endpoint publication/withdrawal order, streaming, local fallback, bounded cleanup, and UI
    operations through the embedded path;
 3. redirect composition and packaged UX exclusively to the embedded path;
 4. delete process runner/guardian, log URL parser, CLI/env configuration and secrets, hard-coded

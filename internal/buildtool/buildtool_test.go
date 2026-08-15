@@ -94,6 +94,76 @@ func TestPackagePlanCompletesResourcesBeforeFinalSignature(t *testing.T) {
 	assert.Less(t, positions["compile macOS arm64 application"], positions["sign completed application bundle"], "application compilation must precede final signature")
 }
 
+func TestPackagePlanOwnsEmbeddedDependencyNoticesAndNoProviderExecutable(t *testing.T) {
+	t.Parallel()
+
+	steps, err := Plan("package", nil)
+	require.NoError(t, err)
+
+	positions := make(map[string]int, len(steps))
+	for index, step := range steps {
+		positions[step.Name] = index
+		values := append([]string{step.Program, step.Path, step.Source, step.Destination}, step.Arguments...)
+		joined := strings.ToLower(strings.Join(values, " "))
+		assert.NotContains(t, joined, "ngrok", "package plan must not copy or execute a provider binary")
+		assert.NotContains(t, joined, "curl", "package plan must not download a provider runtime")
+	}
+
+	dependencyIndex, exists := positions["verify embedded dependency and license inventory"]
+	require.True(t, exists, "package must run the exact SDK/license inventory gate")
+	assert.Equal(t, filepath.Join("scripts", "dependency-license-check.sh"), steps[dependencyIndex].Program)
+
+	noticeIndex, exists := positions["install third-party notices"]
+	require.True(t, exists, "package must include reviewed third-party notices")
+	notice := steps[noticeIndex]
+	assert.Equal(t, "THIRD_PARTY_NOTICES.md", notice.Source)
+	assert.Equal(t, filepath.Join("build", "bin", applicationName+".app", "Contents", "Resources", "THIRD_PARTY_NOTICES.md"), notice.Destination)
+	assert.Equal(t, 0o444, int(notice.Mode.Perm()))
+	assert.Less(t, noticeIndex, positions["compile macOS arm64 application"])
+	assert.Less(t, noticeIndex, positions["sign completed application bundle"])
+
+	compile := steps[positions["compile macOS arm64 application"]]
+	assert.Equal(t, "darwin", compile.Environment["GOOS"])
+	assert.Equal(t, "arm64", compile.Environment["GOARCH"])
+	assert.Equal(t, "1", compile.Environment["CGO_ENABLED"])
+	assert.Equal(t, minimumMacOS, compile.Environment["MACOSX_DEPLOYMENT_TARGET"])
+	assert.Equal(t, "-mmacosx-version-min="+minimumMacOS, compile.Environment["CGO_CFLAGS"])
+	assert.Equal(t, "-mmacosx-version-min="+minimumMacOS, compile.Environment["CGO_LDFLAGS"])
+}
+
+func TestPackagePlanPreservesCanonicalFrontendAndOfflineResourceOwnership(t *testing.T) {
+	t.Parallel()
+
+	steps, err := Plan("package", nil)
+	require.NoError(t, err)
+
+	positions := make(map[string]int, len(steps))
+	for index, step := range steps {
+		positions[step.Name] = index
+	}
+	ordered := []string{
+		"verify protobuf and generated clients",
+		"install locked player dependencies",
+		"build player frontend",
+		"generate Wails bindings",
+		"install locked master dependencies",
+		"build master frontend",
+		"install application metadata",
+		"install application icon",
+		"install bundled demo",
+		"compile macOS arm64 application",
+		"sign completed application bundle",
+	}
+	for index := 1; index < len(ordered); index++ {
+		assert.Lessf(t, positions[ordered[index-1]], positions[ordered[index]], "%s must precede %s", ordered[index-1], ordered[index])
+	}
+
+	demo := steps[positions["install bundled demo"]]
+	assert.Equal(t, filepath.Join("sessions", "demo.json"), demo.Source)
+	assert.Equal(t, filepath.Join("build", "bin", applicationName+".app", "Contents", "Resources", "sessions", "demo.json"), demo.Destination)
+	assert.Equal(t, 0o444, int(demo.Mode.Perm()))
+}
+
 func TestUnknownActionIsRejected(t *testing.T) {
 	_, err := Plan("task", nil)
 	require.Error(t, err)

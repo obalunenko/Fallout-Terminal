@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"sync"
 	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 const wailsShutdownTimeout = 5 * time.Second
@@ -17,6 +19,7 @@ func init() {
 	application.RegisterEvent[int](clientCountEvent)
 	application.RegisterEvent[*domain.PublicHackState](hackStateEvent)
 	application.RegisterEvent[*domain.MasterCoordinationState](coordinationStateEvent)
+	application.RegisterEvent[PublicAccessSnapshot](publicAccessStatusEvent)
 }
 
 func newWailsApplication(frontendAssets fs.FS) *application.App {
@@ -37,7 +40,36 @@ func wailsApplicationOptions(frontendAssets fs.FS) application.Options {
 }
 
 func newMasterWindow(host *application.App) *application.WebviewWindow {
-	return host.Window.NewWithOptions(masterWindowOptions())
+	window := host.Window.NewWithOptions(masterWindowOptions())
+	registerMasterWindowQuitOnClose(window, host)
+	return window
+}
+
+type masterWindowCloseRegistrar interface {
+	RegisterHook(events.WindowEventType, func(*application.WindowEvent)) func()
+	OnWindowEvent(events.WindowEventType, func(*application.WindowEvent)) func()
+}
+
+type applicationQuitter interface {
+	Quit()
+}
+
+func registerMasterWindowQuitOnClose(window masterWindowCloseRegistrar, host applicationQuitter) {
+	var quitOnce sync.Once
+	requestQuit := func(*application.WindowEvent) {
+		quitOnce.Do(func() {
+			// Wails v3 beta may close its final Darwin NSWindow without asking
+			// NSApplication to terminate. Request application shutdown explicitly
+			// before returning control to AppKit so the service cleanup path runs
+			// for the red close button/Cmd+W too.
+			host.Quit()
+		})
+	}
+	window.RegisterHook(events.Common.WindowClosing, requestQuit)
+	// A native/scripted NSWindow close can bypass WindowShouldClose. Observe
+	// AppKit's post-close notification as a fallback while sharing the same
+	// exactly-once quit intent.
+	window.OnWindowEvent(events.Mac.WindowWillClose, requestQuit)
 }
 
 func masterWindowOptions() application.WebviewWindowOptions {

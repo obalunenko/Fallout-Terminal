@@ -1,5 +1,12 @@
 # Feature Specification: Embedded ngrok Public Access
 
+**Bugfix**: 2026-08-15 — BUG-001 replaces the non-portable `127.0.0.2`/exact-Host application
+boundary with ngrok endpoint Basic Auth for personal game sharing while retaining Keychain-only
+storage, local/LAN availability, one player server, and honest opt-in real-service evidence.
+
+**Bugfix**: 2026-08-15 — BUG-001 follow-up separates UI publication from provider-adapter
+atomicity and makes conditional startup measurement executable.
+
 **Feature Directory**: `007-embedded-ngrok-access`  
 **Created**: 2026-08-15  
 **Status**: Approved  
@@ -80,8 +87,10 @@ before returning any player resource.
    starts public access, **Then** the ready address uses that domain.
 3. **Given** a reserved domain that is unavailable or not owned by the account, **When** startup is
    attempted, **Then** the UI shows a clear redacted domain error and does not publish a URL.
-4. **Given** startup is still in progress, **When** a request arrives for the prospective external
-   host, **Then** no public resource or player request is accepted before authorization is active.
+4. ~~**Given** startup is still in progress, **When** a request arrives for the prospective external
+   host, **Then** no public resource or player request is accepted before authorization is active.~~
+   **BUG-001**: The UI does not publish the endpoint until ngrok has created it with its complete
+   Basic Auth Traffic Policy; direct local/LAN access remains independent.
 5. **Given** public access is ready, **When** the game master copies sharing information, **Then**
    the address and username are available while an already stored password is not reconstructed.
 
@@ -111,8 +120,10 @@ confirm that the browser reconnects to authoritative state.
    **Then** they arrive incrementally without waiting for the stream to end.
 4. **Given** an authenticated player loses connectivity, **When** connectivity returns, **Then**
    the player reconnects and converges on current authoritative state.
-5. **Given** correct credentials but an unknown external `Host`, **When** a request arrives,
-   **Then** it is rejected fail-closed.
+5. ~~**Given** correct credentials but an unknown external `Host`, **When** a request arrives,
+   **Then** it is rejected fail-closed.~~ **BUG-001**: Public admission is scoped by possession of
+   the active ngrok URL and its Basic Auth policy; the player application does not implement a
+   separate hostile-client Host/source boundary.
 6. **Given** repeated invalid Basic Auth attempts, **When** a later request supplies the correct
    credentials, **Then** the application accepts it without an application-imposed lockout unless
    the external provider is independently throttling traffic.
@@ -214,8 +225,10 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - What happens to requests using the old URL during and after reconfiguration?
 - How are missing, malformed, stale, or incorrect Basic Auth credentials rejected for both static
   resources and player operations?
-- How is an external `Host` rejected before authorization activation, after stop, and during the
-  disable-before-close interval?
+- ~~How is an external `Host` rejected before authorization activation, after stop, and during the
+  disable-before-close interval?~~ **BUG-001**: How does endpoint Basic Auth reject missing or wrong
+  credentials before forwarding, and how do URL withdrawal plus endpoint close prevent access after
+  stop, reconfigure, or failure?
 - How does a long-lived non-empty stream behave across idle periods, transient network loss, and
   browser reconnect?
 - How does local play recover when a public endpoint fails while local players are active?
@@ -268,14 +281,23 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-019**: When a reserved domain is configured, startup MUST either use that exact domain or
   show a clear redacted ownership or availability error without publishing another URL as though it
   were the requested domain.
-- **FR-020**: The UI MUST publish a public URL only after the endpoint and its complete
-  authorization policy are ready.
-- **FR-021**: The application boundary MUST require the correct Basic Auth username-password pair
-  before serving any public static resource or accepting any public ConnectRPC request.
-- **FR-022**: The exact external `Host` and its authorization policy MUST become active atomically
-  before the public URL is published.
-- **FR-023**: The public endpoint MUST reject every unknown external `Host` before startup
-  completes, during reconfiguration, during stopping, and after failure.
+- **FR-020**: ~~The UI MUST publish a public URL only after the ngrok endpoint and its complete Basic
+  Auth Traffic Policy are ready.~~ **BUG-001 follow-up**: The public URL MUST remain absent from
+  every UI command result, reusable snapshot, status, and named event until lifecycle state is
+  `ready`.
+- **FR-021**: The ngrok endpoint boundary MUST require the correct Basic Auth username-password
+  pair before forwarding any public static resource or ConnectRPC request to the player service.
+- **FR-022**: ~~The exact external `Host` and its authorization policy MUST become active atomically
+  before the public URL is published.~~ **BUG-001**: Endpoint creation and its Basic Auth Traffic
+  Policy MUST complete as one private startup operation before the public URL is published.
+  **BUG-001 follow-up**: The provider adapter MUST create the endpoint with its complete Basic Auth
+  Traffic Policy in the same operation and MUST NOT return an unprotected endpoint handle to the
+  manager.
+- **FR-023**: ~~The public endpoint MUST reject every unknown external `Host` before startup
+  completes, during reconfiguration, during stopping, and after failure.~~ **BUG-001**: The player
+  application MUST NOT infer public ingress from `RemoteAddr`, forwarding headers, or Host; public
+  admission belongs solely to the active ngrok endpoint policy, while direct local/LAN requests
+  remain on the existing player listener without Basic Auth.
 - **FR-024**: Public authorization MUST preserve incremental delivery for a non-empty long-lived
   `Subscribe` stream without buffering it to completion or converting it into a single response.
 - **FR-025**: An authenticated public player MUST retain character selection, navigation, hacking,
@@ -288,12 +310,12 @@ reconfiguring states, then confirm cleanup completes within the established shut
   leave local and LAN play available without an application restart.
 - **FR-029**: Start and stop operations MUST be idempotent, cancellable, and bounded by explicit
   completion time limits.
-- **FR-030**: Applying settings while public access is active MUST disable the old public acceptance
+- **FR-030**: Applying settings while public access is active MUST close the old protected endpoint
   before starting the replacement configuration.
-- **FR-031**: A replacement public URL MUST remain hidden until the replacement endpoint and exact
-  external `Host` authorization are ready.
-- **FR-032**: Stop, reconfigure, failure, and quit paths MUST make stale public URLs unusable before
-  closing or replacing their endpoints.
+- **FR-031**: A replacement public URL MUST remain hidden until the replacement endpoint and its
+  Basic Auth Traffic Policy are ready.
+- **FR-032**: Stop, reconfigure, failure, and quit paths MUST withdraw the published URL and close
+  the owned endpoint; the application MUST NOT present a stale URL as active.
 - **FR-033**: Quit, `Cmd+Q`, repeated shutdown, partial startup, and error cleanup MUST release all
   public endpoints, background work, listeners, and temporary secret material within five seconds.
 - **FR-034**: A completion from a cancelled or superseded lifecycle operation MUST NOT change the
@@ -340,6 +362,10 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-053**: The application MUST restrict secret-bearing private protobuf results to the single
   initial return of a newly generated player password for explicit Copy, with no existing-secret
   readback, named-event publication, or persistence in frontend state or storage.
+- **FR-054**: The player username and password MAY be supplied transiently to the pinned ngrok SDK
+  only to construct the active endpoint's Basic Auth Traffic Policy. They MUST NOT be written to a
+  policy file, command line, environment variable, reusable DTO/event/status, fixture, diagnostic,
+  or application-managed persistence surface.
 
 ### Out of Scope
 
@@ -365,8 +391,8 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **Credential Presence**: An opaque `present`, `absent`, or `unknown` indication for a provider
   token or player password, without carrying the credential value. `unknown` represents a locked,
   denied, or unavailable secure store and is never treated as absence or permission to overwrite.
-- **Public Access Session**: The observable lifecycle of one public endpoint, including its current
-  state, current HTTPS address when ready, exact authorized external host, and redacted error when
+- **Public Access Session**: The observable lifecycle of one ngrok endpoint, including its current
+  state, current HTTPS address when ready, Basic Auth policy readiness, and redacted error when
   applicable.
 - **One-Time Password Presentation**: A transient presentation of a newly generated player password
   that supports one explicit copy before it is discarded and cannot represent an existing stored
@@ -376,14 +402,20 @@ reconfiguring states, then confirm cleanup completes within the established shut
 
 ### Measurable Outcomes
 
-- **SC-001**: Under a responsive network and valid account, at least 95% of public-start attempts
-  reach ready or a clear terminal error within 15 seconds, and every attempt ends within 30 seconds.
-- **SC-002**: Across automated requests made before readiness, during reconfiguration, during stop,
-  and after failure, zero public static resources or player operations succeed without both correct
-  Basic Auth and the currently authorized external host.
-- **SC-003**: Every existing player browser journey passes through the public address, including a
-  non-empty stream sustained for at least 30 minutes and reconnection to current authoritative state
-  within 5 seconds after connectivity is restored under test conditions.
+- **SC-001**: ~~Under a responsive network and valid account, at least 95% of public-start attempts
+  reach ready or a clear terminal error within 15 seconds, and every attempt ends within 30
+  seconds.~~ **BUG-001 follow-up**: Across 20 explicitly opted-in real starts under predeclared
+  responsive-network and valid-account prerequisites, at least 19 MUST reach `ready` or a clear
+  terminal error within 15 seconds and all MUST finish within 30 seconds. Without those
+  prerequisites the real sample is `NOT RUN`. A separate 100-schedule deterministic gate MUST prove
+  timeout and cancellation behavior but MUST NOT be presented as provider-performance evidence.
+- **SC-002**: In deterministic policy construction and each available real-endpoint acceptance run,
+  zero public static resources or player operations succeed through the active ngrok URL without
+  correct Basic Auth; direct local/LAN requests remain unaffected.
+- **SC-003**: Every existing player browser journey passes through the public address when real
+  opt-in prerequisites are supplied, including a non-empty incremental `Subscribe` and reconnection
+  to current authoritative state within 5 seconds under test conditions. Without prerequisites the
+  real portion is `NOT RUN`, not a release-blocking deterministic failure.
 - **SC-004**: During every simulated provider, network, token, domain, timeout, and secure-store
   failure, 100% of the existing local/LAN acceptance journey remains usable without restarting the
   application.
@@ -407,9 +439,9 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **SC-012**: Password validation rejects 100% of manually entered values shorter than eight
   characters and accepts values of eight or more characters without requiring particular character
   classes.
-- **SC-013**: In an acceptance run without external provider throttling, every invalid Basic Auth
-  attempt is rejected and the next request with correct credentials succeeds without an
-  application-imposed cooldown or lockout.
+- **SC-013**: In an available real-endpoint acceptance run without provider throttling, missing and
+  incorrect Basic Auth are rejected by ngrok and the next request with correct credentials succeeds
+  without an application-imposed cooldown or lockout; otherwise this criterion is `NOT RUN`.
 
 ## Assumptions
 
@@ -429,6 +461,10 @@ reconfiguring states, then confirm cleanup completes within the established shut
   embedded provider behavior as production, and provides no external-process fallback.
 - Basic Auth attempt throttling, when present, is an external ngrok behavior and is not an
   application acceptance guarantee.
+- The personal-use threat model prevents accidental entry through the shared ngrok URL; it does not
+  claim a hardened in-application hostile-client Host/source boundary.
+- The player password is disclosed transiently to ngrok as endpoint Traffic Policy configuration;
+  the application still stores it only in Keychain and never reads it back into reusable UI state.
 - Real external-service, signing, notarization, and provider-plan validation uses user-supplied
   prerequisites and remains conditional.
 
@@ -438,7 +474,8 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - Provider name: `ngrok`.
 - Initial player username: `players`.
 - Player authentication scheme: `Basic Auth`.
-- External authority field: `Host`.
+- ~~External authority field: `Host`.~~ **BUG-001**: Public admission authority is the active ngrok
+  endpoint's Basic Auth Traffic Policy.
 - Long-lived player stream: `Subscribe`.
 - Authoritative local player port: `3690`.
 - Packaged application form: `.app`.

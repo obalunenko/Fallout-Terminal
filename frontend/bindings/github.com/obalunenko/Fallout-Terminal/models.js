@@ -177,6 +177,60 @@ export class CoordinationCommandResult {
 }
 
 /**
+ * GeneratedPlayerPasswordResult is deliberately not reusable and contains no
+ * snapshot. GeneratedPassword is populated only after secure-store replacement
+ * and settings persistence both succeed.
+ */
+export class GeneratedPlayerPasswordResult {
+    /**
+     * Creates a new GeneratedPlayerPasswordResult instance.
+     * @param {Partial<GeneratedPlayerPasswordResult>} [$$source = {}] - The source object to create the GeneratedPlayerPasswordResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["generatedPassword"] = undefined;
+        }
+        if (!("settingsRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["settingsRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new GeneratedPlayerPasswordResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {GeneratedPlayerPasswordResult}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new GeneratedPlayerPasswordResult(/** @type {Partial<GeneratedPlayerPasswordResult>} */($$parsedSource));
+    }
+}
+
+/**
  * LiveTerminalPayload is the validated set-live bridge input.
  */
 export class LiveTerminalPayload {
@@ -423,6 +477,273 @@ export class PlayerConfigCommandResult {
     }
 }
 
+export class PublicAccessCommandPayload {
+    /**
+     * Creates a new PublicAccessCommandPayload instance.
+     * @param {Partial<PublicAccessCommandPayload>} [$$source = {}] - The source object to create the PublicAccessCommandPayload.
+     */
+    constructor($$source = {}) {
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessCommandPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessCommandPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PublicAccessCommandPayload(/** @type {Partial<PublicAccessCommandPayload>} */($$parsedSource));
+    }
+}
+
+export class PublicAccessCommandResult {
+    /**
+     * Creates a new PublicAccessCommandResult instance.
+     * @param {Partial<PublicAccessCommandResult>} [$$source = {}] - The source object to create the PublicAccessCommandResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (!("snapshot" in $$source)) {
+            /**
+             * @member
+             * @type {PublicAccessSnapshot}
+             */
+            this["snapshot"] = (new PublicAccessSnapshot());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessCommandResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessCommandResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType4;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("snapshot" in $$parsedSource) {
+            $$parsedSource["snapshot"] = $$createField2_0($$parsedSource["snapshot"]);
+        }
+        return new PublicAccessCommandResult(/** @type {Partial<PublicAccessCommandResult>} */($$parsedSource));
+    }
+}
+
+/**
+ * PublicAccessPreferences is the secret-free native desktop projection.
+ */
+export class PublicAccessPreferences {
+    /**
+     * Creates a new PublicAccessPreferences instance.
+     * @param {Partial<PublicAccessPreferences>} [$$source = {}] - The source object to create the PublicAccessPreferences.
+     */
+    constructor($$source = {}) {
+        if (!("version" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["version"] = 0;
+        }
+        if (!("enabledPreference" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["enabledPreference"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["reservedDomain"] = undefined;
+        }
+        if (!("username" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["username"] = "";
+        }
+        if (!("providerTokenPresentHint" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["providerTokenPresentHint"] = false;
+        }
+        if (!("playerPasswordPresentHint" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["playerPasswordPresentHint"] = false;
+        }
+        if (!("revision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["revision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessPreferences instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessPreferences}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PublicAccessPreferences(/** @type {Partial<PublicAccessPreferences>} */($$parsedSource));
+    }
+}
+
+export class PublicAccessSnapshot {
+    /**
+     * Creates a new PublicAccessSnapshot instance.
+     * @param {Partial<PublicAccessSnapshot>} [$$source = {}] - The source object to create the PublicAccessSnapshot.
+     */
+    constructor($$source = {}) {
+        if (!("preferences" in $$source)) {
+            /**
+             * @member
+             * @type {PublicAccessPreferences}
+             */
+            this["preferences"] = (new PublicAccessPreferences());
+        }
+        if (!("providerTokenPresence" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["providerTokenPresence"] = "";
+        }
+        if (!("playerPasswordPresence" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["playerPasswordPresence"] = "";
+        }
+        if (!("status" in $$source)) {
+            /**
+             * @member
+             * @type {PublicAccessStatus}
+             */
+            this["status"] = (new PublicAccessStatus());
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessSnapshot instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessSnapshot}
+     */
+    static createFrom($$source = {}) {
+        const $$createField0_0 = $$createType5;
+        const $$createField3_0 = $$createType6;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("preferences" in $$parsedSource) {
+            $$parsedSource["preferences"] = $$createField0_0($$parsedSource["preferences"]);
+        }
+        if ("status" in $$parsedSource) {
+            $$parsedSource["status"] = $$createField3_0($$parsedSource["status"]);
+        }
+        return new PublicAccessSnapshot(/** @type {Partial<PublicAccessSnapshot>} */($$parsedSource));
+    }
+}
+
+export class PublicAccessStatus {
+    /**
+     * Creates a new PublicAccessStatus instance.
+     * @param {Partial<PublicAccessStatus>} [$$source = {}] - The source object to create the PublicAccessStatus.
+     */
+    constructor($$source = {}) {
+        if (!("state" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["state"] = "";
+        }
+        if (!("generation" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["generation"] = 0;
+        }
+        if (!("settingsRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["settingsRevision"] = 0;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["publicUrl"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["errorCategory"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["errorMessage"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new PublicAccessStatus instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {PublicAccessStatus}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new PublicAccessStatus(/** @type {Partial<PublicAccessStatus>} */($$parsedSource));
+    }
+}
+
 /**
  * RuntimeStatus is the synchronous startup/status snapshot used to avoid
  * losing events emitted before the frontend subscribes.
@@ -499,8 +820,8 @@ export class RuntimeStatus {
      * @returns {RuntimeStatus}
      */
     static createFrom($$source = {}) {
-        const $$createField0_0 = $$createType5;
-        const $$createField2_0 = $$createType7;
+        const $$createField0_0 = $$createType8;
+        const $$createField2_0 = $$createType10;
         const $$createField7_0 = $$createType1;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("serverInfo" in $$parsedSource) {
@@ -513,6 +834,88 @@ export class RuntimeStatus {
             $$parsedSource["coordinationState"] = $$createField7_0($$parsedSource["coordinationState"]);
         }
         return new RuntimeStatus(/** @type {Partial<RuntimeStatus>} */($$parsedSource));
+    }
+}
+
+/**
+ * SavePublicAccessSettingsPayload is ephemeral trusted input. Its secret
+ * fields are consumed into byte buffers and are never copied into a result,
+ * event, status, or persistence model.
+ */
+export class SavePublicAccessSettingsPayload {
+    /**
+     * Creates a new SavePublicAccessSettingsPayload instance.
+     * @param {Partial<SavePublicAccessSettingsPayload>} [$$source = {}] - The source object to create the SavePublicAccessSettingsPayload.
+     */
+    constructor($$source = {}) {
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+        if (!("enabledPreference" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["enabledPreference"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["reservedDomain"] = undefined;
+        }
+        if (!("username" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["username"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["replacementProviderToken"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["deleteProviderToken"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["replacementPlayerPassword"] = undefined;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {boolean | undefined}
+             */
+            this["deletePlayerPassword"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SavePublicAccessSettingsPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {SavePublicAccessSettingsPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SavePublicAccessSettingsPayload(/** @type {Partial<SavePublicAccessSettingsPayload>} */($$parsedSource));
     }
 }
 
@@ -625,7 +1028,10 @@ const $$createType0 = domain$0.MasterCoordinationState.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = domain$0.PlayerConfigMetadata.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = domain$0.ServerInfo.createFrom;
-const $$createType5 = $Create.Nullable($$createType4);
-const $$createType6 = domain$0.PublicHackState.createFrom;
-const $$createType7 = $Create.Nullable($$createType6);
+const $$createType4 = PublicAccessSnapshot.createFrom;
+const $$createType5 = PublicAccessPreferences.createFrom;
+const $$createType6 = PublicAccessStatus.createFrom;
+const $$createType7 = domain$0.ServerInfo.createFrom;
+const $$createType8 = $Create.Nullable($$createType7);
+const $$createType9 = domain$0.PublicHackState.createFrom;
+const $$createType10 = $Create.Nullable($$createType9);

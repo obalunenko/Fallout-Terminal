@@ -379,8 +379,6 @@ func (x *PathConfig) GetApplicationSupportDirectory() string {
 
 type TunnelCredentials struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -415,32 +413,10 @@ func (*TunnelCredentials) Descriptor() ([]byte, []int) {
 	return file_fallout_terminal_config_v1_config_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *TunnelCredentials) GetUsername() string {
-	if x != nil {
-		return x.Username
-	}
-	return ""
-}
-
-func (x *TunnelCredentials) GetPassword() string {
-	if x != nil {
-		return x.Password
-	}
-	return ""
-}
-
 type TunnelConfig struct {
-	state                      protoimpl.MessageState `protogen:"open.v1"`
-	Enabled                    bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	Binary                     string                 `protobuf:"bytes,2,opt,name=binary,proto3" json:"binary,omitempty"`
-	Domain                     string                 `protobuf:"bytes,3,opt,name=domain,proto3" json:"domain,omitempty"`
-	Port                       uint32                 `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
-	LocalUrl                   string                 `protobuf:"bytes,5,opt,name=local_url,json=localUrl,proto3" json:"local_url,omitempty"`
-	StartupTimeoutMilliseconds int64                  `protobuf:"varint,6,opt,name=startup_timeout_milliseconds,json=startupTimeoutMilliseconds,proto3" json:"startup_timeout_milliseconds,omitempty"`
-	PolicyParent               *string                `protobuf:"bytes,7,opt,name=policy_parent,json=policyParent,proto3,oneof" json:"policy_parent,omitempty"`
-	Credentials                *TunnelCredentials     `protobuf:"bytes,8,opt,name=credentials,proto3" json:"credentials,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TunnelConfig) Reset() {
@@ -471,62 +447,6 @@ func (x *TunnelConfig) ProtoReflect() protoreflect.Message {
 // Deprecated: Use TunnelConfig.ProtoReflect.Descriptor instead.
 func (*TunnelConfig) Descriptor() ([]byte, []int) {
 	return file_fallout_terminal_config_v1_config_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *TunnelConfig) GetEnabled() bool {
-	if x != nil {
-		return x.Enabled
-	}
-	return false
-}
-
-func (x *TunnelConfig) GetBinary() string {
-	if x != nil {
-		return x.Binary
-	}
-	return ""
-}
-
-func (x *TunnelConfig) GetDomain() string {
-	if x != nil {
-		return x.Domain
-	}
-	return ""
-}
-
-func (x *TunnelConfig) GetPort() uint32 {
-	if x != nil {
-		return x.Port
-	}
-	return 0
-}
-
-func (x *TunnelConfig) GetLocalUrl() string {
-	if x != nil {
-		return x.LocalUrl
-	}
-	return ""
-}
-
-func (x *TunnelConfig) GetStartupTimeoutMilliseconds() int64 {
-	if x != nil {
-		return x.StartupTimeoutMilliseconds
-	}
-	return 0
-}
-
-func (x *TunnelConfig) GetPolicyParent() string {
-	if x != nil && x.PolicyParent != nil {
-		return *x.PolicyParent
-	}
-	return ""
-}
-
-func (x *TunnelConfig) GetCredentials() *TunnelCredentials {
-	if x != nil {
-		return x.Credentials
-	}
-	return nil
 }
 
 type StartupConfig struct {
@@ -627,12 +547,10 @@ func (x *ShutdownConfig) GetTimeoutMilliseconds() int64 {
 
 type ApplicationConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TunnelEnabled bool                   `protobuf:"varint,1,opt,name=tunnel_enabled,json=tunnelEnabled,proto3" json:"tunnel_enabled,omitempty"`
 	PlayerServer  *PlayerServerConfig    `protobuf:"bytes,2,opt,name=player_server,json=playerServer,proto3" json:"player_server,omitempty"`
 	Coordination  *CoordinationConfig    `protobuf:"bytes,3,opt,name=coordination,proto3" json:"coordination,omitempty"`
 	Browser       *BrowserClientConfig   `protobuf:"bytes,4,opt,name=browser,proto3" json:"browser,omitempty"`
 	Paths         *PathConfig            `protobuf:"bytes,5,opt,name=paths,proto3" json:"paths,omitempty"`
-	Tunnel        *TunnelConfig          `protobuf:"bytes,6,opt,name=tunnel,proto3" json:"tunnel,omitempty"`
 	Startup       *StartupConfig         `protobuf:"bytes,7,opt,name=startup,proto3" json:"startup,omitempty"`
 	Shutdown      *ShutdownConfig        `protobuf:"bytes,8,opt,name=shutdown,proto3" json:"shutdown,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -669,13 +587,6 @@ func (*ApplicationConfig) Descriptor() ([]byte, []int) {
 	return file_fallout_terminal_config_v1_config_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *ApplicationConfig) GetTunnelEnabled() bool {
-	if x != nil {
-		return x.TunnelEnabled
-	}
-	return false
-}
-
 func (x *ApplicationConfig) GetPlayerServer() *PlayerServerConfig {
 	if x != nil {
 		return x.PlayerServer
@@ -700,13 +611,6 @@ func (x *ApplicationConfig) GetBrowser() *BrowserClientConfig {
 func (x *ApplicationConfig) GetPaths() *PathConfig {
 	if x != nil {
 		return x.Paths
-	}
-	return nil
-}
-
-func (x *ApplicationConfig) GetTunnel() *TunnelConfig {
-	if x != nil {
-		return x.Tunnel
 	}
 	return nil
 }
@@ -758,34 +662,21 @@ const file_fallout_terminal_config_v1_config_proto_rawDesc = "" +
 	"PathConfig\x12/\n" +
 	"\x13documents_directory\x18\x01 \x01(\tR\x12documentsDirectory\x12*\n" +
 	"\x11bundled_demo_path\x18\x02 \x01(\tR\x0fbundledDemoPath\x12B\n" +
-	"\x1dapplication_support_directory\x18\x03 \x01(\tR\x1bapplicationSupportDirectory\"K\n" +
-	"\x11TunnelCredentials\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"\xd8\x02\n" +
-	"\fTunnelConfig\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x16\n" +
-	"\x06binary\x18\x02 \x01(\tR\x06binary\x12\x16\n" +
-	"\x06domain\x18\x03 \x01(\tR\x06domain\x12\x12\n" +
-	"\x04port\x18\x04 \x01(\rR\x04port\x12\x1b\n" +
-	"\tlocal_url\x18\x05 \x01(\tR\blocalUrl\x12@\n" +
-	"\x1cstartup_timeout_milliseconds\x18\x06 \x01(\x03R\x1astartupTimeoutMilliseconds\x12(\n" +
-	"\rpolicy_parent\x18\a \x01(\tH\x00R\fpolicyParent\x88\x01\x01\x12O\n" +
-	"\vcredentials\x18\b \x01(\v2-.fallout.terminal.config.v1.TunnelCredentialsR\vcredentialsB\x10\n" +
-	"\x0e_policy_parent\"B\n" +
+	"\x1dapplication_support_directory\x18\x03 \x01(\tR\x1bapplicationSupportDirectory\"3\n" +
+	"\x11TunnelCredentialsJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\busernameR\bpassword\"x\n" +
+	"\fTunnelConfigJ\x04\b\x01\x10\tR\aenabledR\x06binaryR\x06domainR\x04portR\tlocal_urlR\x1cstartup_timeout_millisecondsR\rpolicy_parentR\vcredentials\"B\n" +
 	"\rStartupConfig\x121\n" +
 	"\x14timeout_milliseconds\x18\x01 \x01(\x03R\x13timeoutMilliseconds\"\x7f\n" +
 	"\x0eShutdownConfig\x12:\n" +
 	"\x19grace_period_milliseconds\x18\x01 \x01(\x03R\x17gracePeriodMilliseconds\x121\n" +
-	"\x14timeout_milliseconds\x18\x02 \x01(\x03R\x13timeoutMilliseconds\"\xbb\x04\n" +
-	"\x11ApplicationConfig\x12%\n" +
-	"\x0etunnel_enabled\x18\x01 \x01(\bR\rtunnelEnabled\x12S\n" +
+	"\x14timeout_milliseconds\x18\x02 \x01(\x03R\x13timeoutMilliseconds\"\xf6\x03\n" +
+	"\x11ApplicationConfig\x12S\n" +
 	"\rplayer_server\x18\x02 \x01(\v2..fallout.terminal.config.v1.PlayerServerConfigR\fplayerServer\x12R\n" +
 	"\fcoordination\x18\x03 \x01(\v2..fallout.terminal.config.v1.CoordinationConfigR\fcoordination\x12I\n" +
 	"\abrowser\x18\x04 \x01(\v2/.fallout.terminal.config.v1.BrowserClientConfigR\abrowser\x12<\n" +
-	"\x05paths\x18\x05 \x01(\v2&.fallout.terminal.config.v1.PathConfigR\x05paths\x12@\n" +
-	"\x06tunnel\x18\x06 \x01(\v2(.fallout.terminal.config.v1.TunnelConfigR\x06tunnel\x12C\n" +
+	"\x05paths\x18\x05 \x01(\v2&.fallout.terminal.config.v1.PathConfigR\x05paths\x12C\n" +
 	"\astartup\x18\a \x01(\v2).fallout.terminal.config.v1.StartupConfigR\astartup\x12F\n" +
-	"\bshutdown\x18\b \x01(\v2*.fallout.terminal.config.v1.ShutdownConfigR\bshutdownBYZWgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1;configv1b\x06proto3"
+	"\bshutdown\x18\b \x01(\v2*.fallout.terminal.config.v1.ShutdownConfigR\bshutdownJ\x04\b\x01\x10\x02J\x04\b\x06\x10\aR\x0etunnel_enabledR\x06tunnelBYZWgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1;configv1b\x06proto3"
 
 var (
 	file_fallout_terminal_config_v1_config_proto_rawDescOnce sync.Once
@@ -814,19 +705,17 @@ var file_fallout_terminal_config_v1_config_proto_goTypes = []any{
 }
 var file_fallout_terminal_config_v1_config_proto_depIdxs = []int32{
 	0, // 0: fallout.terminal.config.v1.PlayerServerConfig.request_limits:type_name -> fallout.terminal.config.v1.PublicRequestLimits
-	5, // 1: fallout.terminal.config.v1.TunnelConfig.credentials:type_name -> fallout.terminal.config.v1.TunnelCredentials
-	1, // 2: fallout.terminal.config.v1.ApplicationConfig.player_server:type_name -> fallout.terminal.config.v1.PlayerServerConfig
-	2, // 3: fallout.terminal.config.v1.ApplicationConfig.coordination:type_name -> fallout.terminal.config.v1.CoordinationConfig
-	3, // 4: fallout.terminal.config.v1.ApplicationConfig.browser:type_name -> fallout.terminal.config.v1.BrowserClientConfig
-	4, // 5: fallout.terminal.config.v1.ApplicationConfig.paths:type_name -> fallout.terminal.config.v1.PathConfig
-	6, // 6: fallout.terminal.config.v1.ApplicationConfig.tunnel:type_name -> fallout.terminal.config.v1.TunnelConfig
-	7, // 7: fallout.terminal.config.v1.ApplicationConfig.startup:type_name -> fallout.terminal.config.v1.StartupConfig
-	8, // 8: fallout.terminal.config.v1.ApplicationConfig.shutdown:type_name -> fallout.terminal.config.v1.ShutdownConfig
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	1, // 1: fallout.terminal.config.v1.ApplicationConfig.player_server:type_name -> fallout.terminal.config.v1.PlayerServerConfig
+	2, // 2: fallout.terminal.config.v1.ApplicationConfig.coordination:type_name -> fallout.terminal.config.v1.CoordinationConfig
+	3, // 3: fallout.terminal.config.v1.ApplicationConfig.browser:type_name -> fallout.terminal.config.v1.BrowserClientConfig
+	4, // 4: fallout.terminal.config.v1.ApplicationConfig.paths:type_name -> fallout.terminal.config.v1.PathConfig
+	7, // 5: fallout.terminal.config.v1.ApplicationConfig.startup:type_name -> fallout.terminal.config.v1.StartupConfig
+	8, // 6: fallout.terminal.config.v1.ApplicationConfig.shutdown:type_name -> fallout.terminal.config.v1.ShutdownConfig
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_config_v1_config_proto_init() }
@@ -834,7 +723,6 @@ func file_fallout_terminal_config_v1_config_proto_init() {
 	if File_fallout_terminal_config_v1_config_proto != nil {
 		return
 	}
-	file_fallout_terminal_config_v1_config_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

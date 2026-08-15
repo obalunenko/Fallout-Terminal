@@ -1,5 +1,8 @@
 # Private Desktop Contract: Public Access
 
+**Bugfix**: 2026-08-15 — BUG-001 replaces player-policy activation/deactivation with protected
+endpoint publication, URL withdrawal, and endpoint/Agent close sequencing.
+
 ## Contract source and isolation
 
 Add `proto/fallout/terminal/private/v1/public_access.proto`. It may import the non-secret
@@ -144,10 +147,11 @@ start.
 ### SavePublicAccessSettings
 
 Validates all non-secret and ephemeral secret inputs before mutation. If public access is starting
-or ready, it first advances generation, deactivates public policy, and closes the old endpoint.
-Then it applies Keychain mutations and atomically writes non-secret settings. If the old runtime was
-active and the complete new revision is valid, it starts one replacement; otherwise it remains
-disabled/failed. No old and new endpoint may accept concurrently.
+or ready, it first advances generation, ~~deactivates public policy~~ **BUG-001** withdraws the URL,
+and closes the old endpoint/Agent. Then it applies Keychain mutations and atomically writes
+non-secret settings. If the old runtime was active and the complete new revision is valid, it starts
+one replacement; otherwise it remains disabled/failed. No old and new endpoint may accept
+concurrently.
 
 ### GeneratePlayerPassword
 
@@ -158,13 +162,16 @@ sequence as another setting change. The named event and all later calls expose p
 ### StartPublicAccess
 
 Requires current revision plus present token/password. It is idempotent for the same current
-starting/ready intent. It publishes no URL until endpoint URL validation and exact-host policy
-activation both succeed.
+starting/ready intent. It publishes no URL until ~~endpoint URL validation and exact-host policy
+activation both succeed~~ **BUG-001** the policy-protected endpoint has been created and its URL has
+passed validation.
 
 ### StopPublicAccess
 
-Is idempotent and joins an existing stop. It atomically disables public acceptance before endpoint
-close and clears URL before reporting disabled. Repeated calls do not extend the shared deadline.
+Is idempotent and joins an existing stop. It ~~atomically disables public acceptance before endpoint
+close~~ **BUG-001** withdraws the URL before closing the endpoint/Agent; endpoint close is the public
+admission shutdown boundary. It clears the URL before reporting disabled. Repeated calls do not
+extend the shared deadline.
 
 ## Frontend handling and Copy
 

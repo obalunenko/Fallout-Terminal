@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1620,6 +1623,16 @@ type callRecorder struct {
 	calls []string
 }
 
+func countRecordedCall(calls []string, want string) int {
+	count := 0
+	for _, call := range calls {
+		if call == want {
+			count++
+		}
+	}
+	return count
+}
+
 type contextCapturingPlayer struct {
 	info              domain.ServerInfo
 	startContext      context.Context
@@ -2200,4 +2213,524 @@ func (desktop *recordingDesktop) Ready(context.Context) error {
 func (desktop *recordingDesktop) Close(context.Context) error {
 	desktop.recorder.Add("desktop:close")
 	return nil
+}
+
+type recordingPublicAccessCore struct {
+	recorder           *callRecorder
+	snapshot           tunnelservice.PublicAccessSnapshot
+	start              tunnelservice.PublicAccessResult
+	stop               tunnelservice.PublicAccessResult
+	reconfigureResults []tunnelservice.PublicAccessResult
+	reconfigures       []recordedPublicAccessMutation
+	starts             int
+	stops              int
+	shutdowns          int
+	shutdownErrors     []error
+}
+
+type recordedPublicAccessMutation struct {
+	ExpectedRevision         uint64
+	Preferences              tunnelservice.PublicAccessPreferences
+	ProviderReplacementBytes int
+	DeleteProviderToken      bool
+	PasswordReplacementBytes int
+	DeletePlayerPassword     bool
+}
+
+func (core *recordingPublicAccessCore) Initialize(context.Context) tunnelservice.PublicAccessSnapshot {
+	core.recorder.Add("public:initialize")
+	return core.snapshot
+}
+
+func (core *recordingPublicAccessCore) Snapshot() tunnelservice.PublicAccessSnapshot {
+	return core.snapshot
+}
+
+func (core *recordingPublicAccessCore) Start(_ context.Context, _ uint64) tunnelservice.PublicAccessResult {
+	core.recorder.Add("public:start")
+	core.starts++
+	core.snapshot = core.start.Snapshot
+	return core.start
+}
+
+func (core *recordingPublicAccessCore) Stop(_ context.Context, _ uint64) tunnelservice.PublicAccessResult {
+	core.recorder.Add("public:stop")
+	core.stops++
+	core.snapshot = core.stop.Snapshot
+	return core.stop
+}
+
+func (core *recordingPublicAccessCore) Reconfigure(_ context.Context, mutation tunnelservice.PublicAccessMutation) tunnelservice.PublicAccessResult {
+	core.recorder.Add("public:reconfigure")
+	core.reconfigures = append(core.reconfigures, recordedPublicAccessMutation{
+		ExpectedRevision: mutation.ExpectedRevision, Preferences: mutation.Preferences,
+		ProviderReplacementBytes: len(mutation.ProviderToken.Replacement), DeleteProviderToken: mutation.ProviderToken.Delete,
+		PasswordReplacementBytes: len(mutation.PlayerPassword.Replacement), DeletePlayerPassword: mutation.PlayerPassword.Delete,
+	})
+	if len(core.reconfigureResults) == 0 {
+		return tunnelservice.PublicAccessResult{Error: tunnelservice.ErrorProviderFailure.SafeMessage(), Snapshot: core.snapshot}
+	}
+	result := core.reconfigureResults[0]
+	core.reconfigureResults = core.reconfigureResults[1:]
+	core.snapshot = result.Snapshot
+	return result
+}
+
+func (core *recordingPublicAccessCore) Shutdown(context.Context) error {
+	core.recorder.Add("public:shutdown")
+	core.shutdowns++
+	if len(core.shutdownErrors) > 0 {
+		err := core.shutdownErrors[0]
+		core.shutdownErrors = core.shutdownErrors[1:]
+		return err
+	}
+	return nil
+}
+
+func TestEmbeddedPublicAccessIsExplicitAfterLocalReadinessAndPublishesOnlyReadyResult(t *testing.T) {
+	recorder := &callRecorder{}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	preferences.Revision = 4
+	disabled := tunnelservice.PublicAccessSnapshot{Preferences: preferences, Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: 4}}
+	ready := disabled
+	ready.Status = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleReady, Generation: 1, SettingsRevision: 4, PublicURL: "https://public.example"}
+	core := &recordingPublicAccessCore{
+		recorder: recorder, snapshot: disabled,
+		start: tunnelservice.PublicAccessResult{OK: true, Snapshot: ready},
+		stop:  tunnelservice.PublicAccessResult{OK: true, Snapshot: disabled},
+	}
+	player := &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690}}
+	events := &recordingEventSink{recorder: recorder}
+	app := NewAppWithDependencies(AppDependencies{Player: player, Events: events, PublicAccess: core})
+	require.NoError(t, app.Start(t.Context()))
+	assert.Equal(t, 0, core.starts)
+	calls := recorder.Calls()
+	assert.Less(t, slices.Index(calls, "player:start"), slices.Index(calls, "public:initialize"))
+
+	result := app.StartPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 4})
+	require.True(t, result.OK, result.Error)
+	assert.Equal(t, "https://public.example", result.Snapshot.Status.PublicURL)
+	assert.Equal(t, 1, core.starts)
+	records := events.Records()
+	require.NotEmpty(t, records)
+	assert.Equal(t, publicAccessStatusEvent, records[len(records)-1].Name)
+	assert.Equal(t, "https://public.example", records[len(records)-1].Payload.(PublicAccessSnapshot).Status.PublicURL)
+
+	stopped := app.StopPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 4})
+	require.True(t, stopped.OK, stopped.Error)
+	assert.Empty(t, stopped.Snapshot.Status.PublicURL)
+	assert.Equal(t, 1, core.stops)
+}
+
+func TestEmbeddedPublicAccessFailurePreservesAuthoritativeLocalServerInfo(t *testing.T) {
+	recorder := &callRecorder{}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	failed := tunnelservice.PublicAccessSnapshot{
+		Preferences: preferences,
+		Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleFailed, Generation: 1, ErrorCategory: tunnelservice.ErrorNetworkUnavailable, ErrorMessage: tunnelservice.ErrorNetworkUnavailable.SafeMessage()},
+	}
+	core := &recordingPublicAccessCore{
+		recorder: recorder,
+		snapshot: tunnelservice.PublicAccessSnapshot{Preferences: preferences, Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled}},
+		start:    tunnelservice.PublicAccessResult{Error: tunnelservice.ErrorNetworkUnavailable.SafeMessage(), Snapshot: failed},
+	}
+	local := domain.ServerInfo{URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690}
+	app := NewAppWithDependencies(AppDependencies{Player: &recordingPlayerServer{recorder: recorder, info: local}, Events: &recordingEventSink{recorder: recorder}, PublicAccess: core})
+	require.NoError(t, app.Start(t.Context()))
+	result := app.StartPublicAccess(PublicAccessCommandPayload{})
+	require.False(t, result.OK)
+	assert.Equal(t, "error", result.Snapshot.Status.State)
+	assert.Empty(t, app.GetRuntimeStatus().StartupError)
+	require.Eventually(t, func() bool {
+		info := app.GetRuntimeStatus().ServerInfo
+		return info != nil && *info == local
+	}, time.Second, time.Millisecond)
+}
+
+func TestEmbeddedPublicAccessFailureMatrixKeepsLocalServerAuthoritative(t *testing.T) {
+	categories := []tunnelservice.ErrorCategory{
+		tunnelservice.ErrorProviderAuthentication,
+		tunnelservice.ErrorNetworkUnavailable,
+		tunnelservice.ErrorTimeout,
+		tunnelservice.ErrorDomainUnavailable,
+		tunnelservice.ErrorSecretStoreLocked,
+		tunnelservice.ErrorSecretStoreDenied,
+		tunnelservice.ErrorSecretStoreUnavailable,
+		tunnelservice.ErrorProviderFailure,
+	}
+	for index, category := range categories {
+		t.Run(fmt.Sprintf("category-%d", index+1), func(t *testing.T) {
+			recorder := &callRecorder{}
+			preferences := tunnelservice.DefaultPublicAccessPreferences()
+			disabled := tunnelservice.PublicAccessSnapshot{
+				Preferences: preferences,
+				Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled},
+			}
+			failed := disabled
+			failed.Status = tunnelservice.PublicAccessStatus{
+				State: tunnelservice.LifecycleFailed, Generation: 1,
+				ErrorCategory: category, ErrorMessage: category.SafeMessage(),
+			}
+			ready := disabled
+			ready.Status = tunnelservice.PublicAccessStatus{
+				State: tunnelservice.LifecycleReady, Generation: 2,
+				PublicURL: "https://recovered.example",
+			}
+			core := &recordingPublicAccessCore{
+				recorder: recorder, snapshot: disabled,
+				start: tunnelservice.PublicAccessResult{Error: category.SafeMessage(), Snapshot: failed},
+			}
+			local := domain.ServerInfo{
+				URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
+			}
+			app := NewAppWithDependencies(AppDependencies{
+				Player: &recordingPlayerServer{recorder: recorder, info: local},
+				Events: &recordingEventSink{recorder: recorder}, PublicAccess: core,
+			})
+			require.NoError(t, app.Start(t.Context()))
+			failedResult := app.StartPublicAccess(PublicAccessCommandPayload{})
+			require.False(t, failedResult.OK)
+			assert.Equal(t, local, *app.GetRuntimeStatus().ServerInfo)
+
+			core.start = tunnelservice.PublicAccessResult{OK: true, Snapshot: ready}
+			recovered := app.StartPublicAccess(PublicAccessCommandPayload{})
+			require.True(t, recovered.OK, recovered.Error)
+			assert.Equal(t, "https://recovered.example", recovered.Snapshot.Status.PublicURL)
+			runtimeInfo := app.GetRuntimeStatus().ServerInfo
+			require.NotNil(t, runtimeInfo)
+			assert.Equal(t, "https://recovered.example", runtimeInfo.URL)
+			assert.Equal(t, local.URL, runtimeInfo.LocalURL)
+			assert.True(t, runtimeInfo.Tunnel)
+			assert.Equal(t, 1, countRecordedCall(recorder.Calls(), "player:start"))
+		})
+	}
+}
+
+type fallbackMatrixSettings struct {
+	preferences tunnelservice.PublicAccessPreferences
+}
+
+func (settings *fallbackMatrixSettings) Load() (tunnelservice.PublicAccessPreferences, error) {
+	return settings.preferences, nil
+}
+
+func (settings *fallbackMatrixSettings) Save(preferences tunnelservice.PublicAccessPreferences) error {
+	settings.preferences = preferences
+	return nil
+}
+
+type fallbackMatrixEndpoint struct {
+	mu         sync.Mutex
+	url        *url.URL
+	done       chan struct{}
+	doneOnce   sync.Once
+	closeErrs  []error
+	closeCalls int
+	closed     bool
+	service    *fallbackMatrixTunnel
+}
+
+func (endpoint *fallbackMatrixEndpoint) URL() *url.URL {
+	endpoint.mu.Lock()
+	defer endpoint.mu.Unlock()
+	if endpoint.url == nil {
+		return nil
+	}
+	copyURL := *endpoint.url
+	return &copyURL
+}
+
+func (endpoint *fallbackMatrixEndpoint) Done() <-chan struct{} { return endpoint.done }
+
+func (endpoint *fallbackMatrixEndpoint) Complete() {
+	endpoint.doneOnce.Do(func() { close(endpoint.done) })
+}
+
+func (endpoint *fallbackMatrixEndpoint) Close(context.Context) error {
+	endpoint.mu.Lock()
+	index := endpoint.closeCalls
+	endpoint.closeCalls++
+	if index < len(endpoint.closeErrs) && endpoint.closeErrs[index] != nil {
+		err := endpoint.closeErrs[index]
+		endpoint.mu.Unlock()
+		return err
+	}
+	if endpoint.closed {
+		endpoint.mu.Unlock()
+		return nil
+	}
+	endpoint.closed = true
+	endpoint.url = nil
+	endpoint.mu.Unlock()
+	endpoint.Complete()
+	endpoint.service.closed()
+	return nil
+}
+
+type fallbackMatrixTunnel struct {
+	mu        sync.Mutex
+	endpoints []*fallbackMatrixEndpoint
+	starts    int
+	active    int
+	maxActive int
+}
+
+func newFallbackMatrixTunnel(closeErrors ...error) *fallbackMatrixTunnel {
+	service := &fallbackMatrixTunnel{}
+	for index := range 2 {
+		endpointURL, err := url.Parse(fmt.Sprintf("https://recovery-%d.example", index+1))
+		if err != nil {
+			panic(err)
+		}
+		endpoint := &fallbackMatrixEndpoint{url: endpointURL, done: make(chan struct{}), service: service}
+		if index == 0 {
+			endpoint.closeErrs = append([]error(nil), closeErrors...)
+		}
+		service.endpoints = append(service.endpoints, endpoint)
+	}
+	return service
+}
+
+func (service *fallbackMatrixTunnel) Start(_ context.Context, request tunnelservice.TunnelStartRequest) (tunnelservice.TunnelEndpoint, error) {
+	defer request.Clear()
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	if service.starts >= len(service.endpoints) {
+		return nil, errors.New("synthetic exhausted schedule")
+	}
+	endpoint := service.endpoints[service.starts]
+	service.starts++
+	service.active++
+	service.maxActive = max(service.maxActive, service.active)
+	return endpoint, nil
+}
+
+func (service *fallbackMatrixTunnel) closed() {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	service.active--
+}
+
+func TestUnexpectedPublicEndpointFailureRetainsCleanupOwnershipBeforeRetryWithoutAppRestart(t *testing.T) {
+	recorder := &callRecorder{}
+	local := domain.ServerInfo{URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690}
+	settings := &fallbackMatrixSettings{preferences: tunnelservice.DefaultPublicAccessPreferences()}
+	secrets := testutil.NewFakeSecretStore()
+	require.NoError(t, secrets.Replace(t.Context(), tunnelservice.ProviderAccountToken, []byte("synthetic-account-input")))
+	require.NoError(t, secrets.Replace(t.Context(), tunnelservice.PlayerBasicAuthPassword, []byte("synthetic-player-input")))
+	service := newFallbackMatrixTunnel(errors.New("synthetic first close failure"), nil)
+	var app *App
+	manager, err := tunnelservice.NewPublicAccessManager(tunnelservice.ManagerConfig{
+		Settings: settings, Secrets: secrets, Tunnel: service,
+		UpstreamURL: "http://127.0.0.1:3690",
+		Publish: func(snapshot tunnelservice.PublicAccessSnapshot) {
+			if app != nil {
+				app.acceptPublicAccessSnapshot(snapshot, true)
+			}
+		},
+	})
+	require.NoError(t, err)
+	app = NewAppWithDependencies(AppDependencies{
+		Player: &recordingPlayerServer{recorder: recorder, info: local},
+		Events: &recordingEventSink{recorder: recorder}, PublicAccess: manager,
+	})
+	require.NoError(t, app.Start(t.Context()))
+	require.True(t, app.StartPublicAccess(PublicAccessCommandPayload{}).OK)
+	service.endpoints[0].Complete()
+	require.Eventually(t, func() bool {
+		return manager.Snapshot().Status.State == tunnelservice.LifecycleFailed
+	}, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool {
+		info := app.GetRuntimeStatus().ServerInfo
+		return info != nil && info.URL == local.URL && info.LocalURL == local.LocalURL && !info.Tunnel && info.TunnelError != ""
+	}, time.Second, time.Millisecond)
+
+	recovered := app.StartPublicAccess(PublicAccessCommandPayload{})
+	require.True(t, recovered.OK, recovered.Error)
+	service.mu.Lock()
+	active, maximum := service.active, service.maxActive
+	service.mu.Unlock()
+	assert.Equal(t, 1, active)
+	assert.Equal(t, 1, maximum, "replacement must not overlap an endpoint whose Close needs retry")
+	assert.Equal(t, 1, countRecordedCall(recorder.Calls(), "player:start"))
+}
+
+func TestApplicationShutdownRetriesOnlyFailedPublicCleanupAfterReleasingLaterResources(t *testing.T) {
+	recorder := &callRecorder{}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	core := &recordingPublicAccessCore{
+		recorder: recorder,
+		snapshot: tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences,
+			Status: tunnelservice.PublicAccessStatus{
+				State: tunnelservice.LifecycleReady, Generation: 1, PublicURL: "https://public.example",
+			},
+		},
+		shutdownErrors: []error{errors.New("synthetic endpoint cleanup failure"), nil},
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		PublicAccess: core,
+		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
+			URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
+		}},
+		Sessions: &recordingSessionService{recorder: recorder},
+		Desktop:  &recordingDesktop{recorder: recorder},
+		Events:   &recordingEventSink{recorder: recorder},
+	})
+	require.NoError(t, app.Start(t.Context()))
+	recorder.Reset()
+
+	first := app.Shutdown(t.Context())
+	require.Error(t, first)
+	assert.NotContains(t, first.Error(), "https://public.example")
+	assert.Equal(t, []string{
+		"public:shutdown", "player:stop", "session:shutdown", "desktop:close",
+	}, recorder.Calls())
+
+	require.NoError(t, app.Shutdown(t.Context()))
+	assert.Equal(t, []string{
+		"public:shutdown", "player:stop", "session:shutdown", "desktop:close", "public:shutdown",
+	}, recorder.Calls())
+	assert.Equal(t, 2, core.shutdowns)
+	assert.Equal(t, "stopped", app.lifecyclePhase())
+}
+
+func TestActivePublicAccessMutationsDelegateAsProtectedReconfigureWithoutMixedRevision(t *testing.T) {
+	recorder := &callRecorder{}
+	events := &recordingEventSink{recorder: recorder}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	preferences.EnabledPreference = true
+	preferences.Revision = 7
+	ready7 := tunnelservice.PublicAccessSnapshot{
+		Preferences: preferences, ProviderTokenPresence: tunnelservice.SecretPresent, PlayerPasswordPresence: tunnelservice.SecretPresent,
+		Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleReady, Generation: 3, SettingsRevision: 7, PublicURL: "https://before.example"},
+	}
+	preferences8 := preferences
+	preferences8.ReservedDomain = "after.example"
+	preferences8.Username = "friends"
+	preferences8.Revision = 8
+	ready8 := tunnelservice.PublicAccessSnapshot{
+		Preferences: preferences8, ProviderTokenPresence: tunnelservice.SecretPresent, PlayerPasswordPresence: tunnelservice.SecretPresent,
+		Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleReady, Generation: 5, SettingsRevision: 8, PublicURL: "https://after.example"},
+	}
+	preferences9 := preferences8
+	preferences9.Revision = 9
+	ready9 := ready8
+	ready9.Preferences = preferences9
+	ready9.Status = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleReady, Generation: 7, SettingsRevision: 9, PublicURL: "https://after.example"}
+	preferences10 := preferences9
+	preferences10.Revision = 10
+	preferences10.ProviderTokenPresentHint = false
+	disabled10 := tunnelservice.PublicAccessSnapshot{
+		Preferences: preferences10, ProviderTokenPresence: tunnelservice.SecretAbsent, PlayerPasswordPresence: tunnelservice.SecretPresent,
+		Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: 9, SettingsRevision: 10},
+	}
+	core := &recordingPublicAccessCore{
+		recorder: recorder, snapshot: ready7,
+		reconfigureResults: []tunnelservice.PublicAccessResult{
+			{OK: true, Snapshot: ready8}, {OK: true, Snapshot: ready9}, {OK: true, Snapshot: disabled10},
+		},
+		start: tunnelservice.PublicAccessResult{
+			Error: tunnelservice.ErrorCredentialMissing.SafeMessage(),
+			Snapshot: tunnelservice.PublicAccessSnapshot{
+				Preferences: preferences10, ProviderTokenPresence: tunnelservice.SecretAbsent, PlayerPasswordPresence: tunnelservice.SecretPresent,
+				Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleFailed, Generation: 10, SettingsRevision: 10, ErrorCategory: tunnelservice.ErrorCredentialMissing, ErrorMessage: tunnelservice.ErrorCredentialMissing.SafeMessage()},
+			},
+		},
+	}
+	app := NewAppWithDependencies(AppDependencies{PublicAccess: core, Events: events, PasswordEntropy: strings.NewReader(strings.Repeat("g", 32))})
+
+	saved := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+		ExpectedRevision: 7, EnabledPreference: true, ReservedDomain: "after.example", Username: "friends",
+		ReplacementProviderToken: "synthetic-provider-rotation", ReplacementPlayerPassword: "synthetic-player-rotation",
+	})
+	require.True(t, saved.OK, saved.Error)
+	assert.Equal(t, uint64(8), saved.Snapshot.Preferences.Revision)
+	assert.Equal(t, uint64(8), saved.Snapshot.Status.SettingsRevision)
+	assert.Equal(t, "https://after.example", saved.Snapshot.Status.PublicURL)
+	require.Len(t, core.reconfigures, 1)
+	assert.Equal(t, uint64(7), core.reconfigures[0].ExpectedRevision)
+	assert.Equal(t, "after.example", core.reconfigures[0].Preferences.ReservedDomain)
+	assert.Equal(t, "friends", core.reconfigures[0].Preferences.Username)
+	assert.Positive(t, core.reconfigures[0].ProviderReplacementBytes)
+	assert.Positive(t, core.reconfigures[0].PasswordReplacementBytes)
+
+	generated := app.GeneratePlayerPassword(PublicAccessCommandPayload{ExpectedRevision: 8})
+	require.True(t, generated.OK, generated.Error)
+	assert.NotEmpty(t, generated.GeneratedPassword)
+	assert.Equal(t, uint64(9), generated.SettingsRevision)
+	require.Len(t, core.reconfigures, 2)
+	assert.Zero(t, core.reconfigures[1].ProviderReplacementBytes)
+	assert.GreaterOrEqual(t, core.reconfigures[1].PasswordReplacementBytes, 16)
+
+	deleted := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+		ExpectedRevision: 9, EnabledPreference: true, ReservedDomain: "after.example", Username: "friends", DeleteProviderToken: true,
+	})
+	require.True(t, deleted.OK, deleted.Error)
+	assert.Equal(t, "absent", deleted.Snapshot.ProviderTokenPresence)
+	assert.Equal(t, "stopped", deleted.Snapshot.Status.State)
+	require.Len(t, core.reconfigures, 3)
+	assert.True(t, core.reconfigures[2].DeleteProviderToken)
+
+	blocked := app.StartPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 10})
+	require.False(t, blocked.OK)
+	assert.Equal(t, "credential_missing", blocked.Snapshot.Status.ErrorCategory)
+	assert.Empty(t, blocked.Snapshot.Status.PublicURL)
+
+	calls := recorder.Calls()
+	assert.Less(t, slices.Index(calls, "public:reconfigure"), slices.Index(calls, "event:"+publicAccessStatusEvent))
+}
+
+func TestPartialPublicAccessMutationFailureUsesReconciledPresenceAndNeverRestartsMixedRevision(t *testing.T) {
+	for _, test := range []struct {
+		name             string
+		providerPresence tunnelservice.SecretPresence
+		passwordPresence tunnelservice.SecretPresence
+		providerState    string
+		passwordState    string
+		category         tunnelservice.ErrorCategory
+	}{
+		{name: "second Keychain mutation fails", providerPresence: tunnelservice.SecretPresent, passwordPresence: tunnelservice.SecretAbsent, providerState: "present", passwordState: "absent", category: tunnelservice.ErrorSecretStoreDenied},
+		{name: "settings commit fails after Keychain mutations", providerPresence: tunnelservice.SecretPresent, passwordPresence: tunnelservice.SecretPresent, providerState: "present", passwordState: "present", category: tunnelservice.ErrorSettingsCorrupt},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := &callRecorder{}
+			events := &recordingEventSink{recorder: recorder}
+			preferences := tunnelservice.DefaultPublicAccessPreferences()
+			preferences.Revision = 7
+			failed := tunnelservice.PublicAccessSnapshot{
+				Preferences: preferences, ProviderTokenPresence: test.providerPresence, PlayerPasswordPresence: test.passwordPresence,
+				Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleFailed, Generation: 5, SettingsRevision: 7, ErrorCategory: test.category, ErrorMessage: test.category.SafeMessage()},
+			}
+			core := &recordingPublicAccessCore{
+				recorder: recorder,
+				snapshot: tunnelservice.PublicAccessSnapshot{
+					Preferences: preferences, ProviderTokenPresence: tunnelservice.SecretPresent, PlayerPasswordPresence: tunnelservice.SecretPresent,
+					Status: tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleReady, Generation: 3, SettingsRevision: 7, PublicURL: "https://before.example"},
+				},
+				reconfigureResults: []tunnelservice.PublicAccessResult{{Error: test.category.SafeMessage(), Snapshot: failed}},
+			}
+			app := NewAppWithDependencies(AppDependencies{PublicAccess: core, Events: events})
+			result := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+				ExpectedRevision: 7, EnabledPreference: true, Username: "friends",
+				ReplacementProviderToken: "synthetic-provider-rotation", ReplacementPlayerPassword: "synthetic-player-rotation",
+			})
+			require.False(t, result.OK)
+			assert.Equal(t, test.category.SafeMessage(), result.Error)
+			assert.Equal(t, uint64(7), result.Snapshot.Preferences.Revision)
+			assert.Equal(t, uint64(7), result.Snapshot.Status.SettingsRevision)
+			assert.Empty(t, result.Snapshot.Status.PublicURL)
+			assert.Equal(t, test.providerState, result.Snapshot.ProviderTokenPresence)
+			assert.Equal(t, test.passwordState, result.Snapshot.PlayerPasswordPresence)
+			assert.Zero(t, core.starts)
+			require.NotEmpty(t, events.Records())
+			assert.Equal(t, result.Snapshot, events.Records()[len(events.Records())-1].Payload)
+		})
+	}
+}
+
+func TestPublicAccessCompositionUsesDirectExistingPlayerTarget(t *testing.T) {
+	route := publicAccessCompositionRoute()
+	assert.Equal(t, tunnelservice.PlayerUpstreamAddress, route.PlayerTarget)
+	assert.Equal(t, "http://127.0.0.1:3690", route.UpstreamURL)
 }

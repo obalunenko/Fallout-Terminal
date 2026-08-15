@@ -10,7 +10,41 @@ const state = globalThis.__desktopFixtureState ??= {
   },
   statusPromise: null,
   resolveStatus: null,
+  publicAccess: {
+    preferences: { version: 1, enabledPreference: false, reservedDomain: '', username: 'players', revision: 0 },
+    providerTokenPresence: 'absent',
+    playerPasswordPresence: 'absent',
+    status: { state: 'disabled', generation: 0, settingsRevision: 0 },
+  },
+  publicAccessPromise: null,
+  resolvePublicAccess: null,
+  savePublicAccessPromise: null,
+  resolveSavePublicAccess: null,
+  pendingSavePublicAccess: null,
 };
+
+const durablePublicAccess = (() => {
+  try {
+    if (globalThis.name?.startsWith('fallout-fixture-public-access:')) {
+      return JSON.parse(globalThis.name.slice('fallout-fixture-public-access:'.length));
+    }
+    const raw = globalThis.localStorage?.getItem('fallout-fixture-public-access');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+})();
+if (durablePublicAccess?.preferences) state.publicAccess = durablePublicAccess;
+
+function persistPublicAccess() {
+  try {
+    const serialized = JSON.stringify(state.publicAccess);
+    globalThis.name = `fallout-fixture-public-access:${serialized}`;
+    globalThis.localStorage?.setItem('fallout-fixture-public-access', serialized);
+  } catch {
+    // The fixture remains usable when browser storage is unavailable.
+  }
+}
 
 function record(method, args) {
   state.calls.push({ method, args });
@@ -21,6 +55,9 @@ globalThis.__desktopFixture = {
   calls: state.calls,
   timeline: state.calls,
   emit(name, data) {
+	if (name === 'public-access-status' && data?.preferences && data?.status) {
+	  state.publicAccess = structuredClone(data);
+	}
     for (const callback of state.listeners.get(name) ?? []) callback({ data });
   },
   deferStatus() {
@@ -31,7 +68,28 @@ globalThis.__desktopFixture = {
     state.resolveStatus = null;
   },
   setStatus(status) { state.status = status; },
+  deferPublicAccess() {
+    state.publicAccessPromise = new Promise(resolve => { state.resolvePublicAccess = resolve; });
+  },
+  resolvePublicAccess(snapshot = state.publicAccess) {
+    state.resolvePublicAccess?.(snapshot);
+    state.resolvePublicAccess = null;
+    state.publicAccessPromise = null;
+  },
   releaseCount(name) { return state.releases.get(name) ?? 0; },
+  deferSavePublicAccess() {
+    state.savePublicAccessPromise = new Promise(resolve => { state.resolveSavePublicAccess = resolve; });
+  },
+  resolveSavePublicAccess(result = state.pendingSavePublicAccess) {
+    if (result?.snapshot) {
+      state.publicAccess = structuredClone(result.snapshot);
+      persistPublicAccess();
+    }
+    state.resolveSavePublicAccess?.(result);
+    state.resolveSavePublicAccess = null;
+    state.savePublicAccessPromise = null;
+    state.pendingSavePublicAccess = null;
+  },
 };
 
 export const Events = {
@@ -53,6 +111,81 @@ export const Events = {
 export function GetRuntimeStatus() {
   state.calls.push({ method: 'GetRuntimeStatus', args: [] });
   return state.statusPromise ?? Promise.resolve(state.status);
+}
+
+function snapshot() {
+  return structuredClone(state.publicAccess);
+}
+
+export function GetPublicAccess() {
+  state.calls.push({ method: 'GetPublicAccess', args: [] });
+  return state.publicAccessPromise ?? Promise.resolve(snapshot());
+}
+
+export function SavePublicAccessSettings(request) {
+  const proposed = request && typeof request === 'object' ? request : {};
+  const providerReplacement = proposed.replacementProviderToken;
+  const passwordReplacement = proposed.replacementPlayerPassword;
+  const retained = {
+    expectedRevision: proposed.expectedRevision,
+    enabledPreference: proposed.enabledPreference,
+    reservedDomain: proposed.reservedDomain,
+    username: proposed.username,
+    replacementProviderToken: '',
+    deleteProviderToken: proposed.deleteProviderToken === true,
+    replacementPlayerPassword: '',
+    deletePlayerPassword: proposed.deletePlayerPassword === true,
+  };
+  state.calls.push({ method: 'SavePublicAccessSettings', args: [retained] });
+  const revision = state.publicAccess.preferences.revision + 1;
+  const nextPublicAccess = {
+    preferences: {
+      version: 1,
+      enabledPreference: proposed.enabledPreference === true,
+      reservedDomain: typeof proposed.reservedDomain === 'string' ? proposed.reservedDomain : '',
+      username: typeof proposed.username === 'string' && proposed.username ? proposed.username : 'players',
+      revision,
+    },
+    providerTokenPresence: proposed.deleteProviderToken ? 'absent' : (providerReplacement ? 'present' : state.publicAccess.providerTokenPresence),
+    playerPasswordPresence: proposed.deletePlayerPassword ? 'absent' : (passwordReplacement ? 'present' : state.publicAccess.playerPasswordPresence),
+    status: { state: 'disabled', generation: state.publicAccess.status.generation + 1, settingsRevision: revision },
+  };
+  const result = { ok: true, snapshot: structuredClone(nextPublicAccess) };
+  if (state.savePublicAccessPromise) {
+    state.pendingSavePublicAccess = result;
+    return state.savePublicAccessPromise;
+  }
+  state.publicAccess = nextPublicAccess;
+  persistPublicAccess();
+  return Promise.resolve(result);
+}
+
+export function GeneratePlayerPassword(request) {
+  state.calls.push({ method: 'GeneratePlayerPassword', args: [{ expectedRevision: request?.expectedRevision ?? 0 }] });
+  const revision = state.publicAccess.preferences.revision + 1;
+  state.publicAccess.preferences.revision = revision;
+  state.publicAccess.playerPasswordPresence = 'present';
+  state.publicAccess.status = { state: 'disabled', generation: state.publicAccess.status.generation + 1, settingsRevision: revision };
+	  persistPublicAccess();
+  return Promise.resolve({ ok: true, generatedPassword: 'synthetic-one-time-generated-value', settingsRevision: revision });
+}
+
+export function StartPublicAccess(request) {
+  state.calls.push({ method: 'StartPublicAccess', args: [{ expectedRevision: request?.expectedRevision ?? 0 }] });
+  state.publicAccess.status = {
+    state: 'ready', generation: state.publicAccess.status.generation + 1,
+    settingsRevision: state.publicAccess.preferences.revision, publicUrl: 'https://fixture.example',
+  };
+  return Promise.resolve({ ok: true, snapshot: snapshot() });
+}
+
+export function StopPublicAccess(request) {
+  state.calls.push({ method: 'StopPublicAccess', args: [{ expectedRevision: request?.expectedRevision ?? 0 }] });
+  state.publicAccess.status = {
+    state: 'disabled', generation: state.publicAccess.status.generation + 1,
+    settingsRevision: state.publicAccess.preferences.revision,
+  };
+  return Promise.resolve({ ok: true, snapshot: snapshot() });
 }
 
 export const AddCharacter = (...args) => record('AddCharacter', args);

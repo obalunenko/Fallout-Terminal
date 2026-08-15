@@ -114,12 +114,14 @@ func packageSteps() []Step {
 	executable := filepath.Join(macOS, applicationName)
 
 	return []Step{
+		commandStep("verify embedded dependency and license inventory", filepath.Join("scripts", "dependency-license-check.sh")),
 		{Name: "remove previous application bundle", Operation: removeTree, Path: app},
 		{Name: "create application executable directory", Operation: makeDirectory, Path: macOS, Mode: 0o755},
 		{Name: "create bundled session directory", Operation: makeDirectory, Path: filepath.Join(resources, "sessions"), Mode: 0o755},
 		{Name: "install application metadata", Operation: copyFile, Source: filepath.Join("build", "darwin", "Info.plist"), Destination: filepath.Join(contents, "Info.plist"), Mode: 0o644},
 		commandStep("install application icon", "go", "tool", "-modfile=tools/wails/go.mod", "wails3", "generate", "icons", "-input", filepath.Join("build", "appicon.png"), "-macfilename", filepath.Join(resources, "icon.icns"), "-windowsfilename", filepath.Join(resources, "icon.ico")),
 		{Name: "install bundled demo", Operation: copyFile, Source: filepath.Join("sessions", "demo.json"), Destination: filepath.Join(resources, "sessions", "demo.json"), Mode: 0o444},
+		{Name: "install third-party notices", Operation: copyFile, Source: "THIRD_PARTY_NOTICES.md", Destination: filepath.Join(resources, "THIRD_PARTY_NOTICES.md"), Mode: 0o444},
 		compileStep(executable),
 		{Name: "make application executable", Operation: changeMode, Path: executable, Mode: 0o755},
 		commandStep("sign completed application bundle", "/usr/bin/codesign", "--force", "--deep", "--options", "runtime", "--entitlements", filepath.Join("build", "darwin", "entitlements.plist"), "--sign", "-", app),

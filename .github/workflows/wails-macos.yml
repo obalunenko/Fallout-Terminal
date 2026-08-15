@@ -49,6 +49,14 @@ jobs:
       - name: Run Go vet
         run: go vet ./...
 
+      - name: Verify dependency, license, secret, and pre-cutover legacy diagnostics
+        run: |
+          scripts/dependency-license-check.sh
+          scripts/secret-leak-check.sh --self-test
+          scripts/secret-leak-check.sh
+          scripts/legacy-public-access-check.sh --self-test
+          scripts/legacy-public-access-check.sh --diagnose
+
   frontend-build:
     name: Frontend and player clean builds
     runs-on: macos-15
@@ -247,7 +255,7 @@ jobs:
           npm ci --prefix client
 
       - name: Build clean unsigned arm64 application
-        run: go run ./cmd/build package
+        run: scripts/reproducible-build-check.sh
 
       - name: Verify Apple Silicon application gate
         shell: bash
@@ -262,6 +270,7 @@ jobs:
             echo "Unexpected Developer ID signature on unsigned CI candidate" >&2
             exit 1
           fi
+          scripts/verify-macos-app.sh "${app_path}"
 
       - name: Upload unsigned Apple Silicon app
         uses: actions/upload-artifact@v4

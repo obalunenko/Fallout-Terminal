@@ -1,32 +1,26 @@
 <!--
 Sync Impact Report
-- Version change: 3.3.2 -> 4.0.0
+- Version change: 4.0.0 -> 5.0.0
 - Modified principles:
-  - I. Govern the Accepted Desktop Runtime (accepted Wails v3 runtime and provider-neutral
-    public-access ownership)
-  - II. Make Protobuf the Application Contract Source of Truth (versioned public-access contracts
-    and narrowly bounded private secret inputs/results)
-  - IV. Separate Public and Private Capabilities (atomic external-host authorization and strict
-    secret boundaries)
-  - VII. Complete Cutovers and Remove Superseded Protocols (general bounded cutover rules; feature
-    006 migration exceptions removed)
+  - I. Govern the Accepted Desktop Runtime (personal-use provider-endpoint authorization and
+    withdrawal/close lifecycle replace mandatory application Host/source admission)
+  - IV. Separate Public and Private Capabilities (public authentication may be owned by the
+    provider endpoint while the player service stays capability-safe)
 - Added principles: None
-- Added sections:
-  - Secret and Credential Governance
-- Removed sections:
-  - Feature-006-only coexistence, migration-candidate, cutover-gate, and completion guidance
+- Added sections: None
+- Removed sections: None
 - Expanded guidance:
-  - Exactly pinned Wails v3.0.0-beta.8 is the sole accepted production desktop runtime; Wails v2
-    and Electron migration records are historical only.
-  - `cmd/build` and `internal/buildtool` retain canonical build-graph ownership while a root
-    Makefile may provide only thin, optional aliases.
-  - `internal/tunnel/` owns provider-neutral embedded or owned-process public-access lifecycle,
-    atomic Host authorization, failure isolation, and bounded cleanup.
-  - Production secrets belong only in supported OS secure credential storage, with no readback;
-    one-time generated player-password return is a narrowly governed exception.
-  - Public-access verification covers secure-store failure, leak scans, lifecycle races, stale
-    completion, streaming compatibility, unknown Host rejection, local fallback, packaged smoke,
-    and honest opt-in external-service evidence.
+  - A personal-use public URL MUST be created with its authentication policy before publication;
+    direct local/LAN play remains outside that endpoint and unauthenticated.
+  - A provider endpoint MAY own Basic Auth and routing; the application is not required to infer
+    public ingress from `RemoteAddr`, forwarding headers, or Host.
+  - Stop/reconfigure/failure MUST withdraw the reusable URL and close the endpoint within the
+    existing deadline; a separate deny-before-close mutation is not required when the endpoint is
+    the sole public acceptance boundary.
+  - Player credentials MAY cross transiently into an embedded provider SDK solely to construct the
+    active endpoint policy, while Keychain remains the only application persistence.
+  - Deterministic tests prove policy construction/lifecycle without claiming external reachability;
+    real provider auth/stream checks remain explicit opt-in and honest `NOT RUN` when unavailable.
 - Follow-up TODOs: None
 -->
 # Fallout Terminal Constitution
@@ -89,9 +83,12 @@ dependencies, compatibility, acceptance, rollback, or release decisions.
   testable through deterministic network, provider, and clock fakes. It MUST NOT create a second
   authoritative player server. Local and LAN access MUST remain functional when provider,
   network, account, secure-storage, or public-endpoint operations fail.
-- Before publishing a public URL, the exact external Host and its authorization policy MUST become
-  active atomically. Unknown external Host values MUST be rejected. Stop, reconfiguration, and
-  failure paths MUST disable public acceptance before closing or replacing the endpoint.
+- Before publishing a public URL, its complete provider-endpoint authentication policy MUST be
+  active. For personal-use sharing, the provider endpoint MAY own Basic Auth and public routing;
+  the player application MUST NOT be required to infer public ingress from `RemoteAddr`, forwarding
+  headers, or Host. Stop, reconfiguration, and failure paths MUST withdraw the reusable URL and
+  close the owned endpoint before publishing a replacement. A separate application deny mutation
+  before close is not required when that endpoint is the sole public acceptance boundary.
 - Shutdown MUST release embedded endpoints, any owned external processes separately authorized by
   a feature plan, goroutines, listeners, and temporary secret material within the application's
   current shutdown budget.
@@ -174,11 +171,11 @@ access, or any player-facing route to desktop capabilities.
 Browser-controlled values, file references, runtime commands, and external URLs MUST be validated
 again at the privileged Go boundary. Content Security Policy MUST remain restrictive, and external
 URL handling MUST allowlist HTTP and HTTPS. Public-access mode MUST fail closed without valid
-credentials and supported secure storage. The exact external Host and its authorization policy
-MUST be activated atomically before the public URL is published; every unknown external Host MUST
-be rejected. Stop, reconfiguration, and failure paths MUST disable public acceptance before the
-endpoint is closed or replaced. Local and LAN player access MUST continue independently of public-
-access availability.
+credentials and supported secure storage. A provider-owned endpoint policy MAY protect every
+public static and ConnectRPC request before forwarding while the player service remains unchanged.
+That protected endpoint MUST exist before its URL is published, and its URL MUST be withdrawn when
+the endpoint is stopped, replaced, or fails. Local and LAN player access MUST continue independently
+of public-access availability and MUST NOT be forced through the provider policy.
 
 ### V. Evolve Schemas Safely and Reproducibly
 
@@ -313,6 +310,13 @@ through a narrow private protobuf-defined result exactly once before or during i
 to support an explicit Copy action. This one-time result MUST NOT permit readback of an existing
 secret, publication through a named event, persistence in frontend state or storage, or exposure to
 players.
+
+For an embedded provider endpoint, a scoped account token and player username/password MAY cross
+transiently from the secure-store callback into the pinned provider SDK solely to authenticate the
+Agent and construct the active endpoint policy. The application MUST NOT write provider policy
+secrets to a file, environment variable, process argument, reusable DTO, event, status, diagnostic,
+fixture, or application-managed persistence. Provider-side handling is an explicit external trust
+boundary that the governing feature plan MUST disclose.
 
 Every private request or result that temporarily contains a new secret MUST have the minimum
 possible lifetime, redact errors, prohibit logging and serialization outside that call, and have
@@ -457,9 +461,9 @@ Public-access and secret-handling changes MUST additionally verify:
 - concurrent start, stop, and reconfiguration races; cancellation and time bounds; idempotence;
   stale-completion rejection; and cleanup of endpoints, owned processes, goroutines, listeners, and
   temporary secret material;
-- ConnectRPC server-stream compatibility through public access, exact authorized Host activation,
-  rejection of unknown external Host values, disable-before-close behavior, and preservation of a
-  single authoritative player server;
+- ConnectRPC server-stream compatibility through public access, protected-endpoint-before-URL
+  publication, URL withdrawal plus bounded endpoint close, direct local/LAN continuity, and
+  preservation of a single authoritative player server;
 - a packaged double-click smoke test that requires neither a Terminal nor an external provider
   binary; and
 - real external-service tests only as explicit opt-in checks using user-supplied credentials. When
@@ -478,9 +482,9 @@ automation or credentials are unavailable; unavailable checks MUST be reported, 
 
 Reviews MUST verify production module boundaries, protobuf contract coverage, schema evolution,
 generated-file integrity, persistence compatibility, authoritative synchronization, privileged-
-interface exposure, public-listener security, secret non-disclosure, secure-store isolation, macOS
-storage behavior, local/LAN failure isolation, stale-completion rejection, final cutover cleanup,
-and owned-resource shutdown.
+interface exposure, provider-endpoint authentication, secret non-disclosure, secure-store
+isolation, macOS storage behavior, local/LAN failure isolation, stale-completion rejection, final
+cutover cleanup, and owned-resource shutdown.
 
 ## Development Workflow
 
@@ -494,7 +498,7 @@ and owned-resource shutdown.
    gate, and dependency-pin consistency gate. A migration that needs temporary coexistence MUST
    identify its owner, expiry, parity criteria, immutable rollback reference, and removal gate.
    Public-access plans MUST also identify provider/runtime selection, secure-store ownership,
-   secret lifetime, atomic Host authorization, local fallback, and shutdown obligations.
+   secret lifetime, endpoint authentication ownership, local fallback, and shutdown obligations.
 5. Regenerate pinned Go and ECMAScript code deterministically through the isolated
    `tools/<tool>` modules; never edit generated files or install a global Go tool.
 6. Implement the smallest coherent vertical slice. Keep generated types at boundaries, domain logic
@@ -504,8 +508,8 @@ and owned-resource shutdown.
    governed assertion, table-driven, `t.Context()`, and protobuf-comparison conventions. Run all
    applicable Buf, generation-drift, breaking-change, streaming, privilege-separation, and
    session-compatibility gates. Public-access changes MUST also run secure-store failure, secret-
-   leak, lifecycle-race, stale-completion, unknown-Host, local-fallback, and packaged double-click
-   gates. Record unavailable conditional checks honestly as `NOT RUN`.
+   leak, lifecycle-race, stale-completion, protected-endpoint publication, local-fallback, and
+   packaged double-click gates. Record unavailable conditional checks honestly as `NOT RUN`.
 8. Prove parity and pass package and rollback gates, then remove superseded transports,
    dependencies, fixtures, tests, and active documentation unless a separate compatibility
    requirement explicitly retains them. A cutover MUST remove every superseded runtime import,
@@ -540,4 +544,4 @@ manually edited generated files, schema-breaking field reuse, public capability 
 stored-secret readback, generic bridge dispatchers, Make-owned build graphs, and permanent dual
 protocols without an explicit compatibility requirement.
 
-**Version**: 4.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-15
+**Version**: 5.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-15
