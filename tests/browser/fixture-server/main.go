@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,13 +20,13 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/obalunenko/Fallout-Terminal/internal/live"
 	"github.com/obalunenko/Fallout-Terminal/internal/player"
+	"github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 )
 
 const (
-	fixtureAddress          = "127.0.0.1:34119"
-	protectedFixtureAddress = "127.0.0.1:34120"
-	fixtureEdgeUsername     = "players"
-	fixtureEdgePassword     = "password-long-enough"
+	fixtureAddress      = "127.0.0.1:34119"
+	fixtureEdgeUsername = "players"
+	fixtureEdgePassword = "password-long-enough"
 )
 
 type ids struct{ next atomic.Uint64 }
@@ -37,7 +36,8 @@ type fixtureEdge struct {
 	publicGeneration atomic.Uint64
 	service          *control.Service
 	connect          *player.ConnectService
-	application      http.Handler
+	ingress          tunnel.PublicIngress
+	publicURL        string
 }
 
 type fixtureEdgeStatus struct {
@@ -45,15 +45,23 @@ type fixtureEdgeStatus struct {
 	Upstream               string `json:"upstream"`
 	Active                 bool   `json:"active"`
 	AuthorizationForwarded bool   `json:"authorizationForwarded"`
+	PublicURL              string `json:"publicUrl"`
 }
 
 func (source *ids) Next() string {
 	return fmt.Sprintf("browser-fixture-%d", source.next.Add(1))
 }
 
-func (edge *fixtureEdge) reset() {
+func (edge *fixtureEdge) reset() error {
+	if edge.ingress == nil || edge.ingress.URL() == nil {
+		return errors.New("fixture ingress is unavailable")
+	}
+	if err := edge.ingress.Activate(edge.ingress.URL().Host, fixtureEdgeUsername, []byte(fixtureEdgePassword)); err != nil {
+		return err
+	}
 	edge.active.Store(true)
 	edge.publicGeneration.Store(0)
+	return nil
 }
 
 type publicAccessFixtureSnapshot struct {
@@ -126,51 +134,6 @@ func (edge *fixtureEdge) publicSnapshot(status publicAccessFixtureStatus) public
 	}
 }
 
-func (edge *fixtureEdge) ServeHTTP(response http.ResponseWriter, request *http.Request) {
-	username, password, ok := request.BasicAuth()
-	if !ok || subtle.ConstantTimeCompare([]byte(username), []byte(fixtureEdgeUsername)) != 1 ||
-		subtle.ConstantTimeCompare([]byte(password), []byte(fixtureEdgePassword)) != 1 {
-		response.Header().Set("WWW-Authenticate", `Basic realm="Fallout Terminal Players"`)
-		http.Error(response, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
-	}
-
-	switch {
-	case request.Method == http.MethodGet && request.URL.Path == "/__fixture/edge/status":
-		response.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(response).Encode(fixtureEdgeStatus{
-			AuthBoundary:           "fixture-edge",
-			Upstream:               "http://" + fixtureAddress,
-			Active:                 edge.active.Load(),
-			AuthorizationForwarded: false,
-		})
-		return
-	case request.Method == http.MethodPost && request.URL.Path == "/__fixture/edge/update":
-		edge.update(response)
-		return
-	case request.Method == http.MethodPost && request.URL.Path == "/__fixture/edge/hacking":
-		edge.activateHacking(response)
-		return
-	case request.Method == http.MethodPost && request.URL.Path == "/__fixture/edge/disconnect":
-		edge.connect.CloseSubscriptions()
-		response.WriteHeader(http.StatusNoContent)
-		return
-	case request.Method == http.MethodPost && request.URL.Path == "/__fixture/edge/disable":
-		edge.active.Store(false)
-		edge.connect.CloseSubscriptions()
-		response.WriteHeader(http.StatusNoContent)
-		return
-	}
-
-	if !edge.active.Load() {
-		http.Error(response, http.StatusText(http.StatusGone), http.StatusGone)
-		return
-	}
-	forwarded := request.Clone(request.Context())
-	forwarded.Header.Del("Authorization")
-	edge.application.ServeHTTP(response, forwarded)
-}
-
 func (edge *fixtureEdge) update(response http.ResponseWriter) {
 	updated := fixtureTerminal()
 	updated.Tree.Children[0].Children = append(updated.Tree.Children[0].Children, domain.ContentNode{
@@ -226,9 +189,7 @@ func run() error {
 	}
 	rpcPath, rpcHandler := player.NewConnectHandler(connectPlayer)
 	applicationHandler := player.NewApplicationHandler(playerAssets, rpcPath, rpcHandler)
-	protectedApplicationHandler := player.NewApplicationHandler(playerAssets, rpcPath, rpcHandler)
-	edge := &fixtureEdge{service: service, connect: connectPlayer, application: protectedApplicationHandler}
-	edge.reset()
+	edge := &fixtureEdge{service: service, connect: connectPlayer}
 
 	for _, name := range []string{"Mara", "Boone", "Arcade", "Cass", "Veronica", "Raul", "Lily"} {
 		if _, err := service.AddCharacter(name); err != nil {
@@ -275,7 +236,10 @@ func run() error {
 		http.ServeFile(response, request, "fixtures/desktop-bindings.js")
 	})
 	mux.HandleFunc("POST /__fixture/reset", func(response http.ResponseWriter, _ *http.Request) {
-		edge.reset()
+		if err := edge.reset(); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if _, err := service.EndBroadcast(); err != nil {
 			http.Error(response, err.Error(), http.StatusConflict)
 			return
@@ -322,6 +286,30 @@ func run() error {
 		response.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(response).Encode(edge.publicRecovery())
 	})
+	mux.HandleFunc("GET /__fixture/edge/status", func(response http.ResponseWriter, request *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(fixtureEdgeStatus{
+			AuthBoundary: "application-ingress", Upstream: "http://" + fixtureAddress,
+			Active: edge.active.Load(), AuthorizationForwarded: request.Header.Get("Authorization") != "",
+			PublicURL: edge.publicURL,
+		})
+	})
+	mux.HandleFunc("POST /__fixture/edge/update", func(response http.ResponseWriter, _ *http.Request) {
+		edge.update(response)
+	})
+	mux.HandleFunc("POST /__fixture/edge/hacking", func(response http.ResponseWriter, _ *http.Request) {
+		edge.activateHacking(response)
+	})
+	mux.HandleFunc("POST /__fixture/edge/disconnect", func(response http.ResponseWriter, _ *http.Request) {
+		edge.connect.CloseSubscriptions()
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/edge/disable", func(response http.ResponseWriter, _ *http.Request) {
+		edge.ingress.Deny()
+		edge.active.Store(false)
+		edge.connect.CloseSubscriptions()
+		response.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("/__fixture/protected/", func(response http.ResponseWriter, request *http.Request) {
 		username, password, ok := request.BasicAuth()
 		if !ok || username != fixtureEdgeUsername || password != fixtureEdgePassword {
@@ -339,19 +327,22 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", fixtureAddress, err)
 	}
-	protectedListener, err := net.Listen("tcp4", protectedFixtureAddress)
+	ingress, err := tunnel.NewPublicIngressFactory().Start(context.Background(), "http://"+fixtureAddress)
 	if err != nil {
 		_ = listener.Close()
-		return fmt.Errorf("listen on %s: %w", protectedFixtureAddress, err)
+		return fmt.Errorf("start fixture public ingress: %w", err)
+	}
+	edge.ingress = ingress
+	edge.publicURL = ingress.URL().String()
+	if err := edge.reset(); err != nil {
+		_ = ingress.Close(context.Background())
+		_ = listener.Close()
+		return fmt.Errorf("activate fixture public ingress: %w", err)
 	}
 	httpServer := &http.Server{Handler: mux}
-	protectedHTTPServer := &http.Server{Handler: edge}
-	serveErrors := make(chan error, 2)
+	serveErrors := make(chan error, 1)
 	go func() {
 		serveErrors <- httpServer.Serve(listener)
-	}()
-	go func() {
-		serveErrors <- protectedHTTPServer.Serve(protectedListener)
 	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -367,7 +358,8 @@ func run() error {
 
 	shutdownContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	return errors.Join(httpServer.Shutdown(shutdownContext), protectedHTTPServer.Shutdown(shutdownContext))
+	ingress.Deny()
+	return errors.Join(ingress.Close(shutdownContext), httpServer.Shutdown(shutdownContext))
 }
 
 func fixtureTerminal() domain.TerminalTarget {

@@ -86,10 +86,8 @@ func (forwarder *contractForwarder) closeCalls() int {
 
 func contractStartRequest() TunnelStartRequest {
 	return TunnelStartRequest{
-		UpstreamURL:    "http://" + PlayerUpstreamAddress,
-		AccountToken:   []byte("synthetic-account-input"),
-		PlayerUsername: []byte("players"),
-		PlayerPassword: []byte("synthetic-player-input"),
+		UpstreamURL:  "http://127.0.0.1:41000",
+		AccountToken: []byte("synthetic-account-input"),
 	}
 }
 
@@ -144,14 +142,12 @@ func TestEmbeddedTunnelServiceLifecycleContract(t *testing.T) {
 		service := newNgrokServiceWithFactory(contractAgentFactory{agent: agent})
 		request := contractStartRequest()
 		accountInput := request.AccountToken
-		passwordInput := request.PlayerPassword
 
 		endpoint, err := service.Start(t.Context(), request)
 		require.NoError(t, err)
 		require.NotNil(t, endpoint)
 		assert.Equal(t, "https://random.example", endpoint.URL().String())
 		assert.Equal(t, make([]byte, len(accountInput)), accountInput)
-		assert.Equal(t, make([]byte, len(passwordInput)), passwordInput)
 		assert.Equal(t, (<-chan struct{})(forwarder.done), endpoint.Done())
 
 		results := make(chan error, 16)
@@ -189,6 +185,4 @@ func TestTunnelStartRequestClearRemovesEphemeralSecrets(t *testing.T) {
 	request.Clear()
 
 	require.Nil(t, request.AccountToken)
-	require.Nil(t, request.PlayerUsername)
-	require.Nil(t, request.PlayerPassword)
 }

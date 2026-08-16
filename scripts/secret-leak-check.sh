@@ -133,11 +133,32 @@ check_generated_password_scope() {
     fail 'browser journey does not prove one-time presentation clearing'
 }
 
+check_development_override_scope() {
+  local override="$repository_root/internal/tunnel/test_override.go"
+  [[ -f "$override" ]] || { fail 'development/test public-access override is missing'; return 1; }
+
+  local name
+  for name in \
+    FALLOUT_NGROK_AUTHTOKEN \
+    FALLOUT_NGROK_RESERVED_DOMAIN \
+    FALLOUT_PUBLIC_TEST_USERNAME \
+    FALLOUT_PUBLIC_TEST_PASSWORD; do
+    grep -Fq "$name" "$override" || { fail "approved development override name is missing: $name"; return 1; }
+  done
+  if grep -Fq 'os.Environ' "$override"; then
+    fail 'development override enumerates the process environment'
+    return 1
+  fi
+  grep -Fq 'publicAccessStoresForProfile(publicSettings, publicSecrets, packaged, os.LookupEnv)' \
+    "$repository_root/main.go" || fail 'root composition does not explicitly gate the development override from packaged production'
+}
+
 check_tree() {
   local canary_file="${1:-}"
   check_public_contracts
   check_active_sources
   check_generated_password_scope
+  check_development_override_scope
   if [[ -n "$canary_file" ]]; then
     [[ -s "$canary_file" ]] || { fail 'canary file is missing or empty'; return 1; }
     scan_canary_file "$canary_file"

@@ -5,8 +5,14 @@ const PUBLIC_TEST_URL = process.env.FALLOUT_PUBLIC_TEST_URL;
 const PUBLIC_TEST_USERNAME = process.env.FALLOUT_PUBLIC_TEST_USERNAME;
 const PUBLIC_TEST_PASSWORD = process.env.FALLOUT_PUBLIC_TEST_PASSWORD;
 const PUBLIC_TEST_FIXTURE = process.env.FALLOUT_PUBLIC_TEST_FIXTURE === '1';
-const PROTECTED_FIXTURE_URL = 'http://127.0.0.1:34120';
+const PUBLIC_TEST_HACKING = process.env.FALLOUT_PUBLIC_TEST_HACKING === '1';
 const PROTECTED_AUTHORIZATION = `Basic ${Buffer.from('players:password-long-enough').toString('base64')}`;
+
+async function protectedFixtureURL(request) {
+  const response = await request.get('/__fixture/edge/status');
+  expect(response.status()).toBe(200);
+  return (await response.json()).publicUrl;
+}
 
 test.beforeEach(async ({ request, page }) => {
   await page.addInitScript(() => {
@@ -34,7 +40,8 @@ test('built player contains no legacy JSON protocol or WebSocket constructor', a
 });
 
 test('protected forwarding authenticates static, unary, and streaming capabilities', async ({ browser, request }) => {
-  const protectedURL = PROTECTED_FIXTURE_URL + '/';
+  const protectedOrigin = await protectedFixtureURL(request);
+  const protectedURL = protectedOrigin + '/';
   for (const headers of [{}, { Authorization: `Basic ${Buffer.from('players:wrong-password').toString('base64')}` }]) {
     const response = await request.get(protectedURL, { headers });
     expect(response.status()).toBe(401);
@@ -48,7 +55,7 @@ test('protected forwarding authenticates static, unary, and streaming capabiliti
   expect(await pageResponse.text()).toContain('characterSelect');
 
   const rpcResponse = await request.post(
-    PROTECTED_FIXTURE_URL + '/fallout.terminal.player.v1.PlayerService/SoundManifest',
+    protectedOrigin + '/fallout.terminal.player.v1.PlayerService/SoundManifest',
     {
       headers: { Authorization: authorization, 'Content-Type': 'application/json' },
       data: { category: 'SOUND_CATEGORY_AMBIENT' },
@@ -57,7 +64,7 @@ test('protected forwarding authenticates static, unary, and streaming capabiliti
   expect(rpcResponse.status()).toBe(200);
 
   const unauthorizedSubscribe = await request.post(
-    PROTECTED_FIXTURE_URL + '/fallout.terminal.player.v1.PlayerService/Subscribe',
+    protectedOrigin + '/fallout.terminal.player.v1.PlayerService/Subscribe',
     {
       headers: {
         'Content-Type': 'application/connect+proto',
@@ -89,15 +96,17 @@ test('protected forwarding authenticates static, unary, and streaming capabiliti
 });
 
 test('protected endpoint keeps five clients converged through navigation, hacking, sound, update, and reconnect before stale shutdown', async ({ browser, request }) => {
-  const edgeStatus = await request.get(PROTECTED_FIXTURE_URL + '/__fixture/edge/status', {
+  const protectedOrigin = await protectedFixtureURL(request);
+  const edgeStatus = await request.get(protectedOrigin + '/__fixture/edge/status', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
   expect(edgeStatus.status()).toBe(200);
   expect(await edgeStatus.json()).toEqual({
-    authBoundary: 'fixture-edge',
+    authBoundary: 'application-ingress',
     upstream: 'http://127.0.0.1:34119',
     active: true,
     authorizationForwarded: false,
+    publicUrl: protectedOrigin,
   });
 
   const context = await browser.newContext({
@@ -113,7 +122,7 @@ test('protected endpoint keeps five clients converged through navigation, hackin
     });
   }
 
-  await Promise.all(pages.map(page => page.goto(PROTECTED_FIXTURE_URL + '/')));
+  await Promise.all(pages.map(page => page.goto(protectedOrigin + '/')));
   await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden()));
   const handles = await Promise.all(pages.map(page => page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)));
   expect(new Set(handles).size).toBe(1);
@@ -123,15 +132,15 @@ test('protected endpoint keeps five clients converged through navigation, hackin
   await pages[0].locator('.term-row', { hasText: 'DOCS' }).click();
   await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible()));
   await expect.poll(() => manifestOrigins.length).toBeGreaterThanOrEqual(5);
-  expect(manifestOrigins.every(origin => origin === PROTECTED_FIXTURE_URL)).toBe(true);
+  expect(manifestOrigins.every(origin => origin === protectedOrigin)).toBe(true);
 
-  const update = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/update', {
+  const update = await request.post(protectedOrigin + '/__fixture/edge/update', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
   expect(update.status()).toBe(204);
   await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible()));
 
-  const hacking = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/hacking', {
+  const hacking = await request.post(protectedOrigin + '/__fixture/edge/hacking', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
   expect(hacking.status()).toBe(204);
@@ -141,21 +150,21 @@ test('protected endpoint keeps five clients converged through navigation, hackin
   await guessTarget.click();
   await Promise.all(pages.map(page => expect(page.locator('#hackLog')).not.toHaveText('')));
 
-  const disconnect = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/disconnect', {
+  const disconnect = await request.post(protectedOrigin + '/__fixture/edge/disconnect', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
   expect(disconnect.status()).toBe(204);
   await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden({ timeout: 5_000 })));
   await expect.poll(() => Math.min(...subscribeCounts.values()), { timeout: 5_000 }).toBeGreaterThanOrEqual(2);
 
-  const disable = await request.post(PROTECTED_FIXTURE_URL + '/__fixture/edge/disable', {
+  const disable = await request.post(protectedOrigin + '/__fixture/edge/disable', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
   expect(disable.status()).toBe(204);
-  const stale = await request.get(PROTECTED_FIXTURE_URL + '/', {
+  const stale = await request.get(protectedOrigin + '/', {
     headers: { Authorization: PROTECTED_AUTHORIZATION },
   });
-  expect(stale.status()).toBe(410);
+  expect(stale.status()).toBe(404);
   await context.close();
 });
 
@@ -165,11 +174,85 @@ test.describe('actual authenticated ngrok endpoint', () => {
     'NOT RUN: set FALLOUT_PUBLIC_TEST_URL, FALLOUT_PUBLIC_TEST_USERNAME, and FALLOUT_PUBLIC_TEST_PASSWORD for the real public streaming acceptance journey',
   );
 
-  test('delivers the first snapshot, dismisses the overlay, and reconnects', async ({ browser }) => {
+  test('keeps five packaged clients converged through snapshot, navigation, sound, and reconnect', async ({ browser }) => {
+    test.setTimeout(60_000);
     const context = await browser.newContext({
       httpCredentials: {
         username: PUBLIC_TEST_USERNAME,
         password: PUBLIC_TEST_PASSWORD,
+      },
+      extraHTTPHeaders: {
+        'ngrok-skip-browser-warning': '1',
+      },
+    });
+    const pages = await Promise.all(Array.from({ length: 5 }, () => context.newPage()));
+    const subscribeResponses = new Map(pages.map(page => [page, []]));
+    const manifestOrigins = [];
+    for (const page of pages) {
+      page.on('response', response => {
+        if (response.url().endsWith('/fallout.terminal.player.v1.PlayerService/Subscribe')) {
+          subscribeResponses.get(page).push({
+            status: response.status(),
+            contentType: response.headers()['content-type'] || '',
+          });
+        }
+      });
+      page.on('request', request => {
+        if (request.url().endsWith('/fallout.terminal.player.v1.PlayerService/SoundManifest')) {
+          manifestOrigins.push(new URL(request.url()).origin);
+        }
+      });
+    }
+
+    const firstNavigation = await pages[0].goto(PUBLIC_TEST_URL, { waitUntil: 'domcontentloaded' });
+    expect(firstNavigation?.status()).toBe(200);
+    await expect(pages[0].locator('#screen')).toBeVisible({ timeout: 5_000 });
+    await expect(pages[0].locator('#connOverlay')).toBeHidden({ timeout: 5_000 });
+    const remainingNavigations = await Promise.all(pages.slice(1).map(page => page.goto(PUBLIC_TEST_URL, { waitUntil: 'domcontentloaded' })));
+    expect(remainingNavigations.every(navigation => navigation?.status() === 200)).toBe(true);
+    await Promise.all(pages.slice(1).map(page => expect(page.locator('#screen')).toBeVisible({ timeout: 15_000 })));
+    await Promise.all(pages.slice(1).map(page => expect(page.locator('#connOverlay')).toBeHidden({ timeout: 15_000 })));
+    await Promise.all(pages.map(page => expect.poll(() => page.evaluate(key => Boolean(localStorage.getItem(key)), RECOGNITION_KEY)).toBe(true)));
+    const handles = await Promise.all(pages.map(page => page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)));
+    expect(new Set(handles).size).toBe(1);
+    const selectableCounts = await Promise.all(pages.map(page => page.locator('#characterOptions button:not([disabled])').count()));
+    const controllerIndex = selectableCounts.findIndex(count => count > 0);
+    expect(controllerIndex).toBeGreaterThanOrEqual(0);
+    const controller = pages[controllerIndex];
+    if (await controller.locator('#characterSelect').isVisible()) {
+      await controller.locator('#characterOptions button:not([disabled])').first().click();
+    }
+    await Promise.all(pages.map(page => expect(page.locator('#termList')).toBeVisible()));
+    await controller.locator('.term-row', { hasText: '2' }).click();
+    await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'запись' })).toBeVisible()));
+    await expect.poll(() => manifestOrigins.length).toBeGreaterThanOrEqual(5);
+    expect(manifestOrigins.every(origin => origin === new URL(PUBLIC_TEST_URL).origin)).toBe(true);
+    if (PUBLIC_TEST_FIXTURE) {
+      const update = await pages[0].request.post(new URL('/__fixture/update', PUBLIC_TEST_URL).href);
+      expect(update.status()).toBe(204);
+      await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible()));
+    }
+
+    await Promise.all(pages.map(page => page.reload({ waitUntil: 'domcontentloaded' })));
+    await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden({ timeout: 5_000 })));
+    expect(await Promise.all(pages.map(page => page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)))).toEqual(handles);
+    await expect.poll(() => Math.min(...[...subscribeResponses.values()].map(responses => responses.length))).toBeGreaterThanOrEqual(2);
+    const allSubscribeResponses = [...subscribeResponses.values()].flat();
+    expect(allSubscribeResponses.every(response => response.status === 200)).toBe(true);
+    expect(allSubscribeResponses.every(response => response.contentType === 'application/connect+proto')).toBe(true);
+
+    await context.close();
+  });
+
+  test('streams a packaged hacking guess and reconnects', async ({ browser }) => {
+    test.skip(!PUBLIC_TEST_HACKING, 'NOT RUN: set FALLOUT_PUBLIC_TEST_HACKING=1 with a live hacking terminal');
+    const context = await browser.newContext({
+      httpCredentials: {
+        username: PUBLIC_TEST_USERNAME,
+        password: PUBLIC_TEST_PASSWORD,
+      },
+      extraHTTPHeaders: {
+        'ngrok-skip-browser-warning': '1',
       },
     });
     const page = await context.newPage();
@@ -183,24 +266,20 @@ test.describe('actual authenticated ngrok endpoint', () => {
       }
     });
 
-    await page.goto(PUBLIC_TEST_URL, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 20_000 });
-    await expect.poll(() => page.evaluate(key => Boolean(localStorage.getItem(key)), RECOGNITION_KEY)).toBe(true);
-    await expect(page.locator('#screen')).toBeVisible();
-    if (await page.locator('#characterSelect').isVisible()) {
-      await page.locator('#characterOptions button:not([disabled])').first().click();
-      await expect(page.locator('#termList')).toBeVisible();
-    }
-    if (PUBLIC_TEST_FIXTURE) {
-      await expect(page.locator('#termList')).toBeVisible();
-      const update = await page.request.post(new URL('/__fixture/update', PUBLIC_TEST_URL).href);
-      expect(update.status()).toBe(204);
-      await expect(page.locator('.term-row', { hasText: 'PUBLIC UPDATE' })).toBeVisible();
-    }
+    const navigation = await page.goto(PUBLIC_TEST_URL, { waitUntil: 'domcontentloaded' });
+    expect(navigation?.status()).toBe(200);
+    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 5_000 });
+    await page.locator('#characterOptions button:not([disabled])').first().click();
+    await expect(page.locator('#hackBoard')).toBeVisible();
+    const guess = page.locator('#hackColumns [data-target]:not([data-target=""])').first();
+    await expect(guess).toBeVisible();
+    await guess.click();
+    await expect(page.locator('#hackLog')).not.toHaveText('');
 
     const handle = await page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 20_000 });
+    await expect(page.locator('#connOverlay')).toBeHidden({ timeout: 5_000 });
+    await expect(page.locator('#hackBoard')).toBeVisible();
     expect(await page.evaluate(key => localStorage.getItem(key), RECOGNITION_KEY)).toBe(handle);
     await expect.poll(() => subscribeResponses.length).toBeGreaterThanOrEqual(2);
     expect(subscribeResponses.every(response => response.status === 200)).toBe(true);

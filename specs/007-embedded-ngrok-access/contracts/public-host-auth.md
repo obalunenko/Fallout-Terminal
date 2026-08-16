@@ -6,7 +6,59 @@ source-bound public ingress class.
 **Bugfix**: 2026-08-15 — BUG-001 supersedes the source/Host contract with endpoint Basic Auth after
 the required `127.0.0.2` bind failed on target macOS.
 
-## Current contract (BUG-001)
+**Bugfix**: 2026-08-16 — BUG-003 supersedes endpoint Traffic Policy Basic Auth after a real public
+page loaded but its `Subscribe` stream never delivered the initial snapshot.
+
+**Bugfix**: 2026-08-16 — BUG-003 non-secret username reconciliation distinguishes approved
+username projection from password-only secret confinement.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification correction distinguishes permitted production
+Keychain storage from forbidden application-managed persistence outside Keychain.
+
+## Current contract (BUG-003)
+
+Public authentication is owned by one private application ingress between the ngrok SDK endpoint
+and the unchanged player service.
+
+1. Before endpoint acquisition, lifecycle starts the ingress on an owned loopback-only address in
+   deny-all mode. It exposes no public/LAN listener, game state, or player-service implementation.
+2. The ngrok Agent Endpoint receives only the provider account token and forwards to that ingress
+   without Basic Auth Traffic Policy or player credentials.
+3. After `Forward` returns, lifecycle validates the HTTPS URL and reserved-domain equality, then
+   atomically activates one exact normalized public Host plus scoped username/password on the
+   ingress. The URL remains private until activation succeeds.
+4. Every request through the ingress must match the active Host and correct Basic Auth before any
+   static or ConnectRPC handler is reached. Missing/wrong credentials return `401`; unknown,
+   inactive, old, or malformed Host is rejected fail-closed.
+5. The ingress strips Authorization before forwarding and delegates through a streaming reverse
+   proxy to the sole authoritative player server at `http://127.0.0.1:3690`. It must preserve
+   flushing, cancellation, trailers, ConnectRPC content type, request/response limits, and
+   server-streaming cardinality without buffering to completion.
+6. Direct local/LAN clients continue to reach the existing player listener and receive no Basic
+   Auth challenge. No second player server, player state machine, or alternative tunnel runtime is
+   created.
+7. Stop, failure, reconfigure, and shutdown first atomically deny public Host admission, then
+   withdraw the URL, close the endpoint, and close the ingress within the shared deadline.
+8. ~~Username/password exist only in transient private input, production scoped Keychain use (or the
+   exact FR-056 dev/test-only override), and active ingress memory. They never enter SDK options,
+   policy files, persistence, events, status values, logs, diagnostics, fixtures, or
+   generated/public DTOs; reusable snapshots expose presence only.~~ **BUG-003 username
+   reconciliation**: Username is an effective non-secret preference and may appear in the existing
+   settings, master snapshot/UI, explicit Save, and Copy surfaces. Password exists only in transient
+   private input, production scoped Keychain use (or the exact FR-056 dev/test-only override), and
+   active ingress memory, ~~and never any generated DTO~~ **with the separate FR-053 one-time
+   `GeneratedPlayerPasswordResult` as the sole direct-result exception**; reusable surfaces expose
+   only password presence. Neither value enters SDK options, and password never enters policy files,
+   application-managed persistence outside Keychain, events, reusable status values, logs,
+   diagnostics, fixtures, or public DTOs.
+
+Acceptance requires missing/wrong/correct Basic Auth for static, unary, and streaming requests;
+exact/unknown/stale Host checks; local/LAN no-challenge behavior; and a real ngrok browser receiving
+a complete initial `Subscribe` snapshot within five seconds plus a later non-empty update and
+reconnect. For BUG-003 closure, static-only success, finite GET success, deterministic fixtures, and
+`NOT RUN` are not substitutes for that real stream.
+
+## ~~Current contract (BUG-001)~~ Superseded by BUG-003
 
 Public authentication is owned by the one ngrok Agent Endpoint, not by `internal/player`.
 

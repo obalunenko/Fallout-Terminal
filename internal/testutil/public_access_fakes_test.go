@@ -52,8 +52,7 @@ func TestFakeTunnelControlsDelayedStartDoneCloseAndActiveCount(t *testing.T) {
 	result := make(chan tunnel.TunnelEndpoint, 1)
 	go func() {
 		started, err := service.Start(t.Context(), tunnel.TunnelStartRequest{
-			UpstreamURL: "http://127.0.0.1:3690", AccountToken: []byte("ephemeral-test-value"),
-			PlayerUsername: []byte("players"), PlayerPassword: []byte("password-test-value"),
+			UpstreamURL: "http://127.0.0.1:41000", AccountToken: []byte("ephemeral-test-value"),
 		})
 		if err == nil {
 			result <- started
@@ -81,7 +80,7 @@ func TestFakeTunnelControlsDelayedStartDoneCloseAndActiveCount(t *testing.T) {
 	require.NoError(t, started.Close(t.Context()))
 	assert.Equal(t, 0, service.ActiveEndpoints())
 	assert.True(t, service.LastStartSecretsCleared())
-	assert.Equal(t, "http://127.0.0.1:3690", service.LastUpstreamURL())
+	assert.Equal(t, "http://127.0.0.1:41000", service.LastUpstreamURL())
 }
 
 func TestFakeClockFilesystemAndEventsAreControllable(t *testing.T) {

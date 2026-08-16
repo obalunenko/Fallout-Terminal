@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -110,6 +111,54 @@ func TestScopedPublicAccessSecretUseClearsCallbackBuffersAndRedactsStoreErrors(t
 	assert.NotContains(t, err.Error(), "synthetic-provider-value")
 }
 
+func TestDevelopmentOverrideUsesNonEmptyEnvironmentSecretsPerFieldWithoutMutationOrReadback(t *testing.T) {
+	providerOverride := "generated-" + strings.Repeat("p", 32)
+	passwordOverride := "generated-" + strings.Repeat("w", 16)
+	storedProvider := "generated-" + strings.Repeat("s", 32)
+	storedPassword := "generated-" + strings.Repeat("f", 16)
+	for _, test := range []struct {
+		name             string
+		values           map[string]string
+		wantProviderSize int
+		wantPasswordSize int
+	}{
+		{name: "token only", values: map[string]string{DevelopmentNgrokAuthtokenEnvironment: providerOverride}, wantProviderSize: len(providerOverride), wantPasswordSize: len(storedPassword)},
+		{name: "password only", values: map[string]string{DevelopmentPlayerPasswordEnvironment: passwordOverride}, wantProviderSize: len(storedProvider), wantPasswordSize: len(passwordOverride)},
+		{name: "both", values: map[string]string{DevelopmentNgrokAuthtokenEnvironment: providerOverride, DevelopmentPlayerPasswordEnvironment: passwordOverride}, wantProviderSize: len(providerOverride), wantPasswordSize: len(passwordOverride)},
+		{name: "empty and unset", values: map[string]string{DevelopmentNgrokAuthtokenEnvironment: ""}, wantProviderSize: len(storedProvider), wantPasswordSize: len(storedPassword)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := newObservingSecretStore()
+			store.values[ProviderAccountToken] = []byte(storedProvider)
+			store.values[PlayerBasicAuthPassword] = []byte(storedPassword)
+			override := NewDevelopmentTestPublicAccessOverride(nil, store, func(name string) (string, bool) {
+				value, ok := test.values[name]
+				return value, ok
+			})
+
+			providerPresence, err := override.Presence(t.Context(), ProviderAccountToken)
+			require.NoError(t, err)
+			passwordPresence, err := override.Presence(t.Context(), PlayerBasicAuthPassword)
+			require.NoError(t, err)
+			assert.Equal(t, SecretPresent, providerPresence)
+			assert.Equal(t, SecretPresent, passwordPresence)
+
+			var captured *SecretUse
+			require.NoError(t, WithPublicAccessSecrets(t.Context(), override, func(use *SecretUse) error {
+				captured = use
+				assert.Equal(t, test.wantProviderSize, len(use.ProviderToken))
+				assert.Equal(t, test.wantPasswordSize, len(use.PlayerPassword))
+				return nil
+			}))
+			require.NotNil(t, captured)
+			assert.Empty(t, captured.ProviderToken)
+			assert.Empty(t, captured.PlayerPassword)
+			assert.Empty(t, store.replacedRefs)
+			assert.Empty(t, store.deletedRefs)
+		})
+	}
+}
+
 type failingSecretReader struct{ err error }
 
 func (reader failingSecretReader) Read([]byte) (int, error) { return 0, reader.err }
@@ -126,8 +175,11 @@ func newObservingSecretStore() *observingSecretStore {
 	return &observingSecretStore{values: make(map[SecretRef][]byte)}
 }
 
-func (store *observingSecretStore) Presence(context.Context, SecretRef) (SecretPresence, error) {
-	return SecretUnknown, nil
+func (store *observingSecretStore) Presence(_ context.Context, ref SecretRef) (SecretPresence, error) {
+	if len(store.values[ref]) == 0 {
+		return SecretAbsent, nil
+	}
+	return SecretPresent, nil
 }
 
 func (store *observingSecretStore) Replace(_ context.Context, ref SecretRef, value []byte) error {

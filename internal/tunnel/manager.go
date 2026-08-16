@@ -22,6 +22,7 @@ type ManagerConfig struct {
 	Settings    PublicAccessSettings
 	Secrets     SecretStore
 	Tunnel      TunnelService
+	Ingress     PublicIngressFactory
 	Publish     SnapshotPublisher
 	Clock       Clock
 	UpstreamURL string
@@ -74,10 +75,11 @@ type SecretMutation struct {
 // PublicAccessMutation combines one expected settings revision with its
 // non-secret replacement and two independent ephemeral Keychain changes.
 type PublicAccessMutation struct {
-	ExpectedRevision uint64
-	Preferences      PublicAccessPreferences
-	ProviderToken    SecretMutation
-	PlayerPassword   SecretMutation
+	ExpectedRevision        uint64
+	Preferences             PublicAccessPreferences
+	ProviderToken           SecretMutation
+	PlayerPassword          SecretMutation
+	PersistVisibleOverrides bool
 }
 
 func (mutation *PublicAccessMutation) clear() {
@@ -91,25 +93,29 @@ func (mutation *PublicAccessMutation) clear() {
 }
 
 type startResponse struct {
-	endpoint TunnelEndpoint
-	err      error
+	endpoint     TunnelEndpoint
+	ingress      PublicIngress
+	canonicalURL string
+	err          error
 }
 
 type PublicAccessManager struct {
 	mu sync.Mutex
 
-	settings PublicAccessSettings
-	secrets  SecretStore
-	tunnel   TunnelService
-	publish  SnapshotPublisher
-	clock    Clock
-	upstream string
+	settings  PublicAccessSettings
+	secrets   SecretStore
+	tunnel    TunnelService
+	ingresses PublicIngressFactory
+	publish   SnapshotPublisher
+	clock     Clock
+	upstream  string
 
 	preferences  PublicAccessPreferences
 	provider     SecretPresence
 	password     SecretPresence
 	status       PublicAccessStatus
 	endpoint     TunnelEndpoint
+	ingress      PublicIngress
 	start        *startOperation
 	pendingStart *startOperation
 	cleanup      *cleanupOperation
@@ -119,7 +125,7 @@ type PublicAccessManager struct {
 }
 
 func NewPublicAccessManager(config ManagerConfig) (*PublicAccessManager, error) {
-	if config.Settings == nil || config.Secrets == nil || config.Tunnel == nil {
+	if config.Settings == nil || config.Secrets == nil || config.Tunnel == nil || config.Ingress == nil {
 		return nil, errors.New("public-access manager dependencies are incomplete")
 	}
 	if config.UpstreamURL != "http://"+PlayerUpstreamAddress {
@@ -129,7 +135,7 @@ func NewPublicAccessManager(config ManagerConfig) (*PublicAccessManager, error) 
 		config.Clock = realClock{}
 	}
 	return &PublicAccessManager{
-		settings: config.Settings, secrets: config.Secrets, tunnel: config.Tunnel,
+		settings: config.Settings, secrets: config.Secrets, tunnel: config.Tunnel, ingresses: config.Ingress,
 		publish: config.Publish, clock: config.Clock, upstream: config.UpstreamURL,
 		preferences: DefaultPublicAccessPreferences(), provider: SecretUnknown, password: SecretUnknown,
 		status: PublicAccessStatus{State: LifecycleDisabled},
@@ -252,13 +258,22 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 		manager.emit(result.Snapshot)
 		return result
 	}
-	if manager.endpoint != nil {
+	if manager.endpoint != nil || manager.ingress != nil {
 		endpoint := manager.endpoint
+		ingress := manager.ingress
+		if ingress != nil {
+			ingress.Deny()
+		}
 		manager.mu.Unlock()
-		closeErr := closePublicAccessEndpoint(ctx, endpoint)
+		closeErr := closePublicAccessRuntime(ctx, endpoint, ingress)
 		manager.mu.Lock()
-		if closeErr == nil && manager.endpoint == endpoint {
-			manager.endpoint = nil
+		if closeErr == nil {
+			if manager.endpoint == endpoint {
+				manager.endpoint = nil
+			}
+			if manager.ingress == ingress {
+				manager.ingress = nil
+			}
 		}
 		if closeErr != nil {
 			category, message := redactedPublicAccessFailure(closeErr)
@@ -291,23 +306,46 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 
 	response := make(chan startResponse, 1)
 	go func() {
+		ingress, ingressErr := manager.ingresses.Start(startContext, manager.upstream)
+		if ingressErr != nil {
+			response <- startResponse{err: ingressErr}
+			return
+		}
 		var endpoint TunnelEndpoint
+		var canonicalURL string
 		err := WithPublicAccessSecrets(startContext, manager.secrets, func(use *SecretUse) error {
+			privateURL := ingress.URL()
+			if privateURL == nil {
+				return errors.New(ErrorProviderFailure.SafeMessage())
+			}
 			var startErr error
 			endpoint, startErr = manager.tunnel.Start(startContext, TunnelStartRequest{
-				UpstreamURL: manager.upstream, ReservedDomain: preferences.ReservedDomain,
-				AccountToken: use.ProviderToken, PlayerUsername: []byte(preferences.Username),
-				PlayerPassword: use.PlayerPassword, Timeout: PublicAccessStartupTimeout,
+				UpstreamURL: privateURL.String(), ReservedDomain: preferences.ReservedDomain,
+				AccountToken: use.ProviderToken, Timeout: PublicAccessStartupTimeout,
 			})
-			return startErr
+			if startErr != nil {
+				return startErr
+			}
+			if endpoint == nil || endpoint.URL() == nil {
+				return errors.New(ErrorProviderFailure.SafeMessage())
+			}
+			var host string
+			canonicalURL, host, startErr = NormalizeEndpointURL(endpoint.URL().String(), preferences.ReservedDomain)
+			if startErr != nil {
+				return errors.New(ErrorProviderFailure.SafeMessage())
+			}
+			if startContext.Err() != nil {
+				return publicAccessCategorizedError{category: ErrorTimeout}
+			}
+			return ingress.Activate(host, preferences.Username, use.PlayerPassword)
 		})
-		response <- startResponse{endpoint: endpoint, err: err}
+		response <- startResponse{endpoint: endpoint, ingress: ingress, canonicalURL: canonicalURL, err: err}
 	}()
 
 	select {
 	case started := <-response:
 		cancel()
-		return manager.finishStart(operation, started.endpoint, started.err)
+		return manager.finishStart(operation, started.endpoint, started.ingress, started.canonicalURL, started.err)
 	case <-manager.clock.After(PublicAccessStartupTimeout):
 		cancel()
 		manager.failCurrentStart(operation, ErrorTimeout)
@@ -321,18 +359,15 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 	}
 }
 
-func (manager *PublicAccessManager) finishStart(operation *startOperation, endpoint TunnelEndpoint, startErr error) PublicAccessResult {
-	if startErr == nil && endpoint == nil {
+func (manager *PublicAccessManager) finishStart(
+	operation *startOperation,
+	endpoint TunnelEndpoint,
+	ingress PublicIngress,
+	canonicalURL string,
+	startErr error,
+) PublicAccessResult {
+	if startErr == nil && (endpoint == nil || ingress == nil || canonicalURL == "") {
 		startErr = errors.New(ErrorProviderFailure.SafeMessage())
-	}
-	var canonicalURL string
-	if startErr == nil {
-		publicURL := endpoint.URL()
-		if publicURL == nil {
-			startErr = errors.New(ErrorProviderFailure.SafeMessage())
-		} else {
-			canonicalURL, _, startErr = NormalizeEndpointURL(publicURL.String(), manager.preferencesForOperation(operation).ReservedDomain)
-		}
 	}
 
 	manager.mu.Lock()
@@ -341,10 +376,11 @@ func (manager *PublicAccessManager) finishStart(operation *startOperation, endpo
 	if !current {
 		result := manager.resultLocked(false)
 		manager.mu.Unlock()
-		if endpoint != nil {
-			if closeErr := closePublicAccessEndpoint(context.Background(), endpoint); closeErr != nil {
-				manager.retainEndpointAfterFailedCleanup(endpoint)
-			}
+		if ingress != nil {
+			ingress.Deny()
+		}
+		if closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress); closeErr != nil {
+			manager.retainRuntimeAfterFailedCleanup(endpoint, ingress)
 		}
 		manager.mu.Lock()
 		manager.completeStartLocked(operation, result)
@@ -358,10 +394,11 @@ func (manager *PublicAccessManager) finishStart(operation *startOperation, endpo
 		manager.status.ErrorMessage = message
 		result := manager.resultLocked(false)
 		manager.mu.Unlock()
-		if endpoint != nil {
-			if closeErr := closePublicAccessEndpoint(context.Background(), endpoint); closeErr != nil {
-				manager.retainEndpointAfterFailedCleanup(endpoint)
-			}
+		if ingress != nil {
+			ingress.Deny()
+		}
+		if closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress); closeErr != nil {
+			manager.retainRuntimeAfterFailedCleanup(endpoint, ingress)
 		}
 		manager.mu.Lock()
 		manager.completeStartLocked(operation, result)
@@ -372,13 +409,14 @@ func (manager *PublicAccessManager) finishStart(operation *startOperation, endpo
 	}
 
 	manager.endpoint = endpoint
+	manager.ingress = ingress
 	manager.status = PublicAccessStatus{State: LifecycleReady, Generation: operation.generation, SettingsRevision: operation.revision, PublicURL: canonicalURL}
 	result := manager.resultLocked(true)
 	manager.completeStartLocked(operation, result)
 	manager.settleStartLocked(operation)
 	manager.mu.Unlock()
 	manager.emit(result.Snapshot)
-	go manager.monitor(operation.generation, endpoint)
+	go manager.monitor(operation.generation, endpoint, ingress)
 	return result
 }
 
@@ -425,7 +463,7 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 			return PublicAccessResult{Error: ErrorShutdownTimeout.SafeMessage(), Snapshot: manager.Snapshot()}
 		}
 	}
-	if manager.status.State == LifecycleDisabled && manager.endpoint == nil {
+	if manager.status.State == LifecycleDisabled && manager.endpoint == nil && manager.ingress == nil {
 		result := manager.resultLocked(true)
 		manager.mu.Unlock()
 		return result
@@ -438,6 +476,10 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 	}
 	pendingStart := manager.pendingStart
 	endpoint := manager.endpoint
+	ingress := manager.ingress
+	if ingress != nil {
+		ingress.Deny()
+	}
 	manager.status = PublicAccessStatus{State: LifecycleStopping, Generation: generation, SettingsRevision: manager.preferences.Revision}
 	operation := &stopOperation{done: make(chan struct{})}
 	manager.stop = operation
@@ -453,13 +495,17 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 			closeErr = context.DeadlineExceeded
 		}
 	}
-	if closeErr == nil && endpoint == nil {
+	if closeErr == nil && endpoint == nil && ingress == nil {
 		manager.mu.Lock()
 		endpoint = manager.endpoint
+		ingress = manager.ingress
+		if ingress != nil {
+			ingress.Deny()
+		}
 		manager.mu.Unlock()
 	}
-	if closeErr == nil && endpoint != nil {
-		closeErr = closePublicAccessEndpoint(ctx, endpoint)
+	if closeErr == nil && (endpoint != nil || ingress != nil) {
+		closeErr = closePublicAccessRuntime(ctx, endpoint, ingress)
 	}
 	manager.mu.Lock()
 	if closeErr != nil {
@@ -473,6 +519,9 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 	} else {
 		if manager.endpoint == endpoint {
 			manager.endpoint = nil
+		}
+		if manager.ingress == ingress {
+			manager.ingress = nil
 		}
 		manager.status = PublicAccessStatus{State: LifecycleDisabled, Generation: generation, SettingsRevision: manager.preferences.Revision}
 		operation.result = manager.resultLocked(true)
@@ -496,8 +545,9 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 		ctx = context.Background()
 	}
 	owned := PublicAccessMutation{
-		ExpectedRevision: mutation.ExpectedRevision,
-		Preferences:      mutation.Preferences,
+		ExpectedRevision:        mutation.ExpectedRevision,
+		Preferences:             mutation.Preferences,
+		PersistVisibleOverrides: mutation.PersistVisibleOverrides,
 		ProviderToken: SecretMutation{
 			Replacement: append([]byte(nil), mutation.ProviderToken.Replacement...), Delete: mutation.ProviderToken.Delete,
 		},
@@ -553,12 +603,17 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 
 	manager.status.Generation++
 	generation := manager.status.Generation
-	wasActive := manager.status.State == LifecycleStarting || manager.status.State == LifecycleReady || manager.endpoint != nil || manager.pendingStart != nil
+	wasActive := manager.status.State == LifecycleStarting || manager.status.State == LifecycleReady ||
+		manager.endpoint != nil || manager.ingress != nil || manager.pendingStart != nil
 	if manager.start != nil && manager.start.cancel != nil {
 		manager.start.cancel()
 	}
 	pendingStart := manager.pendingStart
 	endpoint := manager.endpoint
+	ingress := manager.ingress
+	if ingress != nil {
+		ingress.Deny()
+	}
 	operation := &reconfigureOperation{done: make(chan struct{}), expectedRevision: owned.ExpectedRevision, generation: generation}
 	manager.reconfigure = operation
 	manager.status = PublicAccessStatus{State: LifecycleStopping, Generation: generation, SettingsRevision: manager.preferences.Revision}
@@ -573,19 +628,26 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 			return manager.finishReconfigureFailure(operation, ErrorTimeout)
 		}
 	}
-	if endpoint == nil {
+	if endpoint == nil && ingress == nil {
 		manager.mu.Lock()
 		endpoint = manager.endpoint
+		ingress = manager.ingress
+		if ingress != nil {
+			ingress.Deny()
+		}
 		manager.mu.Unlock()
 	}
-	if endpoint != nil {
-		if err := closePublicAccessEndpoint(ctx, endpoint); err != nil {
+	if endpoint != nil || ingress != nil {
+		if err := closePublicAccessRuntime(ctx, endpoint, ingress); err != nil {
 			category, _ := redactedPublicAccessFailure(err)
 			return manager.finishReconfigureFailure(operation, category)
 		}
 		manager.mu.Lock()
 		if manager.endpoint == endpoint {
 			manager.endpoint = nil
+		}
+		if manager.ingress == ingress {
+			manager.ingress = nil
 		}
 		manager.mu.Unlock()
 	}
@@ -615,7 +677,7 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 	}
 	normalized.ProviderTokenPresentHint = provider == SecretPresent
 	normalized.PlayerPasswordPresentHint = password == SecretPresent
-	if err := manager.settings.Save(normalized); err != nil {
+	if err := savePublicAccessMutation(manager.settings, normalized, owned.PersistVisibleOverrides); err != nil {
 		manager.setPresence(provider, password)
 		return manager.finishReconfigureFailure(operation, ErrorSettingsCorrupt)
 	}
@@ -649,6 +711,17 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 	return result
 }
 
+type mutationAwarePublicAccessSettings interface {
+	SaveForMutation(PublicAccessPreferences, bool) error
+}
+
+func savePublicAccessMutation(settings PublicAccessSettings, preferences PublicAccessPreferences, persistVisibleOverrides bool) error {
+	if aware, ok := settings.(mutationAwarePublicAccessSettings); ok {
+		return aware.SaveForMutation(preferences, persistVisibleOverrides)
+	}
+	return settings.Save(preferences)
+}
+
 func (manager *PublicAccessManager) Shutdown(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -664,13 +737,14 @@ func (manager *PublicAccessManager) Shutdown(ctx context.Context) error {
 	}
 }
 
-func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEndpoint) {
+func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEndpoint, ingress PublicIngress) {
 	<-endpoint.Done()
 	manager.mu.Lock()
-	if manager.endpoint != endpoint || manager.status.State != LifecycleReady || manager.status.Generation != generation {
+	if manager.endpoint != endpoint || manager.ingress != ingress || manager.status.State != LifecycleReady || manager.status.Generation != generation {
 		manager.mu.Unlock()
 		return
 	}
+	ingress.Deny()
 	cleanup := &cleanupOperation{done: make(chan struct{})}
 	manager.cleanup = cleanup
 	manager.status.Generation++
@@ -681,10 +755,15 @@ func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEn
 	manager.mu.Unlock()
 	manager.emit(snapshot)
 
-	closeErr := closePublicAccessEndpoint(context.Background(), endpoint)
+	closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress)
 	manager.mu.Lock()
-	if closeErr == nil && manager.endpoint == endpoint {
-		manager.endpoint = nil
+	if closeErr == nil {
+		if manager.endpoint == endpoint {
+			manager.endpoint = nil
+		}
+		if manager.ingress == ingress {
+			manager.ingress = nil
+		}
 	}
 	if manager.cleanup == cleanup {
 		manager.cleanup = nil
@@ -712,14 +791,30 @@ func boundedPublicAccessCleanupContext(parent context.Context) (context.Context,
 	return context.WithTimeout(parent, publicAccessCleanupTimeout)
 }
 
-func closePublicAccessEndpoint(parent context.Context, endpoint TunnelEndpoint) error {
-	if endpoint == nil {
-		return nil
-	}
+func closePublicAccessRuntime(parent context.Context, endpoint TunnelEndpoint, ingress PublicIngress) error {
 	ctx, cancel := boundedPublicAccessCleanupContext(parent)
 	defer cancel()
+	if ingress != nil {
+		ingress.Deny()
+	}
+	endpointErr := closeOwnedPublicAccessResource(ctx, func(closeContext context.Context) error {
+		if endpoint == nil {
+			return nil
+		}
+		return endpoint.Close(closeContext)
+	})
+	ingressErr := closeOwnedPublicAccessResource(ctx, func(closeContext context.Context) error {
+		if ingress == nil {
+			return nil
+		}
+		return ingress.Close(closeContext)
+	})
+	return errors.Join(endpointErr, ingressErr)
+}
+
+func closeOwnedPublicAccessResource(ctx context.Context, close func(context.Context) error) error {
 	result := make(chan error, 1)
-	go func() { result <- endpoint.Close(ctx) }()
+	go func() { result <- close(ctx) }()
 	select {
 	case err := <-result:
 		return err
@@ -728,11 +823,14 @@ func closePublicAccessEndpoint(parent context.Context, endpoint TunnelEndpoint) 
 	}
 }
 
-func (manager *PublicAccessManager) retainEndpointAfterFailedCleanup(endpoint TunnelEndpoint) {
+func (manager *PublicAccessManager) retainRuntimeAfterFailedCleanup(endpoint TunnelEndpoint, ingress PublicIngress) {
 	manager.mu.Lock()
 	defer manager.mu.Unlock()
 	if manager.endpoint == nil {
 		manager.endpoint = endpoint
+	}
+	if manager.ingress == nil {
+		manager.ingress = ingress
 	}
 }
 
@@ -753,10 +851,11 @@ func (manager *PublicAccessManager) failCurrentStart(operation *startOperation, 
 
 func (manager *PublicAccessManager) disposeLateStart(operation *startOperation, response <-chan startResponse) {
 	started := <-response
-	if started.endpoint != nil {
-		if closeErr := closePublicAccessEndpoint(context.Background(), started.endpoint); closeErr != nil {
-			manager.retainEndpointAfterFailedCleanup(started.endpoint)
-		}
+	if started.ingress != nil {
+		started.ingress.Deny()
+	}
+	if closeErr := closePublicAccessRuntime(context.Background(), started.endpoint, started.ingress); closeErr != nil {
+		manager.retainRuntimeAfterFailedCleanup(started.endpoint, started.ingress)
 	}
 	manager.mu.Lock()
 	manager.settleStartLocked(operation)

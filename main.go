@@ -117,13 +117,16 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 			ApplicationSupport: locations.ApplicationSupport,
 		},
 	)
+	packaged := isPackagedApplication()
 	publicSettings := tunnelservice.NewPublicAccessSettingsStore(publicAccessSettingsPath, nil, nil)
-	publicSecrets := platform.NewPlatformKeychainSecretStore(isPackagedApplication())
+	publicSecrets := platform.NewPlatformKeychainSecretStore(packaged)
+	effectivePublicSettings, effectivePublicSecrets := publicAccessStoresForProfile(publicSettings, publicSecrets, packaged, os.LookupEnv)
 	var app *App
 	publicAccess, err := tunnelservice.NewPublicAccessManager(tunnelservice.ManagerConfig{
-		Settings:    publicSettings,
-		Secrets:     publicSecrets,
+		Settings:    effectivePublicSettings,
+		Secrets:     effectivePublicSecrets,
 		Tunnel:      tunnelservice.NewEmbeddedNgrokService(),
+		Ingress:     tunnelservice.NewPublicIngressFactory(),
 		UpstreamURL: publicAccessCompositionRoute().UpstreamURL,
 		Publish: func(snapshot tunnelservice.PublicAccessSnapshot) {
 			if app != nil {
@@ -143,14 +146,27 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 		Desktop:         desktop,
 		Browser:         desktop,
 		Events:          events,
-		PublicSettings:  publicSettings,
-		PublicSecrets:   publicSecrets,
+		PublicSettings:  effectivePublicSettings,
+		PublicSecrets:   effectivePublicSecrets,
 		PublicAccess:    publicAccess,
 		StartupTimeout:  time.Duration(runtimeConfig.Startup.TimeoutMilliseconds) * time.Millisecond,
 		ShutdownTimeout: time.Duration(runtimeConfig.Shutdown.TimeoutMilliseconds) * time.Millisecond,
 	})
 	effectRouter.Bind(player, app)
 	return app, nil
+}
+
+func publicAccessStoresForProfile(
+	settings tunnelservice.PublicAccessSettings,
+	secrets tunnelservice.SecretStore,
+	packaged bool,
+	lookup tunnelservice.EnvironmentLookup,
+) (tunnelservice.PublicAccessSettings, tunnelservice.SecretStore) {
+	if packaged || lookup == nil {
+		return settings, secrets
+	}
+	override := tunnelservice.NewDevelopmentTestPublicAccessOverride(settings, secrets, lookup)
+	return override, override
 }
 
 type publicAccessRoute struct {

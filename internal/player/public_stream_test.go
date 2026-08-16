@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -12,6 +13,7 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/control"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
+	"github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -27,6 +29,25 @@ type endpointAuthTransport struct {
 	base     http.RoundTripper
 	username string
 	password string
+}
+
+type publicIngressTransport struct {
+	base     http.RoundTripper
+	target   *url.URL
+	host     string
+	username string
+	password string
+}
+
+func (transport publicIngressTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	forwarded := request.Clone(request.Context())
+	targetURL := *request.URL
+	targetURL.Scheme = transport.target.Scheme
+	targetURL.Host = transport.target.Host
+	forwarded.URL = &targetURL
+	forwarded.Host = transport.host
+	forwarded.SetBasicAuth(transport.username, transport.password)
+	return transport.base.RoundTrip(forwarded)
 }
 
 func (transport endpointAuthTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -49,7 +70,7 @@ func endpointAuthSeam(next http.Handler) http.Handler {
 	})
 }
 
-func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary(t *testing.T) {
+func TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary(t *testing.T) {
 	var service *ConnectService
 	coordinator := newConnectTestCoordinator(t, func(effect control.Effect) {
 		if service != nil {
@@ -61,8 +82,12 @@ func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBou
 	require.NoError(t, err)
 	rpcPath, rpcHandler := NewConnectHandler(service)
 	application := NewApplicationHandler(playerAssets(), rpcPath, rpcHandler)
-	server := httptest.NewServer(endpointAuthSeam(application))
+	server := httptest.NewServer(application)
 	t.Cleanup(server.Close)
+	ingress, err := tunnel.NewPublicIngressFactory().Start(t.Context(), server.URL)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, ingress.Close(t.Context())) }()
+	require.NoError(t, ingress.Activate("public.example", edgeTestUsername, []byte(edgeTestPassword)))
 
 	for _, path := range []string{
 		"/", "/client.js",
@@ -70,8 +95,9 @@ func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBou
 		"/fallout.terminal.player.v1.PlayerService/Subscribe",
 	} {
 		for _, credentials := range []struct{ username, password string }{{}, {username: edgeTestUsername, password: "synthetic-wrong-input"}} {
-			request, requestErr := http.NewRequestWithContext(t.Context(), http.MethodPost, server.URL+path, bytes.NewReader([]byte{0, 0, 0, 0, 0}))
+			request, requestErr := http.NewRequestWithContext(t.Context(), http.MethodPost, ingress.URL().String()+path, bytes.NewReader([]byte{0, 0, 0, 0, 0}))
 			require.NoError(t, requestErr)
+			request.Host = "public.example"
 			request.Header.Set("Content-Type", "application/connect+proto")
 			if credentials.username != "" {
 				request.SetBasicAuth(credentials.username, credentials.password)
@@ -84,10 +110,11 @@ func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBou
 		}
 	}
 
-	authenticatedClient := &http.Client{Transport: endpointAuthTransport{
-		base: server.Client().Transport, username: edgeTestUsername, password: edgeTestPassword,
+	authenticatedClient := &http.Client{Transport: publicIngressTransport{
+		base: server.Client().Transport, target: ingress.URL(), host: "public.example",
+		username: edgeTestUsername, password: edgeTestPassword,
 	}}
-	staticRequest, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/", nil)
+	staticRequest, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://public.example/", nil)
 	require.NoError(t, err)
 	staticResponse, err := authenticatedClient.Do(staticRequest)
 	require.NoError(t, err)
@@ -95,7 +122,7 @@ func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBou
 	assert.Equal(t, http.StatusOK, staticResponse.StatusCode)
 	assert.Empty(t, staticResponse.Header.Get("WWW-Authenticate"))
 
-	client := playerv1connect.NewPlayerServiceClient(authenticatedClient, server.URL)
+	client := playerv1connect.NewPlayerServiceClient(authenticatedClient, "http://public.example")
 	manifest, err := client.SoundManifest(t.Context(), connect.NewRequest(&playerv1.SoundManifestRequest{
 		Category: playerv1.SoundCategory_SOUND_CATEGORY_AMBIENT,
 	}))
@@ -103,7 +130,7 @@ func TestEndpointAuthSeamProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBou
 	require.NotNil(t, manifest.Msg)
 
 	streamContext, cancelStream := context.WithCancel(t.Context())
-	t.Cleanup(cancelStream)
+	defer cancelStream()
 	stream, err := client.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
 	require.NoError(t, err)
 	require.True(t, stream.Receive(), "stream error: %v", stream.Err())

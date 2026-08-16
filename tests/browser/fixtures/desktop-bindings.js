@@ -37,9 +37,16 @@ const durablePublicAccess = (() => {
 })();
 if (durablePublicAccess?.preferences) state.publicAccess = durablePublicAccess;
 
-function persistPublicAccess() {
+function persistPublicAccess({ preserveVisiblePreferences = false } = {}) {
   try {
-    const serialized = JSON.stringify(state.publicAccess);
+    const durable = structuredClone(state.publicAccess);
+    if (preserveVisiblePreferences) {
+      const priorRaw = globalThis.localStorage?.getItem('fallout-fixture-public-access');
+      const prior = priorRaw ? JSON.parse(priorRaw) : null;
+      durable.preferences.reservedDomain = prior?.preferences?.reservedDomain ?? '';
+      durable.preferences.username = prior?.preferences?.username ?? 'players';
+    }
+    const serialized = JSON.stringify(durable);
     globalThis.name = `fallout-fixture-public-access:${serialized}`;
     globalThis.localStorage?.setItem('fallout-fixture-public-access', serialized);
   } catch {
@@ -179,7 +186,7 @@ export function GeneratePlayerPassword(request) {
   state.publicAccess.preferences.revision = revision;
   state.publicAccess.playerPasswordPresence = 'present';
   state.publicAccess.status = { state: 'disabled', generation: state.publicAccess.status.generation + 1, settingsRevision: revision };
-	  persistPublicAccess();
+  persistPublicAccess({ preserveVisiblePreferences: true });
   return Promise.resolve({ ok: true, generatedPassword: 'synthetic-one-time-generated-value', settingsRevision: revision });
 }
 

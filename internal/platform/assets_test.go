@@ -1495,7 +1495,7 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 			"active production frontend exposes legacy/global or unauthored capability %q", forbidden)
 	}
 	assert.Contains(t, adapterSource, "import * as desktopService from '../bindings/")
-	assert.Contains(t, adapterSource, "import { Events } from '@wailsio/runtime'")
+	assert.Contains(t, adapterSource, "import { Clipboard, Events } from '@wailsio/runtime'")
 	assert.NotContains(t, masterSource, "@wailsio/runtime")
 	assert.NotContains(t, masterSource, "desktopService.")
 	assert.Contains(t, masterSource, "const desktopAPI = window.desktopAPI")
@@ -1504,6 +1504,28 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 			"master startup presentation is missing existing-status projection %q", presentation)
 	}
 	assert.NotContains(t, masterSource, "status.phase")
+}
+
+func TestPackagedCompositionIgnoresExactDevelopmentPublicAccessEnvironment(t *testing.T) {
+	t.Parallel()
+	root := assetRepositoryRoot(t)
+	mainSource, err := os.ReadFile(filepath.Join(root, "main.go"))
+	require.NoError(t, err)
+	overrideSource, err := os.ReadFile(filepath.Join(root, "internal", "tunnel", "test_override.go"))
+	require.NoError(t, err)
+
+	active := string(mainSource) + "\n" + string(overrideSource)
+	for _, name := range []string{
+		"FALLOUT_NGROK_AUTHTOKEN", "FALLOUT_NGROK_RESERVED_DOMAIN",
+		"FALLOUT_PUBLIC_TEST_USERNAME", "FALLOUT_PUBLIC_TEST_PASSWORD",
+	} {
+		assert.Contains(t, active, name)
+	}
+	assert.Contains(t, string(mainSource), "publicAccessStoresForProfile(publicSettings, publicSecrets, packaged, os.LookupEnv)")
+	assert.Contains(t, string(mainSource), "packaged := isPackagedApplication()")
+	assert.Contains(t, string(mainSource), "if packaged")
+	assert.NotContains(t, string(overrideSource), "os.Environ")
+	assert.NotContains(t, active, `"NGROK_AUTHTOKEN"`)
 }
 
 func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {

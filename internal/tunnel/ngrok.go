@@ -2,10 +2,8 @@ package tunnel
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/url"
-	"strings"
 	"sync"
 
 	ngrok "golang.ngrok.com/ngrok/v2"
@@ -14,7 +12,6 @@ import (
 type ngrokForwardRequest struct {
 	UpstreamURL    string
 	ReservedDomain string
-	TrafficPolicy  string
 }
 
 type ngrokForwarder interface {
@@ -81,11 +78,10 @@ func (agent *sdkAgent) Forward(ctx context.Context, request ngrokForwardRequest)
 	if err := agent.agent.Connect(ctx); err != nil {
 		return nil, newRedactedPublicAccessError(err)
 	}
-	options := make([]ngrok.EndpointOption, 0, 2)
+	options := make([]ngrok.EndpointOption, 0, 1)
 	if request.ReservedDomain != "" {
 		options = append(options, ngrok.WithURL("https://"+request.ReservedDomain))
 	}
-	options = append(options, ngrok.WithTrafficPolicy(request.TrafficPolicy))
 	forwarder, err := agent.agent.Forward(ctx, ngrok.WithUpstream(request.UpstreamURL), options...)
 	if err != nil {
 		return nil, newRedactedPublicAccessError(err)
@@ -170,17 +166,14 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 		ctx = context.Background()
 	}
 	ownedToken := append([]byte(nil), request.AccountToken...)
-	ownedUsername := append([]byte(nil), request.PlayerUsername...)
-	ownedPassword := append([]byte(nil), request.PlayerPassword...)
 	request.Clear()
 	defer clear(ownedToken)
-	defer clear(ownedUsername)
-	defer clear(ownedPassword)
 
 	if service == nil || service.factory == nil {
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
 	}
-	if request.UpstreamURL != "http://"+PlayerUpstreamAddress {
+	privateUpstream, err := normalizeLoopbackHTTPURL(request.UpstreamURL)
+	if err != nil {
 		return nil, errors.New(ErrorValidation.SafeMessage())
 	}
 	reservedDomain, err := NormalizeReservedDomain(request.ReservedDomain)
@@ -189,10 +182,6 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 	}
 	if len(ownedToken) == 0 {
 		return nil, errors.New(ErrorCredentialMissing.SafeMessage())
-	}
-	policy, err := basicAuthTrafficPolicy(ownedUsername, ownedPassword)
-	if err != nil {
-		return nil, err
 	}
 	if request.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -206,9 +195,8 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 	}
 	lifetime := newEmbeddedEndpointLifetime(ctx)
 	forwarder, err := agent.Forward(lifetime.context, ngrokForwardRequest{
-		UpstreamURL:    request.UpstreamURL,
+		UpstreamURL:    privateUpstream.String(),
 		ReservedDomain: reservedDomain,
-		TrafficPolicy:  policy,
 	})
 	if err != nil {
 		lifetime.Abort()
@@ -244,58 +232,6 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 	ownedEndpoint.url = parsed
 	ownedEndpoint.stateMu.Unlock()
 	return ownedEndpoint, nil
-}
-
-func basicAuthTrafficPolicy(username, password []byte) (string, error) {
-	if len(username) == 0 || strings.ContainsAny(string(username), ":\x00\r\n") ||
-		ValidatePlayerPassword(password) != nil || len(password) > MaximumPlayerPasswordBytes {
-		return "", errors.New(ErrorValidation.SafeMessage())
-	}
-	credential := make([]byte, 0, len(username)+1+len(password))
-	credential = append(credential, username...)
-	credential = append(credential, ':')
-	credential = append(credential, password...)
-	defer clear(credential)
-	policy := struct {
-		OnHTTPRequest []struct {
-			Actions []struct {
-				Type   string `json:"type"`
-				Config struct {
-					Realm       string   `json:"realm"`
-					Credentials []string `json:"credentials"`
-					Enforce     bool     `json:"enforce"`
-				} `json:"config"`
-			} `json:"actions"`
-		} `json:"on_http_request"`
-	}{OnHTTPRequest: make([]struct {
-		Actions []struct {
-			Type   string `json:"type"`
-			Config struct {
-				Realm       string   `json:"realm"`
-				Credentials []string `json:"credentials"`
-				Enforce     bool     `json:"enforce"`
-			} `json:"config"`
-		} `json:"actions"`
-	}, 1)}
-	policy.OnHTTPRequest[0].Actions = make([]struct {
-		Type   string `json:"type"`
-		Config struct {
-			Realm       string   `json:"realm"`
-			Credentials []string `json:"credentials"`
-			Enforce     bool     `json:"enforce"`
-		} `json:"config"`
-	}, 1)
-	action := &policy.OnHTTPRequest[0].Actions[0]
-	action.Type = "basic-auth"
-	action.Config.Realm = "Fallout Terminal Players"
-	action.Config.Credentials = []string{string(credential)}
-	action.Config.Enforce = true
-	encoded, err := json.Marshal(policy)
-	clear(action.Config.Credentials)
-	if err != nil {
-		return "", errors.New(ErrorProviderFailure.SafeMessage())
-	}
-	return string(encoded), nil
 }
 
 type embeddedNgrokEndpoint struct {
@@ -373,11 +309,6 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	}
 	ctx, cancel := boundedPublicAccessCleanupContext(ctx)
 	defer cancel()
-	endpoint.cancelOnce.Do(func() {
-		if endpoint.lifetimeCancel != nil {
-			endpoint.lifetimeCancel()
-		}
-	})
 
 	endpoint.closeMu.Lock()
 	endpoint.stateMu.Lock()
@@ -386,6 +317,7 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	endpoint.stateMu.Unlock()
 	if complete {
 		endpoint.closeMu.Unlock()
+		endpoint.cancelLifetime()
 		return nil
 	}
 	attempt := endpoint.closeAttempt
@@ -404,7 +336,9 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 
 	select {
 	case <-attempt.done:
+		endpoint.cancelLifetime()
 	case <-ctx.Done():
+		endpoint.cancelLifetime()
 		return publicAccessCategorizedError{category: ErrorShutdownTimeout}
 	}
 
@@ -438,6 +372,14 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	return nil
 }
 
+func (endpoint *embeddedNgrokEndpoint) cancelLifetime() {
+	endpoint.cancelOnce.Do(func() {
+		if endpoint.lifetimeCancel != nil {
+			endpoint.lifetimeCancel()
+		}
+	})
+}
+
 func runEmbeddedNgrokCloseAttempt(
 	ctx context.Context,
 	attempt *embeddedNgrokCloseAttempt,
@@ -446,20 +388,12 @@ func runEmbeddedNgrokCloseAttempt(
 	forwarderClosed bool,
 	agentDisconnected bool,
 ) {
-	forwarderResult := make(chan error, 1)
-	agentResult := make(chan error, 1)
-	if forwarderClosed {
-		forwarderResult <- nil
-	} else {
-		go func() { forwarderResult <- forwarder.Close(ctx) }()
+	if !forwarderClosed {
+		attempt.forwarderError = forwarder.Close(ctx)
 	}
-	if agentDisconnected {
-		agentResult <- nil
-	} else {
-		go func() { agentResult <- agent.Disconnect() }()
+	if !agentDisconnected {
+		attempt.agentDisconnectError = agent.Disconnect()
 	}
-	attempt.forwarderError = <-forwarderResult
-	attempt.agentDisconnectError = <-agentResult
 	attempt.forwarderClosed = forwarderClosed || attempt.forwarderError == nil
 	attempt.agentDisconnected = agentDisconnected || attempt.agentDisconnectError == nil
 	close(attempt.done)

@@ -169,7 +169,8 @@ func TestRedactionSurvivesDirectResultStatusEventAndRetryPaths(t *testing.T) {
 		Secrets: &redactionSecrets{
 			provider: []byte("synthetic-provider-input"), password: []byte("synthetic-player-input"),
 		},
-		Tunnel: newNgrokServiceWithFactory(factory), UpstreamURL: "http://127.0.0.1:3690",
+		Tunnel: newNgrokServiceWithFactory(factory), Ingress: NewPublicIngressFactory(),
+		UpstreamURL: "http://127.0.0.1:3690",
 		Publish: func(snapshot PublicAccessSnapshot) {
 			eventMu.Lock()
 			serializedEvents = append(serializedEvents, fmt.Sprintf("%#v", snapshot))

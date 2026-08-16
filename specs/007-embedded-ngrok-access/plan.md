@@ -22,13 +22,30 @@ adds the canonical bounded dev smoke, and assigns vulnerability-review evidence.
 safe provider disconnect-code propagation after the embedded SDK forwarder proved dependent on the
 context passed to `Forward`.
 
+**Bugfix**: 2026-08-16 — BUG-003 updates the external-dependency assumption after a real ngrok page
+loaded but its initial `Subscribe` never completed. Traffic Policy Basic Auth is superseded by an
+application-owned streaming ingress and real stream success becomes mandatory for bug closure.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification follow-up reconciles active Network, shutdown,
+Phase-0, risk, and MVP guidance with the private-ingress design and T087–T095 closure chain.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up adds one exact-name, dev/test-only
+environment adapter ahead of Keychain/persisted fallback; packaged production remains environment
+independent and all secret-bearing desktop surfaces remain presence-only.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation limits env removal to legacy
+production mechanisms and synchronizes active lifecycle/secret-source wording.
+
+**Bugfix**: 2026-08-16 — BUG-001/BUG-003 post-implementation verification records convergence
+T096–T097 against the existing single-runtime and dev/test override requirements.
+
 ## Summary
 
 Replace the startup-only external ngrok CLI path with one UI-controlled embedded ngrok runtime that
 forwards to the existing player server and remains optional to local/LAN play. The implementation
-adds a generation-aware lifecycle manager, an ngrok endpoint Basic Auth Traffic Policy, native
-macOS Keychain storage, atomic non-secret Application Support settings, and strictly typed private
-protobuf/Wails operations. The official `golang.ngrok.com/ngrok/v2` SDK is pinned at `v2.1.4` and
+adds a generation-aware lifecycle manager, a private application-owned exact-Host/Basic-Auth
+streaming ingress, native macOS Keychain storage, atomic non-secret Application Support settings,
+and strictly typed private protobuf/Wails operations. The official `golang.ngrok.com/ngrok/v2` SDK is pinned at `v2.1.4` and
 the native Security.framework wrapper `github.com/keybase/go-keychain` at `v0.0.1`; the CLI process,
 PATH/config/parser runtime is removed only after SDK parity tests pass.
 
@@ -50,6 +67,7 @@ PATH/config/parser runtime is removed only after SDK parity tests pass.
 │   │   ├── settings.go                     # versioned atomic non-secret settings store
 │   │   ├── secret.go                       # narrow SecretStore contract and secret refs
 │   │   ├── ngrok.go                        # pinned official SDK adapter
+│   │   ├── public_ingress.go               # deny-all/exact-Host auth streaming ingress
 │   │   ├── *_test.go                       # fake, lifecycle, race, redaction, settings tests
 │   │   ├── config.go                       # delete CLI/env parsing or reduce to non-production seam
 │   │   ├── process*.go                     # DELETE after embedded parity
@@ -129,7 +147,7 @@ master and player frontends
 **New runtime dependencies**: `golang.ngrok.com/ngrok/v2 v2.1.4`,
 `github.com/keybase/go-keychain v0.0.1`  
 **Network**: existing `0.0.0.0:3690` HTTP/ConnectRPC player listener; embedded SDK forwards only to
-`http://127.0.0.1:3690`  
+one loopback-only application ingress, which alone streams to `http://127.0.0.1:3690`
 **Persistence**: macOS Keychain for two secrets; version-1 atomic JSON in the existing Application
 Support directory for non-secret preferences  
 **Startup target**: ~~95% ready/terminal-error within 15s on responsive network; every attempt
@@ -138,10 +156,11 @@ declared responsive-network and valid-account prerequisites reach ready/terminal
 and all finish within 30s; otherwise record the real sample `NOT RUN`. A separate 100-schedule
 deterministic timeout/cancellation gate is not provider-performance evidence.
 
-**Shutdown target**: ~~policy deny plus all owned cleanup~~ **BUG-001**: URL withdrawal plus
-endpoint/Agent and all owned cleanup within the existing single 5s application budget
-**Scale**: one master window, one player server, zero/one endpoint, four to seven representative
-players, concurrent start/stop/reconfigure schedules  
+**Shutdown target**: ~~policy deny plus all owned cleanup~~ ~~**BUG-001**: URL withdrawal plus
+endpoint/Agent cleanup.~~ **BUG-003**: ingress deny → URL withdrawal → endpoint/Agent close →
+ingress close and all remaining owned cleanup within the existing single 5s application budget
+**Scale**: one master window, one player server, zero/one endpoint, zero/one private ingress, four
+to seven representative players, concurrent start/stop/reconfigure schedules
 **Conditional gates**: real ngrok/account/domain, Developer ID, notarization, stapling, DMG,
 Gatekeeper, and provider-plan features
 
@@ -154,16 +173,22 @@ conclusions are:
   URL retrieval, terminal `Done`, and bounded explicit close;
 - cancellation must trigger explicit endpoint close/disconnect rather than being treated as cleanup;
 - ~~application Basic Auth remains at the player HTTP boundary until separate real streaming
-  evidence supports any edge-policy move~~ **BUG-001**: Basic Auth is configured on the ngrok Agent
-  Endpoint because the feature's purpose is casual sharing and direct local/LAN traffic must remain
-  unchanged; a focused opt-in non-empty `Subscribe` is retained as honest compatibility evidence;
-- ~~the owned `WithUpstreamDialer` path binds SDK connections to `127.0.0.2`~~ **BUG-001**: the SDK
-  uses its ordinary upstream connection to the fixed `http://127.0.0.1:3690`; no source/Host
-  discriminator or custom upstream dialer remains;
+  evidence supports any edge-policy move~~ ~~**BUG-001**: Basic Auth is configured on the ngrok
+  Agent Endpoint because the feature's purpose is casual sharing and direct local/LAN traffic must
+  remain unchanged; a focused opt-in non-empty `Subscribe` is retained as honest compatibility
+  evidence.~~ **BUG-003**: the real edge-policy path loaded static content but stalled before the
+  initial snapshot. Basic Auth returns to a non-buffering application-owned private ingress; direct
+  local/LAN traffic remains outside it;
+- ~~the owned `WithUpstreamDialer` path binds SDK connections to `127.0.0.2`~~ ~~**BUG-001**: the SDK
+  uses its ordinary upstream connection directly to `http://127.0.0.1:3690` with no Host
+  discriminator.~~ **BUG-003**: the SDK uses its ordinary upstream connection only to the private
+  ingress; exact Host/auth is enforced there and no custom upstream dialer remains;
 - the selected Keychain adapter calls Security.framework directly and uses isolated dev/prod service
   namespaces;
 - every launch loads settings but starts public access only after explicit UI intent;
-- CLI/env/process mechanisms are removed rather than retained as fallback.
+- ~~CLI/env/process mechanisms are removed rather than retained as fallback.~~ **BUG-003
+  reconciliation**: CLI, process, and legacy production env mechanisms are removed rather than
+  retained as fallback; only the exact FR-056 dev/test adapter remains.
 
 ## Phase 1: Design and contracts
 
@@ -171,8 +196,9 @@ conclusions are:
   generation/revision state machine, ephemeral provider-endpoint input, and mutation rules.
 - [private-public-access.md](contracts/private-public-access.md) defines exact protobuf messages,
   Wails methods, named event, UI facade, redacted errors, and one-time generated result.
-- [public-host-auth.md](contracts/public-host-auth.md) retains the superseded Host/source design as
-  history and defines the current ngrok endpoint Basic Auth boundary plus local/LAN separation.
+- [public-host-auth.md](contracts/public-host-auth.md) retains the superseded source-bound and
+  Traffic Policy designs as history and defines the current application-owned private ingress,
+  exact-Host activation, Basic Auth, streaming, and local/LAN separation.
 - [tunnel-service.md](contracts/tunnel-service.md) defines provider-neutral SDK/fake lifecycle and
   deletion of the process runtime.
 - [quickstart.md](quickstart.md) defines deterministic, real-network, Keychain, race, streaming,
@@ -234,33 +260,44 @@ password rule, ≥128-bit generator source, and zero secret formatting.
 target macOS host cannot bind that unassigned address, and the personal-use requirement does not
 need a hostile-client transport discriminator.
 
-1. Keep the existing player HTTP/Connect handler and the one listener on port 3690 unchanged.
-2. Construct an in-memory ngrok Basic Auth Traffic Policy from the scoped username/password and
-   attach it while creating the Agent Endpoint; never write a policy file or expose policy text.
-3. Forward only to the fixed `http://127.0.0.1:3690` upstream using the SDK's ordinary connection
-   path. Do not configure `WithUpstreamDialer`, a source alias, Host admission, or a second server.
-4. Publish the URL only after `Forward` returns a validated HTTPS endpoint with the policy attached.
-5. Direct local/LAN requests never traverse ngrok and therefore remain unauthenticated.
+1. Keep the existing player HTTP/Connect handler and the one authoritative player listener on port
+   3690 unchanged.
+2. ~~Construct an in-memory ngrok Basic Auth Traffic Policy from the scoped username/password and
+   attach it while creating the Agent Endpoint.~~ **BUG-003**: Start one owned private loopback
+   ingress in deny-all mode. It contains no game state or player service and forwards accepted
+   requests to `http://127.0.0.1:3690` without buffering streaming responses.
+3. ~~Forward only to the fixed `http://127.0.0.1:3690` upstream using the SDK's ordinary connection
+   path.~~ **BUG-003**: The SDK forwards only to that private ingress and receives no player
+   username/password or Traffic Policy. The ingress alone targets the fixed player service.
+4. After `Forward` returns, validate the HTTPS URL, atomically activate exact Host plus Basic Auth
+   on the deny-all ingress, then mark ready and publish. On stop/failure/reconfigure/shutdown, deny
+   the public Host before closing the endpoint and ingress.
+5. Direct local/LAN requests continue to reach port 3690 without traversing the private ingress and
+   therefore remain unauthenticated.
 
-Deterministic tests inspect a provider-neutral policy request rather than its rendered secret text,
-prove empty credentials fail before endpoint creation, and cover static/unary/stream intent. One
-explicit opt-in real test checks `401` for missing/wrong credentials and incremental `Subscribe`
-with correct credentials; without prerequisites it is `NOT RUN`.
+Deterministic tests inspect activation intent without rendering secrets and prove deny-before-Host,
+exact Host, missing/wrong/correct Basic Auth, Authorization stripping, static/unary/streaming parity,
+and local/LAN isolation. A secret-safe real diagnostic records only response status/content type,
+upstream arrival, and header/first-frame timing. BUG-003 cannot close until an explicitly opted-in
+real run passes initial snapshot, later update, reconnect, and multi-client convergence; `NOT RUN`
+remains honest evidence status but is not bug closure.
 
 ### 4. Implement the embedded provider and lifecycle manager
 
 1. Add the provider-neutral `TunnelService`/`TunnelEndpoint` contract and deterministic fake with
    controlled Start, URL, `Done`, Close, clock, failures, and active-count observation.
-2. Implement `ngrok.go` using an explicit `v2.1.4` Agent, scoped token, fixed loopback upstream,
-   omitted URL for random assignment, exact `WithURL` for a reserved domain, and an in-memory Basic
-   Auth Traffic Policy created from scoped Keychain values. No custom upstream dialer or policy file
-   exists.
+2. ~~Implement `ngrok.go` with an in-memory Basic Auth Traffic Policy and direct player upstream.~~
+   **BUG-003**: Keep the explicit `v2.1.4` Agent, scoped account token, random/exact URL options, and
+   endpoint-owned context, but omit Traffic Policy and forward to the owned private ingress. The
+   ingress holds the scoped username/password only for its active exact-Host policy and streams to
+   the fixed player upstream.
 3. Implement `PublicAccessManager` states `disabled`, `starting`, `ready`, `stopping`, `failed` with
    generation and settings revision. Network/store/event calls occur outside locks; every completion
    revalidates its generation/revision/state.
-4. Enforce the no-window sequence: acquire the already protected endpoint privately → validate its
-   HTTPS URL → mark ready/publish. Withdraw the reusable URL before Close on stop, reconfigure,
-   `Done`, failure, and shutdown; endpoint close is the public admission shutdown boundary.
+4. Enforce the no-window sequence: start deny-all ingress → acquire endpoint privately → validate
+   HTTPS URL → atomically activate exact Host/auth → mark ready/publish. On stop, reconfigure,
+   `Done`, failure, and shutdown, deny ingress before withdrawing reusable URL and closing endpoint;
+   close the ingress within the same bounded cleanup.
 5. Make repeated/concurrent Start and Stop join one intent, make reconfigure close before restart,
    and make stale successes close themselves without publication.
 6. Monitor `Done` and disconnect events; map failures to redacted categories and preserve local/LAN.
@@ -271,7 +308,7 @@ with correct credentials; without prerequisites it is `NOT RUN`.
    `ERR_NGROK_<digits>` code, never as raw SDK diagnostic text.
 
 Lifecycle/race tests use 100 schedules, transition probes, timeout/cancellation, partial acquisition,
-late completion, close failure/retry, unexpected `Done`, maximum-one-endpoint assertions, local
+late completion, close failure/retry, unexpected `Done`, maximum-one-endpoint/ingress assertions, local
 fallback, shared five-second shutdown budget, and a fake forwarder that binds `Done` to the exact
 context supplied to `Forward`. SDK integration tests are explicit opt-in and report `NOT RUN`
 without real credentials/connectivity.
@@ -298,9 +335,11 @@ without real credentials/connectivity.
 5. Keep password input/result out of reusable module state and all storage. Clear manual inputs after
    call; clear generated DOM/closure/result on Copy or dismissal. Never offer Reveal or reconstruct
    full credentials from a saved password.
-6. ~~Change shutdown ownership so manager deny/endpoint cleanup occurs first~~ **BUG-001**: Change
-   shutdown ownership so manager URL withdrawal and endpoint/Agent cleanup occur first, then
-   existing player, session, and desktop cleanup within the same fresh five-second Wails context.
+6. ~~Change shutdown ownership so manager deny/endpoint cleanup occurs first~~ ~~**BUG-001**: Change
+   shutdown ownership so manager URL withdrawal and endpoint/Agent cleanup occur first.~~
+   **BUG-003**: Manager shutdown first denies ingress admission, then withdraws the URL, closes the
+   endpoint/Agent and ingress, and finally continues existing player, session, and desktop cleanup
+   within the same fresh five-second Wails context.
 
 Browser tests cover loading/empty/error/starting/ready/stopping/failed rendering, event/snapshot
 races, stale UI completion, keyboard navigation, secure input clearing, one-time Copy, no Reveal,
@@ -336,8 +375,13 @@ gates pass:
 - scan active docs, code, package resources, generated output, and tests to prove no second
   production tunnel mechanism or `NGROK_BIN` survives.
 
-The narrow automation seam is constructor/test-harness injection into the same SDK manager. It has
-no external process option and is unavailable to packaged UI.
+The narrow automation seam is constructor/test-harness injection into the same SDK manager plus one
+canonical dev/test composition adapter for the four exact FR-056 environment names. Non-empty
+environment values take precedence for that process; domain/username may prefill the form, while
+token/password remain presence-only and enter only scoped explicit-start use. The adapter never writes
+Keychain/settings implicitly, never seeds a secret Save mutation, auto-starts, logs values, or starts
+an external process. Explicit Save keeps ordinary visible non-secret semantics. Packaged production
+does not register or consult the adapter.
 
 After deletion, rerun the legacy, dependency/license, leak, reproducibility, package, offline smoke,
 and lifecycle gates against the final tree before any conditional external acceptance or completion
@@ -361,11 +405,12 @@ deletion.
    Install locked npm dependencies before any protobuf gate that reads `client/node_modules`, then
    run the separate bounded canonical `go run ./cmd/build dev` master/player smoke without a
    separately started frontend or player server.
-4. With real credentials, run random URL, reserved domain, invalid/revoked token,
-   ~~Host override~~ **BUG-001** missing/wrong/correct Basic Auth, authenticated
-   static/unary/non-empty incremental stream, reconnect, stop/reconfigure, crash/quit, and packaged
-   UI journeys. Without credentials/connectivity, record each as `NOT RUN`; do not count the fake
-   fixture.
+4. With real credentials, run random URL, reserved domain, invalid/revoked token, exact/unknown Host,
+   missing/wrong/correct Basic Auth, authenticated static/unary/non-empty incremental stream,
+   reconnect, multi-client convergence, stop/reconfigure, crash/quit, and packaged UI journeys.
+   Without credentials/connectivity, record each as `NOT RUN`; do not count the fake fixture.
+   **BUG-003** remains open until the initial snapshot plus a later update pass through the real
+   endpoint; static-only success is a recorded `FAIL`, not partial streaming evidence.
 5. Run Developer ID/notary/staple/DMG/Gatekeeper gates only with their real prerequisites; otherwise
    record separate `NOT RUN` outcomes.
 6. Reconcile the full evidence matrix in `quickstart.md` against the final candidate digest. No
@@ -375,22 +420,25 @@ deletion.
 
 | Layer | Main files | Required proof |
 |---|---|---|
-| Unit | `internal/tunnel/*_test.go`, `internal/player/http_test.go`, `internal/platform/keychain_test.go`, contract tests | validation, state transitions, generation/revision, redaction, stores, ~~Host/Auth~~ **BUG-001** endpoint-policy input, **BUG-002** startup/owned-lifetime handoff, generator, idempotence |
+| Unit | `internal/tunnel/*_test.go`, `internal/player/http_test.go`, `internal/platform/keychain_test.go`, contract tests | validation, state transitions, generation/revision, redaction, stores, **BUG-003** deny-all/exact-Host ingress auth and non-buffering proxy, **BUG-002** startup/owned-lifetime handoff, generator, idempotence |
 | Race | `go test -race ./...` plus focused 100-schedule tests | ~~no mixed grant, stale activation~~ **BUG-001** no mixed revision or stale publication, duplicate endpoint, event/order, or stop/reconfigure race |
-| Lifecycle integration | `app_test.go`, `wails_host_test.go`, fake endpoint/store/network/clock | local-first, policy-before-publish, ~~deny-before-close~~ **BUG-001** URL-withdrawal-before-endpoint-close, `Done`, partial startup, five-second cleanup |
-| HTTP/ConnectRPC | real in-process server and protected fixture | all static/RPC paths, ~~exact/unknown/local Host and constant-time auth~~ **BUG-001** endpoint-auth fixture outcomes and local/LAN no-challenge, non-empty streaming, reconnect |
+| Lifecycle integration | `app_test.go`, `wails_host_test.go`, fake endpoint/ingress/store/network/clock | local-first, deny-all→endpoint→exact-Host/auth→publish, deny-before-close, `Done`, partial startup, five-second cleanup |
+| HTTP/ConnectRPC | real in-process server and protected fixture | all static/RPC paths, exact/unknown/local Host and constant-time auth at the private ingress, local/LAN no-challenge, Authorization stripping, non-empty streaming, reconnect |
 | Contract/drift | Buf/proto scripts, `app_contract_test.go`, Wails checks | public/private isolation, reserved removals, explicit adapters, deterministic generated outputs |
 | Browser | Playwright desktop and multi-client player journeys | UI-only management, one-time Copy, full player behavior, stale UI rejection, accessibility |
-| Leak | canary script plus Go/browser tests | zero token/password exposure across every prohibited surface and shipped artifact |
-| Build/package | canonical build tool, reproducibility/package scripts | exact graph, licenses, offline launch, arm64/macOS13, no CLI/PATH/download, package cleanup |
-| External | opt-in SDK/Playwright/package journeys | real endpoint/domain/stream/~~Host~~ **BUG-001** auth/quit evidence or explicit `NOT RUN` |
+| Dev/test override | root composition, tunnel secret/settings adapters, desktop browser tests | exact four names, per-field env-first precedence, empty/unset fallback, domain/username prefill, secret presence-only, explicit start, no implicit persistence/auto-start or secret Save mutation |
+| Leak | canary script plus Go/browser tests | zero token/password exposure across every prohibited surface—including environment-derived values—and shipped artifact |
+| Build/package | canonical build tool, reproducibility/package scripts | exact graph, licenses, offline launch, arm64/macOS13, no CLI/PATH/download, package cleanup, production ignores test env names |
+| External | opt-in SDK/Playwright/package journeys | real endpoint/domain/exact-Host/auth/static/unary/initial snapshot/later update/reconnect/quit evidence; `NOT RUN` is honest but cannot close BUG-003 |
 
 ## Risk controls
 
 - ~~Unknown external Host currently passes: make all-path dynamic policy foundational and test it
-  before connecting the SDK.~~ **BUG-001**: The player application no longer owns public Host
+  before connecting the SDK.~~ ~~**BUG-001**: The player application no longer owns public Host
   admission. The ngrok endpoint Basic Auth policy is active before URL publication, while direct
-  local/LAN traffic remains outside the endpoint.
+  local/LAN traffic remains outside the endpoint.~~ **BUG-003**: Real streaming invalidated that edge
+  boundary. The private ingress starts deny-all and accepts only the atomically active exact Host
+  plus Basic Auth; local/LAN traffic remains outside it.
 - **SDK cancellation is not cleanup**: always call bounded endpoint close then Agent disconnect; use
   `Done` only as a signal. **BUG-002**: the context passed to SDK `Forward` belongs to the acquired
   endpoint after commit; a completed manager startup operation cannot own or cancel that lifetime.
@@ -401,16 +449,29 @@ deletion.
   individually durable, reconcile actual presence after failure, and never restart a partially
   validated revision.
 - ~~**Host-based local/public distinction is unsafe**: classify the dedicated `127.0.0.2` SDK
-  source before Host and fail closed when source binding fails.~~ **BUG-001**: application
+  source before Host and fail closed when source binding fails.~~ ~~**BUG-001**: application
   Host/source classification is removed; the personal-use endpoint is protected at ngrok and
   local/LAN traffic is separated by topology. A real streaming/auth check remains opt-in evidence,
-  not an unconditional source-binding gate.
+  not an unconditional source-binding gate.~~ **BUG-003**: Public traffic is structurally isolated
+  because only the SDK targets the loopback-only ingress; that ingress requires exact active Host
+  plus Basic Auth, while local/LAN traffic bypasses it to the player listener.
 - **Keychain behavior varies with identity/state**: isolate dev/prod services and keep real packaged
   locked/denied/signing evidence separate from fakes.
+- **Environment values are observable process state**: recognize only the four FR-056 names in the
+  canonical dev/test composition, never enumerate or print their values, treat secret values as
+  scoped inputs, and prove the packaged production composition ignores them.
 - **Schema cleanup is intentionally incompatible internally**: reserve removed fields, document the
   migration, update the baseline once, and continue running the breaking gate afterward.
 - **Conditional gates can be unavailable**: label them `NOT RUN`; never convert missing credentials
-  or a deterministic fake into release/public-endpoint proof.
+  or a deterministic fake into release/public-endpoint proof. Once an available real run reports
+  the BUG-003 streaming failure, `NOT RUN` cannot replace the required corrective real rerun.
+
+## Convergence follow-up
+
+After BUG-003 closure, T096 removes the superseded root startup tunnel owner per FR-037–FR-039.
+T097 ensures environment-derived domain and username values remain ephemeral during Load, Start,
+Stop, and Generate, while explicit Save retains ordinary visible-setting persistence per FR-056
+and SC-015.
 
 ## Completion gate
 
@@ -418,4 +479,7 @@ Feature 007 is ready for task generation only after this plan is approved. Imple
 complete only when the embedded SDK path has parity, the CLI/process path and active documentation
 are gone, direct canonical build commands pass without Make, package smoke proves no external
 binary/PATH dependency, secrets have zero forbidden leaks, and every unavailable external gate is
-honestly recorded as `NOT RUN`.
+honestly recorded as `NOT RUN`. **BUG-003** adds a blocking exception: this bug cannot close until a
+real authenticated public stream delivers its initial snapshot and a later update without ending.
+The optional FR-056 adapter is test ergonomics only and cannot become a packaged-launch prerequisite
+or an alternative production credential store.

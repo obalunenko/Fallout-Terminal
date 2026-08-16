@@ -11,6 +11,22 @@ atomicity and makes conditional startup measurement executable.
 of a committed embedded ngrok endpoint and permits only a validated provider error code alongside
 fixed redacted failure text.
 
+**Bugfix**: 2026-08-16 — BUG-003 treats the observed real ngrok `Subscribe` stall as blocking,
+supersedes Traffic Policy Basic Auth for the active production path, and restores a non-buffering
+application-owned public ingress boundary without adding a second player service.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification follow-up supersedes the remaining BUG-001 Host
+wording and makes real streaming `PASS`, rather than `NOT RUN`, mandatory only for BUG-003 closure.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up defines one dev/test-only environment
+override for repeat ngrok runs without weakening packaged Keychain storage or secret readback rules.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation aligns secret-source,
+persistence, and deny-before-withdraw wording with FR-056 and the private-ingress lifecycle.
+
+**Bugfix**: 2026-08-16 — BUG-003 non-secret username reconciliation separates approved username
+settings/snapshot exposure from password-only confinement.
+
 **Feature Directory**: `007-embedded-ngrok-access`  
 **Created**: 2026-08-15  
 **Status**: Approved  
@@ -30,6 +46,18 @@ desktop application through the game master's own ngrok account.
   no character-class composition rules.
 - Q: How does the application limit repeated invalid Basic Auth attempts? → A: It adds no
   application-level rate limit or account lockout and leaves any upstream throttling to ngrok.
+
+### Session 2026-08-16
+
+- Q: How can repeated development and real-service tests avoid re-entering every ngrok setting in
+  Keychain? → A: Only the canonical development/test composition may read
+  `FALLOUT_NGROK_AUTHTOKEN`, `FALLOUT_NGROK_RESERVED_DOMAIN`,
+  `FALLOUT_PUBLIC_TEST_USERNAME`, and `FALLOUT_PUBLIC_TEST_PASSWORD`. A non-empty environment value
+  wins over its persisted/Keychain counterpart for that run. Domain and username prefill the form;
+  token and password remain presence-only and are consumed transiently. Packaged production ignores
+  these variables, and ~~the override never saves~~ **BUG-003 reconciliation** loading or using the
+  override never implicitly saves, starts public access, or exposes a secret value; an explicit Save
+  retains ordinary semantics only for visible non-secret fields.
 
 ## User Scenarios & Testing
 
@@ -65,6 +93,11 @@ available while both secret values remain unreadable.
    plaintext fallback is created.
 6. **Given** a manually entered password shorter than eight characters, **When** the game master
    tries to save it, **Then** the UI rejects it without requiring any specific character classes.
+7. **Given** the canonical development/test profile starts with one or more supported non-empty
+   environment overrides, **When** public-access settings load, **Then** domain and username are
+   prefilled from the override, token/password report presence without plaintext readback, and the
+   effective values can be used for an explicit start without being persisted or auto-started;
+   the same variables have no effect in a packaged production build.
 
 ---
 
@@ -93,8 +126,10 @@ before returning any player resource.
    attempted, **Then** the UI shows a clear redacted domain error and does not publish a URL.
 4. ~~**Given** startup is still in progress, **When** a request arrives for the prospective external
    host, **Then** no public resource or player request is accepted before authorization is active.~~
-   **BUG-001**: The UI does not publish the endpoint until ngrok has created it with its complete
-   Basic Auth Traffic Policy; direct local/LAN access remains independent.
+   ~~**BUG-001**: The UI does not publish the endpoint until ngrok has created it with its complete
+   Basic Auth Traffic Policy.~~ **BUG-003**: The UI does not publish the endpoint until the private
+   ingress has atomically activated exact Host plus Basic Auth; direct local/LAN access remains
+   independent.
 5. **Given** public access is ready, **When** the game master copies sharing information, **Then**
    the address and username are available while an already stored password is not reconstructed.
 6. **Given** a protected endpoint has been acquired and committed, **When** the bounded startup
@@ -128,12 +163,17 @@ confirm that the browser reconnects to authoritative state.
 4. **Given** an authenticated player loses connectivity, **When** connectivity returns, **Then**
    the player reconnects and converges on current authoritative state.
 5. ~~**Given** correct credentials but an unknown external `Host`, **When** a request arrives,
-   **Then** it is rejected fail-closed.~~ **BUG-001**: Public admission is scoped by possession of
+   **Then** it is rejected fail-closed.~~ ~~**BUG-001**: Public admission is scoped by possession of
    the active ngrok URL and its Basic Auth policy; the player application does not implement a
-   separate hostile-client Host/source boundary.
+   separate hostile-client Host/source boundary.~~ **BUG-003**: The private application ingress now
+   rejects unknown, inactive, stale, or malformed Host before authentication or player routing.
 6. **Given** repeated invalid Basic Auth attempts, **When** a later request supplies the correct
    credentials, **Then** the application accepts it without an application-imposed lockout unless
    the external provider is independently throttling traffic.
+7. **Given** an active game session and correct public credentials, **When** a player opens the real
+   ngrok URL, **Then** `Subscribe` returns the ConnectRPC streaming content type, delivers one
+   complete initial snapshot within five seconds and at least one later non-empty update without
+   ending the stream; loading static HTML alone does not satisfy this scenario.
 
 ---
 
@@ -233,9 +273,11 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - How are missing, malformed, stale, or incorrect Basic Auth credentials rejected for both static
   resources and player operations?
 - ~~How is an external `Host` rejected before authorization activation, after stop, and during the
-  disable-before-close interval?~~ **BUG-001**: How does endpoint Basic Auth reject missing or wrong
-  credentials before forwarding, and how do URL withdrawal plus endpoint close prevent access after
-  stop, reconfigure, or failure?
+  disable-before-close interval?~~ ~~**BUG-001**: How does endpoint Basic Auth reject missing or
+  wrong credentials before forwarding, and how do URL withdrawal plus endpoint close prevent access
+  after stop, reconfigure, or failure?~~ **BUG-003**: How does the private ingress reject an unknown
+  Host or missing/wrong Basic Auth before forwarding, and how do deny-first admission, URL
+  withdrawal, endpoint close, and ingress close prevent access after stop, reconfigure, or failure?
 - How does a long-lived non-empty stream behave across idle periods, transient network loss, and
   browser reconnect?
 - How does local play recover when a public endpoint fails while local players are active?
@@ -292,19 +334,27 @@ reconfiguring states, then confirm cleanup completes within the established shut
   Auth Traffic Policy are ready.~~ **BUG-001 follow-up**: The public URL MUST remain absent from
   every UI command result, reusable snapshot, status, and named event until lifecycle state is
   `ready`.
-- **FR-021**: The ngrok endpoint boundary MUST require the correct Basic Auth username-password
-  pair before forwarding any public static resource or ConnectRPC request to the player service.
+- **FR-021**: ~~The ngrok endpoint boundary MUST require the correct Basic Auth username-password
+  pair before forwarding any public static resource or ConnectRPC request to the player service.~~
+  **BUG-003**: A non-buffering application-owned public ingress boundary MUST require the correct
+  Basic Auth username-password pair before forwarding any public static resource or ConnectRPC
+  request to the player service; ngrok Traffic Policy Basic Auth is superseded for the active path.
 - **FR-022**: ~~The exact external `Host` and its authorization policy MUST become active atomically
-  before the public URL is published.~~ **BUG-001**: Endpoint creation and its Basic Auth Traffic
+  before the public URL is published.~~ ~~**BUG-001**: Endpoint creation and its Basic Auth Traffic
   Policy MUST complete as one private startup operation before the public URL is published.
   **BUG-001 follow-up**: The provider adapter MUST create the endpoint with its complete Basic Auth
   Traffic Policy in the same operation and MUST NOT return an unprotected endpoint handle to the
-  manager.
+  manager.~~ **BUG-003**: The application-owned ingress
+  MUST begin deny-all, then atomically activate the validated exact public Host and Basic Auth
+  credentials before lifecycle state becomes `ready` or any URL is published.
 - **FR-023**: ~~The public endpoint MUST reject every unknown external `Host` before startup
-  completes, during reconfiguration, during stopping, and after failure.~~ **BUG-001**: The player
+  completes, during reconfiguration, during stopping, and after failure.~~ ~~**BUG-001**: The player
   application MUST NOT infer public ingress from `RemoteAddr`, forwarding headers, or Host; public
   admission belongs solely to the active ngrok endpoint policy, while direct local/LAN requests
-  remain on the existing player listener without Basic Auth.
+  remain on the existing player listener without Basic Auth.~~ **BUG-003**: The active ngrok SDK
+  endpoint MUST forward only to an owned private loopback ingress that enforces exact active Host
+  plus Basic Auth and streams to the unchanged player listener. Direct local/LAN requests continue
+  to reach the player listener without that challenge.
 - **FR-024**: Public authorization MUST preserve incremental delivery for a non-empty long-lived
   `Subscribe` stream without buffering it to completion or converting it into a single response.
 - **FR-025**: An authenticated public player MUST retain character selection, navigation, hacking,
@@ -322,7 +372,8 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-030**: Applying settings while public access is active MUST close the old protected endpoint
   before starting the replacement configuration.
 - **FR-031**: A replacement public URL MUST remain hidden until the replacement endpoint and its
-  Basic Auth Traffic Policy are ready.
+  ~~Basic Auth Traffic Policy~~ **BUG-003** private ingress exact-Host/Basic-Auth activation are
+  ready.
 - **FR-032**: Stop, reconfigure, failure, and quit paths MUST withdraw the published URL and close
   the owned endpoint; the application MUST NOT present a stale URL as active. **BUG-002**: An
   unexpected provider disconnect MAY add only a syntactically validated `ERR_NGROK_<digits>` code
@@ -340,8 +391,8 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-038**: The shipped application MUST contain exactly one production public-access mechanism.
 - **FR-039**: The feature MUST retain only one narrow development/test injection seam that routes
   non-secret settings and transient user-supplied credentials through the same embedded provider
-  path, never places secrets in process arguments, remains unavailable to packaged UX, and cannot
-  start an external ngrok process.
+  path. The seam MAY read only the four names in FR-056, never places secrets in process arguments,
+  is excluded from or ignored by packaged production, and cannot start an external ngrok process.
 - **FR-040**: The required packaged profile MUST remain macOS 13 or later on `arm64` Apple Silicon,
   with Windows and Linux excluded from acceptance.
 - **FR-041**: Public distribution, Developer ID credentials, notarization, and provider-plan limits
@@ -373,10 +424,35 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - **FR-053**: The application MUST restrict secret-bearing private protobuf results to the single
   initial return of a newly generated player password for explicit Copy, with no existing-secret
   readback, named-event publication, or persistence in frontend state or storage.
-- **FR-054**: The player username and password MAY be supplied transiently to the pinned ngrok SDK
-  only to construct the active endpoint's Basic Auth Traffic Policy. They MUST NOT be written to a
-  policy file, command line, environment variable, reusable DTO/event/status, fixture, diagnostic,
-  or application-managed persistence surface.
+- **FR-054**: ~~The player username and password MAY be supplied transiently to the pinned ngrok SDK
+  only to construct the active endpoint's Basic Auth Traffic Policy.~~ **BUG-003**: The pinned ngrok
+  SDK MUST NOT receive the player username or password. ~~The application-owned ingress MAY receive
+  them only through scoped secret use for atomic active-policy installation. Production secrets
+  MUST come from Keychain. The explicit FR-056 development/test override is the sole environment
+  exception; values MUST NOT be written to a policy file, command line, reusable DTO/event/status,
+  fixture, diagnostic, or application-managed persistence surface.~~ **BUG-003 username
+  reconciliation**: The ingress receives normalized username from effective non-secret preferences
+  and password only through scoped secret use for atomic active-policy installation. Username MAY
+  appear in the existing non-secret settings, master snapshot/UI, explicit Save, and Copy surfaces.
+  Production password MUST come from Keychain; the exact FR-056 dev/test password override is the
+  sole environment exception. Password MUST NOT enter a policy file, command line, reusable DTO/
+  event/status, fixture, diagnostic, or application-managed persistence surface.
+- **FR-055**: After the reported real ngrok streaming failure, feature completion MUST require an
+  explicitly opted-in real public run that observes authenticated static and unary success, an
+  initial non-empty `Subscribe` snapshot within five seconds, a later update before stream end,
+  reconnect and multi-client convergence. `NOT RUN`, static-only success, a finite GET, or a
+  deterministic provider substitute MUST NOT close BUG-003.
+- **FR-056**: In canonical development/test composition only, each non-empty
+  `FALLOUT_NGROK_AUTHTOKEN`, `FALLOUT_NGROK_RESERVED_DOMAIN`,
+  `FALLOUT_PUBLIC_TEST_USERNAME`, or `FALLOUT_PUBLIC_TEST_PASSWORD` value MUST override the matching
+  Keychain/persisted value for the current process. Domain and username MUST prefill the settings
+  form; token and password MUST expose only presence and MUST be scoped directly into explicit
+  start operations without plaintext UI readback or a secret mutation in Save. Loading or using the
+  override MUST NOT implicitly write Keychain or JSON, auto-save, auto-start, alter either version-1
+  game format, or affect packaged production. Environment-derived token/password values MUST NOT
+  enter logs/events/status/diagnostics; effective domain/username MAY appear only on the existing
+  secret-free master settings surface. An explicit Save MAY retain its ordinary semantics for those
+  visible non-secret fields. An absent/empty variable MUST fall back to the ordinary stored source.
 
 ### Out of Scope
 
@@ -421,13 +497,16 @@ reconfiguring states, then confirm cleanup completes within the established shut
   prerequisites the real sample is `NOT RUN`. A separate 100-schedule deterministic gate MUST prove
   timeout and cancellation behavior, including the startup-to-owned-endpoint lifetime handoff, but
   MUST NOT be presented as provider-performance evidence.
-- **SC-002**: In deterministic policy construction and each available real-endpoint acceptance run,
+- **SC-002**: In deterministic ~~policy construction~~ **BUG-003** ingress construction/activation
+  and each available real-endpoint acceptance run,
   zero public static resources or player operations succeed through the active ngrok URL without
   correct Basic Auth; direct local/LAN requests remain unaffected.
 - **SC-003**: Every existing player browser journey passes through the public address when real
   opt-in prerequisites are supplied, including a non-empty incremental `Subscribe` and reconnection
-  to current authoritative state within 5 seconds under test conditions. Without prerequisites the
-  real portion is `NOT RUN`, not a release-blocking deterministic failure.
+  to current authoritative state within 5 seconds under test conditions. ~~Without prerequisites
+  the real portion is `NOT RUN`, not a release-blocking deterministic failure.~~ **BUG-003**: For
+  unrelated ordinary qualification, absent prerequisites remain honest `NOT RUN`; after the
+  reported real streaming failure, BUG-003 and T095 cannot close until this real journey is `PASS`.
 - **SC-004**: During every simulated provider, network, token, domain, timeout, and secure-store
   failure, 100% of the existing local/LAN acceptance journey remains usable without restarting the
   application.
@@ -452,8 +531,17 @@ reconfiguring states, then confirm cleanup completes within the established shut
   characters and accepts values of eight or more characters without requiring particular character
   classes.
 - **SC-013**: In an available real-endpoint acceptance run without provider throttling, missing and
-  incorrect Basic Auth are rejected by ngrok and the next request with correct credentials succeeds
-  without an application-imposed cooldown or lockout; otherwise this criterion is `NOT RUN`.
+  incorrect Basic Auth are rejected ~~by ngrok~~ **BUG-003** by the application-owned ingress and
+  the next request with correct credentials succeeds without an application-imposed cooldown or
+  lockout; otherwise this criterion is `NOT RUN`.
+- **SC-014**: In every BUG-003 real-endpoint acceptance run, each authenticated player leaves
+  `УСТАНОВКА СВЯЗИ...` within five seconds after `Subscribe` begins, receives a complete initial
+  snapshot plus a later non-empty update before stream completion, and reconnects to current
+  authoritative state; any static-only load or indefinite overlay is `FAIL`.
+- **SC-015**: The dev/test override matrix proves all four exact environment names independently
+  and together, non-empty precedence, empty/unset fallback, visible non-secret prefill, secret
+  presence-only behavior, explicit-start usability, zero implicit persistence/auto-start/leakage,
+  no secret Save mutation, and zero effect in the packaged production profile.
 
 ## Assumptions
 
@@ -469,14 +557,19 @@ reconfiguring states, then confirm cleanup completes within the established shut
   once after generation; an already stored password is never reconstructed for copying.
 - The 15-second readiness target assumes a responsive provider and network; the 30-second terminal
   bound applies even when they are unresponsive.
-- The development/test injection seam in FR-039 is available only to automation, uses the same
-  embedded provider behavior as production, and provides no external-process fallback.
+- The development/test injection seam in FR-039/FR-056 is available only to canonical development
+  and test composition, uses the same embedded provider behavior as production, provides no
+  external-process fallback, and does not make packaged launch depend on Terminal environment.
 - Basic Auth attempt throttling, when present, is an external ngrok behavior and is not an
   application acceptance guarantee.
 - The personal-use threat model prevents accidental entry through the shared ngrok URL; it does not
   claim a hardened in-application hostile-client Host/source boundary.
-- The player password is disclosed transiently to ngrok as endpoint Traffic Policy configuration;
-  the application still stores it only in Keychain and never reads it back into reusable UI state.
+- ~~The player password is disclosed transiently to ngrok as endpoint Traffic Policy
+  configuration.~~ ~~**BUG-003**: The player password never enters ngrok; it is scoped from Keychain
+  only into the active private ingress and is never read back into reusable UI state.~~ **BUG-003
+  reconciliation**: The player password never enters ngrok; production scopes it from Keychain and
+  canonical dev/test composition may scope the FR-056 override into the active private ingress. It
+  is never read back into reusable UI state.
 - Real external-service, signing, notarization, and provider-plan validation uses user-supplied
   prerequisites and remains conditional.
 
@@ -486,8 +579,9 @@ reconfiguring states, then confirm cleanup completes within the established shut
 - Provider name: `ngrok`.
 - Initial player username: `players`.
 - Player authentication scheme: `Basic Auth`.
-- ~~External authority field: `Host`.~~ **BUG-001**: Public admission authority is the active ngrok
-  endpoint's Basic Auth Traffic Policy.
+- ~~External authority field: `Host`.~~ ~~**BUG-001**: Public admission authority is the active ngrok
+  endpoint's Basic Auth Traffic Policy.~~ **BUG-003**: Public admission requires the exact active
+  ngrok `Host` plus Basic Auth at the private application ingress.
 - Long-lived player stream: `Subscribe`.
 - Authoritative local player port: `3690`.
 - Packaged application form: `.app`.

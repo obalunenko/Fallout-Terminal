@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// PlayerUpstreamAddress is the one existing player listener targeted by the
-// embedded endpoint. Public access never starts a second server or proxy.
+// PlayerUpstreamAddress is the one existing player listener targeted only by
+// the application-owned ingress. Public access never starts a second player server.
 const PlayerUpstreamAddress = "127.0.0.1:3690"
 
 // TunnelStartRequest is ephemeral provider input. AccountToken must be cleared
@@ -18,8 +18,6 @@ type TunnelStartRequest struct {
 	UpstreamURL    string
 	ReservedDomain string
 	AccountToken   []byte
-	PlayerUsername []byte
-	PlayerPassword []byte
 	Timeout        time.Duration
 }
 
@@ -28,11 +26,7 @@ func (request *TunnelStartRequest) Clear() {
 		return
 	}
 	clear(request.AccountToken)
-	clear(request.PlayerUsername)
-	clear(request.PlayerPassword)
 	request.AccountToken = nil
-	request.PlayerUsername = nil
-	request.PlayerPassword = nil
 }
 
 type TunnelService interface {

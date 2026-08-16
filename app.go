@@ -18,13 +18,11 @@ import (
 )
 
 const (
-	serverInfoEvent             = "server-info"
-	clientCountEvent            = "client-count"
-	hackStateEvent              = "hack-state"
-	coordinationStateEvent      = "coordination-state"
-	publicAccessStatusEvent     = "public-access-status"
-	tunnelStartupFailureMessage = "public tunnel could not start; verify credentials, tunnel executable, endpoint, and network access"
-	tunnelAddressFailureMessage = "public tunnel returned an invalid protected HTTPS address; local access remains available"
+	serverInfoEvent         = "server-info"
+	clientCountEvent        = "client-count"
+	hackStateEvent          = "hack-state"
+	coordinationStateEvent  = "coordination-state"
+	publicAccessStatusEvent = "public-access-status"
 )
 
 // SessionService is the lifecycle boundary for the ordered persistence worker.
@@ -136,15 +134,6 @@ type playerPublisher interface {
 	PublishHack()
 }
 
-// TunnelService owns the optional public-access process and its temporary
-// credential material. The Darwin implementation additionally binds the child
-// to the application process lifetime so development-supervisor termination
-// cannot bypass cleanup by skipping the native window shutdown callback.
-type TunnelService interface {
-	Start(context.Context) (domain.ServerInfo, error)
-	Stop(context.Context) error
-}
-
 // DesktopRuntime represents the readiness and release boundary of the desktop
 // host independently of Wails globals.
 type DesktopRuntime interface {
@@ -183,7 +172,6 @@ type AppDependencies struct {
 	Live            LiveService
 	Coordination    CoordinationService
 	Player          PlayerServer
-	Tunnel          TunnelService
 	Desktop         DesktopRuntime
 	Browser         Browser
 	Events          EventSink
@@ -191,7 +179,6 @@ type AppDependencies struct {
 	PublicSecrets   tunnelservice.SecretStore
 	PublicAccess    PublicAccessCore
 	PasswordEntropy io.Reader
-	TunnelEnabled   bool
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
 }
@@ -374,7 +361,6 @@ type App struct {
 	requestedRevision   uint64
 	savedRevision       uint64
 	playerStarted       bool
-	tunnelStarted       bool
 	desktopReady        bool
 	sessionsClosed      bool
 	processStateCleared bool
@@ -453,7 +439,8 @@ func (app *App) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload
 		defer clear(passwordValue)
 		current := app.deps.PublicAccess.Snapshot()
 		mutation := tunnelservice.PublicAccessMutation{
-			ExpectedRevision: routed.ExpectedRevision,
+			ExpectedRevision:        routed.ExpectedRevision,
+			PersistVisibleOverrides: true,
 			Preferences: tunnelservice.PublicAccessPreferences{
 				Version: tunnelservice.PublicAccessSettingsVersion, EnabledPreference: routed.EnabledPreference,
 				ReservedDomain: routed.ReservedDomain, Username: routed.Username,
@@ -586,7 +573,7 @@ func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) Gener
 	}
 	current.Revision++
 	current.PlayerPasswordPresentHint = true
-	if app.deps.PublicSettings == nil || app.deps.PublicSettings.Save(current) != nil {
+	if app.deps.PublicSettings == nil || savePublicAccessMutationSettings(app.deps.PublicSettings, current, false) != nil {
 		app.reconcilePublicAccessPresenceLocked(ctx)
 		app.publicAccessFailureLocked(tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage())
 		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorSettingsCorrupt.SafeMessage(), SettingsRevision: current.Revision - 1})
@@ -598,6 +585,17 @@ func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) Gener
 	app.mu.Unlock()
 	app.emitPublicAccessStatusLocked()
 	return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{OK: true, GeneratedPassword: string(generated), SettingsRevision: current.Revision})
+}
+
+type mutationAwarePublicAccessSettingsStore interface {
+	SaveForMutation(tunnelservice.PublicAccessPreferences, bool) error
+}
+
+func savePublicAccessMutationSettings(settings PublicAccessSettingsStore, preferences tunnelservice.PublicAccessPreferences, persistVisibleOverrides bool) error {
+	if aware, ok := settings.(mutationAwarePublicAccessSettingsStore); ok {
+		return aware.SaveForMutation(preferences, persistVisibleOverrides)
+	}
+	return settings.Save(preferences)
 }
 
 func (app *App) StartPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
@@ -873,13 +871,10 @@ func (app *App) Start(ctx context.Context) error {
 		app.publicAccessCommandMu.Unlock()
 	}
 
-	if app.deps.TunnelEnabled {
-		app.startTunnelLocked(acquisitionContext, info)
-	}
 	return nil
 }
 
-// Shutdown releases tunnel, player listener, persistence worker, then desktop.
+// Shutdown releases public access, the player listener, persistence worker, then desktop.
 // It is safe in every lifecycle phase and on repeated calls.
 func (app *App) Shutdown(ctx context.Context) error {
 	app.lifecycleMu.Lock()
@@ -1444,71 +1439,6 @@ func (app *App) OpenURL(rawURL string) CommandResult {
 	return routeCommandResult(CommandResult{OK: true})
 }
 
-func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) {
-	if app.deps.Tunnel == nil {
-		app.recordTunnelFailure("public tunnel is enabled but not configured")
-		return
-	}
-	app.setPhase("starting-tunnel")
-	public, err := app.deps.Tunnel.Start(ctx)
-	if err != nil {
-		// Tunnel implementations own detailed diagnostics and credential
-		// redaction. The desktop boundary deliberately emits a fixed actionable
-		// message so an unexpected dependency error can never disclose secrets.
-		app.recordTunnelFailure(tunnelStartupFailureMessage)
-		return
-	}
-	app.mu.Lock()
-	app.tunnelStarted = true
-	app.mu.Unlock()
-	publicURL, valid := protectedPublicURL(public.URL)
-	if !valid {
-		// Start returning success means a process may have been acquired. Stop it
-		// before reporting the invalid address and falling back to local mode.
-		if err := app.deps.Tunnel.Stop(ctx); err == nil {
-			app.mu.Lock()
-			app.tunnelStarted = false
-			app.mu.Unlock()
-		}
-		app.recordTunnelFailure(tunnelAddressFailureMessage)
-		return
-	}
-	public.URL = publicURL
-	public.LocalURL = local.URL
-	public.Tunnel = true
-	public.TunnelError = ""
-	app.mu.Lock()
-	app.serverInfo = cloneServerInfo(public)
-	app.startupError = ""
-	app.phase = "ready-public"
-	app.mu.Unlock()
-	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(public))
-	}
-}
-
-func protectedPublicURL(rawURL string) (string, bool) {
-	parsed, err := url.ParseRequestURI(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-		return "", false
-	}
-	return parsed.String(), true
-}
-
-func (app *App) recordTunnelFailure(message string) {
-	app.mu.Lock()
-	app.startupError = message
-	if app.serverInfo != nil {
-		app.serverInfo.TunnelError = message
-	}
-	app.phase = "ready-local"
-	info := cloneServerInfoPointer(app.serverInfo)
-	app.mu.Unlock()
-	if info != nil && app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*info))
-	}
-}
-
 func (app *App) failLocked(cause error) error {
 	app.mu.Lock()
 	app.startupError = cause.Error()
@@ -1530,7 +1460,6 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 		return nil
 	}
 	app.phase = "stopping"
-	tunnelStarted := app.tunnelStarted
 	playerStarted := app.playerStarted
 	desktopReady := app.desktopReady
 	sessionsOpen := app.deps.Sessions != nil && !app.sessionsClosed
@@ -1564,15 +1493,6 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 			app.mu.Unlock()
 		}
 	}
-	if tunnelStarted && app.deps.Tunnel != nil {
-		if err := app.deps.Tunnel.Stop(ctx); err != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop public tunnel: %w", err))
-		} else {
-			app.mu.Lock()
-			app.tunnelStarted = false
-			app.mu.Unlock()
-		}
-	}
 	if playerStarted && app.deps.Player != nil {
 		if err := app.deps.Player.Stop(ctx); err != nil {
 			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop player server: %w", err))
@@ -1602,7 +1522,7 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 	}
 
 	app.mu.Lock()
-	remaining := app.tunnelStarted || app.playerStarted || app.desktopReady ||
+	remaining := app.playerStarted || app.desktopReady ||
 		(app.deps.Sessions != nil && !app.sessionsClosed) ||
 		(app.deps.PublicAccess != nil && !app.publicAccessClosed)
 	app.stopped = !remaining

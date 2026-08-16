@@ -11,8 +11,9 @@ executable user-approved checkpoint/worktree rollback gate.
 
 **Bugfix**: 2026-08-15 — BUG-001 supersedes the source/Host portions of completed T010–T012,
 T029–T033, and T035–T036 after the target Darwin host rejected `127.0.0.2`; T034 remains active.
-Corrective pending tasks use ngrok endpoint Basic Auth and the ordinary direct upstream to the
-existing player server.
+~~Corrective pending tasks use ngrok endpoint Basic Auth and the ordinary direct upstream to the
+existing player server.~~ **BUG-003**: The current pending chain uses SDK transport to the private
+ingress, where exact Host/Basic Auth protects streaming to the existing player server.
 
 **Bugfix**: 2026-08-15 — BUG-001 follow-up assigns separate RED/GREEN ownership to T037–T039 and
 makes the exact final constitution command sequence explicit without adding or reopening tasks.
@@ -25,6 +26,23 @@ and current-guidance prose.
 context lifetime and safe unexpected-disconnect diagnostics. The corrective tasks preserve the
 completed historical task record and are checked only from actual RED/GREEN/gate evidence.
 
+**Bugfix**: 2026-08-16 — BUG-003 adds a blocking RED→application-ingress→real-stream correction
+after an available ngrok page loaded static content but never received its initial `Subscribe`
+snapshot. Historical `NOT RUN` tasks remain truthful; new tasks cannot complete on `NOT RUN`.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification follow-up supersedes stale Phase-4/MVP Traffic Policy
+guidance; no historical task is reopened, and T087–T095 remain the active corrective chain.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up adds T093 RED coverage and T094
+implementation for the exact dev/test environment override. Mandatory real closure moves to T095;
+packaged production remains Keychain-only and environment-independent.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation removes residual active
+BUG-001/direct-upstream guidance without adding, reopening, or completing any task.
+
+**Bugfix**: 2026-08-16 — BUG-001/BUG-003 post-implementation verification adds T096–T097 to
+requirement coverage and the dependency/wave graph without reopening completed work.
+
 Every completed task must be journaled through the Companion writer. Do not edit completed feature
 artifacts under `specs/005-connectrpc-protobuf-migration/` or `specs/006-wails-v3-migration/`;
 their records remain historical. Direct `go run ./cmd/build dev|build|package` commands remain
@@ -35,8 +53,9 @@ canonical throughout.
 - **P1 — secure packaged setup**: Phase 3 / US1 (UI, Application Support, Keychain, no readback).
 - **P2 — embedded endpoint and local continuity**: Phase 4 / US2 establishes start/stop and
   random/reserved URLs; Phase 7 / US5 proves local/LAN survival across provider and storage failures.
-- **P3 — protected player parity**: Phase 5 / US3 proves fail-closed Basic Auth plus streaming,
-  reconnect, multi-client, and gameplay behavior.
+- **P3 — protected player parity**: Phase 5 / US3 records historical deterministic parity;
+  **BUG-003 Phase 11** restores fail-closed ingress Basic Auth plus real streaming, reconnect,
+  multi-client, and gameplay behavior.
 - **P4 — safe lifecycle**: Phase 6 / US4 and Phase 8 / US6 cover reconfigure, failures, restart,
   Quit/`Cmd+Q`, stale completions, and bounded cleanup.
 - **P5 — single-runtime cutover**: Phase 9 removes the CLI path only after embedded parity and then
@@ -147,8 +166,9 @@ is the sole bounded exception.
 
 ## Phase 4: User Story 2 — Start and share protected embedded access (Priority P1)
 
-**Goal**: Start/stop one embedded ngrok endpoint from the running UI, obtain random or exact reserved
-HTTPS URL, and publish it only after the endpoint's Basic Auth Traffic Policy is active.
+**Goal**: ~~Start/stop one embedded ngrok endpoint and publish it only after endpoint Basic Auth
+Traffic Policy is active.~~ **BUG-003**: This completed phase is historical; active correction in
+Phase 11 publishes only after private-ingress exact-Host/Basic-Auth activation.
 
 **Independent Test**: With valid settings, observe disabled→starting→ready, verify no request succeeds
 before protected endpoint readiness, copy URL/username, stop, and keep local mode working.
@@ -378,82 +398,179 @@ and unexpected disconnect status contains no raw provider or secret-bearing diag
 
 ---
 
+## Phase 11: BUG-003 — Restore real public ConnectRPC streaming
+
+**Purpose**: Replace the demonstrated incompatible Traffic Policy authentication path with one
+non-buffering application-owned private ingress while keeping exact Host, Basic Auth, one player
+service on port 3690, local/LAN no-challenge behavior, and secret confinement.
+
+### Wave 1 — dependency evidence and RED tests
+
+- [x] **T087** [US3] [BUG-003] Extend the explicit opt-in real ngrok harness to exercise the actual
+  generated `Subscribe` request and record only status, content type, upstream arrival, time to
+  response headers, time to first snapshot, and later-update timing. Never record Authorization,
+  cookies, token, password, request bodies, or raw provider diagnostics; record the reported
+  static-success/indefinite-overlay result as the BUG-003 FAIL baseline ·
+  `internal/tunnel/ngrok_integration_test.go`, `tests/browser/connectrpc-player.spec.mjs`,
+  `specs/007-embedded-ngrok-access/quickstart.md`
+- [x] **T088** [US3] [BUG-003] Add failing deterministic ingress and lifecycle tests for deny-all
+  startup, exact active Host, missing/wrong/correct Basic Auth across static/unary/non-empty
+  streaming, Authorization stripping, no response buffering, stale-Host denial, local/LAN
+  no-challenge access, maximum one endpoint/ingress, and deny-before-close ordering. Prove the
+  current Traffic Policy/direct-upstream implementation fails this contract before production
+  changes · `internal/tunnel/public_ingress_test.go`, `internal/tunnel/ngrok_test.go`,
+  `internal/tunnel/manager_test.go`, `internal/player/public_stream_test.go`
+
+**⟶ Wait for T087–T088 to establish the exact failure and intended RED gaps, then implement:**
+
+### Wave 2 — implementation
+
+- [x] **T089** [US3] [BUG-003] Implement the loopback-only application ingress in deny-all mode
+  with atomic exact-Host/credential activation, constant-time Basic Auth, Authorization stripping,
+  streaming reverse proxy delegation to only `http://127.0.0.1:3690`, bounded idempotent close, and
+  zero game state; remove player credentials and Traffic Policy from ngrok SDK input without adding
+  another player service or production tunnel runtime · `internal/tunnel/public_ingress.go`,
+  `internal/tunnel/model.go`, `internal/tunnel/ngrok.go`, `internal/tunnel/service.go`
+- [x] **T090** [US3] [BUG-003] Integrate ingress ownership into the generation-aware manager and root
+  composition: start deny-all ingress → acquire endpoint → validate URL → atomically activate exact
+  Host/auth → publish; on stop/failure/reconfigure/shutdown deny first → withdraw URL → close
+  endpoint → close ingress within the shared five-second budget. Preserve local readiness and stale
+  completion disposal · `internal/tunnel/manager.go`, `main.go`, `app.go`, `app_test.go`,
+  `wails_host_test.go`
+- [x] **T091** [US3] [BUG-003] Update deterministic browser ingress fixtures and journeys to match
+  the production boundary, then prove initial snapshot removes `УСТАНОВКА СВЯЗИ...`, later updates,
+  reconnect, navigation, hacking, sound, four-to-seven-client convergence, public auth/Host denial,
+  and uninterrupted localhost/LAN behavior · `tests/browser/fixture-server/main.go`,
+  `tests/browser/connectrpc-player.spec.mjs`, `tests/browser/public-access-fallback.spec.mjs`
+
+**⟶ Wait for T089–T091 GREEN, then qualify sequentially:**
+
+### Wave 3 — base qualification
+
+- [x] **T092** [US3] [BUG-003] Run focused tests before broad gates: ingress/tunnel/player unit,
+  race and vet; protobuf/bindings drift and breaking checks; both locked frontend builds; full
+  Playwright; reproducible canonical build; package verification; secret/legacy/runtime scans; and
+  packaged macOS local/offline lifecycle smoke. Record exact sanitized evidence without claiming a
+  real endpoint · `specs/007-embedded-ngrok-access/quickstart.md`
+
+**⟶ Wait for T092 GREEN, then add the test-ergonomics follow-up test-first:**
+
+### Wave 4 — dev/test environment override and final closure
+
+- [x] **T093** [US1] [BUG-003] Add failing unit/browser/leak/package-profile tests for the exact
+  `FALLOUT_NGROK_AUTHTOKEN`, `FALLOUT_NGROK_RESERVED_DOMAIN`,
+  `FALLOUT_PUBLIC_TEST_USERNAME`, and `FALLOUT_PUBLIC_TEST_PASSWORD` names: non-empty per-field
+  env-first precedence, empty/unset persisted/Keychain fallback, domain/username form prefill,
+  token/password presence-only scoped use, explicit-start success, zero implicit save/auto-start/
+  secret log/event/status/diagnostic exposure, no environment-secret Save mutation, ordinary
+  explicit Save semantics for visible non-secrets, and packaged-production ignore behavior. Use generated canaries;
+  never print environment values · `app_test.go`, `internal/tunnel/secret_test.go`,
+  `internal/tunnel/settings_test.go`, `internal/platform/assets_test.go`,
+  `tests/browser/public-access-settings.spec.mjs`, `scripts/secret-leak-check.sh`
+- [x] **T094** [US1] [BUG-003] Implement one canonical dev/test composition adapter for the four
+  FR-056 names and route effective values through the existing settings/scoped-secret manager path.
+  Prefill only domain/username, expose secrets only as presence, perform no implicit Keychain/JSON
+  write or auto-start, never seed environment secrets into Save, preserve explicit non-secret Save,
+  and make the packaged production composition ignore the variables. Add no protobuf,
+  Wails method, process argument, external CLI, second orchestration path, or production credential
+  implementation · `main.go`, `app.go`, `internal/tunnel/secret.go`,
+  `internal/tunnel/test_override.go`, `frontend/src/master.js`
+- [x] **T095** [US3] [BUG-003] Rerun focused env/ingress/tunnel/player tests, then every T092 broad
+  gate against the rebuilt candidate. With explicit user opt-in credentials, run the packaged app
+  and require real missing/wrong/correct Basic Auth for static and unary requests, exact/unknown
+  Host outcomes, initial `Subscribe` snapshot within five seconds, later non-empty update before
+  stream end, reconnect, four-to-seven-client convergence, navigation, hacking, sound, Stop and
+  stale-URL failure while localhost remains usable. `NOT RUN`, static-only success, or an indefinite
+  connection overlay leaves this task unchecked and BUG-003 open. Record that the packaged profile
+  ignores all four test variables without exposing their values ·
+  `specs/007-embedded-ngrok-access/quickstart.md`
+
+**Checkpoint BUG-003**: The public ngrok page is not accepted merely because HTML loads. Closure
+requires the real packaged path to authenticate and stream the authoritative initial snapshot plus
+later updates while the sole player service and unauthenticated local/LAN mode remain unchanged.
+
+---
+
 ## Coverage Mapping: Functional Requirements → Tasks
 
 | Requirement | Task IDs |
 |---|---|
 | FR-001 | T016–T028, T034, T039–T041, T077, T080 |
 | FR-002 | T013, T016–T019, T022, T027 |
-| FR-003 | T014, T029, T034, T037–T041, T079 |
-| FR-004 | T013, T017, T019, T026–T027 |
+| FR-003 | T014, T029, T034, T037–T041, T079, T093–T095 |
+| FR-004 | T013, T017, T019, T026–T027, T093–T095 |
 | FR-005 | T013, T019, T027 |
-| FR-006 | T009, T013, T015, T019, T021–T022 |
-| FR-007 | T015, T021, T028, T072, T080 |
-| FR-008 | T005, T014, T020, T023, T028 |
-| FR-009 | T004, T006, T013–T018, T022, T024–T028, T050, T072 |
-| FR-010 | T001–T003, T018, T068–T072, T075–T078 |
-| FR-011 | T016–T017, T022, T025, T027 |
-| FR-012 | T013, T016–T017, T019, T022, T027 |
+| FR-006 | T009, T013, T015, T019, T021–T022, T093–T095 |
+| FR-007 | T015, T021, T028, T072, T080, T093–T095 |
+| FR-008 | T005, T014, T020, T023, T028, T093–T095 |
+| FR-009 | T004, T006, T013–T018, T022, T024–T028, T050, T072, T093–T095 |
+| FR-010 | T001–T003, T018, T068–T072, T075–T078, T093–T095 |
+| FR-011 | T016–T017, T022, T025, T027, T093–T095 |
+| FR-012 | T013, T016–T017, T019, T022, T027, T093–T095 |
 | FR-013 | T013, T017, T019, T027 |
 | FR-014 | T013, T016–T019, T025, T027 |
-| FR-015 | T014–T017, T020–T023, T027–T028 |
+| FR-015 | T014–T017, T020–T023, T027–T028, T093–T095 |
 | FR-016 | T034, T038–T041, T084–T086 |
 | FR-017 | T006, T009, T016–T017, T027, T029, T034, T040, T049, T053, T058 |
 | FR-018 | T034, T037, T041, T079 |
 | FR-019 | T034, T037, T040–T041, T079 |
 | FR-020 | T029, T037–T041, T084–T086 |
-| FR-021 | T037, T041–T046, T073, T079 |
-| FR-022 | T029, T037–T041, T073, T084–T086 |
-| FR-023 | T037, T039, T042, T073, T083 |
-| FR-024 | T037, T042–T046, T073, T079 |
-| FR-025 | T042–T046, T055–T060, T079 |
-| FR-026 | T033, T037–T039 |
-| FR-027 | T037, T042, T055–T060, T080 |
-| FR-028 | T033, T041, T055–T060, T080 |
+| FR-021 | T037, T041–T046, T073, T079, T087–T095 |
+| FR-022 | T029, T037–T041, T073, T084–T095 |
+| FR-023 | T037, T039, T042, T073, T083, T088–T095 |
+| FR-024 | T037, T042–T046, T073, T079, T087–T095 |
+| FR-025 | T042–T046, T055–T060, T079, T087, T091–T095 |
+| FR-026 | T033, T037–T039, T088–T095 |
+| FR-027 | T037, T042, T055–T060, T080, T088–T095 |
+| FR-028 | T033, T041, T055–T060, T080, T088–T095 |
 | FR-029 | T009, T029, T038, T047, T051, T061, T065, T084–T086 |
 | FR-030 | T047–T054 |
 | FR-031 | T047–T054 |
-| FR-032 | T047–T054, T061–T067, T084–T086 |
-| FR-033 | T061–T067, T073, T078, T080 |
+| FR-032 | T047–T054, T061–T067, T084–T086, T088–T095 |
+| FR-033 | T061–T067, T073, T078, T080, T088–T095 |
 | FR-034 | T009, T029, T038, T047, T051, T061, T065, T084–T086 |
 | FR-035 | T004–T005, T007–T008, T014, T020, T082 |
-| FR-036 | T042–T046, T055–T060, T082 |
-| FR-037 | T068–T078, T083 |
-| FR-038 | T068, T070–T078, T080, T083 |
-| FR-039 | T010–T012, T037, T068–T069, T075 |
+| FR-036 | T042–T046, T055–T060, T082, T091–T095 |
+| FR-037 | T068–T078, T083, T096 |
+| FR-038 | T068, T070–T078, T080, T083, T089, T092–T096 |
+| FR-039 | T010–T012, T037, T068–T069, T075, T093–T096 |
 | FR-040 | T064, T069–T071, T073, T078, T080 |
 | FR-041 | T079–T083 |
-| FR-042 | T013–T018, T029, T033–T034, T042–T043, T047–T050, T055–T056, T061–T064, T082 |
-| FR-043 | T018, T050, T068, T072–T073, T078, T082–T083 |
-| FR-044 | T064, T069–T070, T073, T078, T080 |
-| FR-045 | T043, T079–T082 |
-| FR-046 | T041, T043, T046, T079–T082 |
+| FR-042 | T013–T018, T029, T033–T034, T042–T043, T047–T050, T055–T056, T061–T064, T082, T087–T095 |
+| FR-043 | T018, T050, T068, T072–T073, T078, T082–T083, T087–T095 |
+| FR-044 | T064, T069–T070, T073, T078, T080, T092–T095 |
+| FR-045 | T043, T079–T082, T087, T095 |
+| FR-046 | T041, T043, T046, T079–T082, T087, T095 |
 | FR-047 | T061–T067, T080 |
 | FR-048 | T062, T064, T066–T067, T080 |
 | FR-049 | T068–T071, T073, T075–T080, T083 |
 | FR-050 | T013, T017, T019, T027 |
 | FR-051 | T037, T042, T046, T079 |
-| FR-052 | T004, T006, T013, T016, T019, T022, T025, T027, T050, T072 |
+| FR-052 | T004, T006, T013, T016, T019, T022, T025, T027, T050, T072, T093–T095 |
 | FR-053 | T004, T006, T013, T016–T019, T022, T025, T027, T072 |
-| FR-054 | T013, T018–T019, T037, T050, T072–T073, T083 |
+| FR-054 | T013, T018–T019, T037, T050, T072–T073, T083, T088–T095 |
+| FR-055 | T087–T095 |
+| FR-056 | T093–T095, T097 |
 
 ## Coverage Mapping: Success Criteria → Tasks
 
 | Success criterion | Task IDs |
 |---|---|
 | SC-001 | T029, T038, T041, T079, T084–T086 |
-| SC-002 | T037, T042–T046, T047–T054, T073, T079 |
-| SC-003 | T042–T046, T073, T079 |
-| SC-004 | T055–T060, T080 |
-| SC-005 | T061–T067, T073, T078, T080 |
+| SC-002 | T037, T042–T046, T047–T054, T073, T079, T087–T095 |
+| SC-003 | T042–T046, T073, T079, T087–T095 |
+| SC-004 | T055–T060, T080, T088–T095 |
+| SC-005 | T061–T067, T073, T078, T080, T088–T095 |
 | SC-006 | T047–T054 |
-| SC-007 | T018, T050, T072–T073, T078, T082–T083 |
-| SC-008 | T064, T069–T070, T073, T078, T080 |
-| SC-009 | T014–T015, T020–T021, T028 |
-| SC-010 | T004–T005, T007–T008, T042–T046, T055–T060, T082 |
-| SC-011 | T079–T083 |
+| SC-007 | T018, T050, T072–T073, T078, T082–T083, T093–T095 |
+| SC-008 | T064, T069–T070, T073, T078, T080, T092–T095 |
+| SC-009 | T014–T015, T020–T021, T028, T093–T095 |
+| SC-010 | T004–T005, T007–T008, T042–T046, T055–T060, T082, T091–T095 |
+| SC-011 | T079–T083, T087, T095 |
 | SC-012 | T013, T017, T019, T027 |
-| SC-013 | T037, T042, T046, T079 |
+| SC-013 | T037, T042, T046, T079, T087–T095 |
+| SC-014 | T087–T095 |
+| SC-015 | T093–T095, T097 |
 
 ---
 
@@ -476,6 +593,10 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
               P5 pre-gate/rollback/cutover/requalification T068–T083
                          ↓
               BUG-002 lifetime correction T084–T086
+                         ↓
+              BUG-003 real streaming correction and test override T087–T095
+                         ↓
+              Convergence: root seam removal and override persistence T096–T097
 ```
 
 - US3 depends on US2's protected endpoint, but not on US4 UI rotation.
@@ -484,6 +605,11 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
   breadth; final acceptance still reruns the complete player journey.
 - US6 depends on the latest manager behavior from US4/US5 so every state and failure path is owned.
 - BUG-002 follows the completed embedded cutover and executes strictly T084 → T085 → T086.
+- BUG-003 follows BUG-002 and executes T087 → T088 → T089 → T090 → T091 → T092 → T093 → T094
+  → T095; T093 must establish RED before T094, and T095 cannot complete with real evidence marked
+  `NOT RUN`.
+- Convergence follows T095; T096 and T097 are independent and may execute in parallel, but both
+  must complete before final verification.
 - CLI deletion T075 is forbidden until the full embedded-only package/security gate T073 and
   user-approved immutable checkpoint/worktree rollback drill T074 pass. If T074 is `BLOCKED`, T075
   cannot start. T078 reruns every deterministic gate on the final tree before conditional external
@@ -506,6 +632,9 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
 9. P5: T068 → T069 → T070 → T071 → T072 → T073 → T074 → T075 → T076 → T077 → T078 →
    T079 → T080 → T081 → T082 → T083.
 10. BUG-002: T084 → T085 → T086.
+11. BUG-003: T087 → T088 → T089 → T090 → T091 → T092 → T093 → T094 → T095.
+12. Convergence: after T095, T096 and T097 may execute in parallel; both must complete before final
+    verification.
 
 ## Parallel Examples
 
@@ -521,11 +650,23 @@ US2 Embedded start/stop + protected endpoint publication T029–T041
 
 ## MVP Recommendation
 
-The smallest user-valued demonstration is Phases 1–5 (US1–US3): UI/Keychain setup, one embedded
-endpoint, and complete protected player streaming. It is an MVP candidate only if T015/T021 prove
-Keychain-only storage and T037/T042/T073 prove the endpoint policy is attached before publication
-while direct local/LAN play remains unchanged. ~~Conditional T031/T046 remains real-provider
-evidence~~ **BUG-001 follow-up**: Conditional T046/T079 remains real-provider evidence, never a
-substitute for deterministic policy/lifecycle tests. A production-ready MVP must also complete US4–US6 and the P5
-cutover through T083, because leaving unsafe
-reconfigure/shutdown behavior or a parallel CLI production path would violate the constitution.
+The smallest user-valued demonstration remains UI/Keychain setup, one embedded endpoint, and
+complete protected player streaming. ~~T037/T042/T073 and conditional T046/T079 were sufficient
+for the BUG-001 endpoint-policy candidate through T083.~~ **BUG-003**: That candidate is historical.
+An MVP is not currently production-ready until T087–T094 pass and T095 proves the rebuilt packaged
+application's real initial snapshot, later update, reconnect, multi-client gameplay, auth/Host
+denial, local continuity, and production-profile env isolation. `NOT RUN` cannot satisfy T095.
+
+## Phase 12: Convergence
+
+- [x] T096 CRITICAL Remove the superseded root startup-only `TunnelService`/`TunnelEnabled` path,
+  `startTunnelLocked`, process-era public-tunnel error text, shutdown branch, and dependent legacy
+  tests from `app.go`/`app_test.go`; migrate any still-required lifecycle assertions to the active
+  `PublicAccessCore` manager/fakes and extend `scripts/legacy-public-access-check.sh` to reject this
+  dead second seam per Constitution VII, FR-037–FR-039, and plan: single-runtime cutover
+  (contradicts)
+- [x] T097 Prevent canonical development/test domain and username overrides from being persisted by
+  Load, Start, Stop, or Generate while preserving ordinary persistence only after explicit Save;
+  retain required generated-password Keychain/presence behavior and add focused manager, settings,
+  root-composition, browser, leak, and packaged-profile regression coverage per FR-056, SC-015, and
+  US1/AC7 (partial)

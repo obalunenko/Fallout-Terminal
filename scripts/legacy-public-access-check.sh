@@ -43,6 +43,7 @@ scan_active_tree() {
   local process_pattern='NewProcessRunner|ProcessRunner|OwnedProcess|darwinOwnerGuardScript|tunnel-guardian|exec\.Command(Context)?\([^\n]*ngrok|LookPath\([^\n]*ngrok'
   local legacy_config_pattern='DefaultDomain|PolicyParent|fallout-terminal\.ngrok\.app'
   local launch_pattern='NGROK_[A-Z_]+=.*(go run|Fallout Terminal\.app)|ngrok[[:space:]]+http([[:space:]]|$)'
+  local root_tunnel_seam_pattern='TunnelEnabled|startTunnelLocked|tunnelStartupFailureMessage|tunnelAddressFailureMessage|public tunnel is enabled but not configured'
 
   while IFS= read -r -d '' file; do
     if [[ "${file}" = /* ]]; then
@@ -69,6 +70,10 @@ scan_active_tree() {
     fi
     if LC_ALL=C grep -Eq -- "${launch_pattern}" "${file}"; then
       record_match 'active-launch-guidance' "${relative}"
+      found=1
+    fi
+    if [[ "${relative}" == 'app.go' || "${relative}" == 'app_test.go' ]] && LC_ALL=C grep -Eq -- "${root_tunnel_seam_pattern}" "${file}"; then
+      record_match 'root-startup-tunnel-seam' "${relative}"
       found=1
     fi
   done < <(list_active_files "${scan_root}")
@@ -109,10 +114,10 @@ check_tree() {
       printf 'Legacy public-access diagnostic completed: known pre-cutover findings remain; strict final gate was not run.\n'
       return 0
     fi
-    fail 'legacy CLI/process/PATH runtime or active launch guidance remains'
+    fail 'legacy CLI/process/PATH runtime, root startup tunnel seam, or active launch guidance remains'
     return 1
   fi
-  printf 'Legacy public-access check passed: one embedded production runtime; no CLI, process, PATH, shared-domain, active env/argument guidance, or bundled provider path remains.\n'
+  printf 'Legacy public-access check passed: one embedded production runtime; no CLI, process, PATH, root startup tunnel seam, shared-domain, active env/argument guidance, or bundled provider path remains.\n'
 }
 
 self_test() {
@@ -136,6 +141,12 @@ self_test() {
     fail 'self-test accepted active env launch guidance'
   fi
   rm "${fixture}/README.md"
+
+  printf 'package main\ntype AppDependencies struct { TunnelEnabled bool }\n' >"${fixture}/app.go"
+  if check_tree "${fixture}" >/dev/null 2>&1; then
+    fail 'self-test accepted the dormant root startup tunnel seam'
+  fi
+  rm "${fixture}/app.go"
 
   printf '#!/bin/sh\n' >"${fixture}/build/bin/Fallout Terminal.app/Contents/MacOS/ngrok"
   if scan_package "${fixture}/build/bin/Fallout Terminal.app" >/dev/null 2>&1; then

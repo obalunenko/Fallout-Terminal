@@ -157,20 +157,16 @@ func TestSecretAndProviderRequestTypesHaveNoFormattingSurface(t *testing.T) {
 	}
 
 	request := TunnelStartRequest{
-		UpstreamURL:    "http://127.0.0.1:3690",
-		AccountToken:   []byte("ephemeral-test-value"),
-		PlayerUsername: []byte("players"),
-		PlayerPassword: []byte("synthetic-player-input"),
-		Timeout:        30 * time.Second,
+		UpstreamURL:  "http://127.0.0.1:41000",
+		AccountToken: []byte("ephemeral-test-value"),
+		Timeout:      30 * time.Second,
 	}
 	request.Clear()
 	assert.Equal(t, []byte(nil), request.AccountToken)
-	assert.Equal(t, []byte(nil), request.PlayerUsername)
-	assert.Equal(t, []byte(nil), request.PlayerPassword)
 	requestType := reflect.TypeOf(request)
 	fieldNames := make([]string, 0, requestType.NumField())
 	for index := range requestType.NumField() {
 		fieldNames = append(fieldNames, requestType.Field(index).Name)
 	}
-	assert.Equal(t, []string{"UpstreamURL", "ReservedDomain", "AccountToken", "PlayerUsername", "PlayerPassword", "Timeout"}, fieldNames)
+	assert.Equal(t, []string{"UpstreamURL", "ReservedDomain", "AccountToken", "Timeout"}, fieldNames)
 }

@@ -3,6 +3,15 @@
 **Bugfix**: 2026-08-15 — BUG-001 replaces player-policy activation/deactivation with protected
 endpoint publication, URL withdrawal, and endpoint/Agent close sequencing.
 
+**Bugfix**: 2026-08-16 — BUG-003 restores application-owned public admission through a private
+deny-all/exact-Host ingress while preserving the private desktop API and secret-free DTO surface.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up permits effective dev/test prefill and
+presence from the FR-056 environment adapter without adding a method, field, or secret readback.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation applies deny-before-withdraw
+and endpoint-plus-ingress close to active settings mutation.
+
 ## Contract source and isolation
 
 Add `proto/fallout/terminal/private/v1/public_access.proto`. It may import the non-secret
@@ -133,25 +142,29 @@ payload maps only from `PublicAccessStatusEvent`. Subscription is established be
 `GetPublicAccess` snapshot; an event received first wins over a stale snapshot for the same or lower
 generation/revision. Unsubscribe and hot-disposal follow the existing exact-once rules.
 
-No operation returns a stored token or password. There is deliberately no `RevealSecret`,
-`GetSecret`, `CopyCredentials`, environment, process, or provider-generic desktop method.
+No operation returns a stored or environment-derived token or password. There is deliberately no
+`RevealSecret`, `GetSecret`, `CopyCredentials`, environment, process, or provider-generic desktop
+method. The dev/test adapter is root composition, not a bridge capability.
 
 ## Command behavior
 
 ### GetPublicAccess
 
-Returns persisted non-secret preferences, reconciled presence values, and current status. A locked
-or denied Keychain produces `UNKNOWN`, a redacted error category, no secret readback, and no public
-start.
+Returns effective non-secret preferences, reconciled presence values, and current status. In the
+canonical dev/test profile only, effective domain/username and presence may reflect non-empty
+FR-056 overrides; this does not mutate the persisted preferences. A locked or denied Keychain
+produces `UNKNOWN` for a secret without an effective dev/test override, a redacted error category,
+no secret readback, and no public start. Packaged production ignores the four override names.
 
 ### SavePublicAccessSettings
 
 Validates all non-secret and ephemeral secret inputs before mutation. If public access is starting
-or ready, it first advances generation, ~~deactivates public policy~~ **BUG-001** withdraws the URL,
-and closes the old endpoint/Agent. Then it applies Keychain mutations and atomically writes
-non-secret settings. If the old runtime was active and the complete new revision is valid, it starts
-one replacement; otherwise it remains disabled/failed. No old and new endpoint may accept
-concurrently.
+or ready, it first advances generation, ~~deactivates public policy~~ ~~**BUG-001** withdraws the URL
+and closes the old endpoint/Agent.~~ **BUG-003 reconciliation** It atomically sets the ingress to
+deny-all, withdraws the URL, closes the old endpoint/Agent, and closes the ingress before applying
+Keychain mutations and atomically writing non-secret settings. If the old runtime was active and the
+complete new revision is valid, it starts one replacement; otherwise it remains disabled/failed. No
+old and new endpoint or ingress may accept concurrently.
 
 ### GeneratePlayerPassword
 
@@ -163,15 +176,18 @@ sequence as another setting change. The named event and all later calls expose p
 
 Requires current revision plus present token/password. It is idempotent for the same current
 starting/ready intent. It publishes no URL until ~~endpoint URL validation and exact-host policy
-activation both succeed~~ **BUG-001** the policy-protected endpoint has been created and its URL has
-passed validation.
+activation both succeed~~ ~~**BUG-001** the policy-protected endpoint has been created and its URL has
+passed validation.~~ **BUG-003**: Start creates a deny-all private ingress, acquires the ngrok endpoint
+without player credentials or Traffic Policy, validates its URL, atomically activates exact Host
+plus scoped Basic Auth on the ingress, and only then publishes.
 
 ### StopPublicAccess
 
 Is idempotent and joins an existing stop. It ~~atomically disables public acceptance before endpoint
-close~~ **BUG-001** withdraws the URL before closing the endpoint/Agent; endpoint close is the public
-admission shutdown boundary. It clears the URL before reporting disabled. Repeated calls do not
-extend the shared deadline.
+close~~ ~~**BUG-001** withdraws the URL before closing the endpoint/Agent; endpoint close is the public
+admission shutdown boundary.~~ **BUG-003**: Stop first denies the active Host at the ingress, then
+withdraws the URL, closes endpoint/Agent, and closes ingress. It clears the URL before reporting
+disabled. Repeated calls do not extend the shared deadline.
 
 ## Frontend handling and Copy
 

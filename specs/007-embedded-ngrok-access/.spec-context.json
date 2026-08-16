@@ -745,6 +745,134 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-15T22:10:21.455Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T00:17:42.688Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T087",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:21:19.933Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T088",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:27:54.442Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T089",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:33:04.836Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T090",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:36:39.174Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T091",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:41:22.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T092",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T00:55:37.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T093",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T01:00:42.456Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T094",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T01:03:29.225Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T084",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T01:23:40.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T085",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T01:23:40.123Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T086",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T01:23:40.123Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T095",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T01:56:20.759Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T02:08:35.243Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T096",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T02:12:39.067Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T097",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T02:16:22.825Z"
     }
   ],
   "coverage": {
@@ -1130,20 +1258,20 @@
       ]
     },
     "FR-021": {
-      "title": "Application boundary protects all public static and ConnectRPC requests with Basic Auth",
+      "title": "Embedded public access starts and stops without compromising localhost.",
       "tasks": [
-        "T032",
-        "T035",
-        "T036",
-        "T042",
-        "T043",
-        "T044",
-        "T045"
+        "T087",
+        "T088",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094",
+        "T095"
       ],
       "tests": [
-        "internal/tunnel/ngrok_test.go",
-        "internal/tunnel/manager_test.go",
-        "internal/player/public_stream_test.go",
+        "internal/tunnel/ngrok_integration_test.go",
         "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
@@ -1198,44 +1326,33 @@
       ]
     },
     "FR-024": {
-      "title": "Basic Auth preserves incremental non-empty Subscribe streaming",
+      "title": "Public static, unary, and streaming traffic is protected by Basic Auth and exact Host validation.",
       "tasks": [
-        "T030",
-        "T042",
-        "T043",
-        "T044",
-        "T045",
-        "T046",
-        "T073",
-        "T079"
+        "T087",
+        "T088",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T093",
+        "T094",
+        "T095"
       ],
       "tests": [
-        "internal/tunnel/ngrok_test.go",
-        "internal/tunnel/manager_test.go",
-        "internal/player/public_stream_test.go",
+        "internal/tunnel/public_ingress_test.go",
         "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
     "FR-025": {
-      "title": "Authenticated public players retain gameplay, sound, convergence, and reconnect",
+      "title": "Generated Subscribe streaming delivers an initial snapshot, later updates, and reconnects for concurrent clients.",
       "tasks": [
-        "T042",
-        "T043",
-        "T044",
-        "T045",
-        "T046",
-        "T055",
-        "T056",
-        "T057",
-        "T058",
-        "T059",
-        "T060",
-        "T079"
+        "T087",
+        "T091",
+        "T092",
+        "T095"
       ],
       "tests": [
-        "internal/tunnel/ngrok_test.go",
-        "internal/tunnel/manager_test.go",
-        "internal/player/public_stream_test.go",
+        "internal/tunnel/ngrok_integration_test.go",
         "tests/browser/connectrpc-player.spec.mjs"
       ]
     },
@@ -1476,10 +1593,8 @@
         "T083"
       ],
       "tests": [
-        "scripts/legacy-public-access-check.sh",
-        "scripts/secret-leak-check.sh",
-        "scripts/verify-macos-app.sh",
-        "internal/buildtool/buildtool_test.go"
+        "scripts/legacy-public-access-check.sh::self_test",
+        "app_test.go::TestEmbeddedPublicAccessIsExplicitAfterLocalReadinessAndPublishesOnlyReadyResult"
       ]
     },
     "FR-038": {
@@ -1499,10 +1614,8 @@
         "T083"
       ],
       "tests": [
-        "scripts/legacy-public-access-check.sh",
-        "scripts/secret-leak-check.sh",
-        "scripts/verify-macos-app.sh",
-        "internal/buildtool/buildtool_test.go"
+        "scripts/legacy-public-access-check.sh::self_test",
+        "app_test.go::TestApplicationShutdownIsReverseOrderedAndIdempotent"
       ]
     },
     "FR-039": {
@@ -1519,10 +1632,8 @@
         "T075"
       ],
       "tests": [
-        "scripts/legacy-public-access-check.sh",
-        "scripts/secret-leak-check.sh",
-        "scripts/verify-macos-app.sh",
-        "internal/buildtool/buildtool_test.go"
+        "scripts/legacy-public-access-check.sh::self_test",
+        "internal/tunnel/manager_test.go::TestPublicAccessManagerGeneratedPasswordDoesNotPersistDevelopmentVisibleOverrides"
       ]
     },
     "FR-040": {
@@ -1962,6 +2073,37 @@
         "T045",
         "T079"
       ]
+    },
+    "FR-055": {
+      "title": "Real provider streaming is accepted only after authoritative generated snapshots and gameplay updates.",
+      "tasks": [
+        "T087",
+        "T088",
+        "T089",
+        "T090",
+        "T091",
+        "T092",
+        "T095"
+      ],
+      "tests": [
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/ngrok_integration_test.go",
+        "tests/browser/connectrpc-player.spec.mjs"
+      ]
+    },
+    "FR-056": {
+      "title": "Development/test environment overrides remain presence-only and are ignored by packaged production.",
+      "tasks": [
+        "T093",
+        "T094",
+        "T095"
+      ],
+      "tests": [
+        "internal/tunnel/settings_test.go::TestDevelopmentOverridePersistsVisibleValuesOnlyForExplicitSaveMutation",
+        "internal/tunnel/manager_test.go::TestPublicAccessManagerGeneratedPasswordDoesNotPersistDevelopmentVisibleOverrides",
+        "app_test.go::TestPublicAccessEnvironmentOverrideCompositionIsDevelopmentOnlyAndNeverAutoStarts",
+        "tests/browser/public-access-settings.spec.mjs::development override prefill is presence-only and does not save or start implicitly"
+      ]
     }
   },
   "size": "oversized",
@@ -2057,6 +2199,31 @@
       "decision": "Require Go 1.26.6 as the root module minimum",
       "why": "Official govulncheck found five reachable standard-library vulnerabilities in Go 1.26.5, all fixed by 1.26.6",
       "rejected": "Shipping the reproducible Go 1.26.5 candidate with applicable unresolved advisories"
+    },
+    {
+      "decision": "Authenticate at an application-owned loopback ingress and keep ngrok SDK transport-only",
+      "why": "The real Traffic Policy path served static content but did not deliver the initial ConnectRPC snapshot",
+      "rejected": "ngrok Traffic Policy Basic Auth for the active production path"
+    },
+    {
+      "decision": "Use one dual-interface development adapter around the existing settings and SecretStore paths, bypassed before lookup by packaged composition",
+      "why": "This provides per-field env-first behavior and scoped secret use without persistence, new desktop contracts, or a second provider path",
+      "rejected": "Parsing environment in UI, SDK, process arguments, or packaged production"
+    },
+    {
+      "decision": "Close the SDK forwarder and disconnect the embedded agent before canceling the endpoint-owned lifetime.",
+      "why": "Canceling the committed lifetime first can make a healthy provider stream report an unexpected stop during teardown.",
+      "rejected": "Cancel lifetime before SDK close."
+    },
+    {
+      "decision": "Route settings commits through a mutation-aware adapter and mark only desktop Save as allowed to persist visible development overrides.",
+      "why": "Generate must still commit Keychain presence and revision metadata without turning process-local domain or username overlays into durable settings.",
+      "rejected": "Skipping the Generate settings commit would lose required revision and presence behavior; persisting its effective snapshot violates FR-056."
+    },
+    {
+      "decision": "Scope the dormant root tunnel-seam detector to root app wiring while retaining the active internal tunnel service.",
+      "why": "The removed seam was the superseded App startup owner; generated contracts and the embedded manager legitimately retain tunnel terminology.",
+      "rejected": "A repository-wide TunnelEnabled token ban creates false positives in valid contract code."
     }
   ],
   "approach": "Embed the exactly pinned official ngrok Go SDK behind a provider-neutral endpoint interface, with a generation-aware manager that activates an exact player Host policy before publishing any URL. Persist only non-secret preferences atomically, keep both secrets in macOS Keychain behind scoped-use interfaces, expose typed private protobuf/Wails operations, then delete the CLI runtime after parity.",
@@ -2074,16 +2241,12 @@
       "risks": "Cmd+Q, partial-start, forced-owner-loss, relaunch, cutover, and final qualification remain unverified."
     },
     "implement": {
-      "summary": "Shipped embedded SDK public access with Keychain-only secrets, Basic Auth protected player access, CLI removal, Go 1.26.6 security requalification, reproducible macOS package, and explicit external NOT RUN evidence",
-      "key_finding": "Deterministic close ownership, race, leak, build, signature and package verification pass; packaged interactive normal-close evidence does not.",
-      "risks": [
-        "Phase 9 cutover is forbidden until T067 passes",
-        "Cmd+Q/owner-loss/relaunch packaged journeys remain unreached",
-        "No real-ngrok opt-in evidence was run"
-      ]
+      "summary": "Reconciled completed T096-T097 into plan, requirement coverage, and the Phase 12 dependency/wave model; no code work remained.",
+      "key_finding": "SDK-owned teardown must close the forwarder and disconnect the agent before canceling the committed lifetime.",
+      "risks": "Real-provider tests remain credential-gated and intentionally skip in ordinary deterministic runs."
     }
   },
-  "currentTask": "T083",
+  "currentTask": "T097",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -2781,6 +2944,129 @@
       "files": [
         "specs/007-embedded-ngrok-access/quickstart.md"
       ]
+    },
+    "T087": {
+      "status": "DONE",
+      "did": "Extended opt-in real ngrok acceptance to generated Subscribe with secret-safe timing evidence and recorded the static-success/first-frame FAIL baseline",
+      "files": [
+        "internal/tunnel/ngrok_integration_test.go",
+        "tests/browser/connectrpc-player.spec.mjs",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T088": {
+      "status": "DONE",
+      "did": "Added RED ingress HTTP and lifecycle ordering contracts for deny-all exact Host Basic Auth streaming and owned-resource cleanup",
+      "files": [
+        "internal/tunnel/public_ingress_test.go",
+        "internal/tunnel/manager_test.go"
+      ]
+    },
+    "T089": {
+      "status": "DONE",
+      "did": "Implemented loopback deny-all public ingress and removed player credentials and Traffic Policy from the embedded ngrok SDK adapter",
+      "files": [
+        "internal/tunnel/public_ingress.go",
+        "internal/tunnel/service.go",
+        "internal/tunnel/ngrok.go",
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/model_test.go",
+        "internal/tunnel/service_test.go",
+        "internal/testutil/public_access_fakes.go",
+        "internal/testutil/public_access_fakes_test.go"
+      ]
+    },
+    "T090": {
+      "status": "DONE",
+      "did": "Integrated ingress ownership into manager and root composition with activate-before-publish and deny-before-withdraw endpoint-to-ingress cleanup",
+      "files": [
+        "internal/tunnel/manager.go",
+        "internal/tunnel/manager_test.go",
+        "internal/tunnel/redaction_test.go",
+        "main.go",
+        "app_test.go"
+      ]
+    },
+    "T091": {
+      "status": "DONE",
+      "did": "Moved deterministic browser/player journeys onto the production ingress and proved authenticated streaming, reconnect, gameplay convergence, stale denial, and local fallback",
+      "files": [
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/connectrpc-player.spec.mjs",
+        "internal/player/public_stream_test.go",
+        "internal/tunnel/public_ingress.go"
+      ]
+    },
+    "T092": {
+      "status": "DONE",
+      "did": "Qualified deterministic ingress and lifecycle candidate across focused-to-broad gates, reproducible package verification, scans, browser journeys, and packaged local/offline smoke without a real-endpoint claim",
+      "files": [
+        "internal/platform/assets_test.go",
+        "internal/player/public_stream_test.go",
+        "internal/tunnel/ngrok_test.go",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T093": {
+      "status": "DONE",
+      "did": "Added and executed the FR-056 RED matrix for exact env precedence, fallback, presence-only use, explicit start, non-persistence, packaged ignore, browser projection, and leak/package scope",
+      "files": [
+        "app_test.go",
+        "internal/tunnel/secret_test.go",
+        "internal/tunnel/settings_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "scripts/secret-leak-check.sh",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T094": {
+      "status": "DONE",
+      "did": "Implemented the exact four-name dev/test adapter with per-field fallback, presence-only scoped secrets, no implicit writes/start, and packaged-production bypass",
+      "files": [
+        "internal/tunnel/test_override.go",
+        "main.go",
+        "app_test.go",
+        "internal/tunnel/secret_test.go",
+        "internal/tunnel/settings_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/public-access-settings.spec.mjs",
+        "scripts/secret-leak-check.sh",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T095": {
+      "status": "DONE",
+      "did": "Validated the rebuilt package with real static and unary auth, Host rejection, five-client generated streaming, navigation, sound, hacking, reconnect, Stop, stale URL failure, localhost continuity, and production override isolation.",
+      "files": [
+        "internal/tunnel/ngrok.go",
+        "internal/tunnel/ngrok_test.go",
+        "tests/browser/connectrpc-player.spec.mjs",
+        "specs/007-embedded-ngrok-access/quickstart.md"
+      ]
+    },
+    "T096": {
+      "status": "DONE",
+      "did": "Removed the dormant root startup-only tunnel seam, obsolete tests and fakes, and added a scoped legacy regression detector.",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "scripts/legacy-public-access-check.sh"
+      ]
+    },
+    "T097": {
+      "status": "DONE",
+      "did": "Made development/test visible overrides mutation-aware so only explicit Save persists domain and username; retained generated-password secret and revision updates with manager, settings, root composition, browser, leak, and production-profile coverage.",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "internal/tunnel/manager.go",
+        "internal/tunnel/manager_test.go",
+        "internal/tunnel/settings_test.go",
+        "internal/tunnel/test_override.go",
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/public-access-settings.spec.mjs"
+      ]
     }
   },
   "verified": [
@@ -2838,6 +3124,132 @@
         "interactive red-button/Cmd+W was user-deferred NOT RUN",
         "real provider and stale-URL probes NOT RUN without opt-in credentials"
       ]
+    },
+    {
+      "what": "T089-T091 focused ingress, lifecycle, player and browser gates",
+      "command": "go test focused suites; npm test focused protected/fallback journeys",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker deployment-version warnings were non-fatal",
+        "NO_COLOR/FORCE_COLOR Playwright warning was non-fatal"
+      ]
+    },
+    {
+      "what": "T092 broad Go qualification",
+      "command": "go vet ./...; go test ./... -count=1",
+      "result": "FAIL: go vet passed; go test failed in frontend facade exact-import assertion and two test-convention violations",
+      "warnings": []
+    },
+    {
+      "what": "T092 focused and broad qualification",
+      "command": "focused platform/player/tunnel; gofmt; diff-check; vet; unit; race; schema/bindings/breaking; locked frontend builds; full Playwright; reproducible package; scans; packaged local/offline smoke",
+      "result": "PASS; Playwright 37 passed and 1 real-provider test skipped; deterministic packaged smoke passed with user-deferred interactive close and no real endpoint claim",
+      "warnings": [
+        "macOS linker target-version warnings",
+        "initial sandboxed Playwright bind denied; identical suite passed with loopback permission"
+      ]
+    },
+    {
+      "what": "T093 test-first environment override matrix",
+      "command": "focused tunnel/root/platform tests; Playwright env-prefill projection; secret leak gate",
+      "result": "EXPECTED RED: missing canonical adapter/constants/profile composition; browser projection PASS",
+      "warnings": [
+        "generated synthetic canaries only; no environment value printed"
+      ]
+    },
+    {
+      "what": "T094 canonical development/test environment adapter",
+      "command": "focused tunnel/root/platform tests; browser prefill journey; secret self-test/scan; legacy runtime scan",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker target-version warnings only"
+      ]
+    },
+    {
+      "what": "T095 focused and broad deterministic qualification",
+      "command": "focused Go; drift/security gates; go vet; full unit/race; frontend builds; full Playwright",
+      "result": "PASS; 38 deterministic browser tests passed and one credential-gated real browser test skipped in the broad run",
+      "warnings": [
+        "known test-only macOS linker target-version warnings"
+      ]
+    },
+    {
+      "what": "T095 real generated Connect stream and ordered teardown",
+      "command": "go test ./internal/tunnel -run TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe -count=1 -v",
+      "result": "PASS; missing/wrong auth rejected, correct auth streamed initial snapshot in 147ms and later update in 247ms, teardown clean",
+      "warnings": []
+    },
+    {
+      "what": "T095 reproducible and packaged candidate",
+      "command": "scripts/reproducible-build-check.sh; canonical build/package; verify; lifecycle smoke",
+      "result": "PASS; reproducible verified arm64 macOS-13 bundle a25d1e9d6a1ac920385671b5eee03b40f1fe86d6da0c37ec5fc04ba159b7cbad",
+      "warnings": [
+        "interactive normal-window close remains user-deferred NOT RUN"
+      ]
+    },
+    {
+      "what": "Packaged real-provider T095 acceptance",
+      "result": "PASS: static and unary auth 401/401/200, unknown Host 421, first snapshot within five seconds, five-client convergence/navigation/sound/reconnect, live hacking guess/update/reconnect, stale URL 404, localhost 200.",
+      "command": "Credential-gated Playwright package journeys plus status-only curl probes and package verify/hash.",
+      "warnings": "No credential value was read, logged, copied, or emitted; the known test-only macOS linker target warning remains non-blocking."
+    },
+    {
+      "what": "focused convergence regressions",
+      "command": "go test ./internal/tunnel . -count=1 -timeout=2m",
+      "result": "PASS",
+      "warnings": [
+        "macOS SDK target-version linker warnings were non-blocking"
+      ]
+    },
+    {
+      "what": "full Go unit suite",
+      "command": "go test ./... -count=1 -timeout=5m",
+      "result": "PASS",
+      "warnings": [
+        "macOS SDK target-version linker warnings were non-blocking"
+      ]
+    },
+    {
+      "what": "full Go race suite",
+      "command": "go test -race ./... -count=1 -timeout=10m",
+      "result": "PASS",
+      "warnings": [
+        "macOS SDK target-version linker warnings were non-blocking"
+      ]
+    },
+    {
+      "what": "Go static analysis",
+      "command": "go vet ./...",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "full deterministic browser suite",
+      "command": "npm test --prefix tests/browser",
+      "result": "PASS: 38 passed, 2 opt-in real-provider journeys skipped",
+      "warnings": [
+        "real-provider journeys require explicit credentials and made no claim"
+      ]
+    },
+    {
+      "what": "format, binding, cutover, legacy, and secret gates",
+      "command": "gofmt check; legacy self-test and scan; secret leak; Wails bindings and v3 cutover",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "contract, dependency, frontend, and native build gates",
+      "command": "proto check; proto breaking all fixtures; dependency license; frontend/client builds; go run ./cmd/build build",
+      "result": "PASS",
+      "warnings": [
+        "macOS SDK target-version linker warnings were non-blocking"
+      ]
+    },
+    {
+      "what": "post-implementation artifact convergence",
+      "command": "Companion materialize; bug/status, FR/SC coverage, task sequence, Phase 12 DAG/order checker; git diff --check",
+      "result": "PASS: 3 bugs patched, 56 FRs and 15 SCs mapped, T001-T097 complete",
+      "warnings": []
     }
   ],
   "concerns": [
@@ -2862,7 +3274,15 @@
     {
       "note": "Real provider, packaged public UI/no-installed-host-binary, OS Keychain, distribution/notary/provider-plan, stale-URL, and user-deferred interactive close evidence remain explicit NOT RUN; deterministic evidence was not promoted",
       "step": "implement"
+    },
+    {
+      "note": "T092 stopped at broad go test: obsolete exact frontend import assertion plus context.Background and t.Fatal convention violations; T092-T095 remain unchecked",
+      "step": "implement"
+    },
+    {
+      "note": "T095 packaged real browser received sanitized 401 because production Keychain player password differs from the opted-in development/test password; direct user credential entry is required before rerun",
+      "step": "implement"
     }
   ],
-  "last_action": "all 83 tasks complete — final Go 1.26.6 candidate dcc6d5af31e996e2db2bf84634521207d5b8922c64b01c65c4642852ed59f023 verified"
+  "last_action": "implementation rerun complete — 97/97 tasks and post-implementation artifact convergence pass"
 }

@@ -187,7 +187,7 @@ func (service *FakeTunnelService) Start(ctx context.Context, request tunnel.Tunn
 	defer func() {
 		request.Clear()
 		service.mu.Lock()
-		service.cleared = len(request.AccountToken) == 0 && len(request.PlayerUsername) == 0 && len(request.PlayerPassword) == 0
+		service.cleared = len(request.AccountToken) == 0
 		service.mu.Unlock()
 	}()
 	if !released {

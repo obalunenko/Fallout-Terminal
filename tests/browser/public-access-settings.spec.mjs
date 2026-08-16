@@ -25,6 +25,44 @@ test('settings form is labelled, keyboard reachable, and defaults without reveal
   await expect(page.locator(':focus')).not.toHaveAttribute('type', 'hidden');
 });
 
+test('development override prefill is presence-only and does not save or start implicitly', async ({ page }) => {
+  const callsBefore = await page.evaluate(() => __desktopFixture.calls.length);
+  await page.evaluate(() => __desktopFixture.emit('public-access-status', {
+    preferences: { version: 1, enabledPreference: false, reservedDomain: 'override.example', username: 'override-players', revision: 0 },
+    providerTokenPresence: 'present',
+    playerPasswordPresence: 'present',
+    status: { state: 'disabled', generation: 0, settingsRevision: 0 },
+  }));
+
+  await expect(page.getByLabel('Зарезервированный домен')).toHaveValue('override.example');
+  await expect(page.getByLabel('Имя игрока')).toHaveValue('override-players');
+  await expect(page.getByLabel('Токен ngrok')).toHaveValue('');
+  await expect(page.getByLabel('Пароль игроков')).toHaveValue('');
+  await expect(page.locator('#publicAccessProviderPresence')).toHaveText(/сохранен/i);
+  await expect(page.locator('#publicAccessPasswordPresence')).toHaveText(/сохранен/i);
+  const implicitCalls = await page.evaluate(start => __desktopFixture.calls.slice(start)
+    .filter(call => call.method === 'SavePublicAccessSettings' || call.method === 'StartPublicAccess'), callsBefore);
+  expect(implicitCalls).toEqual([]);
+
+  await page.getByRole('button', { name: 'СГЕНЕРИРОВАТЬ ПАРОЛЬ' }).click();
+  const saveCallsAfterGenerate = await page.evaluate(() => __desktopFixture.calls
+    .filter(call => call.method === 'SavePublicAccessSettings'));
+  expect(saveCallsAfterGenerate).toEqual([]);
+  await page.reload();
+  await expect(page.getByLabel('Зарезервированный домен')).toHaveValue('');
+  await expect(page.getByLabel('Имя игрока')).toHaveValue('players');
+
+  await page.getByLabel('Зарезервированный домен').fill('override.example');
+  await page.getByLabel('Имя игрока').fill('override-players');
+  await page.getByRole('button', { name: 'СОХРАНИТЬ ДОСТУП' }).click();
+  const saved = await page.evaluate(() => __desktopFixture.calls
+    .filter(call => call.method === 'SavePublicAccessSettings').at(-1));
+  expect(saved.args[0]).toMatchObject({
+    reservedDomain: 'override.example', username: 'override-players',
+    replacementProviderToken: '', replacementPlayerPassword: '',
+  });
+});
+
 test('save replaces secrets without echo and clears transient fields', async ({ page }) => {
   await page.getByLabel('Токен ngrok').fill('synthetic-provider-input');
   await page.getByLabel('Пароль игроков').fill('synthetic-player-input');

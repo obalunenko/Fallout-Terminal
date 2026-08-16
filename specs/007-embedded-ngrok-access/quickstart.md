@@ -14,6 +14,13 @@ Traffic Policy construction plus a focused opt-in real Basic Auth/`Subscribe` jo
 **Bugfix**: 2026-08-15 — BUG-001 analysis follow-up installs locked frontend dependencies before
 dependent generation, adds the canonical dev smoke, and makes vulnerability evidence attributable.
 
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation replaces active Traffic Policy,
+direct-upstream, and withdraw-before-deny instructions with the private-ingress lifecycle while
+retaining dated evidence as history.
+
+**Bugfix**: 2026-08-16 — BUG-003 non-secret username reconciliation limits value-confinement checks
+to token/password and makes domain/username verification explicitly observable but non-loggable.
+
 ## Recorded implementation evidence
 
 ### 2026-08-15 — US1 secure settings and Keychain checkpoint (T028)
@@ -794,11 +801,15 @@ when the sources were checked and every applicable finding has a documented disp
 record `NOT RUN` and do not claim that the candidate has no known vulnerabilities. T082 owns the
 final-candidate result; this review adds no second build or dependency-orchestration path.
 
-The unconditional security run inspects provider-neutral SDK requests without rendering secrets and
-proves: the upstream is exactly `http://127.0.0.1:3690`, one non-empty Basic Auth Traffic Policy is
-attached before endpoint publication, no custom source dialer/player Host policy/second server is
-active, and policy construction failures publish no URL. Direct local/LAN journeys remain
-unauthenticated. Repeat lifecycle and scoped-secret schedules under `-race` and in packaged smoke.
+~~The unconditional security run inspects provider-neutral SDK requests without rendering secrets
+and proves: the upstream is exactly `http://127.0.0.1:3690`, one non-empty Basic Auth Traffic Policy
+is attached before endpoint publication, no custom source dialer/player Host policy/second server is
+active, and policy construction failures publish no URL.~~ **BUG-003**: The unconditional security
+run proves the SDK targets only an owned loopback ingress, the ingress alone targets
+`http://127.0.0.1:3690`, it begins deny-all, and exact Host/Basic Auth activates before publication
+without Traffic Policy, buffering, or a second player server. Activation failures publish no URL.
+Direct local/LAN journeys remain unauthenticated. Repeat lifecycle and scoped-secret schedules under
+`-race` and in packaged smoke.
 
 ## 2. Local-only and offline packaged launch
 
@@ -837,8 +848,9 @@ game state.
 9. Repeat save/relaunch 100 times in deterministic adapter tests and record zero displayed/read-back
    secrets.
 
-Expected: only the macOS Keychain contains secret values; Application Support contains valid
-version-1 non-secret JSON with user-only permissions and atomic replacement.
+Expected: in packaged production, only the macOS Keychain contains secret values; Application
+Support contains valid version-1 non-secret JSON with user-only permissions and atomic replacement.
+The separate FR-056 dev/test process override remains transient and is not part of this journey.
 
 ## 4. Generated password one-time journey
 
@@ -868,15 +880,18 @@ journey `NOT RUN`—do not substitute the fake endpoint.
 4. Before the ready publication point, confirm the UI exposes no reusable public URL.
 5. At ready, request `/`, static assets, every unary player procedure, and `Subscribe` with missing,
    wrong, and correct Basic Auth.
-6. Confirm missing/wrong credentials return `401` from ngrok and correct credentials proceed.
+6. ~~Confirm missing/wrong credentials return `401` from ngrok and correct credentials proceed.~~
+   **BUG-003**: Confirm the application-owned ingress returns `401` for missing/wrong credentials
+   and correct credentials proceed for static, unary, and streaming requests.
 7. Confirm direct local/LAN access remains outside the ngrok endpoint and receives no Basic Auth
    challenge.
-8. Stop from UI, confirm URL is withdrawn before endpoint close, and verify the old URL serves zero
-   player resources.
+8. Stop from UI, ~~confirm URL is withdrawn before endpoint close~~ **BUG-003** confirm ingress
+   admission is denied before URL withdrawal and endpoint/ingress close, then verify the old URL
+   serves zero player resources.
 
 Record missing/wrong/correct public Basic Auth and non-empty incremental `Subscribe` separately as
 `PASS`, `FAIL`, or `NOT RUN`; neither may be inferred from a provider fake. Deterministic tests prove
-only policy construction intent, lifecycle ordering, redaction, and local isolation.
+only ingress activation/auth/streaming intent, lifecycle ordering, redaction, and local isolation.
 
 For SC-001, repeat this explicitly opted-in real start 20 times under predeclared
 responsive-network and valid-account prerequisites. At least 19 attempts must reach `ready` or a
@@ -892,8 +907,9 @@ Requires a real token; domain success additionally requires a domain reserved by
 1. Save an owned reserved domain and Start; confirm the exact normalized domain is returned—never a
    silent random fallback.
 2. Stop, save an unowned/occupied domain, and Start.
-3. Confirm a redacted ownership/availability error, no URL, ~~public Host deny~~ **BUG-001** no owned
-   endpoint left active, and working local/LAN clients.
+3. Confirm a redacted ownership/availability error, no URL, ~~public Host deny~~ ~~**BUG-001** no
+   owned endpoint left active~~ **BUG-003** deny-all ingress admission plus no owned endpoint/ingress
+   left active, and working local/LAN clients.
 4. Repeat with invalid and revoked tokens, no network, DNS failure, provider timeout, and provider
    disconnect after ready.
 5. Correct each cause and Start again without restarting the application.
@@ -907,22 +923,25 @@ Use deterministic provider, Keychain, network, and clock fakes first, then repea
 against a real endpoint when available.
 
 1. Run 100 concurrent/repeated Start, Stop, and settings-change schedules.
-2. Pause provider completion at policy-configured endpoint acquisition, URL validation, and event
-   publication boundaries.
+2. ~~Pause provider completion at policy-configured endpoint acquisition, URL validation, and event
+   publication boundaries.~~ **BUG-003**: Pause at deny-all ingress start, endpoint acquisition,
+   URL validation, exact-Host/auth activation, and event publication boundaries.
 3. During each pause, ~~probe static plus every Connect path for local, exact prospective, stale,
-   and unknown Hosts~~ **BUG-001** inspect policy-before-publication and URL state, prove direct
-   local/LAN remains without a challenge, and use the protected fixture for public static/Connect
-   authentication outcomes.
+   and unknown Hosts~~ ~~**BUG-001** inspect policy-before-publication and URL state~~ **BUG-003**
+   inspect deny-all/active ingress state and URL publication, prove direct local/LAN remains without
+   a challenge, and use the protected fixture for public static/Connect authentication outcomes.
 4. Change domain, username, token, and password while starting and ready.
 5. Deliver a late success and late failure for each superseded generation.
 6. Assert one final state matching the latest valid intent, maximum one endpoint, zero stale URL
    publications, and no old/new overlap.
-7. Inject endpoint close failure and retry; ~~assert policy remains deny throughout~~ **BUG-001**
-   assert the URL remains withdrawn and no replacement publishes until prior endpoint ownership is
+7. Inject endpoint close failure and retry; ~~assert policy remains deny throughout~~ ~~**BUG-001**
+   assert the URL remains withdrawn~~ **BUG-003** assert ingress admission remains deny-all, the URL
+   remains withdrawn, and no replacement publishes until prior endpoint/ingress ownership is
    resolved.
 
-Expected: protected endpoint creation is before URL publication; URL withdrawal is before endpoint
-close; stale completion can only be closed, never published.
+Expected: deny-all ingress and protected endpoint acquisition precede exact-Host/auth activation and
+URL publication; ingress denial precedes URL withdrawal and endpoint/ingress close; stale completion
+can only be closed, never published.
 
 ## 8. Streaming, multi-client, and reconnect
 
@@ -963,7 +982,8 @@ upgrade them to a real packaged pass.
    interrupt.
 3. In deterministic lifecycle tests, repeat every state 100 times and inject blocked/erroring close,
    late `Done`, and stale completion.
-4. For graceful paths, verify URL withdrawal occurs first and endpoint, agent, goroutines,
+4. For graceful paths, ~~verify URL withdrawal occurs first~~ **BUG-003** verify ingress admission is
+   denied first, then URL withdrawal and endpoint/ingress close occur; endpoint, agent, goroutines,
    listeners, scoped secret buffers, player streams, session worker, and desktop resources finish
    within the existing single five-second budget.
 5. Force-kill the packaged process after endpoint readiness; verify the previous URL serves zero
@@ -989,10 +1009,176 @@ real ngrok reachability each keep independent evidence. Missing external prerequ
 | Surface | Deterministic evidence | Real/package evidence | Required outcome |
 |---|---|---|---|
 | State/generation/order | unit, race, lifecycle integration | packaged start/stop/reconfigure | no unprotected window or stale publication |
-| Endpoint auth | adapter integration and protected fixture | real missing/wrong/correct Basic Auth | endpoint policy rejects accidental unauthenticated entry |
+| Endpoint auth | private-ingress integration and protected fixture | real missing/wrong/correct Basic Auth | exact-Host ingress rejects accidental unauthenticated entry without buffering |
 | Streaming/reconnect | in-process Connect + browser fixture | focused real incremental stream/multi-client reconnect | incremental, authoritative, ≤5s reconnect condition |
 | Secrets | fake store, descriptor/adapter/leak scans | macOS Keychain packaged journey | zero forbidden exposure/readback |
 | Failure isolation | provider/network/store/clock fakes | offline, invalid token/domain where available | local/LAN remains usable |
 | Cleanup | 100-state schedules, race tests | close, Cmd+Q, kill, relaunch | ≤5s graceful cleanup; stale URL unusable |
 | Build/package | drift, module/license, reproducible build | arm64 package/offline smoke | no CLI/runtime download; exact pins |
 | Release | deterministic preflight only | Developer ID/notary/provider credentials | honest `PASS`/`FAIL`/`NOT RUN` |
+
+## 12. BUG-003 corrective execution and dev/test override (T087–T095)
+
+This section supersedes the active Traffic Policy/direct-upstream instructions above for BUG-003
+work; dated evidence remains historical. Execute T087–T095 in order. The current path is ngrok SDK
+endpoint → owned loopback-only deny-all/exact-Host Basic Auth ingress → the sole player service on
+port 3690. Real closure requires an initial non-empty `Subscribe` snapshot, a later update, and
+reconnect through the packaged endpoint; `NOT RUN` cannot close BUG-003.
+
+For canonical development/test launches only, the application may consume these exact names:
+
+- `FALLOUT_NGROK_AUTHTOKEN`
+- `FALLOUT_NGROK_RESERVED_DOMAIN`
+- `FALLOUT_PUBLIC_TEST_USERNAME`
+- `FALLOUT_PUBLIC_TEST_PASSWORD`
+
+Set credentials outside recorded commands and output. ~~Never print, inspect, echo, snapshot, or
+capture their values.~~ **BUG-003 username reconciliation**: Never print, inspect, echo, snapshot,
+or capture token/password values. Domain and username may be inspected only in the approved
+non-secret master form/snapshot surfaces and must not enter logs or diagnostics. For each non-empty
+name, the environment source wins for that development/test process; domain and username prefill the
+form, while token/password show only presence and are used transiently after explicit Start. Empty
+or unset names fall back independently to persisted settings or Keychain. Loading never saves or
+starts public access.
+
+Run the RED matrix in T093 before T094. It must cover every name alone and together, empty/unset
+fallback, invalid non-secret validation, explicit-start use, no implicit persistence, no secret Save
+mutation, ordinary explicit Save of visible non-secrets, no auto-start, and canary absence from UI
+values/events/status for token/password plus absence of every secret canary from logs, diagnostics,
+JSON, game data, and artifacts. Domain/username canaries must appear only in the expected secret-free
+master form/snapshot surfaces.
+Then rebuild through the canonical build graph and prove the packaged production profile ignores all
+four names. Configure the T095 packaged real run through its UI/Keychain; it must not depend on a
+Terminal environment.
+
+### T087 real-stream baseline — 2026-08-16
+
+- `FAIL` — the available real ngrok endpoint served the player HTML but the generated
+  `PlayerService/Subscribe` request did not deliver its initial snapshot; the browser remained on
+  `УСТАНОВКА СВЯЗИ...` until public access was disabled and localhost was used.
+- No Authorization header, cookie, token, password, request body, raw provider diagnostic, or
+  secret-bearing environment value was captured. The pre-correction observation therefore proves
+  only static success plus missing first-frame delivery; it does not assign a provider status or
+  buffering cause.
+- The opt-in Go harness now records only response status/content type, upstream-arrival time,
+  response-header time, first-snapshot time, and later-update time for the actual generated
+  `Subscribe` request. The browser journey requires the connection overlay to clear within five
+  seconds and verifies reconnect. Without explicit opt-in credentials these checks report `NOT RUN`.
+
+### T092 qualification checkpoint — 2026-08-16
+
+- `PASS` — empty `gofmt -l .`, `git diff --check`, focused ingress/tunnel/player/root tests,
+  deterministic protected Playwright journeys, local-fallback Playwright journey, and `go vet ./...`.
+- `FAIL` — the first broad `go test ./... -count=1` gate stopped qualification. Exact non-secret
+  causes: `TestActiveFrontendUsesRuntimeNeutralDesktopFacade` still requires the obsolete exact
+  substring `import { Events } from '@wailsio/runtime'` while the active facade imports both
+  `Clipboard` and `Events`; the convention gate rejects the new `context.Background()` cleanup in
+  `internal/player/public_stream_test.go`; and it rejects direct `t.Fatal` in
+  `internal/tunnel/ngrok_test.go`.
+- No credential value or secret-bearing diagnostic was captured. T092 remains unchecked; race,
+  protobuf/bindings, full frontend/browser, reproducibility, package, scan, and packaged-smoke gates
+  were not run after this mandatory failure, and T093–T095 were not started.
+
+### T092 qualification rerun — 2026-08-16
+
+- `PASS` — the obsolete runtime-import assertion now requires the active `Clipboard, Events`
+  contract, the public-stream fixture cancels its stream before bounded ingress shutdown without a
+  root context, and the endpoint-lifetime assertion uses semantic Testify polling. The focused
+  platform/player/tunnel checks pass, including the test-convention gate.
+- `PASS` — `gofmt -l .` is empty, `git diff --check` and `go vet ./...` pass, and fresh bounded
+  `go test ./... -count=1 -timeout=2m` plus `go test -race ./... -count=1 -timeout=3m` runs pass.
+  The only warnings are macOS linker target-version warnings from system objects.
+- `PASS` — locked installs for `frontend`, `client`, and `tests/browser`; tool-module, protobuf,
+  generated-contract drift, breaking, Wails bindings/v3, dependency-license, legacy-runtime, and
+  secret-leak gates; and both production frontend builds pass. The drift gate's synthetic dirty
+  generation is rejected as intended before the clean deterministic result passes.
+- `PASS` — full Playwright reports 37 passed and one real-provider test skipped because this task
+  makes no real-endpoint claim. Its first sandboxed attempt could not bind the loopback fixture;
+  the identical suite passed when allowed to bind only its local test ports.
+- `PASS` — two canonical package runs are byte-reproducible with zero repository drift. The rebuilt
+  `.app` passes signature, architecture, entitlements, offline-resource, dependency/license, and
+  no-provider-executable/PATH verification with bundle-manifest SHA-256
+  `048e413a94b2662337bc5bae19b699caf3741db030f609c4e347b408efc7cc00`.
+- `PASS` — packaged local/offline lifecycle smoke preserves localhost after partial startup,
+  releases owned resources on deferred-close cleanup and Cmd+Q-equivalent quit within one second,
+  and retains local mode after forced owner loss without stale endpoint reuse. Per the recorded user
+  deferral, interactive normal-window close is `NOT RUN`; real stale-public-URL probes are also
+  `NOT RUN` without explicit opt-in. No provider request was made and no credential or secret value
+  was read, printed, or persisted.
+
+### T093 environment-override RED checkpoint — 2026-08-16
+
+- Added table-driven settings and secret tests for each of the four exact FR-056 names alone and
+  together, empty/unset per-field fallback, invalid visible values, presence-only secret use,
+  callback clearing, ordinary visible Save, no implicit persistence, and no secret-store mutation.
+- Added root-composition coverage for explicit Start only, secret-free snapshot serialization,
+  underlying Keychain fallback remaining untouched, and zero environment lookup in the packaged
+  profile. Added the browser prefill/no-auto-save/no-auto-start journey and leak/package source
+  gates using generated synthetic canaries only.
+- `RED` is confirmed: tunnel/root tests fail to compile because the approved environment constants,
+  `NewDevelopmentTestPublicAccessOverride`, and `publicAccessStoresForProfile` do not exist yet;
+  the package-profile test cannot find `internal/tunnel/test_override.go`; and the leak gate reports
+  `development/test public-access override is missing`. The browser projection test already passes
+  because it exercises the existing secret-free snapshot surface. No environment value was printed.
+
+### T094 environment-override GREEN checkpoint — 2026-08-16
+
+- `PASS` — one `DevelopmentTestPublicAccessOverride` implements the existing settings and
+  `SecretStore` contracts. It queries only the four exact FR-056 names, overlays non-empty
+  domain/username during normalized `Load`, reports token/password as presence, and copies them only
+  into a cleared `SecretUse` callback for explicit Start. Empty/unset fields independently fall back
+  to persisted settings or Keychain.
+- `PASS` — adapter `Save`, Replace, and Delete delegate ordinary explicit mutations without ever
+  seeding an environment secret. Initialization performs no write or Start; the focused composition
+  test proves an explicit Start succeeds through the existing embedded manager/ingress path while
+  the underlying secret store remains absent.
+- `PASS` — packaged profile composition returns the original settings/Keychain stores before any
+  environment lookup. Focused tunnel/root/package-source tests, the browser presence-only prefill
+  journey, secret-leak self-test and active scan, and legacy single-runtime scan all pass. No Wails
+  method, protobuf field, process argument, external CLI, second server, or second build path was
+  added, and no environment value was logged or returned.
+
+### T095 final closure — 2026-08-16 (PASS)
+
+- `PASS` — focused environment/ingress/tunnel/player/root tests after correcting explicit endpoint
+  teardown order. The first real run delivered HTTP 200 `application/connect+proto`, its initial
+  snapshot in 140 ms, and a later update in 315 ms, but exposed that endpoint cleanup cancelled the
+  committed lifetime before SDK close. A regression test now requires SDK close before owned-
+  lifetime cancellation; the corrected real rerun delivered its initial snapshot in 147 ms, a later
+  update in 247 ms, and clean teardown. Missing and wrong Basic Auth returned `401`; correct auth
+  returned the player resource.
+- `PASS` — empty `gofmt -l .`, `git diff --check`, all three locked npm installs, tool-module,
+  protobuf format/lint/drift/breaking, Wails bindings/v3/cutover, dependency-license, legacy-runtime,
+  secret-leak, `go vet ./...`, fresh full unit and race suites, both production frontend builds, and
+  full deterministic Playwright. Playwright reported 38 passed and one real-browser test skipped in
+  the broad run. The known test-only macOS linker target warnings remained non-blocking.
+- `PASS` — two canonical package graphs were byte-reproducible with zero repository drift. Separate
+  direct build/package commands and package verification reproduced arm64/macOS-13 bundle-manifest
+  SHA-256 `a25d1e9d6a1ac920385671b5eee03b40f1fe86d6da0c37ec5fc04ba159b7cbad` with a valid final
+  signature, reviewed resources, native frameworks, and no provider executable/PATH runtime.
+- `PASS` — credential-free packaged lifecycle smoke kept localhost usable and met the five-second
+  cleanup budget for deferred-close cleanup, Cmd+Q-equivalent quit, partial startup, forced owner
+  loss, and stopped relaunch. Interactive normal-window close remains the prior user-deferred
+  `NOT RUN`.
+- `PASS` — the Finder-semantics packaged production profile restored Keychain presence, ignored all
+  four development/test variables, loaded a writable copy of the bundled session, created a player
+  configuration and character, started broadcast, activated a terminal, reached a real provider-
+  assigned HTTPS URL, then stopped with the stale URL returning `404` while localhost returned
+  `200`.
+- `PASS` — after the user aligned the packaged Keychain password through the secure UI, status-only
+  probes against the real endpoint returned static `401`/`401`/`200` and unary
+  `401`/`401`/`200` for missing/wrong/correct Basic Auth. The provider-assigned exact Host reached
+  the application, while an unknown Host was rejected with `421`. No credential value was read,
+  shown, printed, copied, or persisted outside Keychain.
+- `PASS` — the credential-gated real Playwright journey requires HTTP 200, a visible player
+  `#screen`, and the first authoritative snapshot within five seconds. Five simultaneous packaged
+  clients converged on character selection and the streamed navigation update from folder `2` to
+  `запись`, requested sound manifests from the exact public origin, and each reconnected with HTTP
+  200 `application/connect+proto`; the run passed in 12.3 seconds. A separate live level-2-terminal
+  journey rendered the hack board, submitted a real guess, observed the non-empty streamed hack
+  log, and reconnected; it passed in 4.5 seconds.
+- `PASS` — Stop removed the public endpoint: the stale URL returned `404` while
+  `http://127.0.0.1:3690/` remained `200`. The post-change full deterministic browser suite reports
+  38 passed and two explicitly credential-gated real-provider tests skipped. The packaged
+  production composition continued to ignore all four development/test variables without reading
+  or exposing their values.

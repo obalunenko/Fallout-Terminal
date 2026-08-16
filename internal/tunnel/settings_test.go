@@ -120,6 +120,111 @@ func TestPublicAccessSettingsAtomicFailureRemovesTemporaryFile(t *testing.T) {
 	assert.False(t, exists)
 }
 
+func TestDevelopmentOverridePrefillsNonEmptyDomainAndUsernameWithPerFieldFallback(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		values     map[string]string
+		wantDomain string
+		wantUser   string
+	}{
+		{name: "domain only", values: map[string]string{tunnel.DevelopmentNgrokDomainEnvironment: "override.example"}, wantDomain: "override.example", wantUser: "stored-players"},
+		{name: "username only", values: map[string]string{tunnel.DevelopmentPlayerUsernameEnvironment: "override-players"}, wantDomain: "stored.example", wantUser: "override-players"},
+		{name: "both", values: map[string]string{tunnel.DevelopmentNgrokDomainEnvironment: "override.example", tunnel.DevelopmentPlayerUsernameEnvironment: "override-players"}, wantDomain: "override.example", wantUser: "override-players"},
+		{name: "empty and unset", values: map[string]string{tunnel.DevelopmentNgrokDomainEnvironment: ""}, wantDomain: "stored.example", wantUser: "stored-players"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			base := &recordingPublicAccessSettings{preferences: tunnel.PublicAccessPreferences{
+				Version: 1, ReservedDomain: "stored.example", Username: "stored-players", Revision: 7,
+			}}
+			override := tunnel.NewDevelopmentTestPublicAccessOverride(base, nil, func(name string) (string, bool) {
+				value, ok := test.values[name]
+				return value, ok
+			})
+
+			loaded, err := override.Load()
+			require.NoError(t, err)
+			assert.Equal(t, test.wantDomain, loaded.ReservedDomain)
+			assert.Equal(t, test.wantUser, loaded.Username)
+			assert.Equal(t, uint64(7), loaded.Revision)
+			assert.Zero(t, base.saves, "loading an override must not write JSON")
+
+			loaded.ReservedDomain = "saved.example"
+			loaded.Username = "saved-players"
+			require.NoError(t, override.Save(loaded))
+			assert.Equal(t, 1, base.saves)
+			assert.Equal(t, "saved.example", base.preferences.ReservedDomain)
+			assert.Equal(t, "saved-players", base.preferences.Username)
+		})
+	}
+}
+
+func TestDevelopmentOverridePersistsVisibleValuesOnlyForExplicitSaveMutation(t *testing.T) {
+	base := &recordingPublicAccessSettings{preferences: tunnel.PublicAccessPreferences{
+		Version: 1, ReservedDomain: "stored.example", Username: "stored-players", Revision: 7,
+	}}
+	override := tunnel.NewDevelopmentTestPublicAccessOverride(base, nil, func(name string) (string, bool) {
+		values := map[string]string{
+			tunnel.DevelopmentNgrokDomainEnvironment:    "override.example",
+			tunnel.DevelopmentPlayerUsernameEnvironment: "override-players",
+		}
+		value, ok := values[name]
+		return value, ok
+	})
+
+	effective, err := override.Load()
+	require.NoError(t, err)
+	effective.Revision = 8
+	effective.PlayerPasswordPresentHint = true
+	require.NoError(t, override.SaveForMutation(effective, false))
+	assert.Equal(t, "stored.example", base.preferences.ReservedDomain)
+	assert.Equal(t, "stored-players", base.preferences.Username)
+	assert.Equal(t, uint64(8), base.preferences.Revision)
+	assert.True(t, base.preferences.PlayerPasswordPresentHint)
+
+	effective.Revision = 9
+	require.NoError(t, override.SaveForMutation(effective, true))
+	assert.Equal(t, "override.example", base.preferences.ReservedDomain)
+	assert.Equal(t, "override-players", base.preferences.Username)
+	assert.Equal(t, uint64(9), base.preferences.Revision)
+}
+
+func TestDevelopmentOverrideRejectsInvalidVisibleValuesWithoutSaving(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		env   string
+		value string
+	}{
+		{name: "invalid domain", env: tunnel.DevelopmentNgrokDomainEnvironment, value: "https://override.example"},
+		{name: "invalid username", env: tunnel.DevelopmentPlayerUsernameEnvironment, value: "bad\nuser"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			base := &recordingPublicAccessSettings{preferences: tunnel.DefaultPublicAccessPreferences()}
+			override := tunnel.NewDevelopmentTestPublicAccessOverride(base, nil, func(name string) (string, bool) {
+				return test.value, name == test.env
+			})
+			_, err := override.Load()
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), test.value)
+			assert.Zero(t, base.saves)
+		})
+	}
+}
+
+type recordingPublicAccessSettings struct {
+	preferences tunnel.PublicAccessPreferences
+	saves       int
+}
+
+func (settings *recordingPublicAccessSettings) Load() (tunnel.PublicAccessPreferences, error) {
+	return settings.preferences, nil
+}
+
+func (settings *recordingPublicAccessSettings) Save(preferences tunnel.PublicAccessPreferences) error {
+	settings.saves++
+	settings.preferences = preferences
+	return nil
+}
+
 func mapKeys(values map[string]json.RawMessage) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {

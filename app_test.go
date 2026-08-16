@@ -252,146 +252,6 @@ func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision
 	require.Equal(t, uint64(3), status.SavedRevision)
 }
 
-func TestApplicationStartsProtectedTunnelAfterLocalReadinessAndPublishesBothAddresses(t *testing.T) {
-	recorder := &callRecorder{}
-	events := &recordingEventSink{recorder: recorder}
-	local := domain.ServerInfo{
-		IP: "192.0.2.10", Port: 3690, URL: "http://192.0.2.10:3690", LocalURL: "http://127.0.0.1:3690",
-	}
-	tunnel := &recordingTunnel{
-		recorder: recorder,
-		info: domain.ServerInfo{
-			URL: "https://players.example.test", LocalURL: "http://untrusted.invalid", Tunnel: true,
-		},
-	}
-	app := NewAppWithDependencies(AppDependencies{
-		Player:        &recordingPlayerServer{recorder: recorder, info: local},
-		Tunnel:        tunnel,
-		TunnelEnabled: true,
-		Events:        events,
-		Desktop:       &recordingDesktop{recorder: recorder},
-	})
-	{
-
-		err := app.Start(t.Context())
-		require.Falsef(t, err != nil,
-			"Start() error = %v", err)
-	}
-	{
-
-		got, want := recorder.Calls(), []string{
-			"player:start", "event:server-info", "desktop:ready", "tunnel:start", "event:server-info",
-		}
-		require.Falsef(t, !cmp.Equal(got, want),
-			"public startup calls = %v, want %v", got, want)
-	}
-
-	status := app.GetRuntimeStatus()
-	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != "https://players.example.test" || status.ServerInfo.LocalURL != local.URL || !status.ServerInfo.Tunnel,
-		"public runtime status = %#v, want protected public and trusted local addresses", status)
-	require.Falsef(t, status.StartupError != "" || status.ServerInfo.TunnelError != "",
-		"successful public runtime status retained an error: %#v", status)
-
-	records := events.Records()
-	require.Falsef(t, len(records) != 2,
-		"server-info events = %#v, want local then public", records)
-
-	first, firstOK := records[0].Payload.(domain.ServerInfo)
-	second, secondOK := records[1].Payload.(domain.ServerInfo)
-	require.Falsef(t, !firstOK || first.URL != local.URL || first.Tunnel || !secondOK || second.URL != "https://players.example.test" || second.LocalURL != local.URL || !second.Tunnel,
-		"server-info transition = %#v, want local then protected public", records)
-
-	recorder.Reset()
-	{
-		err := app.Shutdown(t.Context())
-		require.Falsef(t, err != nil,
-			"Shutdown() error = %v", err)
-	}
-	{
-
-		got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "desktop:close"}
-		require.Falsef(t, !cmp.Equal(got, want),
-			"public shutdown calls = %v, want %v", got, want)
-	}
-
-}
-
-func TestApplicationRejectsUnsafeTunnelAddressAndStopsAcquiredTunnel(t *testing.T) {
-	for _, unsafeURL := range []string{
-		"http://players.example.test",
-		"https://overseer:vault-password@players.example.test",
-		"not a URL",
-	} {
-		t.Run(unsafeURL, func(t *testing.T) {
-			recorder := &callRecorder{}
-			local := domain.ServerInfo{IP: "192.0.2.10", Port: 3690, URL: "http://192.0.2.10:3690"}
-			app := NewAppWithDependencies(AppDependencies{
-				Player: &recordingPlayerServer{recorder: recorder, info: local},
-				Tunnel: &recordingTunnel{
-					recorder: recorder,
-					info:     domain.ServerInfo{URL: unsafeURL, Tunnel: true},
-				},
-				TunnelEnabled: true,
-				Events:        &recordingEventSink{recorder: recorder},
-				Desktop:       &recordingDesktop{recorder: recorder},
-			})
-			{
-
-				err := app.Start(t.Context())
-				require.Falsef(t, err != nil,
-					"Start() error = %v, want safe local fallback", err)
-			}
-			{
-
-				got, want := recorder.Calls(), []string{
-					"player:start", "event:server-info", "desktop:ready", "tunnel:start", "tunnel:stop", "event:server-info",
-				}
-				require.Falsef(t, !cmp.Equal(got, want),
-					"unsafe-public startup calls = %v, want %v", got, want)
-			}
-
-			status := app.GetRuntimeStatus()
-			require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != local.URL || status.ServerInfo.Tunnel || status.ServerInfo.TunnelError != tunnelAddressFailureMessage,
-				"unsafe-public status = %#v, want local fallback", status)
-			require.Falsef(t, strings.Contains(status.StartupError, unsafeURL) || strings.Contains(status.ServerInfo.TunnelError, unsafeURL),
-				"unsafe public address leaked into status: %#v", status)
-
-		})
-	}
-}
-
-func TestInvalidTunnelStopFailureRetainsOwnershipForShutdownRetry(t *testing.T) {
-	t.Parallel()
-
-	recorder := &callRecorder{}
-	tunnel := &retryingTunnel{
-		recorder: recorder,
-		info:     domain.ServerInfo{URL: "http://unsafe.example", Tunnel: true},
-		stopErrs: []error{errors.New("temporary terminate failure"), nil},
-	}
-	app := NewAppWithDependencies(AppDependencies{
-		Sessions: &recordingSessionService{recorder: recorder},
-		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
-			IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
-		}},
-		Tunnel: tunnel, TunnelEnabled: true,
-		Events:  &recordingEventSink{recorder: recorder},
-		Desktop: &recordingDesktop{recorder: recorder},
-	})
-
-	require.NoError(t, app.Start(t.Context()))
-	require.Equal(t, "ready-local", app.lifecyclePhase())
-	require.Equal(t, 1, tunnel.stopCalls)
-	require.Equal(t, tunnelAddressFailureMessage, app.GetRuntimeStatus().StartupError)
-
-	recorder.Reset()
-	require.NoError(t, app.Shutdown(t.Context()))
-	require.Equal(t, 2, tunnel.stopCalls)
-	require.Equal(t, []string{"tunnel:stop", "player:stop", "session:shutdown", "desktop:close"}, recorder.Calls())
-	require.NoError(t, app.Shutdown(t.Context()))
-	require.Equal(t, 2, tunnel.stopCalls)
-}
-
 func TestApplicationUnwindsPartialStartup(t *testing.T) {
 	recorder := &callRecorder{}
 	player := &recordingPlayerServer{
@@ -430,10 +290,8 @@ func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
 			recorder: recorder,
 			info:     domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"},
 		},
-		Tunnel:        &recordingTunnel{recorder: recorder, info: domain.ServerInfo{URL: "https://public.example", Tunnel: true}},
-		TunnelEnabled: true,
-		Events:        &recordingEventSink{recorder: recorder},
-		Desktop:       &recordingDesktop{recorder: recorder},
+		Events:  &recordingEventSink{recorder: recorder},
+		Desktop: &recordingDesktop{recorder: recorder},
 	})
 	{
 		err := app.Start(t.Context())
@@ -455,121 +313,10 @@ func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
 	}
 	{
 
-		got, want := recorder.Calls(), []string{"tunnel:stop", "player:stop", "session:shutdown", "desktop:close"}
+		got, want := recorder.Calls(), []string{"player:stop", "session:shutdown", "desktop:close"}
 		require.Falsef(t, !cmp.Equal(got, want),
 			"shutdown calls = %v, want %v", got, want)
 	}
-
-}
-
-func TestInvalidPublicConfigurationStartsZeroTunnelProcesses(t *testing.T) {
-	recorder := &callRecorder{}
-	tunnel := &invalidPublicTunnel{
-		recorder: recorder,
-		err:      errors.New("public credentials are missing or invalid"),
-	}
-	app := NewAppWithDependencies(AppDependencies{
-		Player: &recordingPlayerServer{
-			recorder: recorder,
-			info:     domain.ServerInfo{IP: "192.0.2.10", Port: 3690, URL: "http://192.0.2.10:3690"},
-		},
-		Tunnel:        tunnel,
-		TunnelEnabled: true,
-		Events:        &recordingEventSink{recorder: recorder},
-		Desktop:       &recordingDesktop{recorder: recorder},
-	})
-	{
-
-		err := app.Start(t.Context())
-		require.Falsef(t, err != nil,
-			"Start() error = %v, want local readiness despite invalid public configuration", err)
-	}
-	require.Falsef(t, tunnel.validationCalls != 1,
-		"tunnel validation calls = %d, want 1", tunnel.validationCalls)
-	require.Falsef(t, tunnel.processStarts != 0,
-		"tunnel process starts = %d, want 0 for invalid credentials", tunnel.processStarts)
-	{
-
-		got, want := recorder.Calls(), []string{
-			"player:start", "event:server-info", "desktop:ready", "tunnel:validate", "event:server-info",
-		}
-		require.Falsef(t, !cmp.Equal(got, want),
-			"invalid-public startup calls = %v, want %v", got, want)
-	}
-
-}
-
-func TestInvalidPublicConfigurationPreservesLocalReadinessAndNonSecretStatus(t *testing.T) {
-	const (
-		localURL       = "http://192.0.2.10:3690"
-		secretUsername = "overseer-private"
-		secretPassword = "vault-door-password"
-	)
-	recorder := &callRecorder{}
-	events := &recordingEventSink{recorder: recorder}
-	tunnel := &invalidPublicTunnel{
-		recorder: recorder,
-		err:      errors.New("authentication rejected for " + secretUsername + ":" + secretPassword),
-	}
-	app := NewAppWithDependencies(AppDependencies{
-		Player: &recordingPlayerServer{
-			recorder: recorder,
-			info: domain.ServerInfo{
-				IP: "192.0.2.10", Port: 3690, URL: localURL, LocalURL: "http://127.0.0.1:3690",
-			},
-		},
-		Tunnel:        tunnel,
-		TunnelEnabled: true,
-		Events:        events,
-		Desktop:       &recordingDesktop{recorder: recorder},
-	})
-	{
-
-		err := app.Start(t.Context())
-		require.Falsef(t, err != nil,
-			"Start() error = %v, want usable local mode", err)
-	}
-
-	status := app.GetRuntimeStatus()
-	require.Falsef(t, status.ServerInfo == nil || status.ServerInfo.URL != localURL || status.ServerInfo.Tunnel,
-		"runtime server info = %#v, want unchanged local readiness", status.ServerInfo)
-	require.Falsef(t, status.ServerInfo.TunnelError == "" || status.StartupError == "",
-		"runtime status = %#v, want actionable public-access failure", status)
-
-	combinedStatus := status.StartupError + " " + status.ServerInfo.TunnelError
-	for _, expected := range []string{"public", "credential", "executable", "network"} {
-		assert.Falsef(t, !strings.Contains(strings.ToLower(combinedStatus), expected),
-			"public failure status %q is missing actionable term %q", combinedStatus, expected)
-
-	}
-	for _, secret := range []string{secretUsername, secretPassword} {
-		assert.Falsef(t, strings.Contains(combinedStatus, secret),
-			"public failure status disclosed secret %q", secret)
-
-	}
-
-	records := events.Records()
-	require.Falsef(t, len(records) < 2,
-		"server-info event records = %#v, want local and failure status", records)
-
-	lastInfo, ok := records[len(records)-1].Payload.(domain.ServerInfo)
-	require.Falsef(t, !ok || lastInfo.URL != localURL || lastInfo.Tunnel || lastInfo.TunnelError == "",
-		"last server-info event = %#v, want usable local URL plus tunnel error", records[len(records)-1])
-
-	recorder.Reset()
-	{
-		err := app.Shutdown(t.Context())
-		require.Falsef(t, err != nil,
-			"Shutdown() error = %v", err)
-	}
-	{
-
-		got, want := recorder.Calls(), []string{"player:stop", "desktop:close"}
-		require.Falsef(t, !cmp.Equal(got, want),
-			"invalid-public shutdown calls = %v, want %v", got, want)
-	}
-	require.Falsef(t, tunnel.stopCalls != 0,
-		"tunnel stop calls = %d, want 0 because no process was acquired", tunnel.stopCalls)
 
 }
 
@@ -2118,63 +1865,6 @@ func (server *recordingPlayerServer) PublishHack() {
 	server.recorder.Add("player:publish-hack")
 }
 
-type recordingTunnel struct {
-	recorder *callRecorder
-	info     domain.ServerInfo
-}
-
-type retryingTunnel struct {
-	recorder  *callRecorder
-	info      domain.ServerInfo
-	stopErrs  []error
-	stopCalls int
-}
-
-func (tunnel *retryingTunnel) Start(context.Context) (domain.ServerInfo, error) {
-	tunnel.recorder.Add("tunnel:start")
-	return tunnel.info, nil
-}
-
-func (tunnel *retryingTunnel) Stop(context.Context) error {
-	tunnel.recorder.Add("tunnel:stop")
-	index := tunnel.stopCalls
-	tunnel.stopCalls++
-	if index < len(tunnel.stopErrs) {
-		return tunnel.stopErrs[index]
-	}
-	return nil
-}
-
-type invalidPublicTunnel struct {
-	recorder        *callRecorder
-	err             error
-	validationCalls int
-	processStarts   int
-	stopCalls       int
-}
-
-func (tunnel *invalidPublicTunnel) Start(context.Context) (domain.ServerInfo, error) {
-	tunnel.recorder.Add("tunnel:validate")
-	tunnel.validationCalls++
-	return domain.ServerInfo{}, tunnel.err
-}
-
-func (tunnel *invalidPublicTunnel) Stop(context.Context) error {
-	tunnel.recorder.Add("tunnel:stop")
-	tunnel.stopCalls++
-	return nil
-}
-
-func (tunnel *recordingTunnel) Start(context.Context) (domain.ServerInfo, error) {
-	tunnel.recorder.Add("tunnel:start")
-	return tunnel.info, nil
-}
-
-func (tunnel *recordingTunnel) Stop(context.Context) error {
-	tunnel.recorder.Add("tunnel:stop")
-	return nil
-}
-
 type recordingEventSink struct {
 	recorder *callRecorder
 	err      error
@@ -2230,6 +1920,7 @@ type recordingPublicAccessCore struct {
 
 type recordedPublicAccessMutation struct {
 	ExpectedRevision         uint64
+	PersistVisibleOverrides  bool
 	Preferences              tunnelservice.PublicAccessPreferences
 	ProviderReplacementBytes int
 	DeleteProviderToken      bool
@@ -2263,7 +1954,8 @@ func (core *recordingPublicAccessCore) Stop(_ context.Context, _ uint64) tunnels
 func (core *recordingPublicAccessCore) Reconfigure(_ context.Context, mutation tunnelservice.PublicAccessMutation) tunnelservice.PublicAccessResult {
 	core.recorder.Add("public:reconfigure")
 	core.reconfigures = append(core.reconfigures, recordedPublicAccessMutation{
-		ExpectedRevision: mutation.ExpectedRevision, Preferences: mutation.Preferences,
+		ExpectedRevision: mutation.ExpectedRevision, PersistVisibleOverrides: mutation.PersistVisibleOverrides,
+		Preferences:              mutation.Preferences,
 		ProviderReplacementBytes: len(mutation.ProviderToken.Replacement), DeleteProviderToken: mutation.ProviderToken.Delete,
 		PasswordReplacementBytes: len(mutation.PlayerPassword.Replacement), DeletePlayerPassword: mutation.PlayerPassword.Delete,
 	})
@@ -2522,6 +2214,7 @@ func TestUnexpectedPublicEndpointFailureRetainsCleanupOwnershipBeforeRetryWithou
 	var app *App
 	manager, err := tunnelservice.NewPublicAccessManager(tunnelservice.ManagerConfig{
 		Settings: settings, Secrets: secrets, Tunnel: service,
+		Ingress:     tunnelservice.NewPublicIngressFactory(),
 		UpstreamURL: "http://127.0.0.1:3690",
 		Publish: func(snapshot tunnelservice.PublicAccessSnapshot) {
 			if app != nil {
@@ -2654,6 +2347,7 @@ func TestActivePublicAccessMutationsDelegateAsProtectedReconfigureWithoutMixedRe
 	assert.Equal(t, "friends", core.reconfigures[0].Preferences.Username)
 	assert.Positive(t, core.reconfigures[0].ProviderReplacementBytes)
 	assert.Positive(t, core.reconfigures[0].PasswordReplacementBytes)
+	assert.True(t, core.reconfigures[0].PersistVisibleOverrides)
 
 	generated := app.GeneratePlayerPassword(PublicAccessCommandPayload{ExpectedRevision: 8})
 	require.True(t, generated.OK, generated.Error)
@@ -2662,6 +2356,7 @@ func TestActivePublicAccessMutationsDelegateAsProtectedReconfigureWithoutMixedRe
 	require.Len(t, core.reconfigures, 2)
 	assert.Zero(t, core.reconfigures[1].ProviderReplacementBytes)
 	assert.GreaterOrEqual(t, core.reconfigures[1].PasswordReplacementBytes, 16)
+	assert.False(t, core.reconfigures[1].PersistVisibleOverrides)
 
 	deleted := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
 		ExpectedRevision: 9, EnabledPreference: true, ReservedDomain: "after.example", Username: "friends", DeleteProviderToken: true,
@@ -2671,6 +2366,7 @@ func TestActivePublicAccessMutationsDelegateAsProtectedReconfigureWithoutMixedRe
 	assert.Equal(t, "stopped", deleted.Snapshot.Status.State)
 	require.Len(t, core.reconfigures, 3)
 	assert.True(t, core.reconfigures[2].DeleteProviderToken)
+	assert.True(t, core.reconfigures[2].PersistVisibleOverrides)
 
 	blocked := app.StartPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 10})
 	require.False(t, blocked.OK)
@@ -2733,4 +2429,84 @@ func TestPublicAccessCompositionUsesDirectExistingPlayerTarget(t *testing.T) {
 	route := publicAccessCompositionRoute()
 	assert.Equal(t, tunnelservice.PlayerUpstreamAddress, route.PlayerTarget)
 	assert.Equal(t, "http://127.0.0.1:3690", route.UpstreamURL)
+}
+
+func TestPublicAccessEnvironmentOverrideCompositionIsDevelopmentOnlyAndNeverAutoStarts(t *testing.T) {
+	settings := &fallbackMatrixSettings{preferences: tunnelservice.DefaultPublicAccessPreferences()}
+	secrets := testutil.NewFakeSecretStore()
+	lookupCalls := 0
+	providerCanary := "generated-" + strings.Repeat("t", 32)
+	passwordCanary := "generated-" + strings.Repeat("w", 16)
+	lookup := func(name string) (string, bool) {
+		lookupCalls++
+		values := map[string]string{
+			tunnelservice.DevelopmentNgrokAuthtokenEnvironment: providerCanary,
+			tunnelservice.DevelopmentNgrokDomainEnvironment:    "override.example",
+			tunnelservice.DevelopmentPlayerUsernameEnvironment: "override-players",
+			tunnelservice.DevelopmentPlayerPasswordEnvironment: passwordCanary,
+		}
+		value, ok := values[name]
+		return value, ok
+	}
+
+	developmentSettings, developmentSecrets := publicAccessStoresForProfile(settings, secrets, false, lookup)
+	service := testutil.NewFakeTunnelService(testutil.NewFakeTunnelEndpoint("https://override.example"))
+	manager, err := tunnelservice.NewPublicAccessManager(tunnelservice.ManagerConfig{
+		Settings: developmentSettings, Secrets: developmentSecrets, Tunnel: service,
+		Ingress: tunnelservice.NewPublicIngressFactory(), UpstreamURL: publicAccessCompositionRoute().UpstreamURL,
+	})
+	require.NoError(t, err)
+	snapshot := manager.Initialize(t.Context())
+	assert.Equal(t, "override.example", snapshot.Preferences.ReservedDomain)
+	assert.Equal(t, "override-players", snapshot.Preferences.Username)
+	assert.Equal(t, tunnelservice.SecretPresent, snapshot.ProviderTokenPresence)
+	assert.Equal(t, tunnelservice.SecretPresent, snapshot.PlayerPasswordPresence)
+	assert.Equal(t, tunnelservice.LifecycleDisabled, snapshot.Status.State)
+	assert.Zero(t, service.StartCalls(), "environment loading must not auto-start public access")
+	assert.Positive(t, lookupCalls)
+	rawSnapshot, err := json.Marshal(snapshot)
+	require.NoError(t, err)
+	assert.NotContains(t, string(rawSnapshot), providerCanary)
+	assert.NotContains(t, string(rawSnapshot), passwordCanary)
+	underlyingProvider, err := secrets.Presence(t.Context(), tunnelservice.ProviderAccountToken)
+	require.NoError(t, err)
+	underlyingPassword, err := secrets.Presence(t.Context(), tunnelservice.PlayerBasicAuthPassword)
+	require.NoError(t, err)
+	assert.Equal(t, tunnelservice.SecretAbsent, underlyingProvider)
+	assert.Equal(t, tunnelservice.SecretAbsent, underlyingPassword)
+
+	app := NewAppWithDependencies(AppDependencies{
+		PublicAccess: manager, PasswordEntropy: strings.NewReader(strings.Repeat("g", 32)),
+	})
+	generated := app.GeneratePlayerPassword(PublicAccessCommandPayload{ExpectedRevision: snapshot.Preferences.Revision})
+	require.True(t, generated.OK, generated.Error)
+	assert.NotEmpty(t, generated.GeneratedPassword)
+	assert.Equal(t, "", settings.preferences.ReservedDomain, "Generate must not persist the environment domain")
+	assert.Equal(t, "players", settings.preferences.Username, "Generate must not persist the environment username")
+	assert.Equal(t, generated.SettingsRevision, settings.preferences.Revision)
+
+	saved := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+		ExpectedRevision: generated.SettingsRevision, ReservedDomain: "override.example", Username: "override-players",
+	})
+	require.True(t, saved.OK, saved.Error)
+	assert.Equal(t, "override.example", settings.preferences.ReservedDomain)
+	assert.Equal(t, "override-players", settings.preferences.Username)
+
+	started := manager.Start(t.Context(), saved.Snapshot.Preferences.Revision)
+	require.True(t, started.OK, started.Error)
+	assert.Equal(t, tunnelservice.LifecycleReady, started.Snapshot.Status.State)
+	assert.Equal(t, 1, service.StartCalls(), "only explicit Start may consume the override")
+	underlyingProvider, err = secrets.Presence(t.Context(), tunnelservice.ProviderAccountToken)
+	require.NoError(t, err)
+	underlyingPassword, err = secrets.Presence(t.Context(), tunnelservice.PlayerBasicAuthPassword)
+	require.NoError(t, err)
+	assert.Equal(t, tunnelservice.SecretAbsent, underlyingProvider)
+	assert.Equal(t, tunnelservice.SecretPresent, underlyingPassword)
+	require.NoError(t, manager.Shutdown(t.Context()))
+
+	lookupCalls = 0
+	productionSettings, productionSecrets := publicAccessStoresForProfile(settings, secrets, true, lookup)
+	assert.Same(t, settings, productionSettings)
+	assert.Same(t, secrets, productionSecrets)
+	assert.Zero(t, lookupCalls, "packaged production must not consult the development environment")
 }

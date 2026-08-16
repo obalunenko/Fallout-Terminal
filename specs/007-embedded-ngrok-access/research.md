@@ -11,16 +11,42 @@ remote `Host` preservation and makes the pre-removal rollback reference mechanic
 **Bugfix**: 2026-08-15 — BUG-001 records the target Darwin `EADDRNOTAVAIL` result for unassigned
 `127.0.0.2` and adopts ngrok Agent Endpoint Basic Auth for the personal-game threat model.
 
+**Bugfix**: 2026-08-16 — BUG-003 records the real static-success/`Subscribe`-stall result, rejects
+Traffic Policy Basic Auth for the active candidate, and selects an application-owned private
+loopback ingress that authenticates without buffering the existing ConnectRPC handler.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification follow-up removes the remaining active endpoint-auth
+rationale; retained BUG-001 text is explicitly non-normative history.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up selects a four-name dev/test-only
+environment adapter for repeat runs while retaining Keychain as the sole production secret store.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation distinguishes effective
+dev/test secret sourcing from removed legacy production env configuration.
+
+**Bugfix**: 2026-08-16 — BUG-003 non-secret username reconciliation permits approved master
+settings/snapshot exposure while keeping password confinement unchanged.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification correction distinguishes permitted production
+Keychain storage from forbidden application-managed persistence outside Keychain.
+
 ## Real SDK acceptance harness decision (2026-08-15)
 
 The real SDK test is strictly opt-in with `FALLOUT_NGROK_INTEGRATION=1`; its account credential and
 optional owned reserved domain are read only by the test process from an external harness. The test
 never logs either value or raw SDK diagnostics. Without explicit opt-in or a non-empty external
 credential it reports `NOT RUN`, and that result is never substituted for deterministic policy,
-streaming, or fake lifecycle evidence. When enabled, the harness uses the existing upstream at
-`127.0.0.1:3690`, probes a random or exact reserved HTTPS endpoint, checks missing/wrong/correct
-Basic Auth plus a non-empty incremental `Subscribe`, and closes the endpoint with a five-second
-context.
+streaming, or fake lifecycle evidence. When enabled, the harness uses the production private-ingress
+path to the existing player service at `127.0.0.1:3690`, probes a random or exact reserved HTTPS
+endpoint, checks exact/unknown Host, missing/wrong/correct Basic Auth plus a non-empty incremental
+`Subscribe`, and closes the endpoint and ingress with a five-second context.
+
+For repeat development and real-service runs, canonical dev/test root composition may also resolve
+the exact FR-056 variables before persisted/Keychain sources. This is the same embedded SDK and
+private-ingress path, not a second harness or tunnel runtime. Domain and username may prefill the
+master form; token/password remain presence-only, transient scoped inputs. Empty/unset values fall
+back normally. The adapter performs no save or auto-start, never prints values, and is not
+constructed by packaged production.
 
 ## 1. Embedded ngrok runtime
 
@@ -28,14 +54,15 @@ context.
 module. As of 2026-08-15, `v2.1.4` is the latest stable tagged release. It was released on
 2026-04-27, is MIT licensed, declares Go `1.25.7`, and is compatible with this repository's pinned
 Go 1.26 toolchain. Use an explicitly constructed agent rather than the package default so the
-authtoken comes only from the scoped `SecretStore` callback and never from
-`NGROK_AUTHTOKEN`:
+authtoken comes only from the scoped effective-secret callback—production `SecretStore` or the
+exact FR-056 dev/test override—and never implicitly from `NGROK_AUTHTOKEN`:
 
 1. `ngrok.NewAgent(ngrok.WithAuthtoken(token), ngrok.WithAutoConnect(false), ...)`;
 2. `Agent.Connect(startContext)`;
-3. construct the in-memory Basic Auth Traffic Policy from scoped username/password buffers;
-4. `Agent.Forward(startContext, ngrok.WithUpstream("http://127.0.0.1:3690"),
-   ngrok.WithTrafficPolicy(policy), endpointOptions...)` without a custom upstream dialer;
+3. start the application-owned private ingress in deny-all mode and retain player credentials
+   outside the SDK;
+4. `Agent.Forward(startContext, ngrok.WithUpstream(privateIngressURL), endpointOptions...)` without
+   Traffic Policy or a custom upstream dialer;
 5. read and strictly validate `EndpointForwarder.URL()`;
 6. observe `EndpointForwarder.Done()` and provider disconnect events;
 7. on every stop path call bounded `CloseWithContext`, then `Agent.Disconnect`, and drop all SDK
@@ -90,10 +117,11 @@ existing player server.
 
 ## 2. Forwarding and ConnectRPC streaming
 
-**Decision (BUG-001)**: Configure exactly one SDK forwarder with upstream
-`http://127.0.0.1:3690` and ngrok Basic Auth Traffic Policy. Do not create another application
-listener or Connect service. Leave the Connect handler and server-streaming `Subscribe`
-implementation unchanged.
+**Decision (BUG-003)**: ~~BUG-001 configured one SDK forwarder directly to
+`http://127.0.0.1:3690` with ngrok Basic Auth Traffic Policy.~~ Configure exactly one SDK forwarder
+to one loopback-only application ingress without Traffic Policy. The ingress authenticates exact
+Host/Basic Auth and streams to the unchanged single Connect handler/player service on port 3690; it
+is not another Connect service or game-state owner.
 
 Official SDK documentation explicitly supports forwarding to an existing HTTP upstream. At the
 selected pin, the forwarder accepts edge connections and serves/copies them to the configured
@@ -102,10 +130,11 @@ existing non-empty server stream technically compatible, but documentation and s
 not acceptance evidence. Integration and real-network browser tests must prove that a snapshot and
 later update arrive incrementally before `Subscribe` completes, and that reconnect converges.
 
-**Rationale**: Public authentication at the endpoint keeps direct local/LAN traffic unchanged and
-removes the impossible source discriminator. Keeping the generated Connect handler untouched
-minimizes streaming risk; a focused opt-in real test, rather than documentation alone, records
-whether the provider policy preserves non-empty incremental delivery.
+**Rationale (BUG-003)**: ~~Public authentication at the ngrok endpoint kept direct local/LAN traffic
+unchanged but depended on unproven Traffic Policy streaming.~~ The private ingress preserves the
+same topology separation while keeping authentication in application-owned header middleware and
+delegating immediately to the unchanged generated Connect handler. The focused real test remains
+mandatory evidence that the complete path preserves non-empty incremental delivery.
 
 **Alternatives considered**:
 
@@ -118,14 +147,29 @@ whether the provider policy preserves non-empty incremental delivery.
 
 ## 3. Basic Auth and Traffic Policy
 
-**Decision (BUG-001)**: ~~Do not configure ngrok Basic Auth or another request/response Traffic
-Policy.~~ Configure one ngrok Agent Endpoint Basic Auth policy before publication. It covers the
-page, every static asset, and every ConnectRPC procedure forwarded through the public URL. The
-application adds no second authentication authority, rate limit, lockout, or Host/source policy.
+**Decision (BUG-003)**: ~~**BUG-001** configured one ngrok Agent Endpoint Basic Auth policy before
+publication.~~ A real endpoint loaded the player HTML but did not deliver the initial `Subscribe`
+snapshot, matching the previously recorded streaming-intermediary risk. The SDK now owns endpoint
+transport only and receives no player credential or Traffic Policy.
 
-The player username/password cross the provider boundary only through the scoped in-memory SDK
-construction call. No policy file, environment value, process argument, log, event, or reusable
-status contains them. Direct local/LAN requests bypass ngrok by topology and remain unauthenticated.
+Start one application-owned private loopback ingress in deny-all mode. The SDK forwards only to
+that ingress; after the returned public URL is validated, lifecycle atomically installs its exact
+Host plus scoped Basic Auth credentials and only then publishes the URL. The ingress authenticates
+headers and delegates immediately to a streaming reverse proxy targeting the unchanged
+`http://127.0.0.1:3690` player server. It holds no game state, exposes no LAN listener, and is not a
+second player service. Stop/failure/reconfigure/shutdown deny the Host before endpoint/ingress close.
+
+~~The player username/password no longer cross the provider SDK boundary. They enter only the scoped
+in-memory ingress activation call. Production credentials do not come from environment; the exact
+FR-056 dev/test password name is the sole transient exception. No policy file, process argument,
+log, event, or reusable status contains them.~~ **BUG-003 username reconciliation**: Neither value
+crosses the provider SDK boundary. The ingress receives normalized username from effective
+non-secret preferences and password from the scoped effective-secret callback. Username may appear
+only in approved non-secret settings/master snapshot/UI surfaces; password never appears in a policy
+file, process argument, log, event, reusable status, or application-managed persistence outside
+Keychain. Production password comes from Keychain, with only the exact FR-056 dev/test password
+override as a transient exception. Direct local/LAN requests bypass the ingress by topology and
+remain unauthenticated.
 
 The following pre-BUG-001 source-classification paragraphs are retained as superseded design
 history and are non-normative:
@@ -164,16 +208,17 @@ Header-only application auth has directly testable semantics and preserves the r
 
 **Alternatives considered**:
 
-- ~~ngrok Traffic Policy Basic Auth: deferred until a separate feature supplies real evidence.~~
-  BUG-001 accepts it for personal sharing and retains one focused opt-in streaming/auth check.
+- ~~ngrok Traffic Policy Basic Auth: BUG-001 accepted it for personal sharing pending one focused
+  opt-in streaming/auth check.~~ **BUG-003** rejects it after the available real path loaded static
+  content but stalled before the first snapshot.
 - Dual edge and application Basic Auth: rejected because it produces two credential authorities and
   can create confusing double challenges.
 - Host-only local/public classification: rejected because a forwarded request can carry a local
   authority unless a separate trusted transport discriminator exists.
-- A second ingress listener/proxy: ~~rejected because the source-bound SDK dialer distinguishes the
-  same authoritative listener without creating a second player server.~~ **BUG-001** retained only
-  as a future fallback if the focused real Traffic Policy test proves streaming incompatibility; it
-  is not part of the current production path.
+- ~~A private loopback ingress/proxy remained a future fallback if the focused real Traffic Policy
+  test proved streaming incompatibility.~~ **BUG-003** selects that fallback. It is an
+  application-owned authentication/streaming adapter, not an authoritative player server, and the
+  sole game service remains on port 3690.
 - Application lockout/rate limiting: rejected by the approved specification; provider throttling is
   an external condition only.
 
@@ -297,9 +342,13 @@ override that supplies settings and scoped temporary credentials to the same `Tu
 official SDK adapter. It is not registered as a Wails operation, is not compiled into packaged UX,
 cannot select a process runner, and cannot choose a second provider implementation.
 
-Real-network automation may read dedicated test variables in the external test harness and submit
-them through the same private mutation/start behavior as a user. The application process itself does
-not read those values. Missing credentials or connectivity produces an explicit `NOT RUN` record.
+Canonical dev/test root composition may read only `FALLOUT_NGROK_AUTHTOKEN`,
+`FALLOUT_NGROK_RESERVED_DOMAIN`, `FALLOUT_PUBLIC_TEST_USERNAME`, and
+`FALLOUT_PUBLIC_TEST_PASSWORD`. Non-empty values override the matching source for that process;
+domain/username may prefill while secrets remain presence-only and scoped. External real-network
+automation uses the same names and embedded path. Packaged production does not construct the
+adapter. Missing credentials or connectivity produces an explicit `NOT RUN` record except for the
+blocking BUG-003 closure rerun.
 
 **Rationale**: Tests retain deterministic and credential-gated seams without preserving a hidden
 production mode or process fallback.
@@ -309,8 +358,8 @@ production mode or process fallback.
 - Preserve `NGROK_BIN` or external-process overrides: rejected because they leave a second runtime.
 - Remove all injection: rejected because deterministic lifecycle/race tests and opt-in real-service
   tests need controlled inputs.
-- Expose an environment/argument switch in the packaged binary: rejected because packaged users
-  must use only the UI and production secrets must not enter process metadata.
+- Expose an environment/argument switch in the packaged production composition: rejected because
+  packaged users must use only the UI and production secrets must not depend on process metadata.
 
 ## 8. Reproducibility, packaging, and release impact
 
@@ -358,7 +407,9 @@ an unknown syntactically valid external Host. The implementation therefore needs
 generation-aware manager and a dynamic player-boundary policy before deleting the CLI path.~~
 **BUG-001**: The present runtime remains startup-static and process-owned. The cutover needs a
 restartable generation-aware embedded SDK manager, policy-protected endpoint construction, and URL
-withdrawal/endpoint-close sequencing before deleting the CLI path.
+withdrawal/endpoint-close sequencing before deleting the CLI path. **BUG-003** supersedes endpoint
+policy construction with deny-all private ingress acquisition, exact-Host/auth activation before
+publication, and deny-before-endpoint-close sequencing.
 
 The cutover order is:
 
@@ -367,8 +418,11 @@ The cutover order is:
 2. prove protected-endpoint publication/withdrawal order, streaming, local fallback, bounded cleanup, and UI
    operations through the embedded path;
 3. redirect composition and packaged UX exclusively to the embedded path;
-4. delete process runner/guardian, log URL parser, CLI/env configuration and secrets, hard-coded
-   domain, process-specific tests, and active CLI documentation;
+4. ~~delete process runner/guardian, log URL parser, CLI/env configuration and secrets, hard-coded
+   domain, process-specific tests, and active CLI documentation;~~ **BUG-003 reconciliation** delete
+   process runner/guardian, log URL parser, legacy production CLI/env configuration and secrets,
+   hard-coded domain, process-specific tests, and active CLI documentation while retaining only the
+   exact FR-056 dev/test adapter;
 5. retain their security and lifecycle guarantees in provider-neutral tests and reject any second
    production tunnel mechanism.
 

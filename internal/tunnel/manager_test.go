@@ -88,6 +88,85 @@ type scheduledTunnelEndpoint struct {
 	closeCall int
 }
 
+type scheduledIngressFactory struct {
+	mu        sync.Mutex
+	events    *orderedEvents
+	starts    int
+	active    int
+	maxActive int
+}
+
+type scheduledIngress struct {
+	mu       sync.Mutex
+	owner    *scheduledIngressFactory
+	index    int
+	url      *url.URL
+	denied   bool
+	closed   bool
+	activate int
+}
+
+func (factory *scheduledIngressFactory) Start(context.Context, string) (tunnel.PublicIngress, error) {
+	factory.mu.Lock()
+	factory.starts++
+	index := factory.starts
+	factory.active++
+	if factory.active > factory.maxActive {
+		factory.maxActive = factory.active
+	}
+	factory.mu.Unlock()
+	parsed, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", 41000+index))
+	if err != nil {
+		return nil, err
+	}
+	factory.events.add(fmt.Sprintf("ingress-start:%d", index))
+	return &scheduledIngress{owner: factory, index: index, url: parsed, denied: true}, nil
+}
+
+func (ingress *scheduledIngress) URL() *url.URL {
+	copyURL := *ingress.url
+	return &copyURL
+}
+
+func (ingress *scheduledIngress) Activate(host, _ string, _ []byte) error {
+	ingress.mu.Lock()
+	defer ingress.mu.Unlock()
+	ingress.denied = false
+	ingress.activate++
+	ingress.owner.events.add(fmt.Sprintf("activate:%d:%s", ingress.index, host))
+	return nil
+}
+
+func (ingress *scheduledIngress) Deny() {
+	ingress.mu.Lock()
+	defer ingress.mu.Unlock()
+	if ingress.denied {
+		return
+	}
+	ingress.denied = true
+	ingress.owner.events.add(fmt.Sprintf("deny:%d", ingress.index))
+}
+
+func (ingress *scheduledIngress) Close(context.Context) error {
+	ingress.mu.Lock()
+	defer ingress.mu.Unlock()
+	if ingress.closed {
+		return nil
+	}
+	ingress.closed = true
+	ingress.owner.mu.Lock()
+	ingress.owner.active--
+	ingress.owner.mu.Unlock()
+	ingress.owner.events.add(fmt.Sprintf("ingress-close:%d", ingress.index))
+	return nil
+}
+
+func (factory *scheduledIngressFactory) counts() (starts, active, maximum int) {
+	factory.mu.Lock()
+	defer factory.mu.Unlock()
+	return factory.starts, factory.active, factory.maxActive
+}
+
 func newScheduledTunnelService(events *orderedEvents, plans ...scheduledStart) *scheduledTunnelService {
 	return &scheduledTunnelService{
 		plans: plans, events: events, closeErrors: make(map[int]error),
@@ -216,7 +295,8 @@ func newScheduledManager(t *testing.T, service tunnel.TunnelService, events *ord
 	require.NoError(t, secrets.Replace(t.Context(), tunnel.ProviderAccountToken, []byte("synthetic-account-input")))
 	require.NoError(t, secrets.Replace(t.Context(), tunnel.PlayerBasicAuthPassword, []byte("synthetic-player-input")))
 	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
-		Settings: settings, Secrets: secrets, Tunnel: service, UpstreamURL: "http://127.0.0.1:3690",
+		Settings: settings, Secrets: secrets, Tunnel: service,
+		Ingress: &scheduledIngressFactory{events: events}, UpstreamURL: "http://127.0.0.1:3690",
 		Publish: func(snapshot tunnel.PublicAccessSnapshot) {
 			events.add(fmt.Sprintf("publish:%d:%t:%d", snapshot.Status.State, snapshot.Status.PublicURL != "", snapshot.Preferences.Revision))
 		},
@@ -246,9 +326,10 @@ func newManagerFixture(t *testing.T) managerFixture {
 	service := testutil.NewFakeTunnelService(endpoint)
 	publisher := testutil.NewFakeSnapshotPublisher()
 	clock := testutil.NewFakeClock(time.Unix(100, 0))
+	events := &orderedEvents{}
 	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
 		Settings: settings, Secrets: secrets, Tunnel: service,
-		Publish: publisher.Publish, Clock: clock,
+		Ingress: &scheduledIngressFactory{events: events}, Publish: publisher.Publish, Clock: clock,
 		UpstreamURL: "http://127.0.0.1:3690",
 	})
 	require.NoError(t, err)
@@ -263,7 +344,7 @@ func TestPublicAccessManagerPublishesPrivateStartingThenReadyOnlyAfterProtectedE
 	require.Equal(t, tunnel.LifecycleReady, result.Snapshot.Status.State)
 	require.Equal(t, "https://public.example", result.Snapshot.Status.PublicURL)
 	require.Equal(t, uint64(1), result.Snapshot.Status.Generation)
-	assert.Equal(t, "http://127.0.0.1:3690", fixture.service.LastUpstreamURL())
+	assert.Equal(t, "http://127.0.0.1:41001", fixture.service.LastUpstreamURL())
 	assert.True(t, fixture.service.LastStartSecretsCleared())
 
 	snapshots := fixture.publisher.Snapshots()
@@ -272,6 +353,46 @@ func TestPublicAccessManagerPublishesPrivateStartingThenReadyOnlyAfterProtectedE
 	assert.Empty(t, snapshots[0].Status.PublicURL)
 	assert.Equal(t, tunnel.LifecycleReady, snapshots[len(snapshots)-1].Status.State)
 	assert.Equal(t, "https://public.example", snapshots[len(snapshots)-1].Status.PublicURL)
+}
+
+func TestPublicAccessManagerActivatesBeforePublishAndDeniesBeforeEndpointClose(t *testing.T) {
+	events := &orderedEvents{}
+	service := newScheduledTunnelService(events)
+	ingresses := &scheduledIngressFactory{events: events}
+	preferences := tunnel.DefaultPublicAccessPreferences()
+	preferences.Revision = 7
+	settings := &memorySettings{preferences: preferences}
+	secrets := testutil.NewFakeSecretStore()
+	require.NoError(t, secrets.Replace(t.Context(), tunnel.ProviderAccountToken, []byte("synthetic-account-input")))
+	require.NoError(t, secrets.Replace(t.Context(), tunnel.PlayerBasicAuthPassword, []byte("synthetic-player-input")))
+	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
+		Settings: settings, Secrets: secrets, Tunnel: service, Ingress: ingresses,
+		UpstreamURL: "http://127.0.0.1:3690",
+		Publish: func(snapshot tunnel.PublicAccessSnapshot) {
+			events.add(fmt.Sprintf("publish:%d:%t:%d", snapshot.Status.State, snapshot.Status.PublicURL != "", snapshot.Preferences.Revision))
+		},
+	})
+	require.NoError(t, err)
+	manager.Initialize(t.Context())
+	require.True(t, manager.Start(t.Context(), 7).OK)
+	require.True(t, manager.Stop(t.Context(), 7).OK)
+
+	ordered := events.snapshot()
+	activate := indexOfEvent(ordered, "activate:1:public-1.example")
+	ready := indexOfEvent(ordered, fmt.Sprintf("publish:%d:true:7", tunnel.LifecycleReady))
+	deny := indexOfEvent(ordered, "deny:1")
+	withdraw := indexOfEvent(ordered, fmt.Sprintf("publish:%d:false:7", tunnel.LifecycleStopping))
+	endpointClose := indexOfEvent(ordered, "close:1")
+	ingressClose := indexOfEvent(ordered, "ingress-close:1")
+	assert.GreaterOrEqual(t, activate, 0, ordered)
+	assert.Greater(t, ready, activate, ordered)
+	assert.Greater(t, withdraw, deny, ordered)
+	assert.Greater(t, endpointClose, withdraw, ordered)
+	assert.Greater(t, ingressClose, endpointClose, ordered)
+	starts, active, maximum := ingresses.counts()
+	assert.Equal(t, 1, starts)
+	assert.Equal(t, 0, active)
+	assert.Equal(t, 1, maximum)
 }
 
 func TestPublicAccessManagerRejectsStaleRevisionAndJoinsRepeatedStartStop(t *testing.T) {
@@ -391,7 +512,8 @@ func TestPublicAccessManagerUnexpectedDonePublishesOnlySafeNgrokCode(t *testing.
 	require.NoError(t, secrets.Replace(t.Context(), tunnel.PlayerBasicAuthPassword, []byte("synthetic-player-input")))
 	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
 		Settings: &memorySettings{preferences: preferences}, Secrets: secrets,
-		Tunnel: diagnosticTunnelService{endpoint: endpoint}, UpstreamURL: "http://127.0.0.1:3690",
+		Tunnel:  diagnosticTunnelService{endpoint: endpoint},
+		Ingress: &scheduledIngressFactory{events: &orderedEvents{}}, UpstreamURL: "http://127.0.0.1:3690",
 	})
 	require.NoError(t, err)
 	manager.Initialize(t.Context())
@@ -452,6 +574,66 @@ func TestPublicAccessManagerConcurrentReconfigureConvergesWithoutEndpointOverlap
 		assert.Greaterf(t, closeIndex, stoppingIndex, "schedule %d events = %#v", schedule, ordered)
 		assert.Greaterf(t, replacementIndex, closeIndex, "schedule %d events = %#v", schedule, ordered)
 	}
+}
+
+func TestPublicAccessManagerGeneratedPasswordDoesNotPersistDevelopmentVisibleOverrides(t *testing.T) {
+	stored := tunnel.DefaultPublicAccessPreferences()
+	stored.ReservedDomain = "stored.example"
+	stored.Username = "stored-players"
+	stored.Revision = 7
+	base := &memorySettings{preferences: stored}
+	secrets := testutil.NewFakeSecretStore()
+	override := tunnel.NewDevelopmentTestPublicAccessOverride(base, secrets, func(name string) (string, bool) {
+		values := map[string]string{
+			tunnel.DevelopmentNgrokAuthtokenEnvironment: "synthetic-environment-provider-token",
+			tunnel.DevelopmentNgrokDomainEnvironment:    "override.example",
+			tunnel.DevelopmentPlayerUsernameEnvironment: "override-players",
+			tunnel.DevelopmentPlayerPasswordEnvironment: "synthetic-environment-player-password",
+		}
+		value, ok := values[name]
+		return value, ok
+	})
+	manager, err := tunnel.NewPublicAccessManager(tunnel.ManagerConfig{
+		Settings: override, Secrets: override,
+		Tunnel:  testutil.NewFakeTunnelService(testutil.NewFakeTunnelEndpoint("https://override.example")),
+		Ingress: tunnel.NewPublicIngressFactory(), UpstreamURL: "http://127.0.0.1:3690",
+	})
+	require.NoError(t, err)
+	effective := manager.Initialize(t.Context())
+	require.Equal(t, "override.example", effective.Preferences.ReservedDomain)
+	require.Equal(t, "override-players", effective.Preferences.Username)
+	require.True(t, manager.Start(t.Context(), effective.Preferences.Revision).OK)
+	require.True(t, manager.Stop(t.Context(), effective.Preferences.Revision).OK)
+	persisted, saves := base.Snapshot()
+	assert.Equal(t, stored, persisted)
+	assert.Zero(t, saves, "Load, Start, and Stop must not persist visible overrides")
+
+	generated := manager.Reconfigure(t.Context(), tunnel.PublicAccessMutation{
+		ExpectedRevision: effective.Preferences.Revision,
+		Preferences:      effective.Preferences,
+		PlayerPassword:   tunnel.SecretMutation{Replacement: []byte("synthetic-generated-player-password")},
+	})
+	require.True(t, generated.OK, generated.Error)
+	persisted, saves = base.Snapshot()
+	assert.Equal(t, "stored.example", persisted.ReservedDomain)
+	assert.Equal(t, "stored-players", persisted.Username)
+	assert.Equal(t, uint64(8), persisted.Revision)
+	assert.True(t, persisted.PlayerPasswordPresentHint)
+	assert.Equal(t, 1, saves)
+	assert.Equal(t, "override.example", generated.Snapshot.Preferences.ReservedDomain)
+	assert.Equal(t, "override-players", generated.Snapshot.Preferences.Username)
+
+	explicitSave := manager.Reconfigure(t.Context(), tunnel.PublicAccessMutation{
+		ExpectedRevision:        generated.Snapshot.Preferences.Revision,
+		Preferences:             generated.Snapshot.Preferences,
+		PersistVisibleOverrides: true,
+	})
+	require.True(t, explicitSave.OK, explicitSave.Error)
+	persisted, saves = base.Snapshot()
+	assert.Equal(t, "override.example", persisted.ReservedDomain)
+	assert.Equal(t, "override-players", persisted.Username)
+	assert.Equal(t, uint64(9), persisted.Revision)
+	assert.Equal(t, 2, saves)
 }
 
 func TestPublicAccessManagerReconfigureDisposesLateStartBeforeReplacement(t *testing.T) {

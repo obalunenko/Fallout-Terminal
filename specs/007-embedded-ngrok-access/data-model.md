@@ -6,6 +6,18 @@ bypass never depends on forwarded `Host` behavior.
 **Bugfix**: 2026-08-15 — BUG-001 supersedes the player-bound source/Host grant with an ephemeral
 ngrok Basic Auth Traffic Policy after `127.0.0.2` failed to bind on target macOS.
 
+**Bugfix**: 2026-08-16 — BUG-003 supersedes Traffic Policy Basic Auth after the real public stream
+stalled and adds an ephemeral application-owned ingress activation to the process-local lifecycle.
+
+**Bugfix**: 2026-08-16 — BUG-003 verification follow-up reconciles lifecycle transitions and
+cardinality invariants with deny-before-withdraw and one endpoint/ingress ownership.
+
+**Bugfix**: 2026-08-16 — BUG-003 test-ergonomics follow-up models the exact dev/test environment
+override as ephemeral input, not a fifth persistent lifetime or an alternate production store.
+
+**Bugfix**: 2026-08-16 — BUG-003 second verification reconciliation applies the effective secret
+source and deny-before-withdraw order to publication and settings mutation.
+
 ## Model boundaries
 
 Public-access data is split into four deliberately different lifetimes:
@@ -14,7 +26,7 @@ Public-access data is split into four deliberately different lifetimes:
 2. two independent secrets in macOS Keychain;
 3. one process-local lifecycle snapshot and active provider endpoint handle;
 4. narrow ephemeral mutation/generated-password payloads that exist only for one trusted desktop
-   call.
+   call; the dev/test-only environment override is resolved within this same ephemeral lifetime.
 
 Session JSON version 1, player-config JSON version 1, public player protobuf messages, and
 authoritative game state do not reference any of these entities.
@@ -53,7 +65,7 @@ temp creation, file sync, atomic rename, and cleanup on every failed path.
 | Ref | Purpose | Keychain account |
 |---|---|---|
 | `ProviderAccountToken` | Authenticates the user's ngrok Agent session. | `ngrok-authtoken` |
-| `PlayerBasicAuthPassword` | ~~Authenticates requests for the active public Host.~~ **BUG-001** Authenticates requests through the active public endpoint. | `player-basic-auth-password` |
+| `PlayerBasicAuthPassword` | ~~BUG-001 authenticated requests through the active endpoint Traffic Policy.~~ **BUG-003** Authenticates exact-Host requests at the private application ingress. | `player-basic-auth-password` |
 
 Both use the service selected by bundle profile. The secret value is not a field of any settings,
 status, event, public descriptor, persisted model, or reusable result.
@@ -72,6 +84,28 @@ The `SecretStore` supports only:
 
 There is no general `Get`, string-return, export, reveal, list, or desktop-facing read operation.
 
+### DevelopmentTestPublicAccessOverride
+
+This process-local adapter exists only in canonical development/test composition. It reads four
+exact names without enumerating or logging environment contents:
+
+| Environment name | Effective field | Exposure rule |
+|---|---|---|
+| `FALLOUT_NGROK_AUTHTOKEN` | provider account token | Non-empty value overrides Keychain use for this process; reusable UI sees presence only. |
+| `FALLOUT_NGROK_RESERVED_DOMAIN` | reserved domain | Non-empty validated value overrides persisted preference and may prefill the form. |
+| `FALLOUT_PUBLIC_TEST_USERNAME` | player username | Non-empty validated value overrides persisted preference and may prefill the form. |
+| `FALLOUT_PUBLIC_TEST_PASSWORD` | player Basic Auth password | Non-empty value overrides Keychain use for this process; reusable UI sees presence only. |
+
+Resolution is per field: non-empty environment value first, otherwise the ordinary persisted or
+Keychain source. Environment-derived secrets are passed only through the same scoped callback shape
+used by `SecretStore`; they are never written into Keychain or seeded into a Save secret mutation.
+The adapter itself performs no persistence; an explicit Save retains ordinary semantics for visible
+non-secret domain/username fields. The effective non-secret form values
+and secret presence may appear in the existing secret-free snapshot, but no new DTO, protobuf field,
+desktop method, status/event payload, serialization, or persistent entity is added. Loading the
+override does not save settings or start public access. Packaged production does not construct this
+adapter and ignores all four names.
+
 ## PublicAccessStatus
 
 Protobuf source: `fallout.terminal.private.v1.PublicAccessStatus`.
@@ -81,11 +115,13 @@ Protobuf source: `fallout.terminal.private.v1.PublicAccessStatus`.
 | `state` | `PublicAccessLifecycleState` | One of `disabled`, `starting`, `ready`, `stopping`, `failed`; zero is `UNSPECIFIED`. |
 | `generation` | unsigned 64-bit integer | Increases for every start, stop, reconfigure, failure cleanup, or shutdown intent. |
 | `settings_revision` | unsigned 64-bit integer | Revision whose settings the operation uses. |
-| `public_url` | optional string | Present only in `ready`, only after protected endpoint creation. |
+| `public_url` | optional string | Present only in `ready`, only after endpoint validation and exact-Host/auth ingress activation. |
 | `error_category` | enum | Redacted stable category; zero when there is no failure. |
 | `error_message` | optional string | Safe corrective text, never a raw provider/Keychain error. |
 
-`PublicAccessSnapshot` combines redacted preferences, reconciled secret presence, and status. It is
+`PublicAccessSnapshot` combines effective redacted preferences, reconciled secret presence, and
+status. In development/test composition only, effective domain/username and presence may reflect
+the ephemeral override; persisted values remain unchanged. It is
 safe for the private master bridge and `public-access-status` named event. It never contains the
 active password, provider token, Keychain data, provider account details, or internal endpoint ID.
 
@@ -97,15 +133,15 @@ and settings revision.
 
 | Current | Trigger | Immediate protected action | Completion |
 |---|---|---|---|
-| `disabled` | Start | Increment generation; enter `starting` without a published URL. | Current success validates an already protected endpoint, then enters `ready`; current failure enters `failed`. |
+| `disabled` | Start | Increment generation; enter `starting`; start one deny-all private ingress without a published URL. | Current success validates the endpoint, atomically activates exact Host/auth, then enters `ready`; current failure denies and closes owned public resources before `failed`. |
 | `failed` | Start | Clear redacted error, increment generation, enter `starting`. | Same as disabled Start. |
 | `starting` | Start again | Join/return the same current intent; do not create another endpoint. | Existing operation decides result. |
 | `ready` | Start with same revision | Idempotently return current snapshot. | No provider action. |
-| `starting` or `ready` | Stop | Increment generation, withdraw URL, cancel startup/monitor, enter `stopping`. | Close endpoint/agent; enter `disabled`, URL absent. |
+| `starting` or `ready` | Stop | Increment generation, deny ingress, withdraw URL, cancel startup/monitor, enter `stopping`. | Close endpoint/agent and ingress; enter `disabled`, URL absent. |
 | `stopping` | Stop again | Join the same stop under its existing deadline. | Same terminal result; no extended budget. |
-| any active/transition state | Commit changed settings | Increment generation, withdraw URL, cancel and close old endpoint before applying/restarting. | If it was active, start only one replacement generation; otherwise remain `disabled`. |
-| `ready` | Endpoint `Done`/disconnect | If generation is current, clear URL immediately. | Bounded close/disconnect; enter `failed`; local/LAN remains ready. |
-| any | Quit/Cmd+Q | Increment generation, withdraw URL, cancel and close endpoint. | Continue player/session/desktop cleanup within the shared five-second deadline. |
+| any active/transition state | Commit changed settings | Increment generation, deny ingress, withdraw URL, cancel and close old endpoint/ingress before applying/restarting. | If it was active, start only one replacement generation; otherwise remain `disabled`. |
+| `ready` | Endpoint `Done`/disconnect | If generation is current, deny ingress and clear URL immediately. | Bounded endpoint/ingress close; enter `failed`; local/LAN remains ready. |
+| any | Quit/Cmd+Q | Increment generation, deny ingress, withdraw URL, cancel and close endpoint/ingress. | Continue player/session/desktop cleanup within the shared five-second deadline. |
 
 A completion is stale if either generation or settings revision differs from the current intent, or
 the expected state is no longer `starting`. A stale success closes its acquired endpoint without
@@ -115,13 +151,18 @@ publishing a URL. A stale failure cannot overwrite current status.
 
 For every generation the only legal readiness order is:
 
-1. scoped Keychain values are used to construct the ngrok Basic Auth Traffic Policy in memory;
-2. the provider creates the endpoint with that policy and no UI URL is exposed;
+1. an owned private loopback ingress starts in deny-all mode;
+2. the provider creates an endpoint targeting that ingress without player credentials or Traffic
+   Policy and no UI URL is exposed;
 3. the returned URL passes strict validation;
-4. state changes to `ready` and only then may snapshot/events expose `public_url`.
+4. ~~scoped Keychain values~~ **BUG-003 reconciliation** scoped effective secret values—production
+   Keychain or the exact FR-056 dev/test override—atomically activate exact Host plus Basic Auth at
+   the ingress;
+5. state changes to `ready` and only then may snapshot/events expose `public_url`.
 
-Stop, reconfigure, provider failure, and quit withdraw the URL before closing the endpoint. Direct
-local/LAN behavior is outside this endpoint lifecycle and is never changed by public failure.
+Stop, reconfigure, provider failure, and quit deny ingress admission before withdrawing the URL and
+closing endpoint/ingress. Direct local/LAN behavior is outside this endpoint lifecycle and is never
+changed by public failure.
 
 ## ~~PublicAccessGrant~~ Superseded by BUG-001
 
@@ -140,21 +181,24 @@ released before static or ConnectRPC handlers run, so a long-lived stream holds 
 Deactivation takes the write lock, swaps to deny, and clears credential buffers after outstanding
 header comparisons finish.
 
-## ~~PublicIngressRoute~~ ProviderEndpointInput (BUG-001)
+## ~~PublicIngressRoute / ProviderEndpointInput (BUG-001)~~ PublicIngressActivation (BUG-003)
 
-The old source-bound `PublicIngressRoute` is superseded. `ProviderEndpointInput` is ephemeral
-process-local adapter input, not protobuf, JSON, status, or reusable provider/user configuration.
+The old source-bound `PublicIngressRoute` and SDK credential-bearing `ProviderEndpointInput` are
+superseded. `PublicIngressActivation` is ephemeral process-local ingress input, not protobuf, JSON,
+status, or reusable provider/user configuration.
 
 | Field | Value | Rule |
 |---|---|---|
-| `upstream_url` | `http://127.0.0.1:3690` | The one authoritative player listener. |
-| `username` | scoped byte buffer | Used only to construct the endpoint Basic Auth policy. |
-| `password` | scoped byte buffer | Used only to construct the endpoint Basic Auth policy. |
+| `exact_public_host` | validated host | Installed atomically only after endpoint URL validation. |
+| `username` | scoped byte buffer | Used only by ingress Basic Auth comparison. |
+| `password` | scoped byte buffer | Used only by ingress Basic Auth comparison. |
+| `player_upstream_url` | `http://127.0.0.1:3690` | The sole authoritative player listener. |
 
-The adapter attaches the Basic Auth policy while creating the endpoint, clears/drops its scoped
-input after construction, and never renders policy text into diagnostics. The existing player
-listener performs ordinary application routing only. Local/LAN clients connect directly to it and
-therefore do not encounter the ngrok policy; public clients use the ngrok URL and do.
+The ingress begins deny-all, atomically installs activation after endpoint URL validation, and never
+renders credential or policy text into diagnostics. The ngrok adapter receives only its private
+loopback upstream plus account token/domain. The existing player listener performs ordinary
+application routing only. Local/LAN clients connect directly to it and therefore do not encounter
+the ingress policy; public clients reach it only through the active ingress.
 
 ## Ephemeral private payloads
 
@@ -182,9 +226,10 @@ event. Failure before durable Keychain replacement returns no password.
 ## Settings mutation failure model
 
 There is no false claim of a cross-Keychain/filesystem transaction. Before a mutation of active
-configuration, ~~public acceptance is disabled and the old endpoint is closed~~ **BUG-001** the URL
-is withdrawn and the old protected endpoint is closed. Keychain changes and the atomic non-secret
-file write are individually durable. If a later step fails, the manager stays non-public in
+configuration, ~~public acceptance is disabled and the old endpoint is closed~~ ~~**BUG-001** the URL
+is withdrawn and the old protected endpoint is closed.~~ **BUG-003 reconciliation** the ingress is
+set deny-all before URL withdrawal, then the old endpoint and ingress are closed. Keychain changes
+and the atomic non-secret file write are individually durable. If a later step fails, the manager stays non-public in
 `failed`, re-queries actual Keychain presence, reports a redacted partial-update recovery message,
 and lets the user retry. It never restarts using a mixture that was not validated as one current
 settings revision.
@@ -193,17 +238,24 @@ settings revision.
 
 - One `PublicAccessPreferences` record references zero or one item of each fixed `SecretRef` only by
   presence hint; it never carries Keychain data.
-- One `PublicAccessStatus` describes at most one owned `TunnelEndpoint`.
+- One `PublicAccessStatus` describes at most one owned `TunnelEndpoint` and one owned private
+  ingress in the same generation.
 - ~~One ready endpoint maps to exactly one active `PublicAccessGrant` and the existing player server
-  at `http://127.0.0.1:3690`.~~ **BUG-001**: One ready status maps to exactly one owned,
-  policy-protected `TunnelEndpoint` forwarding to the existing player server.
+  at `http://127.0.0.1:3690`.~~ ~~**BUG-001**: One ready status maps to exactly one owned,
+  policy-protected `TunnelEndpoint` forwarding directly to the existing player server.~~
+  **BUG-003**: One ready status maps to one endpoint targeting one active ingress, which alone
+  streams to the existing player server.
 - ~~Every SDK upstream connection uses the one `PublicIngressRoute`; no alternate/default dialer
-  path can reach ready.~~ **BUG-001**: Every production endpoint uses the exact upstream
-  `http://127.0.0.1:3690`; no custom dialer or alternate upstream can reach ready.
+  path can reach ready.~~ ~~**BUG-001**: Every production endpoint uses direct upstream
+  `http://127.0.0.1:3690`.~~ **BUG-003**: Every production endpoint targets only its owned private
+  ingress; only that ingress targets the exact player upstream, with no alternate path to ready.
 - There is never more than one production endpoint or provider runtime.
 - ~~`public_url` implies `state=ready` and an active matching policy generation.~~ **BUG-001**:
-  `public_url` implies `state=ready` and one active matching protected endpoint generation.
+  ~~`public_url` implies `state=ready` and one active matching protected endpoint generation.~~
+  **BUG-003**: `public_url` implies `state=ready`, one matching endpoint, and active exact-Host/auth
+  ingress policy in the same generation.
 - ~~`state!=ready` implies no published URL and no external Host acceptance.~~ **BUG-001**:
-  `state!=ready` implies no published URL.
+  ~~`state!=ready` implies no published URL.~~ **BUG-003**: `state!=ready` implies no published URL
+  and deny-all ingress admission.
 - Provider or secure-store failure never changes local player, broadcast, role, session, or
   player-config state.
