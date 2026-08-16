@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -27,9 +28,55 @@ const (
 	fixtureAddress      = "127.0.0.1:34119"
 	fixtureEdgeUsername = "players"
 	fixtureEdgePassword = "password-long-enough"
+	fixtureRandomSeed   = uint64(0x435254)
 )
 
 type ids struct{ next atomic.Uint64 }
+
+type fixtureRandom struct {
+	mu     sync.Mutex
+	state  uint64
+	forced []int
+}
+
+func (random *fixtureRandom) Intn(limit int) int {
+	if limit <= 1 {
+		return 0
+	}
+	random.mu.Lock()
+	defer random.mu.Unlock()
+	if len(random.forced) != 0 {
+		value := random.forced[0]
+		random.forced = random.forced[1:]
+		if value < 0 {
+			return limit - 1
+		}
+		return value % limit
+	}
+	random.state = random.state*6364136223846793005 + 1442695040888963407
+	return int(random.state % uint64(limit))
+}
+
+func (random *fixtureRandom) forceDudRemoval(position string) bool {
+	random.mu.Lock()
+	defer random.mu.Unlock()
+	switch position {
+	case "revealed":
+		random.forced = []int{0, 0}
+	case "pending":
+		random.forced = []int{0, -1}
+	default:
+		return false
+	}
+	return true
+}
+
+func (random *fixtureRandom) reset() {
+	random.mu.Lock()
+	defer random.mu.Unlock()
+	random.state = fixtureRandomSeed
+	random.forced = nil
+}
 
 type fixtureEdge struct {
 	active           atomic.Bool
@@ -158,6 +205,22 @@ func (edge *fixtureEdge) activateHacking(response http.ResponseWriter) {
 	response.WriteHeader(http.StatusNoContent)
 }
 
+func activateCRTTerminal(service *control.Service, response http.ResponseWriter, target domain.TerminalTarget) bool {
+	state, err := service.RequestTerminalActivation(target)
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusConflict)
+		return false
+	}
+	if state.PendingSwitch == nil {
+		return true
+	}
+	if _, err = service.ResolveTerminalSwitch(state.PendingSwitch.SwitchID, domain.TerminalSwitchDiscard); err != nil {
+		http.Error(response, err.Error(), http.StatusConflict)
+		return false
+	}
+	return true
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -170,7 +233,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("open built player assets: %w", err)
 	}
-	liveService := live.New(nil, nil)
+	fixtureHackRandom := &fixtureRandom{state: fixtureRandomSeed}
+	liveService := live.New(fixtureHackRandom, nil)
 	var connectPlayer *player.ConnectService
 	service := control.New(control.Config{
 		IDs:         &ids{},
@@ -236,6 +300,7 @@ func run() error {
 		http.ServeFile(response, request, "fixtures/desktop-bindings.js")
 	})
 	mux.HandleFunc("POST /__fixture/reset", func(response http.ResponseWriter, _ *http.Request) {
+		fixtureHackRandom.reset()
 		if err := edge.reset(); err != nil {
 			http.Error(response, err.Error(), http.StatusInternalServerError)
 			return
@@ -267,6 +332,58 @@ func run() error {
 	})
 	mux.HandleFunc("POST /__fixture/local/hacking", func(response http.ResponseWriter, _ *http.Request) {
 		edge.activateHacking(response)
+	})
+	mux.HandleFunc("POST /__fixture/local/crt/{state}", func(response http.ResponseWriter, request *http.Request) {
+		state := request.PathValue("state")
+		switch state {
+		case "content":
+			if _, err := service.RequestTerminalActivation(crtFixtureTerminal()); err != nil {
+				http.Error(response, err.Error(), http.StatusConflict)
+				return
+			}
+		case "unchanged":
+			target := crtFixtureTerminal()
+			if _, err := service.UpdateLiveTerminal(target.Tree, &target.IntroText); err != nil {
+				http.Error(response, err.Error(), http.StatusConflict)
+				return
+			}
+		case "replacement":
+			target := crtReplacementTerminal()
+			if _, err := service.UpdateLiveTerminal(target.Tree, &target.IntroText); err != nil {
+				http.Error(response, err.Error(), http.StatusConflict)
+				return
+			}
+		case "waiting":
+			if _, err := service.RequestTerminalClear(); err != nil {
+				http.Error(response, err.Error(), http.StatusConflict)
+				return
+			}
+		case "hacking", "blocked":
+			if !activateCRTTerminal(service, response, crtHackingTerminal("a")) {
+				return
+			}
+		case "hacking-unchanged":
+			target := crtHackingTerminal("a")
+			if _, err := service.UpdateLiveTerminal(target.Tree, &target.IntroText); err != nil {
+				http.Error(response, err.Error(), http.StatusConflict)
+				return
+			}
+		case "hacking-replacement":
+			if !activateCRTTerminal(service, response, crtHackingTerminal("b")) {
+				return
+			}
+		default:
+			http.NotFound(response, request)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/local/crt/hacking-dud/{position}", func(response http.ResponseWriter, request *http.Request) {
+		if !fixtureHackRandom.forceDudRemoval(request.PathValue("position")) {
+			http.NotFound(response, request)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("POST /__fixture/local/disconnect", func(response http.ResponseWriter, _ *http.Request) {
 		connectPlayer.CloseSubscriptions()
@@ -375,4 +492,56 @@ func fixtureTerminal() domain.TerminalTarget {
 			},
 		},
 	}
+}
+
+func crtFixtureTerminal() domain.TerminalTarget {
+	children := make([]domain.ContentNode, 0, 25)
+	for index := 1; index <= 21; index++ {
+		children = append(children, domain.ContentNode{
+			ID:          fmt.Sprintf("crt-row-%02d", index),
+			Type:        domain.NodeEntry,
+			Name:        fmt.Sprintf("ARCHIVE %02d", index),
+			Description: fmt.Sprintf("CRT ARCHIVE LINE %02d", index),
+		})
+	}
+	children = append(children,
+		domain.ContentNode{ID: "crt-empty", Type: domain.NodeFolder, Name: "EMPTY", Children: []domain.ContentNode{}},
+		domain.ContentNode{
+			ID: "crt-record", Type: domain.NodeEntry, Name: "LONG RECORD",
+			Description: strings.Repeat("ROBCO RECORD LINE\n", 48) + "RECORD COMPLETE",
+		},
+		domain.ContentNode{
+			ID: "crt-command", Type: domain.NodeCommand, Name: "RUN DIAGNOSTIC",
+			Text: strings.Repeat("DIAGNOSTIC OUTPUT\n", 36) + "DIAGNOSTIC COMPLETE",
+		},
+		domain.ContentNode{
+			ID: "crt-literal", Type: domain.NodeEntry, Name: `<img data-crt-injected src=x onerror="window.__crtInjected=true">`,
+			Description: `<script>window.__crtInjected=true</script> & literal terminal text`,
+		},
+	)
+
+	return domain.TerminalTarget{
+		TerminalID: "terminal-crt", TerminalName: "CRT Acceptance", HackLevel: 0,
+		IntroText: "CRT PRESENTATION ACCEPTANCE",
+		Tree:      domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: children},
+	}
+}
+
+func crtReplacementTerminal() domain.TerminalTarget {
+	target := crtFixtureTerminal()
+	target.IntroText = "CRT REPLACEMENT ACCEPTANCE"
+	target.Tree.Children = []domain.ContentNode{
+		{ID: "crt-replacement-a", Type: domain.NodeEntry, Name: "REPLACEMENT ALPHA", Description: "ALPHA"},
+		{ID: "crt-replacement-b", Type: domain.NodeEntry, Name: "REPLACEMENT BETA", Description: "BETA"},
+		{ID: "crt-replacement-c", Type: domain.NodeEntry, Name: "REPLACEMENT GAMMA", Description: "GAMMA"},
+	}
+	return target
+}
+
+func crtHackingTerminal(identity string) domain.TerminalTarget {
+	target := crtFixtureTerminal()
+	target.TerminalID = "terminal-crt-hacking-" + identity
+	target.TerminalName = "CRT Security " + strings.ToUpper(identity)
+	target.HackLevel = 1
+	return target
 }
