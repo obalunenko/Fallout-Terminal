@@ -190,6 +190,60 @@ func TestGoPackageOutputDeploymentTargetAndFinalSignOrderAreExplicit(t *testing.
 	assert.Less(t, compile, sign)
 }
 
+func TestReproducibleBuildHashesPackagedExecutableAndUsesQuietToolEnvironments(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	reproducible := readAcceptanceDocument(t, filepath.Join(root, "scripts", "reproducible-build-check.sh"))
+	assert.Contains(t, reproducible, `application_executable="${application_bundle}/Contents/MacOS/Fallout Terminal"`)
+	assert.NotContains(t, reproducible, `shasum -a 256 "build/bin/Fallout Terminal"`)
+
+	protoCheck := readAcceptanceDocument(t, filepath.Join(root, "scripts", "proto-check.sh"))
+	assert.Contains(t, protoCheck, `MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"`)
+	assert.Contains(t, protoCheck, `CGO_CFLAGS="${CGO_CFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"`)
+	assert.Contains(t, protoCheck, `CGO_LDFLAGS="${CGO_LDFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"`)
+
+	protoGenerate := readAcceptanceDocument(t, filepath.Join(root, "scripts", "proto-generate.sh"))
+	assert.Contains(t, protoGenerate, `node_major >= 22`)
+	assert.Contains(t, protoGenerate, `--no-experimental-webstorage`)
+}
+
+func TestCIRunsOnlyMinimalLintTestProtobufAndApplicationBuild(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	workflow := readAcceptanceDocument(t, filepath.Join(root, ".github", "workflows", "wails-macos.yml"))
+	assert.Equal(t, 1, strings.Count(workflow, "\n    runs-on:"), "CI must use one job")
+	for _, required := range []string{
+		"- name: Lint",
+		"gofmt -l .",
+		"go vet ./...",
+		"- name: Test",
+		"go test ./...",
+		"- name: Build protobuf",
+		"buf format proto --diff --exit-code",
+		"buf lint proto",
+		"buf build proto",
+		"scripts/proto-generate.sh",
+		"git diff --exit-code -- internal/gen client/gen",
+		"- name: Build application",
+		"go run ./cmd/build package",
+	} {
+		assert.Contains(t, workflow, required)
+	}
+	for _, forbidden := range []string{
+		"go test -race",
+		"tests/browser",
+		"reproducible-build-check.sh",
+		"secret-leak-check.sh",
+		"legacy-public-access-check.sh",
+		"proto-breaking.sh",
+		"actions/upload-artifact",
+	} {
+		assert.NotContains(t, workflow, forbidden)
+	}
+}
+
 func TestWailsV3RollbackRecordHasIdentitySafetyTriggersAndHonestEvidenceFields(t *testing.T) {
 	t.Parallel()
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -67,6 +66,10 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 	if err := validateProductionResources(playerAssets, locations.BundledDemo); err != nil {
 		return nil, err
 	}
+	publicAccessSettingsPath, err := platform.PublicAccessSettingsPath(locations.ApplicationSupport)
+	if err != nil {
+		return nil, fmt.Errorf("resolve public-access settings path: %w", err)
+	}
 	runtimeConfig := defaultApplicationConfig(locations)
 	desktop := platform.NewDesktop(nil, host.Dialog, host.Browser)
 	events := newWailsEventSink(host.Event)
@@ -83,11 +86,9 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 		RosterStore:        playerConfigs,
 		RequestResultLimit: int(runtimeConfig.Coordination.RequestResultLimit),
 	})
-	tunnel, tunnelEnabled, publicAccess := configureTunnel(os.Args[1:])
 	playerConfig := playerserver.Config{
-		Address:      runtimeConfig.PlayerServer.Address,
-		Assets:       playerAssets,
-		PublicAccess: publicAccess,
+		Address: runtimeConfig.PlayerServer.Address,
+		Assets:  playerAssets,
 	}
 	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
 		Coordinator: coordination,
@@ -116,22 +117,77 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 			ApplicationSupport: locations.ApplicationSupport,
 		},
 	)
-	app := NewAppWithDependencies(AppDependencies{
+	packaged := isPackagedApplication()
+	publicSettings := tunnelservice.NewPublicAccessSettingsStore(publicAccessSettingsPath, nil, nil)
+	publicSecrets := platform.NewPlatformKeychainSecretStore(packaged)
+	effectivePublicSettings, effectivePublicSecrets := publicAccessStoresForProfile(publicSettings, publicSecrets, packaged, os.LookupEnv)
+	var app *App
+	publicAccess, err := tunnelservice.NewPublicAccessManager(tunnelservice.ManagerConfig{
+		Settings:    effectivePublicSettings,
+		Secrets:     effectivePublicSecrets,
+		Tunnel:      tunnelservice.NewEmbeddedNgrokService(),
+		Ingress:     tunnelservice.NewPublicIngressFactory(),
+		UpstreamURL: publicAccessCompositionRoute().UpstreamURL,
+		Publish: func(snapshot tunnelservice.PublicAccessSnapshot) {
+			if app != nil {
+				app.acceptPublicAccessSnapshot(snapshot, true)
+			}
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("construct embedded public access: %w", err)
+	}
+	app = NewAppWithDependencies(AppDependencies{
 		Sessions:        sessions,
 		PlayerConfigs:   playerConfigs,
 		Live:            live,
 		Coordination:    coordination,
 		Player:          player,
-		Tunnel:          tunnel,
 		Desktop:         desktop,
 		Browser:         desktop,
 		Events:          events,
-		TunnelEnabled:   tunnelEnabled,
+		PublicSettings:  effectivePublicSettings,
+		PublicSecrets:   effectivePublicSecrets,
+		PublicAccess:    publicAccess,
 		StartupTimeout:  time.Duration(runtimeConfig.Startup.TimeoutMilliseconds) * time.Millisecond,
 		ShutdownTimeout: time.Duration(runtimeConfig.Shutdown.TimeoutMilliseconds) * time.Millisecond,
 	})
 	effectRouter.Bind(player, app)
 	return app, nil
+}
+
+func publicAccessStoresForProfile(
+	settings tunnelservice.PublicAccessSettings,
+	secrets tunnelservice.SecretStore,
+	packaged bool,
+	lookup tunnelservice.EnvironmentLookup,
+) (tunnelservice.PublicAccessSettings, tunnelservice.SecretStore) {
+	if packaged || lookup == nil {
+		return settings, secrets
+	}
+	override := tunnelservice.NewDevelopmentTestPublicAccessOverride(settings, secrets, lookup)
+	return override, override
+}
+
+type publicAccessRoute struct {
+	PlayerTarget string
+	UpstreamURL  string
+}
+
+func publicAccessCompositionRoute() publicAccessRoute {
+	return publicAccessRoute{
+		PlayerTarget: tunnelservice.PlayerUpstreamAddress,
+		UpstreamURL:  "http://" + tunnelservice.PlayerUpstreamAddress,
+	}
+}
+
+func isPackagedApplication() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	macOSDirectory := filepath.Dir(executable)
+	return filepath.Base(macOSDirectory) == "MacOS" && filepath.Base(filepath.Dir(macOSDirectory)) == "Contents"
 }
 
 func defaultApplicationConfig(locations platform.SessionLocations) *configv1.ApplicationConfig {
@@ -211,47 +267,6 @@ func (router *coordinationEffectRouter) Enqueue(effect controlservice.Effect) {
 			app.updateHackState(effect.Live.Hack)
 		}
 	}
-}
-
-func configureTunnel(args []string) (TunnelService, bool, *playerserver.PublicAccess) {
-	config, err := tunnelservice.ParseConfig(args, os.LookupEnv)
-	enabled := config.Enabled || publicModeRequested(args)
-	if !enabled {
-		return nil, false, nil
-	}
-	if err != nil {
-		return configurationErrorTunnel{err: err}, true, nil
-	}
-	publicAccess := &playerserver.PublicAccess{
-		Host:     config.Domain,
-		Username: config.Credentials.Username,
-		Password: config.Credentials.Password,
-	}
-	return tunnelservice.NewService(config, tunnelservice.NewProcessRunner(), tunnelservice.ServiceOptions{}), true, publicAccess
-}
-
-func publicModeRequested(args []string) bool {
-	if enabled, exists := os.LookupEnv("NGROK_ENABLED"); exists && enabled == "1" {
-		return true
-	}
-	for _, argument := range args {
-		if argument == "--ngrok" {
-			return true
-		}
-	}
-	return false
-}
-
-type configurationErrorTunnel struct {
-	err error
-}
-
-func (tunnel configurationErrorTunnel) Start(context.Context) (domain.ServerInfo, error) {
-	return domain.ServerInfo{}, tunnel.err
-}
-
-func (configurationErrorTunnel) Stop(context.Context) error {
-	return nil
 }
 
 func applicationResourceRoot() string {

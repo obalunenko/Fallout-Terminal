@@ -1,6 +1,6 @@
 'use strict';
 
-import { Events } from '@wailsio/runtime';
+import { Clipboard, Events } from '@wailsio/runtime';
 import * as desktopService from '../bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js';
 
 const APP_METHODS = Object.freeze({
@@ -28,6 +28,11 @@ const APP_METHODS = Object.freeze({
   startBroadcast: desktopService.StartBroadcast,
   endBroadcast: desktopService.EndBroadcast,
   openUrl: desktopService.OpenURL,
+  getPublicAccess: desktopService.GetPublicAccess,
+  savePublicAccessSettings: desktopService.SavePublicAccessSettings,
+  generatePlayerPassword: desktopService.GeneratePlayerPassword,
+  startPublicAccess: desktopService.StartPublicAccess,
+  stopPublicAccess: desktopService.StopPublicAccess,
 });
 
 const DISPOSE = Symbol.for('fallout-terminal.desktop-api.dispose');
@@ -54,6 +59,17 @@ function command(binding, ...args) {
     ok: false,
     error: error instanceof Error ? error.message : String(error),
   }));
+}
+
+async function writeClipboardText(value) {
+  if (typeof value !== 'string' || value === '') return false;
+  try {
+    if (typeof Clipboard?.SetText !== 'function') return false;
+    await Clipboard.SetText(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const TERMINAL_SWITCH_STATUSES = new Set(['activated', 'cleared', 'decision-required', 'cancelled']);
@@ -89,6 +105,98 @@ function normalizePlayerConfigResult(result) {
 
 function playerConfigCommand(binding, ...args) {
   return command(binding, ...args).then(normalizePlayerConfigResult);
+}
+
+const PUBLIC_ACCESS_STATES = Object.freeze({
+  disabled: 'stopped',
+  starting: 'starting',
+  ready: 'ready',
+  stopping: 'stopping',
+  failed: 'error',
+  stopped: 'stopped',
+  error: 'error',
+});
+const SECRET_PRESENCES = new Set(['absent', 'present', 'unknown']);
+
+function normalizePublicAccessSnapshot(snapshot) {
+  const value = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const rawPreferences = value.preferences && typeof value.preferences === 'object' ? value.preferences : {};
+  const rawStatus = value.status && typeof value.status === 'object' ? value.status : {};
+  const preferences = Object.freeze({
+    version: Number.isInteger(rawPreferences.version) ? rawPreferences.version : 1,
+    enabledPreference: rawPreferences.enabledPreference === true,
+    reservedDomain: typeof rawPreferences.reservedDomain === 'string' ? rawPreferences.reservedDomain : '',
+    username: typeof rawPreferences.username === 'string' && rawPreferences.username ? rawPreferences.username : 'players',
+    providerTokenPresentHint: rawPreferences.providerTokenPresentHint === true,
+    playerPasswordPresentHint: rawPreferences.playerPasswordPresentHint === true,
+    revision: Number.isSafeInteger(rawPreferences.revision) ? rawPreferences.revision : 0,
+  });
+  const state = PUBLIC_ACCESS_STATES[rawStatus.state] ?? '';
+  const status = Object.freeze({
+    state,
+    generation: Number.isSafeInteger(rawStatus.generation) ? rawStatus.generation : 0,
+    settingsRevision: Number.isSafeInteger(rawStatus.settingsRevision)
+      ? rawStatus.settingsRevision
+      : preferences.revision,
+    publicUrl: state === 'ready' && typeof rawStatus.publicUrl === 'string' ? rawStatus.publicUrl : '',
+    errorCategory: state === 'error' && typeof rawStatus.errorCategory === 'string' ? rawStatus.errorCategory : '',
+    errorMessage: state === 'error' && typeof rawStatus.errorMessage === 'string' ? rawStatus.errorMessage : '',
+  });
+  const presence = (candidate) => SECRET_PRESENCES.has(candidate) ? candidate : 'unknown';
+  return Object.freeze({
+    preferences,
+    providerTokenPresence: presence(value.providerTokenPresence),
+    playerPasswordPresence: presence(value.playerPasswordPresence),
+    status,
+  });
+}
+
+function normalizePublicAccessCommandResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  let error = typeof value.error === 'string' ? value.error : '';
+  if (!ok && !error) error = 'Public access command failed';
+  return Object.freeze({ ok, error, snapshot: normalizePublicAccessSnapshot(value.snapshot) });
+}
+
+let latestPublicAccessSnapshot = null;
+
+function retainLatestPublicAccessSnapshot(snapshot) {
+  if (!latestPublicAccessSnapshot) {
+    latestPublicAccessSnapshot = snapshot;
+    return snapshot;
+  }
+  const candidate = publicAccessVersion(snapshot);
+  const latest = publicAccessVersion(latestPublicAccessSnapshot);
+  if (versionIsNewer(candidate, latest) || (candidate[0] === latest[0] && candidate[1] === latest[1])) {
+    latestPublicAccessSnapshot = snapshot;
+  }
+  return latestPublicAccessSnapshot;
+}
+
+function publicAccessCommand(binding, payload) {
+  return command(binding, payload).then((value) => {
+    const result = normalizePublicAccessCommandResult(value);
+    return Object.freeze({
+      ok: result.ok,
+      error: result.error,
+      snapshot: retainLatestPublicAccessSnapshot(result.snapshot),
+    });
+  });
+}
+
+function publicAccessVersion(snapshot) {
+  return [snapshot.status.generation, snapshot.status.settingsRevision];
+}
+
+function versionIsNewer(candidate, baseline) {
+  return candidate[0] > baseline[0] || (candidate[0] === baseline[0] && candidate[1] > baseline[1]);
+}
+
+function clearSecretMutationFields(value) {
+  if (!value || typeof value !== 'object') return;
+  if (Object.hasOwn(value, 'replacementProviderToken')) value.replacementProviderToken = '';
+  if (Object.hasOwn(value, 'replacementPlayerPassword')) value.replacementPlayerPassword = '';
 }
 
 let latestServerInfo = null;
@@ -178,11 +286,44 @@ const desktopAPI = {
   onClientCount: (callback) => subscribe('client-count', 'clientCount', callback),
   onHackState: (callback) => subscribe('hack-state', 'hackState', callback),
   onCoordinationState: (callback) => subscribe('coordination-state', 'coordinationState', callback),
+  onPublicAccessStatus: (callback) => {
+    if (typeof callback !== 'function') throw new TypeError('public-access-status listener must be a function');
+    let active = true;
+    let released = false;
+    let latestEventVersion = [-1, -1];
+    const releaseRuntime = Events.On('public-access-status', (event) => {
+      if (!active) return;
+      const snapshot = normalizePublicAccessSnapshot(unwrapEvent(event));
+      const candidate = publicAccessVersion(snapshot);
+      if (!versionIsNewer(candidate, latestEventVersion)) return;
+      latestEventVersion = candidate;
+      callback(retainLatestPublicAccessSnapshot(snapshot));
+    });
+    void command(APP_METHODS.getPublicAccess).then((value) => {
+      if (!active || value?.ok === false) return;
+      const snapshot = normalizePublicAccessSnapshot(value);
+      const candidate = publicAccessVersion(snapshot);
+      if (latestEventVersion[0] >= 0 && !versionIsNewer(candidate, latestEventVersion)) return;
+      callback(retainLatestPublicAccessSnapshot(snapshot));
+    });
+    const unsubscribe = () => {
+      if (!active) return;
+      active = false;
+      subscriptions.delete(unsubscribe);
+      if (!released) {
+        released = true;
+        releaseRuntime();
+      }
+    };
+    subscriptions.add(unsubscribe);
+    return unsubscribe;
+  },
   getRuntimeStatus: () => {
     beginStatusSnapshotWhenReady();
     return runtimeStatusPromise ?? command(APP_METHODS.getRuntimeStatus);
   },
   openUrl: (url) => command(APP_METHODS.openUrl, url),
+  writeClipboardText,
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),
   saveSession: (session) => command(APP_METHODS.saveSession, session),
@@ -205,6 +346,43 @@ const desktopAPI = {
   setActiveController: (sessionId) => command(APP_METHODS.setActiveController, sessionId),
   startBroadcast: () => command(APP_METHODS.startBroadcast),
   endBroadcast: () => command(APP_METHODS.endBroadcast),
+  getPublicAccess: () => command(APP_METHODS.getPublicAccess)
+    .then(normalizePublicAccessSnapshot)
+    .then(retainLatestPublicAccessSnapshot),
+  savePublicAccessSettings: (request) => {
+    const source = request && typeof request === 'object' ? request : {};
+    const nativeRequest = {
+      expectedRevision: Number.isSafeInteger(source.expectedRevision) ? source.expectedRevision : 0,
+      enabledPreference: source.enabledPreference === true,
+      reservedDomain: typeof source.reservedDomain === 'string' ? source.reservedDomain : '',
+      username: typeof source.username === 'string' ? source.username : '',
+      replacementProviderToken: typeof source.replacementProviderToken === 'string' ? source.replacementProviderToken : '',
+      deleteProviderToken: source.deleteProviderToken === true,
+      replacementPlayerPassword: typeof source.replacementPlayerPassword === 'string' ? source.replacementPlayerPassword : '',
+      deletePlayerPassword: source.deletePlayerPassword === true,
+    };
+    const pending = publicAccessCommand(APP_METHODS.savePublicAccessSettings, nativeRequest);
+    clearSecretMutationFields(nativeRequest);
+    clearSecretMutationFields(source);
+    return pending;
+  },
+  generatePlayerPassword: (request) => command(APP_METHODS.generatePlayerPassword, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }).then((result) => {
+    const value = result && typeof result === 'object' ? result : {};
+    return {
+      ok: value.ok === true,
+      error: typeof value.error === 'string' ? value.error : '',
+      generatedPassword: typeof value.generatedPassword === 'string' ? value.generatedPassword : '',
+      settingsRevision: Number.isSafeInteger(value.settingsRevision) ? value.settingsRevision : 0,
+    };
+  }),
+  startPublicAccess: (request) => publicAccessCommand(APP_METHODS.startPublicAccess, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }),
+  stopPublicAccess: (request) => publicAccessCommand(APP_METHODS.stopPublicAccess, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }),
 };
 
 Object.defineProperty(desktopAPI, DISPOSE, {

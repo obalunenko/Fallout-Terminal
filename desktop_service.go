@@ -116,3 +116,23 @@ func (service *desktopService) EndBroadcast() CoordinationCommandResult {
 func (service *desktopService) OpenURL(rawURL string) CommandResult {
 	return service.core.OpenURL(rawURL)
 }
+
+func (service *desktopService) GetPublicAccess() PublicAccessSnapshot {
+	return service.core.GetPublicAccess()
+}
+
+func (service *desktopService) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload) PublicAccessCommandResult {
+	return service.core.SavePublicAccessSettings(payload)
+}
+
+func (service *desktopService) GeneratePlayerPassword(payload PublicAccessCommandPayload) GeneratedPlayerPasswordResult {
+	return service.core.GeneratePlayerPassword(payload)
+}
+
+func (service *desktopService) StartPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+	return service.core.StartPublicAccess(payload)
+}
+
+func (service *desktopService) StopPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+	return service.core.StopPublicAccess(payload)
+}

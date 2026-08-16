@@ -6,16 +6,140 @@ import (
 	"go/parser"
 	"go/token"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	configv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1"
 	privatev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/testing/prototest"
 )
+
+func TestPublicAccessDescriptorsAreExactAndSecretSurfacesStayNarrow(t *testing.T) {
+	t.Parallel()
+
+	messages := []struct {
+		message proto.Message
+		fields  []string
+	}{
+		{&configv1.PublicAccessPreferences{}, []string{"version", "enabled_preference", "reserved_domain", "username", "provider_token_present_hint", "player_password_present_hint", "revision"}},
+		{&privatev1.PublicAccessStatus{}, []string{"state", "generation", "settings_revision", "public_url", "error_category", "error_message"}},
+		{&privatev1.PublicAccessSnapshot{}, []string{"preferences", "provider_token_presence", "player_password_presence", "status"}},
+		{&privatev1.GetPublicAccessRequest{}, []string{}},
+		{&privatev1.PublicAccessStatusEvent{}, []string{"snapshot"}},
+		{&privatev1.PublicAccessCommandResult{}, []string{"ok", "error", "snapshot"}},
+		{&privatev1.SavePublicAccessSettingsRequest{}, []string{"expected_revision", "enabled_preference", "reserved_domain", "username", "replacement_provider_token", "delete_provider_token", "replacement_player_password", "delete_player_password"}},
+		{&privatev1.GeneratePlayerPasswordRequest{}, []string{"expected_revision"}},
+		{&privatev1.GeneratedPlayerPasswordResult{}, []string{"ok", "error", "generated_password", "settings_revision"}},
+		{&privatev1.PublicAccessCommandRequest{}, []string{"expected_revision"}},
+	}
+	for _, test := range messages {
+		descriptor := test.message.ProtoReflect().Descriptor()
+		prototest.Message{}.Test(t, test.message.ProtoReflect().Type())
+		actual := make([]string, 0, descriptor.Fields().Len())
+		for index := range descriptor.Fields().Len() {
+			actual = append(actual, string(descriptor.Fields().Get(index).Name()))
+		}
+		require.Equal(t, test.fields, actual, "descriptor drifted for %s", descriptor.FullName())
+	}
+
+	save := (&privatev1.SavePublicAccessSettingsRequest{}).ProtoReflect().Descriptor()
+	require.NotNil(t, save.Oneofs().ByName("provider_token_change"))
+	require.NotNil(t, save.Oneofs().ByName("player_password_change"))
+	nonsyntheticOneofs := 0
+	for index := range save.Oneofs().Len() {
+		if !save.Oneofs().Get(index).IsSynthetic() {
+			nonsyntheticOneofs++
+		}
+	}
+	require.Equal(t, 2, nonsyntheticOneofs)
+
+	assertEnum := func(message proto.Message, field string, names []string) {
+		t.Helper()
+		descriptor := message.ProtoReflect().Descriptor().Fields().ByName(protoreflect.Name(field)).Enum()
+		actual := make([]string, 0, descriptor.Values().Len())
+		for index := range descriptor.Values().Len() {
+			value := descriptor.Values().Get(index)
+			require.Equal(t, protoreflect.EnumNumber(index), value.Number())
+			actual = append(actual, string(value.Name()))
+		}
+		require.Equal(t, names, actual)
+	}
+	assertEnum(&privatev1.PublicAccessStatus{}, "state", []string{
+		"PUBLIC_ACCESS_LIFECYCLE_STATE_UNSPECIFIED", "PUBLIC_ACCESS_LIFECYCLE_STATE_DISABLED",
+		"PUBLIC_ACCESS_LIFECYCLE_STATE_STARTING", "PUBLIC_ACCESS_LIFECYCLE_STATE_READY",
+		"PUBLIC_ACCESS_LIFECYCLE_STATE_STOPPING", "PUBLIC_ACCESS_LIFECYCLE_STATE_FAILED",
+	})
+	assertEnum(&privatev1.PublicAccessSnapshot{}, "provider_token_presence", []string{
+		"SECRET_PRESENCE_UNSPECIFIED", "SECRET_PRESENCE_ABSENT", "SECRET_PRESENCE_PRESENT", "SECRET_PRESENCE_UNKNOWN",
+	})
+	assertEnum(&privatev1.PublicAccessStatus{}, "error_category", []string{
+		"PUBLIC_ACCESS_ERROR_CATEGORY_UNSPECIFIED", "PUBLIC_ACCESS_ERROR_CATEGORY_VALIDATION",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_SETTINGS_CORRUPT", "PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_LOCKED",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_DENIED", "PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_UNAVAILABLE",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_CREDENTIAL_MISSING", "PUBLIC_ACCESS_ERROR_CATEGORY_PROVIDER_AUTHENTICATION",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_DOMAIN_UNAVAILABLE", "PUBLIC_ACCESS_ERROR_CATEGORY_NETWORK_UNAVAILABLE",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_TIMEOUT", "PUBLIC_ACCESS_ERROR_CATEGORY_PROVIDER_FAILURE",
+		"PUBLIC_ACCESS_ERROR_CATEGORY_SHUTDOWN_TIMEOUT", "PUBLIC_ACCESS_ERROR_CATEGORY_CONFLICT",
+	})
+
+	for _, message := range []proto.Message{
+		&configv1.PublicAccessPreferences{}, &privatev1.PublicAccessStatus{},
+		&privatev1.PublicAccessSnapshot{}, &privatev1.PublicAccessStatusEvent{},
+		&privatev1.PublicAccessCommandResult{}, &privatev1.PublicAccessCommandRequest{},
+	} {
+		descriptor := message.ProtoReflect().Descriptor()
+		for index := range descriptor.Fields().Len() {
+			name := strings.ToLower(string(descriptor.Fields().Get(index).Name()))
+			isOpaquePresence := strings.HasSuffix(name, "_presence") || strings.HasSuffix(name, "_present_hint")
+			if !isOpaquePresence {
+				require.NotContains(t, name, "password", "%s must be reusable and secret-free", descriptor.FullName())
+				require.NotContains(t, name, "token", "%s must be reusable and secret-free", descriptor.FullName())
+			}
+		}
+	}
+
+	protoregistry.GlobalFiles.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		if !strings.HasPrefix(file.Path(), "fallout/terminal/player/v1/") {
+			return true
+		}
+		for index := range file.Imports().Len() {
+			path := file.Imports().Get(index).Path()
+			require.False(t, strings.Contains(path, "/private/"), "public player schema imports private contract: %s", path)
+			require.False(t, strings.Contains(path, "public_access.proto"), "public player schema imports public-access config: %s", path)
+		}
+		return true
+	})
+}
+
+func TestLegacyTunnelConfigurationFieldsAreReserved(t *testing.T) {
+	t.Parallel()
+
+	file := configv1.File_fallout_terminal_config_v1_config_proto
+	assertReserved := func(messageName string, numbers []protoreflect.FieldNumber, names []protoreflect.Name) {
+		t.Helper()
+		message := file.Messages().ByName(protoreflect.Name(messageName))
+		require.NotNil(t, message)
+		for _, number := range numbers {
+			require.True(t, message.ReservedRanges().Has(number), "%s field %d must be reserved", messageName, number)
+			require.Nil(t, message.Fields().ByNumber(number))
+		}
+		for _, name := range names {
+			require.True(t, message.ReservedNames().Has(name), "%s field %s must be reserved", messageName, name)
+			require.Nil(t, message.Fields().ByName(name))
+		}
+	}
+	assertReserved("TunnelCredentials", []protoreflect.FieldNumber{1, 2}, []protoreflect.Name{"username", "password"})
+	assertReserved("TunnelConfig", []protoreflect.FieldNumber{1, 2, 3, 4, 5, 6, 7, 8}, []protoreflect.Name{
+		"enabled", "binary", "domain", "port", "local_url", "startup_timeout_milliseconds", "policy_parent", "credentials",
+	})
+	assertReserved("ApplicationConfig", []protoreflect.FieldNumber{1, 6}, []protoreflect.Name{"tunnel_enabled", "tunnel"})
+}
 
 func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T) {
 	coverage := []struct {
@@ -121,14 +245,14 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 		"GetRuntimeStatus", "NewSession", "OpenSession", "CopyDemo", "SaveSession", "LoadReferencedPlayerConfig", "NewPlayerConfig", "OpenPlayerConfig",
 		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ForceHackSuccess", "ResetFailedHack",
 		"AddCharacter", "RenameCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
-		"StartBroadcast", "EndBroadcast", "OpenURL",
+		"StartBroadcast", "EndBroadcast", "OpenURL", "GetPublicAccess", "SavePublicAccessSettings", "GeneratePlayerPassword", "StartPublicAccess", "StopPublicAccess",
 	}
 	serviceType := reflect.TypeOf((*desktopService)(nil))
 	actualMethods := make([]string, 0, serviceType.NumMethod())
 	for index := range serviceType.NumMethod() {
 		actualMethods = append(actualMethods, serviceType.Method(index).Name)
 	}
-	require.Len(t, actualMethods, 25)
+	require.Len(t, actualMethods, 30)
 	require.ElementsMatch(t, requiredMethods, actualMethods)
 
 	for _, forbidden := range []string{
@@ -140,7 +264,7 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 		require.NotContains(t, actualMethods, forbidden)
 	}
 
-	require.Equal(t, []string{"server-info", "client-count", "hack-state", "coordination-state"}, []string{serverInfoEvent, clientCountEvent, hackStateEvent, coordinationStateEvent})
+	require.Equal(t, []string{"server-info", "client-count", "hack-state", "coordination-state", "public-access-status"}, []string{serverInfoEvent, clientCountEvent, hackStateEvent, coordinationStateEvent, publicAccessStatusEvent})
 }
 
 func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
@@ -172,7 +296,7 @@ func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
 		forwarded[method.Name.Name] = selector.Sel.Name
 	}
 
-	require.Len(t, forwarded, 25)
+	require.Len(t, forwarded, 30)
 	for exposed, core := range forwarded {
 		require.Equal(t, exposed, core, "%s must not translate into an authored capability", exposed)
 	}

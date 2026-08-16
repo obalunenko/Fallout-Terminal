@@ -143,7 +143,7 @@ setup tasks unless the approved feature actually introduces those changes.
 - [ ] T035 Run `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected browser journeys are available
 - [ ] T036 Run `go run ./cmd/build dev` and complete the documented master/player smoke journeys
 - [ ] T037 Run `go run ./cmd/build package` for packaging-sensitive changes when the required macOS environment is available
-- [ ] T038 Run the approved ngrok or signing/notarization/DMG gates when affected and credentials are available; otherwise record them as unavailable
+- [ ] T038 Run approved credential-gated public-provider or signing/notarization/DMG gates when affected and prerequisites are available; otherwise record them as unavailable
 - [ ] T039 Update `README.md`, contracts, fixtures, and CI configuration when setup, operation, protocol, or user-visible workflows changed
 
 ---

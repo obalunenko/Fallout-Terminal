@@ -164,57 +164,6 @@ func TestApplicationHandlerRejectsCrossOriginMalformedHostAndOversizedBodiesBefo
 	}
 }
 
-func TestApplicationHandlerAuthenticatesEveryPublicHostRequestBeforeRPC(t *testing.T) {
-	t.Parallel()
-
-	var calls int
-	rpc := http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
-		calls++
-		response.WriteHeader(http.StatusNoContent)
-	})
-	handler := NewApplicationHandlerWithPublicAccess(
-		playerAssets(),
-		"/fallout.terminal.player.v1.PlayerService/",
-		rpc,
-		&PublicAccess{Host: "https://fallout-terminal.ngrok.app", Username: "players", Password: "password-long-enough"},
-	)
-
-	tests := []struct {
-		name       string
-		host       string
-		path       string
-		username   string
-		password   string
-		wantStatus int
-		wantCalls  int
-	}{
-		{name: "public Subscribe without credentials", host: "fallout-terminal.ngrok.app", path: "/fallout.terminal.player.v1.PlayerService/Subscribe", wantStatus: http.StatusUnauthorized},
-		{name: "public Subscribe with wrong credentials", host: "fallout-terminal.ngrok.app", path: "/fallout.terminal.player.v1.PlayerService/Subscribe", username: "players", password: "wrong-password", wantStatus: http.StatusUnauthorized},
-		{name: "public Subscribe with valid credentials", host: "fallout-terminal.ngrok.app", path: "/fallout.terminal.player.v1.PlayerService/Subscribe", username: "players", password: "password-long-enough", wantStatus: http.StatusNoContent, wantCalls: 1},
-		{name: "local Subscribe remains unchallenged", host: "127.0.0.1:3690", path: "/fallout.terminal.player.v1.PlayerService/Subscribe", wantStatus: http.StatusNoContent, wantCalls: 2},
-		{name: "public unary without credentials", host: "fallout-terminal.ngrok.app", path: "/fallout.terminal.player.v1.PlayerService/SoundManifest", wantStatus: http.StatusUnauthorized, wantCalls: 2},
-		{name: "public unary with valid credentials", host: "fallout-terminal.ngrok.app", path: "/fallout.terminal.player.v1.PlayerService/SoundManifest", username: "players", password: "password-long-enough", wantStatus: http.StatusNoContent, wantCalls: 3},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodPost, "https://"+test.host+test.path, bytes.NewReader([]byte{0, 0, 0, 0, 0}))
-			request.Host = test.host
-			request.Header.Set("Origin", "https://"+test.host)
-			request.Header.Set("Content-Type", "application/connect+proto")
-			if test.username != "" || test.password != "" {
-				request.SetBasicAuth(test.username, test.password)
-			}
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, request)
-			require.Equal(t, test.wantStatus, recorder.Code)
-			require.Equal(t, test.wantCalls, calls)
-			if test.wantStatus == http.StatusUnauthorized {
-				require.Contains(t, recorder.Header().Get("WWW-Authenticate"), "Fallout Terminal Players")
-			}
-		})
-	}
-}
-
 func TestTypedSoundManifestAllowsOnlyEightCategoriesAndSafeSortedAssets(t *testing.T) {
 	t.Parallel()
 

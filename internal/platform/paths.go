@@ -17,6 +17,7 @@ const (
 	productDirectoryName     = "Fallout Terminal"
 	bundledSessionsDirectory = "sessions"
 	bundledDemoFilename      = "demo.json"
+	publicAccessFilename     = "public-access.json"
 )
 
 // SessionLocations separates user-owned session documents, the immutable
@@ -28,6 +29,16 @@ type SessionLocations struct {
 	DocumentsDefault   string
 	BundledDemo        string
 	ApplicationSupport string
+}
+
+// PublicAccessSettingsPath resolves the separate version-1 non-secret settings file.
+// It has no filesystem side effects and never points into session or player-config storage.
+func PublicAccessSettingsPath(applicationSupportDirectory string) (string, error) {
+	directory, err := cleanAbsolutePath("application support directory", applicationSupportDirectory)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(directory, publicAccessFilename), nil
 }
 
 // DefaultSessionLocations resolves locations for the current user beneath

@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 func TestWailsV3ApplicationOptionsServeOnlyMasterAssetsAndQuitWithLastWindow(t *testing.T) {
@@ -50,6 +52,44 @@ func TestMasterWindowOptionsPreserveAcceptedSingleWindowContract(t *testing.T) {
 	require.Equal(t, "/", options.URL)
 	require.Equal(t, application.NewRGB(11, 13, 10), options.BackgroundColour)
 	require.False(t, options.AllowSimpleEventEmit)
+}
+
+func TestMasterWindowCloseExplicitlyRequestsApplicationQuit(t *testing.T) {
+	t.Parallel()
+
+	window := &recordingMasterWindowCloseRegistrar{}
+	quit := &blockingApplicationQuitter{
+		entered: make(chan struct{}, 1),
+		release: make(chan struct{}),
+	}
+	registerMasterWindowQuitOnClose(window, quit)
+
+	require.Equal(t, events.Common.WindowClosing, window.hookEventType)
+	require.NotNil(t, window.hookCallback)
+	require.Equal(t, events.Mac.WindowWillClose, window.nativeEventType)
+	require.NotNil(t, window.nativeCallback)
+	callbackDone := make(chan struct{})
+	go func() {
+		window.nativeCallback(&application.WindowEvent{})
+		close(callbackDone)
+	}()
+	require.Eventually(t, func() bool { return len(quit.entered) == 1 }, time.Second, time.Millisecond)
+	select {
+	case <-callbackDone:
+		require.Fail(t, "native close returned before application termination completed")
+	default:
+	}
+	close(quit.release)
+	require.Eventually(t, func() bool {
+		select {
+		case <-callbackDone:
+			return true
+		default:
+			return false
+		}
+	}, time.Second, time.Millisecond)
+	window.hookCallback(&application.WindowEvent{})
+	require.Len(t, quit.entered, 1)
 }
 
 func TestWailsLifecycleStartupClassifiesApplicationFailuresAsStatusVisible(t *testing.T) {
@@ -116,6 +156,35 @@ func TestWailsLifecyclePartialStartupUnwindsOnceAndRepeatedShutdownIsSafe(t *tes
 	require.Equal(t, []string{"player:start", "event:server-info", "player:stop"}, recorder.Calls())
 }
 
+func TestWailsLifecycleRepeatedQuitRetriesFailedPublicCleanupWithFreshFiveSecondContexts(t *testing.T) {
+	recorder := &callRecorder{}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	core := &recordingPublicAccessCore{
+		recorder: recorder,
+		snapshot: tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences,
+			Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled},
+		},
+		shutdownErrors: []error{errors.New("synthetic first cleanup failure"), nil},
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		PublicAccess: core,
+		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
+			URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
+		}},
+		Events: &recordingEventSink{recorder: recorder},
+	})
+	service := newWailsLifecycleService(app)
+	require.NoError(t, service.ServiceStartup(t.Context(), application.ServiceOptions{}))
+
+	started := time.Now()
+	require.Error(t, service.ServiceShutdown())
+	require.NoError(t, service.ServiceShutdown())
+	assert.Equal(t, 2, core.shutdowns)
+	assert.WithinDuration(t, started, time.Now(), wailsShutdownTimeout)
+	assert.Equal(t, 1, countRecordedCall(recorder.Calls(), "player:stop"))
+}
+
 func TestWailsEventSinkUsesInjectedManagerForExactTypedEventNames(t *testing.T) {
 	t.Parallel()
 
@@ -142,6 +211,41 @@ func TestWailsEventSinkUsesInjectedManagerForExactTypedEventNames(t *testing.T) 
 }
 
 type lifecycleContextKey struct{}
+
+type recordingMasterWindowCloseRegistrar struct {
+	hookEventType   events.WindowEventType
+	hookCallback    func(*application.WindowEvent)
+	nativeEventType events.WindowEventType
+	nativeCallback  func(*application.WindowEvent)
+}
+
+func (registrar *recordingMasterWindowCloseRegistrar) RegisterHook(
+	eventType events.WindowEventType,
+	callback func(*application.WindowEvent),
+) func() {
+	registrar.hookEventType = eventType
+	registrar.hookCallback = callback
+	return func() {}
+}
+
+func (registrar *recordingMasterWindowCloseRegistrar) OnWindowEvent(
+	eventType events.WindowEventType,
+	callback func(*application.WindowEvent),
+) func() {
+	registrar.nativeEventType = eventType
+	registrar.nativeCallback = callback
+	return func() {}
+}
+
+type blockingApplicationQuitter struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (quitter *blockingApplicationQuitter) Quit() {
+	quitter.entered <- struct{}{}
+	<-quitter.release
+}
 
 type recordingWailsEventEmitter struct {
 	names    []string

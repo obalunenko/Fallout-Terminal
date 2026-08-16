@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"strings"
 	"sync"
@@ -12,15 +14,15 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
+	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 )
 
 const (
-	serverInfoEvent             = "server-info"
-	clientCountEvent            = "client-count"
-	hackStateEvent              = "hack-state"
-	coordinationStateEvent      = "coordination-state"
-	tunnelStartupFailureMessage = "public tunnel could not start; verify credentials, tunnel executable, endpoint, and network access"
-	tunnelAddressFailureMessage = "public tunnel returned an invalid protected HTTPS address; local access remains available"
+	serverInfoEvent         = "server-info"
+	clientCountEvent        = "client-count"
+	hackStateEvent          = "hack-state"
+	coordinationStateEvent  = "coordination-state"
+	publicAccessStatusEvent = "public-access-status"
 )
 
 // SessionService is the lifecycle boundary for the ordered persistence worker.
@@ -132,15 +134,6 @@ type playerPublisher interface {
 	PublishHack()
 }
 
-// TunnelService owns the optional public-access process and its temporary
-// credential material. The Darwin implementation additionally binds the child
-// to the application process lifetime so development-supervisor termination
-// cannot bypass cleanup by skipping the native window shutdown callback.
-type TunnelService interface {
-	Start(context.Context) (domain.ServerInfo, error)
-	Stop(context.Context) error
-}
-
 // DesktopRuntime represents the readiness and release boundary of the desktop
 // host independently of Wails globals.
 type DesktopRuntime interface {
@@ -153,6 +146,24 @@ type EventSink interface {
 	Emit(name string, payload any) error
 }
 
+// PublicAccessSettingsStore persists only the versioned, non-secret public-
+// access preferences. Production credentials remain behind SecretStore.
+type PublicAccessSettingsStore interface {
+	Load() (tunnelservice.PublicAccessPreferences, error)
+	Save(tunnelservice.PublicAccessPreferences) error
+}
+
+// PublicAccessCore owns the embedded endpoint lifecycle and its secret-free
+// state. App exposes only the five trusted desktop methods around this core.
+type PublicAccessCore interface {
+	Initialize(context.Context) tunnelservice.PublicAccessSnapshot
+	Snapshot() tunnelservice.PublicAccessSnapshot
+	Start(context.Context, uint64) tunnelservice.PublicAccessResult
+	Stop(context.Context, uint64) tunnelservice.PublicAccessResult
+	Reconfigure(context.Context, tunnelservice.PublicAccessMutation) tunnelservice.PublicAccessResult
+	Shutdown(context.Context) error
+}
+
 // AppDependencies contains constructed services. Construction acquires no
 // external resources; Start owns acquisition in contract order.
 type AppDependencies struct {
@@ -161,11 +172,13 @@ type AppDependencies struct {
 	Live            LiveService
 	Coordination    CoordinationService
 	Player          PlayerServer
-	Tunnel          TunnelService
 	Desktop         DesktopRuntime
 	Browser         Browser
 	Events          EventSink
-	TunnelEnabled   bool
+	PublicSettings  PublicAccessSettingsStore
+	PublicSecrets   tunnelservice.SecretStore
+	PublicAccess    PublicAccessCore
+	PasswordEntropy io.Reader
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
 }
@@ -187,6 +200,67 @@ type RuntimeStatus struct {
 type CommandResult struct {
 	OK    bool   `json:"ok"`
 	Error string `json:"error,omitempty"`
+}
+
+// PublicAccessPreferences is the secret-free native desktop projection.
+type PublicAccessPreferences struct {
+	Version                   uint32 `json:"version"`
+	EnabledPreference         bool   `json:"enabledPreference"`
+	ReservedDomain            string `json:"reservedDomain,omitempty"`
+	Username                  string `json:"username"`
+	ProviderTokenPresentHint  bool   `json:"providerTokenPresentHint"`
+	PlayerPasswordPresentHint bool   `json:"playerPasswordPresentHint"`
+	Revision                  uint64 `json:"revision"`
+}
+
+type PublicAccessStatus struct {
+	State            string `json:"state"`
+	Generation       uint64 `json:"generation"`
+	SettingsRevision uint64 `json:"settingsRevision"`
+	PublicURL        string `json:"publicUrl,omitempty"`
+	ErrorCategory    string `json:"errorCategory,omitempty"`
+	ErrorMessage     string `json:"errorMessage,omitempty"`
+}
+
+type PublicAccessSnapshot struct {
+	Preferences            PublicAccessPreferences `json:"preferences"`
+	ProviderTokenPresence  string                  `json:"providerTokenPresence"`
+	PlayerPasswordPresence string                  `json:"playerPasswordPresence"`
+	Status                 PublicAccessStatus      `json:"status"`
+}
+
+// SavePublicAccessSettingsPayload is ephemeral trusted input. Its secret
+// fields are consumed into byte buffers and are never copied into a result,
+// event, status, or persistence model.
+type SavePublicAccessSettingsPayload struct {
+	ExpectedRevision          uint64 `json:"expectedRevision"`
+	EnabledPreference         bool   `json:"enabledPreference"`
+	ReservedDomain            string `json:"reservedDomain,omitempty"`
+	Username                  string `json:"username"`
+	ReplacementProviderToken  string `json:"replacementProviderToken,omitempty"`
+	DeleteProviderToken       bool   `json:"deleteProviderToken,omitempty"`
+	ReplacementPlayerPassword string `json:"replacementPlayerPassword,omitempty"`
+	DeletePlayerPassword      bool   `json:"deletePlayerPassword,omitempty"`
+}
+
+type PublicAccessCommandPayload struct {
+	ExpectedRevision uint64 `json:"expectedRevision"`
+}
+
+type PublicAccessCommandResult struct {
+	OK       bool                 `json:"ok"`
+	Error    string               `json:"error,omitempty"`
+	Snapshot PublicAccessSnapshot `json:"snapshot"`
+}
+
+// GeneratedPlayerPasswordResult is deliberately not reusable and contains no
+// snapshot. GeneratedPassword is populated only after secure-store replacement
+// and settings persistence both succeed.
+type GeneratedPlayerPasswordResult struct {
+	OK                bool   `json:"ok"`
+	Error             string `json:"error,omitempty"`
+	GeneratedPassword string `json:"generatedPassword,omitempty"`
+	SettingsRevision  uint64 `json:"settingsRevision"`
 }
 
 // CoordinationCommandResult returns the authoritative detached state for
@@ -271,6 +345,7 @@ type TerminalSwitchDecisionPayload struct {
 type App struct {
 	lifecycleMu           sync.Mutex
 	coordinationCommandMu sync.Mutex
+	publicAccessCommandMu sync.Mutex
 	mu                    sync.RWMutex
 
 	deps AppDependencies
@@ -286,11 +361,17 @@ type App struct {
 	requestedRevision   uint64
 	savedRevision       uint64
 	playerStarted       bool
-	tunnelStarted       bool
 	desktopReady        bool
 	sessionsClosed      bool
 	processStateCleared bool
+	publicAccessClosed  bool
 	stopped             bool
+
+	publicAccessLoaded      bool
+	publicAccessPreferences tunnelservice.PublicAccessPreferences
+	providerTokenPresence   tunnelservice.SecretPresence
+	playerPasswordPresence  tunnelservice.SecretPresence
+	publicAccessStatus      tunnelservice.PublicAccessStatus
 }
 
 // lifecyclePhase returns the host-owned lifecycle observation used by Go
@@ -310,11 +391,410 @@ func NewApp() *App {
 
 // NewAppWithDependencies constructs a testable composition root.
 func NewAppWithDependencies(deps AppDependencies) *App {
-	app := &App{deps: deps, phase: "constructed", saveState: string(sessionservice.SaveStateIdle)}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	app := &App{
+		deps: deps, phase: "constructed", saveState: string(sessionservice.SaveStateIdle),
+		publicAccessPreferences: preferences,
+		providerTokenPresence:   tunnelservice.SecretUnknown,
+		playerPasswordPresence:  tunnelservice.SecretUnknown,
+		publicAccessStatus: tunnelservice.PublicAccessStatus{
+			State: tunnelservice.LifecycleDisabled, SettingsRevision: preferences.Revision,
+		},
+	}
 	if deps.Coordination != nil {
 		app.coordinationState = domain.CloneMasterCoordinationState(deps.Coordination.Snapshot())
 	}
 	return app
+}
+
+// GetPublicAccess returns only reconciled presence and non-secret settings.
+func (app *App) GetPublicAccess() PublicAccessSnapshot {
+	app.publicAccessCommandMu.Lock()
+	defer app.publicAccessCommandMu.Unlock()
+	if app.deps.PublicAccess != nil {
+		snapshot := app.deps.PublicAccess.Snapshot()
+		app.acceptPublicAccessSnapshot(snapshot, false)
+		return routePublicAccessSnapshot(snapshot)
+	}
+	app.loadPublicAccessLocked(app.contextSnapshot())
+	return app.publicAccessSnapshotLocked()
+}
+
+// SavePublicAccessSettings validates the complete proposed revision before
+// applying scoped Keychain changes and then the atomic non-secret file write.
+func (app *App) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload) PublicAccessCommandResult {
+	app.publicAccessCommandMu.Lock()
+	defer app.publicAccessCommandMu.Unlock()
+	ctx := app.contextSnapshot()
+	if app.deps.PublicAccess != nil {
+		routed, err := routeSavePublicAccessSettingsRequest(payload)
+		if err != nil {
+			return app.publicAccessCoreFailure(app.deps.PublicAccess.Snapshot(), tunnelservice.ErrorValidation)
+		}
+		providerValue := []byte(routed.ReplacementProviderToken)
+		passwordValue := []byte(routed.ReplacementPlayerPassword)
+		routed.ReplacementProviderToken = ""
+		routed.ReplacementPlayerPassword = ""
+		defer clear(providerValue)
+		defer clear(passwordValue)
+		current := app.deps.PublicAccess.Snapshot()
+		mutation := tunnelservice.PublicAccessMutation{
+			ExpectedRevision:        routed.ExpectedRevision,
+			PersistVisibleOverrides: true,
+			Preferences: tunnelservice.PublicAccessPreferences{
+				Version: tunnelservice.PublicAccessSettingsVersion, EnabledPreference: routed.EnabledPreference,
+				ReservedDomain: routed.ReservedDomain, Username: routed.Username,
+			},
+			ProviderToken:  tunnelservice.SecretMutation{Replacement: providerValue, Delete: routed.DeleteProviderToken},
+			PlayerPassword: tunnelservice.SecretMutation{Replacement: passwordValue, Delete: routed.DeletePlayerPassword},
+		}
+		if routed.ExpectedRevision != current.Preferences.Revision {
+			return app.publicAccessCoreFailure(current, tunnelservice.ErrorConflict)
+		}
+		result := app.deps.PublicAccess.Reconfigure(ctx, mutation)
+		app.acceptPublicAccessSnapshot(result.Snapshot, true)
+		return routePublicAccessCommandResult(PublicAccessCommandResult{
+			OK: result.OK, Error: result.Error, Snapshot: routePublicAccessSnapshot(result.Snapshot),
+		})
+	}
+	app.loadPublicAccessLocked(ctx)
+
+	routed, err := routeSavePublicAccessSettingsRequest(payload)
+	if err != nil {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorValidation, err.Error())
+	}
+	app.mu.RLock()
+	current := app.publicAccessPreferences
+	app.mu.RUnlock()
+	if routed.ExpectedRevision != current.Revision {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorConflict, tunnelservice.ErrorConflict.SafeMessage())
+	}
+	proposed := tunnelservice.PublicAccessPreferences{
+		Version: tunnelservice.PublicAccessSettingsVersion, EnabledPreference: routed.EnabledPreference,
+		ReservedDomain: routed.ReservedDomain, Username: routed.Username, Revision: current.Revision + 1,
+		ProviderTokenPresentHint:  current.ProviderTokenPresentHint,
+		PlayerPasswordPresentHint: current.PlayerPasswordPresentHint,
+	}
+	proposed, err = proposed.Normalized()
+	if err != nil {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorValidation, tunnelservice.ErrorValidation.SafeMessage())
+	}
+	providerValue := []byte(routed.ReplacementProviderToken)
+	passwordValue := []byte(routed.ReplacementPlayerPassword)
+	defer clear(providerValue)
+	defer clear(passwordValue)
+	if len(providerValue) > 0 {
+		if err := tunnelservice.ValidateProviderToken(providerValue); err != nil {
+			return app.publicAccessFailureLocked(tunnelservice.ErrorValidation, tunnelservice.ErrorValidation.SafeMessage())
+		}
+	}
+	if len(passwordValue) > 0 {
+		if err := tunnelservice.ValidatePlayerPassword(passwordValue); err != nil {
+			return app.publicAccessFailureLocked(tunnelservice.ErrorValidation, tunnelservice.ErrorValidation.SafeMessage())
+		}
+	}
+	if err := app.applySecretMutationLocked(ctx, tunnelservice.ProviderAccountToken, providerValue, routed.DeleteProviderToken); err != nil {
+		return app.publicAccessSecretFailureLocked(err)
+	}
+	if err := app.applySecretMutationLocked(ctx, tunnelservice.PlayerBasicAuthPassword, passwordValue, routed.DeletePlayerPassword); err != nil {
+		app.reconcilePublicAccessPresenceLocked(ctx)
+		return app.publicAccessSecretFailureLocked(err)
+	}
+	app.reconcilePublicAccessPresenceLocked(ctx)
+	app.mu.RLock()
+	proposed.ProviderTokenPresentHint = app.providerTokenPresence == tunnelservice.SecretPresent
+	proposed.PlayerPasswordPresentHint = app.playerPasswordPresence == tunnelservice.SecretPresent
+	app.mu.RUnlock()
+	if app.deps.PublicSettings == nil {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage())
+	}
+	if err := app.deps.PublicSettings.Save(proposed); err != nil {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage())
+	}
+	app.mu.Lock()
+	app.publicAccessPreferences = proposed
+	app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: app.publicAccessStatus.Generation + 1, SettingsRevision: proposed.Revision}
+	app.mu.Unlock()
+	return app.publicAccessSuccessLocked()
+}
+
+func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) GeneratedPlayerPasswordResult {
+	app.publicAccessCommandMu.Lock()
+	defer app.publicAccessCommandMu.Unlock()
+	ctx := app.contextSnapshot()
+	if app.deps.PublicAccess != nil {
+		current := app.deps.PublicAccess.Snapshot()
+		routed := routePublicAccessCommandRequest(payload)
+		if routed.ExpectedRevision != current.Preferences.Revision {
+			return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorConflict.SafeMessage(), SettingsRevision: current.Preferences.Revision})
+		}
+		source := app.deps.PasswordEntropy
+		if source == nil {
+			source = rand.Reader
+		}
+		generated, err := tunnelservice.GeneratePlayerPassword(source)
+		if err != nil {
+			return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorProviderFailure.SafeMessage(), SettingsRevision: current.Preferences.Revision})
+		}
+		defer clear(generated)
+		oneTimeValue := string(generated)
+		result := app.deps.PublicAccess.Reconfigure(ctx, tunnelservice.PublicAccessMutation{
+			ExpectedRevision: routed.ExpectedRevision,
+			Preferences:      current.Preferences,
+			PlayerPassword:   tunnelservice.SecretMutation{Replacement: generated},
+		})
+		app.acceptPublicAccessSnapshot(result.Snapshot, true)
+		if !result.OK {
+			oneTimeValue = ""
+			return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: result.Error, SettingsRevision: result.Snapshot.Preferences.Revision})
+		}
+		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{OK: true, GeneratedPassword: oneTimeValue, SettingsRevision: result.Snapshot.Preferences.Revision})
+	}
+	app.loadPublicAccessLocked(ctx)
+	routed := routePublicAccessCommandRequest(payload)
+	app.mu.RLock()
+	current := app.publicAccessPreferences
+	app.mu.RUnlock()
+	if routed.ExpectedRevision != current.Revision {
+		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorConflict.SafeMessage(), SettingsRevision: current.Revision})
+	}
+	source := app.deps.PasswordEntropy
+	if source == nil {
+		source = rand.Reader
+	}
+	generated, err := tunnelservice.GeneratePlayerPassword(source)
+	if err != nil {
+		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorProviderFailure.SafeMessage(), SettingsRevision: current.Revision})
+	}
+	defer clear(generated)
+	if err := tunnelservice.ReplaceSecret(ctx, app.deps.PublicSecrets, tunnelservice.PlayerBasicAuthPassword, generated); err != nil {
+		app.publicAccessSecretFailureLocked(err)
+		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: publicAccessSecretCategory(err).SafeMessage(), SettingsRevision: current.Revision})
+	}
+	current.Revision++
+	current.PlayerPasswordPresentHint = true
+	if app.deps.PublicSettings == nil || savePublicAccessMutationSettings(app.deps.PublicSettings, current, false) != nil {
+		app.reconcilePublicAccessPresenceLocked(ctx)
+		app.publicAccessFailureLocked(tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage())
+		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: tunnelservice.ErrorSettingsCorrupt.SafeMessage(), SettingsRevision: current.Revision - 1})
+	}
+	app.mu.Lock()
+	app.publicAccessPreferences = current
+	app.playerPasswordPresence = tunnelservice.SecretPresent
+	app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: app.publicAccessStatus.Generation + 1, SettingsRevision: current.Revision}
+	app.mu.Unlock()
+	app.emitPublicAccessStatusLocked()
+	return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{OK: true, GeneratedPassword: string(generated), SettingsRevision: current.Revision})
+}
+
+type mutationAwarePublicAccessSettingsStore interface {
+	SaveForMutation(tunnelservice.PublicAccessPreferences, bool) error
+}
+
+func savePublicAccessMutationSettings(settings PublicAccessSettingsStore, preferences tunnelservice.PublicAccessPreferences, persistVisibleOverrides bool) error {
+	if aware, ok := settings.(mutationAwarePublicAccessSettingsStore); ok {
+		return aware.SaveForMutation(preferences, persistVisibleOverrides)
+	}
+	return settings.Save(preferences)
+}
+
+func (app *App) StartPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+	app.publicAccessCommandMu.Lock()
+	defer app.publicAccessCommandMu.Unlock()
+	if app.deps.PublicAccess != nil {
+		result := app.deps.PublicAccess.Start(app.contextSnapshot(), routePublicAccessCommandRequest(payload).ExpectedRevision)
+		app.acceptPublicAccessSnapshot(result.Snapshot, true)
+		return routePublicAccessCommandResult(PublicAccessCommandResult{
+			OK: result.OK, Error: result.Error, Snapshot: routePublicAccessSnapshot(result.Snapshot),
+		})
+	}
+	app.loadPublicAccessLocked(app.contextSnapshot())
+	if routePublicAccessCommandRequest(payload).ExpectedRevision != app.publicAccessPreferences.Revision {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorConflict, tunnelservice.ErrorConflict.SafeMessage())
+	}
+	return app.publicAccessFailureLocked(tunnelservice.ErrorProviderFailure, "Public access is not available yet; local access remains available.")
+}
+
+func (app *App) StopPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+	app.publicAccessCommandMu.Lock()
+	defer app.publicAccessCommandMu.Unlock()
+	if app.deps.PublicAccess != nil {
+		result := app.deps.PublicAccess.Stop(app.contextSnapshot(), routePublicAccessCommandRequest(payload).ExpectedRevision)
+		app.acceptPublicAccessSnapshot(result.Snapshot, true)
+		return routePublicAccessCommandResult(PublicAccessCommandResult{
+			OK: result.OK, Error: result.Error, Snapshot: routePublicAccessSnapshot(result.Snapshot),
+		})
+	}
+	app.loadPublicAccessLocked(app.contextSnapshot())
+	if routePublicAccessCommandRequest(payload).ExpectedRevision != app.publicAccessPreferences.Revision {
+		return app.publicAccessFailureLocked(tunnelservice.ErrorConflict, tunnelservice.ErrorConflict.SafeMessage())
+	}
+	app.mu.Lock()
+	app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: app.publicAccessStatus.Generation + 1, SettingsRevision: app.publicAccessPreferences.Revision}
+	app.mu.Unlock()
+	return app.publicAccessSuccessLocked()
+}
+
+func (app *App) loadPublicAccessLocked(ctx context.Context) {
+	app.mu.RLock()
+	loaded := app.publicAccessLoaded
+	app.mu.RUnlock()
+	if loaded {
+		return
+	}
+	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	category := tunnelservice.ErrorCategory(0)
+	message := ""
+	if app.deps.PublicSettings != nil {
+		loadedPreferences, err := app.deps.PublicSettings.Load()
+		if err == nil {
+			preferences = loadedPreferences
+		} else if errors.Is(err, tunnelservice.ErrSettingsRecovered) {
+			category, message = tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage()
+		} else {
+			category, message = tunnelservice.ErrorSettingsCorrupt, tunnelservice.ErrorSettingsCorrupt.SafeMessage()
+		}
+	}
+	app.mu.Lock()
+	app.publicAccessLoaded = true
+	app.publicAccessPreferences = preferences
+	app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: preferences.Revision}
+	if category != 0 {
+		app.publicAccessStatus.State = tunnelservice.LifecycleFailed
+		app.publicAccessStatus.ErrorCategory = category
+		app.publicAccessStatus.ErrorMessage = message
+	}
+	app.mu.Unlock()
+	app.reconcilePublicAccessPresenceLocked(ctx)
+}
+
+func (app *App) reconcilePublicAccessPresenceLocked(ctx context.Context) {
+	provider, providerErr := tunnelservice.SecretUnknown, error(nil)
+	password, passwordErr := tunnelservice.SecretUnknown, error(nil)
+	if app.deps.PublicSecrets != nil {
+		provider, providerErr = app.deps.PublicSecrets.Presence(ctx, tunnelservice.ProviderAccountToken)
+		password, passwordErr = app.deps.PublicSecrets.Presence(ctx, tunnelservice.PlayerBasicAuthPassword)
+	}
+	app.mu.Lock()
+	app.providerTokenPresence = provider
+	app.playerPasswordPresence = password
+	if providerErr != nil || passwordErr != nil {
+		failure := providerErr
+		if failure == nil {
+			failure = passwordErr
+		}
+		category := publicAccessSecretCategory(failure)
+		app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleFailed, Generation: app.publicAccessStatus.Generation, SettingsRevision: app.publicAccessPreferences.Revision, ErrorCategory: category, ErrorMessage: category.SafeMessage()}
+	}
+	app.mu.Unlock()
+}
+
+func (app *App) applySecretMutationLocked(ctx context.Context, ref tunnelservice.SecretRef, replacement []byte, deleteValue bool) error {
+	if len(replacement) > 0 {
+		return tunnelservice.ReplaceSecret(ctx, app.deps.PublicSecrets, ref, replacement)
+	}
+	if deleteValue {
+		return tunnelservice.DeleteSecret(ctx, app.deps.PublicSecrets, ref)
+	}
+	return nil
+}
+
+func (app *App) publicAccessSnapshotLocked() PublicAccessSnapshot {
+	app.mu.RLock()
+	snapshot := tunnelservice.PublicAccessSnapshot{Preferences: app.publicAccessPreferences, ProviderTokenPresence: app.providerTokenPresence, PlayerPasswordPresence: app.playerPasswordPresence, Status: app.publicAccessStatus}
+	app.mu.RUnlock()
+	return routePublicAccessSnapshot(snapshot)
+}
+
+func (app *App) publicAccessSuccessLocked() PublicAccessCommandResult {
+	snapshot := app.publicAccessSnapshotLocked()
+	app.emitPublicAccessStatusLocked()
+	return routePublicAccessCommandResult(PublicAccessCommandResult{OK: true, Snapshot: snapshot})
+}
+
+func (app *App) publicAccessFailureLocked(category tunnelservice.ErrorCategory, message string) PublicAccessCommandResult {
+	app.mu.Lock()
+	app.publicAccessStatus = tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleFailed, Generation: app.publicAccessStatus.Generation, SettingsRevision: app.publicAccessPreferences.Revision, ErrorCategory: category, ErrorMessage: message}
+	app.mu.Unlock()
+	snapshot := app.publicAccessSnapshotLocked()
+	app.emitPublicAccessStatusLocked()
+	return routePublicAccessCommandResult(PublicAccessCommandResult{Error: message, Snapshot: snapshot})
+}
+
+func (app *App) publicAccessSecretFailureLocked(err error) PublicAccessCommandResult {
+	category := publicAccessSecretCategory(err)
+	return app.publicAccessFailureLocked(category, category.SafeMessage())
+}
+
+func publicAccessSecretCategory(err error) tunnelservice.ErrorCategory {
+	switch {
+	case errors.Is(err, tunnelservice.ErrSecretStoreLocked):
+		return tunnelservice.ErrorSecretStoreLocked
+	case errors.Is(err, tunnelservice.ErrSecretStoreDenied), errors.Is(err, tunnelservice.ErrSecretStoreUserCancelled):
+		return tunnelservice.ErrorSecretStoreDenied
+	default:
+		return tunnelservice.ErrorSecretStoreUnavailable
+	}
+}
+
+func (app *App) emitPublicAccessStatusLocked() {
+	if app.deps.Events != nil {
+		_ = app.deps.Events.Emit(publicAccessStatusEvent, app.publicAccessSnapshotLocked())
+	}
+}
+
+func (app *App) acceptPublicAccessSnapshot(snapshot tunnelservice.PublicAccessSnapshot, emit bool) {
+	app.mu.Lock()
+	if app.publicAccessLoaded && publicAccessSnapshotOlder(snapshot, app.publicAccessPreferences, app.publicAccessStatus) {
+		app.mu.Unlock()
+		return
+	}
+	app.publicAccessLoaded = true
+	app.publicAccessPreferences = snapshot.Preferences
+	app.providerTokenPresence = snapshot.ProviderTokenPresence
+	app.playerPasswordPresence = snapshot.PlayerPasswordPresence
+	app.publicAccessStatus = snapshot.Status
+	serverInfoChanged := false
+	if app.serverInfo != nil {
+		if snapshot.Status.State == tunnelservice.LifecycleReady && snapshot.Status.PublicURL != "" {
+			localURL := app.serverInfo.LocalURL
+			if localURL == "" || app.serverInfo.Tunnel == false {
+				localURL = app.serverInfo.URL
+			}
+			if app.serverInfo.URL != snapshot.Status.PublicURL || !app.serverInfo.Tunnel {
+				app.serverInfo.URL = snapshot.Status.PublicURL
+				app.serverInfo.LocalURL = localURL
+				app.serverInfo.Tunnel = true
+				app.serverInfo.TunnelError = ""
+				serverInfoChanged = true
+			}
+		} else if app.serverInfo.Tunnel {
+			app.serverInfo.URL = app.serverInfo.LocalURL
+			app.serverInfo.Tunnel = false
+			app.serverInfo.TunnelError = snapshot.Status.ErrorMessage
+			serverInfoChanged = true
+		}
+	}
+	serverInfo := cloneServerInfoPointer(app.serverInfo)
+	app.mu.Unlock()
+	if emit && app.deps.Events != nil {
+		if serverInfoChanged && serverInfo != nil {
+			_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*serverInfo))
+		}
+		_ = app.deps.Events.Emit(publicAccessStatusEvent, routePublicAccessSnapshot(snapshot))
+	}
+}
+
+func (app *App) publicAccessCoreFailure(snapshot tunnelservice.PublicAccessSnapshot, category tunnelservice.ErrorCategory) PublicAccessCommandResult {
+	app.acceptPublicAccessSnapshot(snapshot, false)
+	return routePublicAccessCommandResult(PublicAccessCommandResult{
+		Error: category.SafeMessage(), Snapshot: routePublicAccessSnapshot(snapshot),
+	})
+}
+
+func publicAccessSnapshotOlder(candidate tunnelservice.PublicAccessSnapshot, preferences tunnelservice.PublicAccessPreferences, status tunnelservice.PublicAccessStatus) bool {
+	return candidate.Status.Generation < status.Generation ||
+		candidate.Status.Generation == status.Generation && candidate.Preferences.Revision < preferences.Revision
 }
 
 // Start acquires the player listener, publishes local status, allows the
@@ -343,6 +823,11 @@ func (app *App) Start(ctx context.Context) error {
 	app.ctx = ctx
 	app.stopped = false
 	app.mu.Unlock()
+	if app.deps.PublicAccess == nil {
+		app.publicAccessCommandMu.Lock()
+		app.loadPublicAccessLocked(ctx)
+		app.publicAccessCommandMu.Unlock()
+	}
 
 	acquisitionContext := ctx
 	if app.deps.StartupTimeout > 0 {
@@ -360,6 +845,9 @@ func (app *App) Start(ctx context.Context) error {
 	app.playerStarted = true
 	app.serverInfo = cloneServerInfo(info)
 	app.mu.Unlock()
+	if app.deps.PublicAccess != nil {
+		app.acceptPublicAccessSnapshot(app.deps.PublicAccess.Initialize(ctx), false)
+	}
 
 	if app.deps.Events != nil {
 		if err := app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(info)); err != nil {
@@ -377,14 +865,16 @@ func (app *App) Start(ctx context.Context) error {
 		app.mu.Unlock()
 	}
 	app.setPhase("ready-local")
-
-	if app.deps.TunnelEnabled {
-		app.startTunnelLocked(acquisitionContext, info)
+	if app.deps.PublicAccess != nil || app.deps.PublicSettings != nil || app.deps.PublicSecrets != nil {
+		app.publicAccessCommandMu.Lock()
+		app.emitPublicAccessStatusLocked()
+		app.publicAccessCommandMu.Unlock()
 	}
+
 	return nil
 }
 
-// Shutdown releases tunnel, player listener, persistence worker, then desktop.
+// Shutdown releases public access, the player listener, persistence worker, then desktop.
 // It is safe in every lifecycle phase and on repeated calls.
 func (app *App) Shutdown(ctx context.Context) error {
 	app.lifecycleMu.Lock()
@@ -949,71 +1439,6 @@ func (app *App) OpenURL(rawURL string) CommandResult {
 	return routeCommandResult(CommandResult{OK: true})
 }
 
-func (app *App) startTunnelLocked(ctx context.Context, local domain.ServerInfo) {
-	if app.deps.Tunnel == nil {
-		app.recordTunnelFailure("public tunnel is enabled but not configured")
-		return
-	}
-	app.setPhase("starting-tunnel")
-	public, err := app.deps.Tunnel.Start(ctx)
-	if err != nil {
-		// Tunnel implementations own detailed diagnostics and credential
-		// redaction. The desktop boundary deliberately emits a fixed actionable
-		// message so an unexpected dependency error can never disclose secrets.
-		app.recordTunnelFailure(tunnelStartupFailureMessage)
-		return
-	}
-	app.mu.Lock()
-	app.tunnelStarted = true
-	app.mu.Unlock()
-	publicURL, valid := protectedPublicURL(public.URL)
-	if !valid {
-		// Start returning success means a process may have been acquired. Stop it
-		// before reporting the invalid address and falling back to local mode.
-		if err := app.deps.Tunnel.Stop(ctx); err == nil {
-			app.mu.Lock()
-			app.tunnelStarted = false
-			app.mu.Unlock()
-		}
-		app.recordTunnelFailure(tunnelAddressFailureMessage)
-		return
-	}
-	public.URL = publicURL
-	public.LocalURL = local.URL
-	public.Tunnel = true
-	public.TunnelError = ""
-	app.mu.Lock()
-	app.serverInfo = cloneServerInfo(public)
-	app.startupError = ""
-	app.phase = "ready-public"
-	app.mu.Unlock()
-	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(public))
-	}
-}
-
-func protectedPublicURL(rawURL string) (string, bool) {
-	parsed, err := url.ParseRequestURI(strings.TrimSpace(rawURL))
-	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
-		return "", false
-	}
-	return parsed.String(), true
-}
-
-func (app *App) recordTunnelFailure(message string) {
-	app.mu.Lock()
-	app.startupError = message
-	if app.serverInfo != nil {
-		app.serverInfo.TunnelError = message
-	}
-	app.phase = "ready-local"
-	info := cloneServerInfoPointer(app.serverInfo)
-	app.mu.Unlock()
-	if info != nil && app.deps.Events != nil {
-		_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*info))
-	}
-}
-
 func (app *App) failLocked(cause error) error {
 	app.mu.Lock()
 	app.startupError = cause.Error()
@@ -1035,16 +1460,25 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 		return nil
 	}
 	app.phase = "stopping"
-	tunnelStarted := app.tunnelStarted
 	playerStarted := app.playerStarted
 	desktopReady := app.desktopReady
 	sessionsOpen := app.deps.Sessions != nil && !app.sessionsClosed
+	publicAccessOpen := app.deps.PublicAccess != nil && !app.publicAccessClosed
 	clearProcessState := !app.processStateCleared
 	app.processStateCleared = true
 	app.ctx = nil
 	app.mu.Unlock()
 
 	var cleanupErrors []error
+	if publicAccessOpen {
+		if err := app.deps.PublicAccess.Shutdown(ctx); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop embedded public access: %w", err))
+		} else {
+			app.mu.Lock()
+			app.publicAccessClosed = true
+			app.mu.Unlock()
+		}
+	}
 	if clearProcessState && app.deps.Live != nil {
 		app.deps.Live.Clear()
 		app.mu.Lock()
@@ -1056,15 +1490,6 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 			coordination.Shutdown()
 			app.mu.Lock()
 			app.coordinationState = nil
-			app.mu.Unlock()
-		}
-	}
-	if tunnelStarted && app.deps.Tunnel != nil {
-		if err := app.deps.Tunnel.Stop(ctx); err != nil {
-			cleanupErrors = append(cleanupErrors, fmt.Errorf("stop public tunnel: %w", err))
-		} else {
-			app.mu.Lock()
-			app.tunnelStarted = false
 			app.mu.Unlock()
 		}
 	}
@@ -1097,7 +1522,9 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 	}
 
 	app.mu.Lock()
-	remaining := app.tunnelStarted || app.playerStarted || app.desktopReady || (app.deps.Sessions != nil && !app.sessionsClosed)
+	remaining := app.playerStarted || app.desktopReady ||
+		(app.deps.Sessions != nil && !app.sessionsClosed) ||
+		(app.deps.PublicAccess != nil && !app.publicAccessClosed)
 	app.stopped = !remaining
 	if !remaining {
 		app.serverInfo = nil

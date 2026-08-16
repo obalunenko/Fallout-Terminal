@@ -8,13 +8,17 @@ import { Create as $Create } from "@wailsio/runtime";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as main$0 from "../../../../obalunenko/Fallout-Terminal/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as domain$0 from "../../../../obalunenko/Fallout-Terminal/internal/domain/models.js";
 
 function configure() {
     Object.freeze(Object.assign($Create.Events, {
         "coordination-state": $$createType1,
         "hack-state": $$createType3,
-        "server-info": $$createType4,
+        "public-access-status": $$createType4,
+        "server-info": $$createType5,
     }));
 }
 
@@ -23,6 +27,7 @@ const $$createType0 = domain$0.MasterCoordinationState.createFrom;
 const $$createType1 = $Create.Nullable($$createType0);
 const $$createType2 = domain$0.PublicHackState.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
-const $$createType4 = domain$0.ServerInfo.createFrom;
+const $$createType4 = main$0.PublicAccessSnapshot.createFrom;
+const $$createType5 = domain$0.ServerInfo.createFrom;
 
 configure();

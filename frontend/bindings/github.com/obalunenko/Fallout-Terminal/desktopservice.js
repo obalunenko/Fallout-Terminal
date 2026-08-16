@@ -83,11 +83,30 @@ export function ForceHackSuccess() {
 }
 
 /**
+ * @param {$models.PublicAccessCommandPayload} payload
+ * @returns {$CancellablePromise<$models.GeneratedPlayerPasswordResult>}
+ */
+export function GeneratePlayerPassword(payload) {
+    return $Call.ByID(2485398858, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType3($result);
+    }));
+}
+
+/**
+ * @returns {$CancellablePromise<$models.PublicAccessSnapshot>}
+ */
+export function GetPublicAccess() {
+    return $Call.ByID(760826452).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType4($result);
+    }));
+}
+
+/**
  * @returns {$CancellablePromise<$models.RuntimeStatus>}
  */
 export function GetRuntimeStatus() {
     return $Call.ByID(858476939).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType3($result);
+        return $$createType5($result);
     }));
 }
 
@@ -96,7 +115,7 @@ export function GetRuntimeStatus() {
  */
 export function LoadReferencedPlayerConfig() {
     return $Call.ByID(3625309117).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -115,7 +134,7 @@ export function MoveCharacter(payload) {
  */
 export function NewPlayerConfig() {
     return $Call.ByID(1361487498).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -133,7 +152,7 @@ export function NewSession() {
  */
 export function OpenPlayerConfig() {
     return $Call.ByID(3818260626).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType4($result);
+        return $$createType6($result);
     }));
 }
 
@@ -192,7 +211,7 @@ export function RenameLogicalSession(payload) {
  */
 export function RequestTerminalActivation(payload) {
     return $Call.ByID(2107315930, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -201,7 +220,7 @@ export function RequestTerminalActivation(payload) {
  */
 export function RequestTerminalClear() {
     return $Call.ByID(2661250323).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
     }));
 }
 
@@ -221,7 +240,17 @@ export function ResetFailedHack(payload) {
  */
 export function ResolveTerminalSwitch(payload) {
     return $Call.ByID(3005579231, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType5($result);
+        return $$createType7($result);
+    }));
+}
+
+/**
+ * @param {$models.SavePublicAccessSettingsPayload} payload
+ * @returns {$CancellablePromise<$models.PublicAccessCommandResult>}
+ */
+export function SavePublicAccessSettings(payload) {
+    return $Call.ByID(2107763802, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
     }));
 }
 
@@ -231,7 +260,7 @@ export function ResolveTerminalSwitch(payload) {
  */
 export function SaveSession(session) {
     return $Call.ByID(830349524, session).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType6($result);
+        return $$createType9($result);
     }));
 }
 
@@ -255,6 +284,26 @@ export function StartBroadcast() {
 }
 
 /**
+ * @param {$models.PublicAccessCommandPayload} payload
+ * @returns {$CancellablePromise<$models.PublicAccessCommandResult>}
+ */
+export function StartPublicAccess(payload) {
+    return $Call.ByID(2229627868, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
+ * @param {$models.PublicAccessCommandPayload} payload
+ * @returns {$CancellablePromise<$models.PublicAccessCommandResult>}
+ */
+export function StopPublicAccess(payload) {
+    return $Call.ByID(887374898, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
  * @param {$models.LiveUpdatePayload} payload
  * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
  */
@@ -268,7 +317,10 @@ export function UpdateLiveTerminal(payload) {
 const $$createType0 = $models.CoordinationCommandResult.createFrom;
 const $$createType1 = session$0.SessionResult.createFrom;
 const $$createType2 = $models.CommandResult.createFrom;
-const $$createType3 = $models.RuntimeStatus.createFrom;
-const $$createType4 = $models.PlayerConfigCommandResult.createFrom;
-const $$createType5 = $models.TerminalSwitchCommandResult.createFrom;
-const $$createType6 = session$0.SaveResult.createFrom;
+const $$createType3 = $models.GeneratedPlayerPasswordResult.createFrom;
+const $$createType4 = $models.PublicAccessSnapshot.createFrom;
+const $$createType5 = $models.RuntimeStatus.createFrom;
+const $$createType6 = $models.PlayerConfigCommandResult.createFrom;
+const $$createType7 = $models.TerminalSwitchCommandResult.createFrom;
+const $$createType8 = $models.PublicAccessCommandResult.createFrom;
+const $$createType9 = session$0.SaveResult.createFrom;

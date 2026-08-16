@@ -128,12 +128,12 @@ scan_lifecycle_schema() {
     fail 'feature-005 private runtime schema changed during the Wails migration'
     return 1
   }
-  [[ "$revision_digest" == e2e1f53725c02255cbdac9b83dedc8ccb22abfb13f58541032b3abaf43e8e2cf ]] || {
-    fail 'feature-005 schema revision record changed during the Wails migration'
+  [[ "$revision_digest" == 1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06 ]] || {
+    fail 'reviewed feature-007 schema revision record changed unexpectedly'
     return 1
   }
-  [[ "$baseline_digest" == af0f7c7ce8e7e1215f6b4436d35d69b40032e563d20e93d6919b027737a1f1c9 ]] || {
-    fail 'feature-005 compatibility baseline changed during the Wails migration'
+  [[ "$baseline_digest" == 50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3 ]] || {
+    fail 'reviewed feature-007 compatibility baseline changed unexpectedly'
     return 1
   }
 }
