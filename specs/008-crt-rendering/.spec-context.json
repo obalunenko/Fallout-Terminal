@@ -1,0 +1,1077 @@
+{
+  "workflow": "speckit",
+  "specName": "CRT Rendering and Motion Effects",
+  "branch": "008-crt-rendering",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T14:39:21.655Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T14:42:50.613Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T14:44:54.252Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:39:16.527Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:41:00.118Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T15:50:47.641Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:53:13.440Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T15:54:17.652Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:54:48.508Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:56:00.118Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:56:30.288Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:58:22.146Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:58:31.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T15:58:47.301Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:01:29.896Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:02:16.318Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:03:47.188Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:05:26.981Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:06:01.886Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:07:34.509Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:12:06.794Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:12:21.171Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:13:49.578Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:15:08.161Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-16T16:15:08.317Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T16:20:56.990Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:23:51.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T16:26:15.324Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T17:01:07.614Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:03:37.525Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:05:28.592Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:07:28.159Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:10:16.468Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:10:53.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T17:20:58.255Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-16T21:42:46.857Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:44:20.128Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:46:01.566Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:49:14.322Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:50:52.102Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:51:29.881Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-16T21:54:07.831Z"
+    }
+  ],
+  "approach": "Keep the current DOM/CSS CRT shell and exact historical visual timing, then refactor only the browser-local row/line reveal into an explicit controller. A capture-phase key guard completes the current visible reveal and consumes that physical key while preserving all persistent effects, authoritative state, and current architecture.",
+  "decisions": [
+    {
+      "decision": "Retain exact historical DOM/CSS CRT effects with no reduced-motion branch",
+      "why": "The clarified product contract requires the historical palette and persistent motion to remain active",
+      "rejected": "OS or application motion preferences and a rendering redesign"
+    },
+    {
+      "decision": "Use an idempotent generation-safe reveal controller",
+      "why": "It can complete remaining nodes synchronously and prevent stale callbacks after replacement",
+      "rejected": "Timer-only state or a persistent skip flag"
+    },
+    {
+      "decision": "Consume the reveal-skip key before normal input and suppress same-press repeats until keyup",
+      "why": "The physical key used to skip must cause zero normal terminal actions",
+      "rejected": "Continuing dispatch or swallowing later input for a timeout"
+    },
+    {
+      "decision": "Keep pagination and layout recalculation immediate for already-opened content",
+      "why": "Content identity, not page fitting, owns reveal replay under FR-010 and FR-011",
+      "rejected": "Revealing every pagination or resize result"
+    },
+    {
+      "decision": "Separate temporal assertions from stable historical-color snapshots",
+      "why": "Frozen screenshots protect exact visual states while browser animation data deterministically protects timing",
+      "rejected": "Live-animation screenshots or numeric contrast substitution"
+    },
+    {
+      "decision": "Test literal authored content and optional-audio failure in the browser journey",
+      "why": "Reveal refactoring must preserve escaping and remain functional when sound fails",
+      "rejected": "Asset-string checks or audio call-count assertions alone"
+    },
+    {
+      "decision": "Anchor reveal scheduling to the original start time while preserving 40ms row targets",
+      "why": "Chained timers can accumulate scheduler drift and violate the 1.2-second 25-row acceptance bound",
+      "rejected": "Allowing each timer callback delay to compound"
+    },
+    {
+      "decision": "Use content-aware private reveal identities and retain completed container identity",
+      "why": "Identical authoritative snapshots and reconnects must preserve both active progress and completed DOM, while changed text under the same navigation key must still replace and reveal",
+      "rejected": "Unconditionally resetting render keys on every live-terminal projection"
+    },
+    {
+      "decision": "Use generation-bearing opaque pattern IDs plus rendered board content as browser-local reveal identity",
+      "why": "The public player projection already carries stable authoritative pattern IDs and complete board text, preserving progress without expanding the RPC schema",
+      "rejected": "Atomic full-grid insertion or an additional public generation field"
+    },
+    {
+      "decision": "Reveal complete row descriptors into persistent empty column shells through the shared reveal controller",
+      "why": "This preserves deterministic two-column DOM order, keeps unrevealed targets absent, supports cancellation, and reuses established skip semantics",
+      "rejected": "Character-by-character hacking markup or independent unmanaged timers"
+    },
+    {
+      "decision": "Use stable generation identity plus coordinate-keyed mutable row snapshots",
+      "why": "Dud removal mutates board text inside one authoritative generation and must preserve the existing reveal controller and row DOM",
+      "rejected": "Including mutable column text in reveal identity, which restarts the full reveal"
+    },
+    {
+      "decision": "Replace the queued descriptor row for an unrevealed dud target without appending it",
+      "why": "The active reveal controller retains the descriptor and exposes the updated row only at its original turn",
+      "rejected": "Reconciling pending content directly into the live DOM, which would expose interaction early"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned historical CRT preservation plus consumed any-key reveal completion with no reduced-motion mode",
+      "key_finding": "The current CSS already matches the exact historical palette and flicker; the implementation gap is explicit reveal completion and key consumption."
+    },
+    "tasks": {
+      "summary": "16 dependency-ordered tasks across Setup, Foundational, three test-first user-story phases, and single-owner validation Polish."
+    },
+    "implement": {
+      "summary": "Same-generation dud removal now reconciles revealed and queued hacking rows without replay, while new generations retain ordered reveal behavior.",
+      "key_finding": "Safe row-level DOM insertion through the existing reveal controller provides cadence, cancellation, skip, and non-interactivity guarantees without protocol changes",
+      "risks": "Native startup requires GUI permission in restricted automation; macOS linker emits known deployment-target warnings"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "The player experience MUST present every supported state within one consistent CRT visual shell.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005",
+        "T006"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell"
+      ]
+    },
+    "FR-002": {
+      "title": "The CRT shell MUST provide a dark screen, green phosphor foreground, restrained glow, scanline texture, and edge darkening while preserving text legibility.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell"
+      ]
+    },
+    "FR-003": {
+      "title": "Decorative CRT layers MUST cover the visible screen without receiving pointer or keyboard interaction.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005",
+        "T006"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell"
+      ]
+    },
+    "FR-004": {
+      "title": "Connection feedback MUST remain visually dominant and readable without permanently replacing or mutating the underlying player state.",
+      "tasks": [
+        "T004",
+        "T005",
+        "T006"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell"
+      ]
+    },
+    "FR-005": {
+      "title": "Selection, focus, active, and hacking-hover feedback MUST preserve the exact historical color treatment and MUST be validated through approved visual snapshot baselines rather than a numeric contrast threshold.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell"
+      ]
+    },
+    "FR-006": {
+      "title": "Screen flicker MUST use the historical six-second cycle with opacity 1 through 96%, .92 at 97%, 1 at 98%, .96 at 99%, and 1 at 100%.",
+      "tasks": [
+        "T008",
+        "T009",
+        "T015"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTMotionAndRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT motion and reveal lifecycle"
+      ]
+    },
+    "FR-007": {
+      "title": "Cursor and pending-action indicators MUST use a discrete on/off presentation that remains independent of screen flicker.",
+      "tasks": [
+        "T008",
+        "T009"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTMotionAndRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT motion and reveal lifecycle"
+      ]
+    },
+    "FR-008": {
+      "title": "Newly opened folder rows, record lines, and command-output lines MUST reveal progressively in source order under normal motion settings.",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTMotionAndRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT motion and reveal lifecycle"
+      ]
+    },
+    "FR-009": {
+      "title": "A replacement render MUST cancel any unfinished reveal associated with the replaced content.",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTMotionAndRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT motion and reveal lifecycle"
+      ]
+    },
+    "FR-010": {
+      "title": "An unchanged content identity MUST NOT replay progressive reveal solely because another player-state field changed.",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::25 rows reveal in order within 1.2 seconds and unchanged updates do not replay"
+      ]
+    },
+    "FR-011": {
+      "title": "Pagination, viewport recalculation, and font-fit recalculation MUST NOT restart progressive reveal for already visible content.",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTMotionAndRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT motion and reveal lifecycle"
+      ]
+    },
+    "FR-012": {
+      "title": "While a folder, record, or command page is progressively revealing, pressing any keyboard key MUST stop the active reveal, render the complete current page immediately, and consume that key without performing its normal action; normal keyboard handling MUST resume on the next key press.",
+      "tasks": [
+        "T011",
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTRevealSkipAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT reveal skip"
+      ]
+    },
+    "FR-013": {
+      "title": "The visual shell and essential controls MUST remain usable without page-level scrolling across the supported compact, medium, and large viewport checks.",
+      "tasks": [
+        "T004",
+        "T006",
+        "T012",
+        "T015",
+        "T016"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell viewport state matrix"
+      ]
+    },
+    "FR-014": {
+      "title": "CRT presentation behavior MUST remain local to the player experience and MUST NOT alter authoritative navigation, hacking, identity, broadcast, or persistence state.",
+      "tasks": [
+        "T011",
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTRevealSkipAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT reveal skip"
+      ]
+    },
+    "FR-015": {
+      "title": "Optional audio availability or playback failure MUST NOT prevent the visual shell, animation fallback, or player interaction from working.",
+      "tasks": [
+        "T012",
+        "T013",
+        "T015"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTRevealSkipAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT reveal skip"
+      ]
+    },
+    "FR-016": {
+      "title": "The player experience MUST NOT expose or honor a reduced-motion mode that disables screen flicker, cursor blinking, pending-state pulsing, or other persistent CRT effects; reveal skipping applies only to the currently rendering page.",
+      "tasks": [
+        "T006",
+        "T008",
+        "T009",
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTRevealSkipAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT reveal skip"
+      ]
+    },
+    "SC-006": {
+      "title": "All nine CRT presentation states remain readable and operable at all three supported viewports.",
+      "tasks": [
+        "T018"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::CRT visual shell viewport state matrix"
+      ]
+    },
+    "FR-017": {
+      "tasks": [
+        "T019",
+        "T020",
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTHackingRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::new-hacking-generations-reveal-complete-rows"
+      ]
+    },
+    "FR-018": {
+      "tasks": [
+        "T019",
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTHackRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::new hacking generations reveal complete rows in deterministic 40ms order"
+      ]
+    },
+    "FR-019": {
+      "tasks": [
+        "T019",
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::same hacking identity survives updates reconnect viewport and fitting without replay",
+        "tests/browser/crt-rendering.spec.mjs::replacement generations cancel stale rows before starting one fresh reveal"
+      ]
+    },
+    "FR-020": {
+      "tasks": [
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::hacking-key-completes-board-without-acting"
+      ]
+    },
+    "FR-021": {
+      "tasks": [
+        "T020",
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTHackingRevealAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::new-hacking-generations-reveal-complete-rows"
+      ]
+    },
+    "SC-009": {
+      "tasks": [
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::new-hacking-generations-reveal-complete-rows",
+        "tests/browser/crt-rendering.spec.mjs::hacking-key-completes-board-without-acting"
+      ]
+    },
+    "SC-010": {
+      "tasks": [
+        "T019",
+        "T021",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::CRT hacking code reveal"
+      ]
+    },
+    "FR-022": {
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTDudReconciliationAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::removing a dud from a revealed row reconciles that row without replaying the board",
+        "tests/browser/crt-rendering.spec.mjs::removing a dud from a pending row preserves reveal cadence and existing interaction"
+      ]
+    },
+    "SC-011": {
+      "tests": [
+        "tests/browser/crt-rendering.spec.mjs::removing a dud from a revealed row reconciles that row without replaying the board",
+        "tests/browser/crt-rendering.spec.mjs::removing a dud from a pending row preserves reveal cadence and existing interaction"
+      ]
+    }
+  },
+  "currentTask": "T030",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Created shared CRT Playwright helpers for fixture setup, player assignment, action observation, animation freezing, viewport checks, and audio failure.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added deterministic CRT fixture routes and content for 25 rows, records, commands, literal markup, replacement, waiting, hacking, and blocked journeys.",
+      "files": [
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added failing Testify asset contract for CRT shell semantics, historical colors, responsive layer clipping, CSP, and browser-only capabilities.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added test-first Playwright CRT shell journeys for states, geometry, hit testing, connection precedence, historical colors, and required viewports.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Marked scanline and vignette layers aria-hidden while preserving their DOM order and interaction model.",
+      "files": [
+        "client/index.html"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Aligned decorative layer clipping to the responsive screen radius while preserving the exact historical palette and pointer transparency.",
+      "files": [
+        "client/client.css"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Generated and visually reviewed 12 approved historical-color snapshots across compact, medium, and large viewports.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs-snapshots"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added failing Testify contracts for exact flicker/blink/pulse timing, 40ms reveal cadence, controller lifecycle, identity suppression, and no reduced-motion overrides.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added Playwright checks for exact animation data, 25-row cadence, identity suppression, replacement cancellation, and immediate pagination/layout recalculation.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Refactored revealInto into an idempotent generation-safe controller with synchronous completion, stale-callback cancellation, safe clearing, and existing identity semantics.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Added failing Testify contracts for capture-phase reveal skipping, event and repeat consumption, teardown state, text-only rendering, and no shared/persisted skip state.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added failing Playwright reveal-skip journeys for completion latency, consumed actions/repeats, later input, independent pages, persistent effects, literal content, audio failure, and reduced-motion non-behavior.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Added capture-phase current-page reveal completion with physical-key repeat consumption, deadline-based 40ms cadence, and preserved later input and persistent effects.",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Reconciled the verification guide with the implemented CRT fixture states, Playwright snapshot naming, focused commands, and observable manual checks.",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Passed client install/build, gofmt, vet, all Go tests, Wails binding generation with zero drift, the 17-test focused CRT suite, and the 57-test full browser suite (55 passed, 2 conditional ngrok tests skipped).",
+      "files": [
+        "client/dist tests/browser/test-results frontend/bindings"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Started the native Wails development application through the runtime launch stage, stopped it after startup, completed the unsigned macOS arm64 production build, and confirmed the CRT player markup is embedded in the executable.",
+      "files": [
+        "build/dev/Fallout Terminal.app build/bin/Fallout Terminal.app"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Preserved reveal DOM and progress across identical authoritative snapshots and reconnects using content-aware identities, while retaining replacement cancellation; added mutation-based reconnect coverage.",
+      "files": [
+        "client/client.js",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Expanded CRT browser coverage to all nine presentation states across compact, medium, and large viewports with containment, hit-target, pagination, and hacking operability checks.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added stable CRT hacking states for same-generation updates and resolved replacement-generation switches",
+      "files": [
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added failing asset contract for safe generation-keyed hacking row reveal and removal of atomic grid insertion",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Added failing Playwright coverage for hacking row cadence, identity stability, replacement cancellation, interaction gating, and consumed keys",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Implemented safe generation-keyed 40ms hacking row reveal with stable updates, cancellation, fit scheduling, and consumed-key completion",
+      "files": [
+        "client/client.js",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Updated CRT verification guide for deterministic hacking reveal, identity stability, replacement, skip, and runtime checks",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Validated focused and full Go/browser suites, binding drift, native startup, interactive hacking reveal journeys, and unsigned macOS build",
+      "files": [
+        "client/client.js",
+        "internal/platform/assets_test.go",
+        "tests/browser/crt-rendering.spec.mjs",
+        "tests/browser/fixture-server/main.go",
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Added a resettable deterministic fixture random source and revealed/pending dud-removal outcome controls",
+      "files": [
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added a failing asset contract for generation-only identity and revealed/queued dud reconciliation",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Added failing browser regressions for revealed and pending dud removal without row replay or cadence reset",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Separated hacking generation identity from mutable snapshots and reconciled changed revealed or queued rows in place",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Documented deterministic revealed and pending dud-removal DOM, gating, cadence, input, and replacement checks",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Validated focused and full CRT, Go, browser, bindings, interactive dud/replacement, and unsigned app build gates",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Player production assets",
+      "result": "passed",
+      "command": "npm ci --prefix client && npm run build --prefix client"
+    },
+    {
+      "what": "Go formatting, vet, and tests",
+      "result": "passed",
+      "command": "gofmt -l .; go vet ./...; go test ./...",
+      "warnings": "Non-fatal macOS deployment-version linker warnings (objects built for macOS 26.0 while linking 11.0)."
+    },
+    {
+      "what": "Generated Wails bindings",
+      "result": "passed with zero drift",
+      "command": "go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...; git diff --exit-code -- frontend/bindings"
+    },
+    {
+      "what": "Focused CRT browser journey",
+      "result": "17 passed",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs"
+    },
+    {
+      "what": "Complete browser regression",
+      "result": "55 passed, 2 conditional live-ngrok tests skipped",
+      "command": "npm test --prefix tests/browser"
+    },
+    {
+      "what": "Native runtime and accepted build",
+      "result": "development runtime reached launch; unsigned macOS arm64 build passed; CRT markup found in executable",
+      "command": "go run ./cmd/build dev; go run ./cmd/build build"
+    },
+    {
+      "what": "Working-tree integrity",
+      "result": "passed",
+      "command": "git diff --check"
+    },
+    {
+      "what": "Convergence identity and reconnect regression",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs -g 25 rows reveal",
+      "result": "1 passed; identical updates and reconnects preserved row identity with zero child-list mutations"
+    },
+    {
+      "what": "Convergence viewport state matrix",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs -g all nine presentation states",
+      "result": "3 passed across compact, medium, and large viewports"
+    },
+    {
+      "what": "Focused CRT browser journey after convergence",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs",
+      "result": "19 passed"
+    },
+    {
+      "what": "CRT asset contracts after convergence",
+      "command": "go test ./internal/platform -run CRT|Player.*Asset",
+      "result": "passed",
+      "warnings": "Non-fatal macOS deployment-version linker warnings."
+    },
+    {
+      "what": "Repository and binding gates after convergence",
+      "command": "npm run build --prefix client; gofmt -l .; go vet ./...; go test ./...; wails3 generate bindings; binding drift check",
+      "result": "passed with zero formatting or generated-binding drift",
+      "warnings": "Non-fatal macOS deployment-version linker warnings."
+    },
+    {
+      "what": "Complete browser regression after convergence",
+      "command": "npm test --prefix tests/browser",
+      "result": "57 passed, 2 conditional live-ngrok tests skipped"
+    },
+    {
+      "what": "Native build after convergence",
+      "command": "go run ./cmd/build build",
+      "result": "unsigned macOS arm64 build passed and embedded CRT markup was found in the executable"
+    },
+    {
+      "what": "{\"what\":\"Focused hacking reveal asset and browser checks\",\"result\":\"passed\",\"command\":\"go test ./internal/platform -run CRT\\|Player.*Asset -count=1; npm test --prefix tests/browser -- crt-rendering.spec.mjs\",\"warnings\":\"Known non-fatal macOS deployment-target linker warnings\"}"
+    },
+    {
+      "what": "Full Go and browser regression suites",
+      "result": "go test ./... passed; Playwright 61 passed, 2 external-ngrok scenarios skipped",
+      "command": "go vet ./...; go test ./...; npm test --prefix tests/browser"
+    },
+    {
+      "what": "Build, generation drift, and native startup gates",
+      "result": "player and unsigned macOS arm64 builds passed; bindings unchanged; native master-control window reached local mode ready",
+      "command": "npm run build --prefix client; go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...; git diff --exit-code -- frontend/bindings; go run ./cmd/build dev; go run ./cmd/build build"
+    },
+    {
+      "what": "Focused BUG-001 hacking reveal checks",
+      "result": "focused asset contract passed and all 23 CRT browser cases passed",
+      "command": "go test ./internal/platform -run TestPlayerCRTHackingRevealAssetContract -count=1; npm test --prefix tests/browser -- crt-rendering.spec.mjs"
+    },
+    {
+      "what": "Focused asset contracts",
+      "command": "go test ./internal/platform -run CRT|Player.*Asset",
+      "result": "passed",
+      "warnings": [
+        "macOS linker emitted benign deployment-target warnings"
+      ]
+    },
+    {
+      "what": "Go formatting, vet, and regression suite",
+      "command": "gofmt -l .; go vet ./...; go test ./...",
+      "result": "clean formatting; vet passed; all packages passed",
+      "warnings": [
+        "macOS linker emitted benign deployment-target warnings"
+      ]
+    },
+    {
+      "what": "Full browser regression suite",
+      "command": "npm test --prefix tests/browser",
+      "result": "63 passed, 2 skipped",
+      "warnings": [
+        "two conditional authenticated ngrok tests skipped because external provider was not enabled"
+      ]
+    },
+    {
+      "what": "Player production build",
+      "command": "npm run build --prefix client",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Generated binding drift",
+      "command": "go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...; git diff --exit-code -- frontend/bindings",
+      "result": "generation passed with zero drift",
+      "warnings": []
+    },
+    {
+      "what": "Unsigned application build",
+      "command": "go run ./cmd/build build",
+      "result": "passed; build/bin/Fallout Terminal.app produced",
+      "warnings": []
+    }
+  ],
+  "concerns": [
+    {
+      "note": "The complete native GUI journey was not manually driven after launch; equivalent state, viewport, reveal, skip, input, audio-failure, and persistent-effect behavior is covered by Playwright.",
+      "step": "implement",
+      "kind": "manual-check-unavailable"
+    }
+  ],
+  "last_action": "BUG-002 implementation complete — focused and full validation passed"
+}

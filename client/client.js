@@ -50,6 +50,10 @@ let currentCommandNodeId = null;
 let lastRenderedFolderKey  = null;
 let lastRenderedEntryId    = null;
 let lastRenderedCommandKey = null;
+let lastRenderedHackKey    = null;
+let lastRenderedHackRows = new Map();
+const activeRevealControllers = new Set();
+let consumedRevealKey = null;
 
 let pagedView = {
   kind: null,
@@ -655,6 +659,8 @@ function clearBroadcastMirrors() {
   lastRenderedFolderKey = null;
   lastRenderedEntryId = null;
   lastRenderedCommandKey = null;
+  lastRenderedHackKey = null;
+  lastRenderedHackRows = new Map();
   hackLevel = 0;
   hack = null;
   hackTyped = '';
@@ -665,6 +671,7 @@ function clearBroadcastMirrors() {
   lastAttemptsLeft = null;
   terminalLiveBaselinePending = true;
   appliedSharedRevision = 0;
+  consumedRevealKey = null;
 
   clearTimeout(hackSolvedTimer);
   hackSolvedTimer = null;
@@ -672,10 +679,12 @@ function clearBroadcastMirrors() {
   deactivatePagination();
 
   for (const container of [termList, entryBody, termOutput]) {
-    if (container._revealTimer) clearTimeout(container._revealTimer);
-    container._revealTimer = null;
+    cancelReveal(container);
+    container._revealedContentIdentity = null;
     container.replaceChildren();
   }
+  cancelReveal(hackColumns);
+  hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
   hackLog.replaceChildren();
   introTextEl.textContent = '';
@@ -726,11 +735,15 @@ function applyRecognitionSnapshot(recognitionHandle, state) {
 function applyLiveTerminal(msg) {
     if (!matchesExpectedTerminalLive(msg) || !acceptSharedSnapshot(msg)) return;
     const previousHack = hack;
+    const nextTerminalID = msg.terminalId || '';
+    const nextBroadcastID = playerState?.broadcastId || '';
+    const terminalIdentityChanged = !hasLive || terminalID !== nextTerminalID ||
+      terminalBroadcastID !== nextBroadcastID;
     const isContinuousTerminalUpdate = !terminalLiveBaselinePending && hasLive &&
       terminalID === msg.terminalId && mode === MODE.HACK;
     hasLive       = true;
-    terminalID    = msg.terminalId || '';
-    terminalBroadcastID = playerState?.broadcastId || '';
+    terminalID    = nextTerminalID;
+    terminalBroadcastID = nextBroadcastID;
     terminalName  = msg.terminalName || '';
     introText     = msg.introText || '';
     tree          = msg.tree;
@@ -755,9 +768,13 @@ function applyLiveTerminal(msg) {
     currentCommandNodeId = nav.commandNodeId || null;
     commandOutput = nav.commandNodeId ? ((findNodeById(tree, nav.commandNodeId) || {}).text ?? null) : null;
     selIndex      = 0;
-    lastRenderedFolderKey  = null;
-    lastRenderedEntryId    = null;
-    lastRenderedCommandKey = null;
+    if (terminalIdentityChanged) {
+      lastRenderedFolderKey  = null;
+      lastRenderedEntryId    = null;
+      lastRenderedCommandKey = null;
+      lastRenderedHackKey    = null;
+      lastRenderedHackRows   = new Map();
+    }
 
     mode = (hackLevel > 0 && hack && (!hack.solved || isContinuousTerminalUpdate))
       ? MODE.HACK
@@ -1048,6 +1065,9 @@ function renderPlayerContext() {
 
 function hideTerminalSurface() {
   deactivatePagination();
+  cancelReveal(termList);
+  cancelReveal(entryBody);
+  cancelReveal(termOutput);
   normalHeader.hidden = true;
   hackHeader.hidden = true;
   termIdle.hidden = true;
@@ -1246,6 +1266,46 @@ hackColumns.addEventListener('click', (e) => {
 // ════════════════════════════════════════════════════
 // KEYBOARD
 // ════════════════════════════════════════════════════
+function revealPhysicalKey(event) {
+  return event.code || event.key || 'Unidentified';
+}
+
+function visibleRevealController(controller) {
+  const container = controller?.container;
+  return Boolean(container && container.isConnected && !container.hidden && !container.closest('[hidden]'));
+}
+
+function completeVisibleReveals() {
+  let completed = false;
+  for (const controller of Array.from(activeRevealControllers)) {
+    if (visibleRevealController(controller) && controller.complete()) completed = true;
+  }
+  return completed;
+}
+
+function consumeKeyboardEvent(event) {
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function consumeRevealKeydown(event) {
+  const key = revealPhysicalKey(event);
+  if (consumedRevealKey !== null && event.repeat && key === consumedRevealKey) {
+    consumeKeyboardEvent(event);
+    return;
+  }
+  if (!completeVisibleReveals()) return;
+  consumedRevealKey = key;
+  consumeKeyboardEvent(event);
+}
+
+function releaseConsumedRevealKey(event) {
+  if (revealPhysicalKey(event) === consumedRevealKey) consumedRevealKey = null;
+}
+
+document.addEventListener('keydown', consumeRevealKeydown, { capture: true });
+document.addEventListener('keyup', releaseConsumedRevealKey, { capture: true });
+
 document.addEventListener('keydown', (e) => {
   if (!hasLive) return;
 
@@ -1343,25 +1403,98 @@ function esc(s) {
 // instantly — used when re-rendering content that hasn't actually changed.
 const REVEAL_DELAY_MS = 40;
 
-function revealInto(container, elements, animate) {
-  if (container._revealTimer) {
-    clearTimeout(container._revealTimer);
-    container._revealTimer = null;
+function revealInto(container, elements, animate, contentIdentity = '', options = {}) {
+  const currentController = container._revealController;
+  if (!animate && currentController?.state === 'revealing' &&
+      currentController.contentIdentity === contentIdentity) {
+    return currentController;
   }
-  container.innerHTML = '';
+  if (!animate && container._revealedContentIdentity === contentIdentity) return null;
+  cancelReveal(container);
+  container._revealGeneration = (container._revealGeneration || 0) + 1;
+  const generation = container._revealGeneration;
+  container._revealedContentIdentity = null;
+  container.replaceChildren();
+  const appendElement = options.appendElement || (element => container.appendChild(element));
+  const afterAppend = options.afterAppend || (() => {});
+  if (options.prepareContainer) options.prepareContainer(container);
+  const append = element => {
+    appendElement(element);
+    afterAppend(element);
+  };
   if (!animate) {
-    elements.forEach(el => container.appendChild(el));
-    return;
+    elements.forEach(append);
+    container._revealedContentIdentity = contentIdentity;
+    return null;
   }
-  let i = 0;
+
+  const controller = {
+    container,
+    elements,
+    contentIdentity,
+    generation,
+    nextIndex: 0,
+    startedAt: performance.now(),
+    timer: null,
+    state: 'revealing',
+    complete: null,
+    cancel: null,
+  };
+
+  function settle(state) {
+    if (controller.timer !== null) clearTimeout(controller.timer);
+    controller.timer = null;
+    controller.state = state;
+    activeRevealControllers.delete(controller);
+    if (container._revealController === controller) container._revealController = null;
+    if (state === 'complete') container._revealedContentIdentity = contentIdentity;
+    if (state === 'complete' && pagedView.container === container) scheduleRepagination();
+  }
+
+  controller.complete = () => {
+    if (controller.state !== 'revealing' || container._revealGeneration !== generation) return false;
+    while (controller.nextIndex < elements.length) {
+      append(elements[controller.nextIndex]);
+      controller.nextIndex += 1;
+    }
+    settle('complete');
+    return true;
+  };
+
+  controller.cancel = () => {
+    if (controller.state !== 'revealing') return false;
+    if (container._revealGeneration === generation) container._revealGeneration += 1;
+    settle('cancelled');
+    return true;
+  };
+
+  container._revealController = controller;
+  activeRevealControllers.add(controller);
+
   function next() {
-    if (i >= elements.length) return;
-    container.appendChild(elements[i]);
+    if (controller.state !== 'revealing' || container._revealGeneration !== generation) return;
+    if (controller.nextIndex >= elements.length) {
+      settle('complete');
+      return;
+    }
+    append(elements[controller.nextIndex]);
     playCharScroll();
-    i++;
-    if (i < elements.length) container._revealTimer = setTimeout(next, REVEAL_DELAY_MS);
+    controller.nextIndex += 1;
+    if (controller.nextIndex < elements.length) {
+      const targetTime = controller.startedAt + controller.nextIndex * REVEAL_DELAY_MS;
+      controller.timer = setTimeout(next, Math.max(0, targetTime - performance.now()));
+    } else {
+      settle('complete');
+    }
   }
   next();
+  return controller;
+}
+
+function cancelReveal(container) {
+  const controller = container?._revealController;
+  if (!controller) return false;
+  return controller.cancel();
 }
 
 function lineToDiv(text) {
@@ -1370,12 +1503,14 @@ function lineToDiv(text) {
   return d;
 }
 
+function revealContentIdentity(kind, key, text, detail = '') {
+  return `${kind}:${JSON.stringify([key, String(text == null ? '' : text), detail])}`;
+}
+
 function replaceWithText(container, text) {
-  if (container._revealTimer) {
-    clearTimeout(container._revealTimer);
-    container._revealTimer = null;
-  }
-  container.innerHTML = '';
+  cancelReveal(container);
+  container._revealedContentIdentity = null;
+  container.replaceChildren();
   String(text).split('\n').forEach(line => container.appendChild(lineToDiv(line)));
 }
 
@@ -1442,7 +1577,8 @@ function renderPagedView(animate) {
   if (!pagedView.container) return;
   const page = pagedView.pages[pagedView.index] || '';
   const lines = page.split('\n').map(lineToDiv);
-  revealInto(pagedView.container, lines, animate);
+  const identity = revealContentIdentity(pagedView.kind, pagedView.key, page, pagedView.index);
+  revealInto(pagedView.container, lines, animate, identity);
   updatePageControls();
 }
 
@@ -1476,6 +1612,7 @@ function deactivatePagination() {
     cancelAnimationFrame(paginationFrame);
     paginationFrame = null;
   }
+  cancelReveal(pagedView.container);
   pagedView = {
     kind: null,
     key: null,
@@ -1506,6 +1643,7 @@ function changePage(delta) {
 
 function scheduleRepagination() {
   if (pagedView.kind === null) return;
+  if (pagedView.container?._revealController?.state === 'revealing') return;
   if (paginationFrame !== null) cancelAnimationFrame(paginationFrame);
   paginationFrame = requestAnimationFrame(() => {
     paginationFrame = null;
@@ -1640,6 +1778,7 @@ function render() {
 
   if (!hasCurrentTerminalMirror()) {
     deactivatePagination();
+    cancelReveal(termList);
     normalHeader.hidden = true;
     hackHeader.hidden   = true;
     termIdle.hidden     = false;
@@ -1663,6 +1802,11 @@ function render() {
 }
 
 function renderNormalScreen() {
+  cancelReveal(hackColumns);
+  hackColumns._revealedContentIdentity = null;
+  hackColumns.replaceChildren();
+  lastRenderedHackKey = null;
+  lastRenderedHackRows = new Map();
   hackHeader.hidden  = true;
   hackBoard.hidden   = true;
   hackBlocked.hidden = true;
@@ -1673,6 +1817,7 @@ function renderNormalScreen() {
   termPrompt.hidden          = false;
 
   if (mode === MODE.ENTRY) {
+    cancelReveal(termList);
     const node = findNodeById(tree, viewEntryId);
     termList.hidden   = true;
     termEntry.hidden  = false;
@@ -1680,16 +1825,19 @@ function renderNormalScreen() {
     backBtn.hidden    = false;
     entryTitle.textContent  = node ? node.name : '';
 
-    const isNewEntry = viewEntryId !== lastRenderedEntryId;
-    lastRenderedEntryId = viewEntryId;
+    const entryText = node ? (node.description || '') : '';
+    const entryKey = revealContentIdentity('entry', viewEntryId, entryText);
+    const isNewEntry = entryKey !== lastRenderedEntryId;
+    lastRenderedEntryId = entryKey;
     lastRenderedFolderKey = null;
     lastRenderedCommandKey = null;
 
-    activatePagination('entry', viewEntryId, node ? (node.description || '') : '', entryBody, isNewEntry);
+    activatePagination('entry', viewEntryId, entryText, entryBody, isNewEntry);
     return;
   }
 
   // MODE.LIST
+  cancelReveal(entryBody);
   termEntry.hidden = true;
   termList.hidden  = false;
   backBtn.hidden   = navStack.length <= 1;
@@ -1699,7 +1847,9 @@ function renderNormalScreen() {
   const folder = currentFolderNode();
   const kids = folder.children || [];
 
-  const folderKey = navStack.join('/');
+  const folderPath = navStack.join('/');
+  const folderText = JSON.stringify(kids.map(node => [node.id, node.type, node.name]));
+  const folderKey = revealContentIdentity('folder', folderPath, folderText);
   const isNewFolder = folderKey !== lastRenderedFolderKey;
   lastRenderedFolderKey = folderKey;
 
@@ -1722,12 +1872,13 @@ function renderNormalScreen() {
       return row;
     });
   }
-  revealInto(termList, rows, isNewFolder);
+  revealInto(termList, rows, isNewFolder, `${folderKey}:selection:${selIndex}`);
 
   if (commandOutput !== null) {
     termOutput.hidden = false;
-    const isNewCommand = currentCommandNodeId !== lastRenderedCommandKey;
-    lastRenderedCommandKey = currentCommandNodeId;
+    const commandKey = revealContentIdentity('command', currentCommandNodeId, commandOutput);
+    const isNewCommand = commandKey !== lastRenderedCommandKey;
+    lastRenderedCommandKey = commandKey;
     activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
   } else {
     termOutput.hidden = true;
@@ -1753,6 +1904,7 @@ function attemptsLineHtml(h) {
 
 function renderHackScreen() {
   deactivatePagination();
+  cancelReveal(termList);
   normalHeader.hidden = true;
   termList.hidden     = true;
   termEntry.hidden    = true;
@@ -1762,6 +1914,9 @@ function renderHackScreen() {
   hackHeader.hidden   = false;
 
   if (!hack) {
+    cancelReveal(hackColumns);
+    lastRenderedHackKey = null;
+    lastRenderedHackRows = new Map();
     hackBoard.hidden   = true;
     hackBlocked.hidden = true;
     return;
@@ -1770,6 +1925,7 @@ function renderHackScreen() {
   attemptsLine.innerHTML = attemptsLineHtml(hack);
 
   if (hack.failed) {
+    cancelReveal(hackColumns);
     hackBoard.hidden   = true;
     hackBlocked.hidden = false;
     return;
@@ -1777,48 +1933,148 @@ function renderHackScreen() {
 
   hackBlocked.hidden = true;
   hackBoard.hidden   = false;
-  renderHackColumns();
+  const hackKey = hackRevealIdentity(hack);
+  const isNewHack = hackKey !== lastRenderedHackKey;
+  lastRenderedHackKey = hackKey;
+  renderHackColumns(isNewHack, hackKey);
   renderHackLog();
   renderHackInputPreview();
   scheduleHackFit();
 }
 
-function buildColumnHtml(col, colIndex, rowBase) {
+function hackRevealIdentity(hackState) {
+  const generationKey = (hackState.patterns || [])
+    .map(pattern => String(pattern.id || ''))
+    .sort()
+    .join('|');
+  return revealContentIdentity('hack', generationKey, '');
+}
+
+function createHackCell(className, target, text) {
+  const cell = document.createElement('span');
+  cell.className = `hcell ${className}`;
+  cell.dataset.target = String(target);
+  cell.tabIndex = 0;
+  cell.textContent = text;
+  return cell;
+}
+
+function buildHackColumn(col, colIndex, rowBase) {
   const wordAt = new Array(col.text.length).fill(null);
   col.words.forEach(w => { for (let i = w.start; i < w.start + w.length; i++) wordAt[i] = w.id; });
 
-  const rows = Math.ceil(col.text.length / ROW_WIDTH);
-  let rowsHtml = '';
-  for (let r = 0; r < rows; r++) {
-    const rowStart = r * ROW_WIDTH;
+  const column = document.createElement('div');
+  column.className = 'hack-col';
+  const rowDescriptors = [];
+  const rowCount = Math.ceil(col.text.length / ROW_WIDTH);
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+    const rowStart = rowIndex * ROW_WIDTH;
     const rowEnd = Math.min(rowStart + ROW_WIDTH, col.text.length);
-    let cellsHtml = '';
+    const row = document.createElement('div');
+    row.className = 'hack-row';
+    const address = document.createElement('span');
+    address.className = 'hack-addr';
+    address.textContent = col.addresses[rowIndex] || '';
+    const cells = document.createElement('span');
+    cells.className = 'hack-cells';
     let i = rowStart;
     while (i < rowEnd) {
       const wid = wordAt[i];
       if (wid) {
         let j = i;
         while (j < rowEnd && wordAt[j] === wid) j++;
-        cellsHtml += `<span class="hcell word" data-target="${esc(wid)}" tabindex="0">${esc(col.text.slice(i, j))}</span>`;
+        cells.appendChild(createHackCell('word', wid, col.text.slice(i, j)));
         i = j;
       } else {
-        cellsHtml += `<span class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0">${esc(col.text[i])}</span>`;
+        const cell = createHackCell('filler', `${colIndex}:${i}`, col.text[i]);
+        cell.dataset.row = String(rowBase + rowIndex);
+        cell.dataset.offset = String(i - rowStart);
+        cells.appendChild(cell);
         i++;
       }
     }
-    const addr = col.addresses[r] || '';
-    rowsHtml += `<div class="hack-row"><span class="hack-addr">${esc(addr)}</span><span class="hack-cells">${cellsHtml}</span></div>`;
+    row.append(address, cells);
+    const key = `${colIndex}:${rowIndex}`;
+    row.dataset.hackRow = key;
+    const signature = JSON.stringify(Array.from(row.children, element => [
+      element.className,
+      element.textContent,
+      Array.from(element.children, child => [
+        child.className,
+        child.dataset.target || '',
+        child.dataset.row || '',
+        child.dataset.offset || '',
+        child.textContent,
+      ]),
+    ]));
+    rowDescriptors.push({ key, parent: column, row, signature });
   }
-  return `<div class="hack-col">${rowsHtml}</div>`;
+  return { column, rows: rowDescriptors, rowCount };
 }
 
-function renderHackColumns() {
+function buildHackColumns(hackState) {
+  const columns = [];
+  const rows = [];
   let rowBase = 0;
-  hackColumns.innerHTML = hack.columns.map((col, ci) => {
-    const html = buildColumnHtml(col, ci, rowBase);
-    rowBase += Math.ceil(col.text.length / ROW_WIDTH);
-    return html;
-  }).join('');
+  for (const [columnIndex, source] of (hackState.columns || []).entries()) {
+    const built = buildHackColumn(source, columnIndex, rowBase);
+    columns.push(built.column);
+    rows.push(...built.rows);
+    rowBase += built.rowCount;
+  }
+  return { columns, rows };
+}
+
+function hackBoardSnapshot(hackState) {
+  return buildHackColumns(hackState);
+}
+
+function reconcileHackRow(current, replacement) {
+  const activeCell = current.row.contains(document.activeElement)
+    ? {
+        target: document.activeElement.dataset.target,
+        row: document.activeElement.dataset.row,
+        offset: document.activeElement.dataset.offset,
+      }
+    : null;
+  current.row.replaceChildren(...replacement.row.childNodes);
+  current.signature = replacement.signature;
+  if (!activeCell) return;
+  const replacementCell = Array.from(current.row.querySelectorAll('.hcell')).find(cell =>
+    cell.dataset.target === activeCell.target &&
+    cell.dataset.row === activeCell.row &&
+    cell.dataset.offset === activeCell.offset
+  );
+  replacementCell?.focus({ preventScroll: true });
+}
+
+function reconcileHackColumns(hackState) {
+  const snapshot = hackBoardSnapshot(hackState);
+  for (const replacement of snapshot.rows) {
+    const current = lastRenderedHackRows.get(replacement.key);
+    if (!current || current.signature === replacement.signature) continue;
+    if (current.row.isConnected) {
+      reconcileHackRow(current, replacement);
+    } else {
+      current.row = replacement.row;
+      current.signature = replacement.signature;
+    }
+  }
+  scheduleHackFit();
+}
+
+function renderHackColumns(animate, hackKey) {
+  if (!animate && lastRenderedHackRows.size !== 0) {
+    reconcileHackColumns(hack);
+  } else {
+    const built = hackBoardSnapshot(hack);
+    lastRenderedHackRows = new Map(built.rows.map(descriptor => [descriptor.key, descriptor]));
+    revealInto(hackColumns, built.rows, animate, hackKey, {
+      prepareContainer: container => built.columns.forEach(column => container.appendChild(column)),
+      appendElement: descriptor => descriptor.parent.appendChild(descriptor.row),
+      afterAppend: scheduleHackFit,
+    });
+  }
 
   if (hackHoverKey === null) return;
   const hoveredPattern = (hack.patterns || []).find(pattern =>
@@ -1834,7 +2090,7 @@ function renderHackColumns() {
 
 function renderHackLog() {
   const lines = Array.isArray(hack.log) ? hack.log : [];
-  hackLog.innerHTML = lines.map(line => `<div>${esc(line)}</div>`).join('');
+  hackLog.replaceChildren(...lines.map(lineToDiv));
 }
 
 function renderHackInputPreview() {

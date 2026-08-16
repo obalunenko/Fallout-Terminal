@@ -900,7 +900,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	js := read("client/client.js")
 	start := strings.Index(js, "function renderHackScreen()")
-	end := strings.Index(js, "function buildColumnHtml")
+	end := strings.Index(js, "function hackRevealIdentity")
 	require.False(t, start < 0 || end <= start,
 		"player script is missing the hacking render boundary")
 
@@ -1009,8 +1009,13 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 
 	}
 	for _, required := range []string{
-		`class="hcell word" data-target="${esc(wid)}" tabindex="0"`,
-		`class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0"`,
+		"cell.className = `hcell ${className}`",
+		"cell.dataset.target = String(target)",
+		"cell.tabIndex = 0",
+		"createHackCell('word', wid, col.text.slice(i, j))",
+		"createHackCell('filler', `${colIndex}:${i}`, col.text[i])",
+		"cell.dataset.row = String(rowBase + rowIndex)",
+		"cell.dataset.offset = String(i - rowStart)",
 		"const lines = Array.isArray(hack.log) ? hack.log : []",
 	} {
 		assert.Falsef(t, !strings.Contains(js, required),
@@ -1090,8 +1095,8 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"if (beginPattern(pattern.id)) playEnter();",
 		"if (pattern) return;",
 		"if (beginGuess(cell.dataset.target)) playEnter();",
-		"class=\"hcell word\"",
-		"class=\"hcell filler\"",
+		"createHackCell('word', wid, col.text.slice(i, j))",
+		"createHackCell('filler', `${colIndex}:${i}`, col.text[i])",
 	} {
 		assert.Falsef(t, !strings.Contains(playerScript, required),
 			"bundled player is missing camouflage interaction contract %q", required)
@@ -1461,6 +1466,192 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 	assert.False(t, strings.Contains(js, "hackFitObserver.observe(hackBoard)") || strings.Contains(js, "hackFitObserver.observe(hackColumns)"),
 		"hacking-row fit must not observe its own font-sized descendants and create a resize feedback loop")
 
+}
+
+func TestPlayerCRTVisualShellAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+
+	html := read("client/index.html")
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+
+	for _, fragment := range []string{
+		`class="crt"`,
+		`class="screen" id="screen"`,
+		`class="scanlines" aria-hidden="true"`,
+		`class="vignette" aria-hidden="true"`,
+		`class="conn-overlay" id="connOverlay"`,
+		`default-src 'self'`,
+		`object-src 'none'`,
+		`frame-ancestors 'none'`,
+	} {
+		assert.Contains(t, html, fragment)
+	}
+
+	for _, fragment := range []string{
+		".screen{position:relative;",
+		"background:#020a02;",
+		"border:2pxsolid#0c2e0c;",
+		"color:#57ff6e;",
+		".scanlines{position:absolute;inset:0;border-radius:inherit;pointer-events:none;",
+		".vignette{position:absolute;inset:0;border-radius:inherit;pointer-events:none;",
+		".term-row.sel{background:#57ff6e;color:#021002;text-shadow:none;}",
+		".hcell.hi{background:#57ff6e;color:#021002;text-shadow:none;}",
+		".character-option:hover,.character-option:focus-visible{border-color:#d8ffb8;background:rgba(87,255,110,.16);outline:none;}",
+		".back-btn:focus-visible,.page-btn:focus-visible{outline:2pxsolid#d8ffb8;",
+	} {
+		assert.Contains(t, compactCSS, fragment)
+	}
+
+	for _, forbidden := range []string{"@wailsio/runtime", "window.desktopAPI", "electronAPI", "genericDispatch"} {
+		assert.NotContains(t, html+css, forbidden)
+	}
+}
+
+func TestPlayerCRTMotionAndRevealAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+
+	css := read("client/client.css")
+	js := read("client/client.js")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+
+	for _, fragment := range []string{
+		"animation:flicker6sinfinite;",
+		"@keyframesflicker{0%,96%,100%{opacity:1;}97%{opacity:.92;}98%{opacity:1;}99%{opacity:.96;}}",
+		".blink{animation:blink1ssteps(1)infinite;}",
+		"@keyframesblink{0%,49%{opacity:1;}50%,100%{opacity:0;}}",
+		"animation:selection-pending1ssteps(2)infinite;",
+		"@keyframesselection-pending{0%,49%{border-color:#57ff6e;}50%,100%{border-color:#144d18;}}",
+	} {
+		assert.Contains(t, compactCSS, fragment)
+	}
+	assert.NotContains(t, strings.ToLower(css), "prefers-reduced-motion")
+
+	for _, fragment := range []string{
+		"const REVEAL_DELAY_MS = 40",
+		"const activeRevealControllers = new Set()",
+		"container._revealGeneration",
+		"controller.complete",
+		"controller.cancel",
+		"container.replaceChildren()",
+		"lastRenderedFolderKey",
+		"lastRenderedEntryId",
+		"lastRenderedCommandKey",
+	} {
+		assert.Contains(t, js, fragment)
+	}
+	assert.NotContains(t, strings.ToLower(js), "prefers-reduced-motion")
+}
+
+func TestPlayerCRTHackingRevealAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let lastRenderedHackKey",
+		"function hackRevealIdentity(hackState)",
+		"function createHackCell(className, target, text)",
+		"cell.textContent = text",
+		"function buildHackColumn(col, colIndex, rowBase)",
+		"address.textContent = col.addresses[rowIndex] || ''",
+		"function revealInto(container, elements, animate, contentIdentity = '', options = {})",
+		"const appendElement = options.appendElement ||",
+		"revealInto(hackColumns, built.rows, animate, hackKey, {",
+		"appendElement: descriptor => descriptor.parent.appendChild(descriptor.row)",
+		"cancelReveal(hackColumns)",
+	} {
+		assert.Contains(t, js, fragment, "player script is missing hacking reveal contract %q", fragment)
+	}
+
+	assert.NotContains(t, js, "hackColumns.innerHTML")
+	assert.NotContains(t, js, "function buildColumnHtml")
+}
+
+func TestPlayerCRTDudReconciliationAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let lastRenderedHackRows = new Map()",
+		"function hackBoardSnapshot(hackState)",
+		"function reconcileHackRow(current, replacement)",
+		"function reconcileHackColumns(hackState)",
+		"if (current.row.isConnected)",
+		"current.row.replaceChildren(...replacement.row.childNodes)",
+		"current.row = replacement.row",
+		"if (!animate && lastRenderedHackRows.size !== 0)",
+	} {
+		assert.Contains(t, js, fragment, "player script is missing dud reconciliation contract %q", fragment)
+	}
+
+	identityStart := strings.Index(js, "function hackRevealIdentity(hackState)")
+	identityEnd := strings.Index(js, "function createHackCell(className, target, text)")
+	require.NotEqual(t, -1, identityStart)
+	require.Greater(t, identityEnd, identityStart)
+	identity := js[identityStart:identityEnd]
+	assert.NotContains(t, identity, "hackState.columns")
+	assert.NotContains(t, identity, "boardText")
+}
+
+func TestPlayerCRTRevealSkipAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let consumedRevealKey = null",
+		"function completeVisibleReveals()",
+		"function consumeRevealKeydown(event)",
+		"function releaseConsumedRevealKey(event)",
+		"event.preventDefault()",
+		"event.stopImmediatePropagation()",
+		"event.repeat && key === consumedRevealKey",
+		"document.addEventListener('keydown', consumeRevealKeydown, { capture: true })",
+		"document.addEventListener('keyup', releaseConsumedRevealKey, { capture: true })",
+		"controller.complete()",
+		"d.textContent = text",
+		"row.textContent = '> ' + node.name",
+	} {
+		assert.Contains(t, js, fragment)
+	}
+
+	for _, forbidden := range []string{
+		"localStorage.setItem('crt",
+		"localStorage.setItem(\"crt",
+		"playerRPC.reveal",
+		"innerHTML = node.name",
+		"innerHTML = node.description",
+		"innerHTML = commandOutput",
+	} {
+		assert.NotContains(t, js, forbidden)
+	}
 }
 
 func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
