@@ -23,207 +23,14 @@ env:
   NODE_VERSION: 20.19.0
 
 jobs:
-  go-quality:
-    name: Go test and vet
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - name: Check out clean source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            go.sum
-            tools/buf/go.sum
-            tools/protoc-gen-connect-go/go.sum
-            tools/protoc-gen-go/go.sum
-            tools/wails/go.sum
-
-      - name: Run Go tests with race detector
-        run: go test -race ./...
-
-      - name: Run Go vet
-        run: go vet ./...
-
-      - name: Verify dependency, license, secret, and pre-cutover legacy diagnostics
-        run: |
-          scripts/dependency-license-check.sh
-          scripts/secret-leak-check.sh --self-test
-          scripts/secret-leak-check.sh
-          scripts/legacy-public-access-check.sh --self-test
-          scripts/legacy-public-access-check.sh --diagnose
-
-  frontend-build:
-    name: Frontend and player clean builds
-    runs-on: macos-15
-    timeout-minutes: 15
-    steps:
-      - name: Check out clean source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            go.sum
-            tools/buf/go.sum
-            tools/protoc-gen-connect-go/go.sum
-            tools/protoc-gen-go/go.sum
-            tools/wails/go.sum
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            frontend/package-lock.json
-            client/package-lock.json
-
-      - name: Install locked frontend dependencies
-        run: npm ci --prefix frontend
-
-      - name: Generate deterministic Wails bindings
-        run: go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean -d frontend/bindings ./...
-
-      - name: Build frontend
-        run: npm run build --prefix frontend
-
-      - name: Install locked player dependencies
-        run: npm ci --prefix client
-
-      - name: Build generated player client
-        run: npm run build --prefix client
-
-  protobuf-contracts:
-    name: Protobuf contract evolution
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - name: Check out clean source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            go.sum
-            tools/buf/go.sum
-            tools/protoc-gen-connect-go/go.sum
-            tools/protoc-gen-go/go.sum
-            tools/wails/go.sum
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install locked schema dependencies
-        run: npm ci --prefix client
-
-      - name: Verify checked-in generated drift is rejected
-        run: scripts/proto-drift-test.sh
-
-      - name: Verify deterministic generated contracts
-        run: |
-          scripts/proto-check.sh
-          git diff --exit-code -- internal/gen client/gen
-
-      - name: Verify compatibility baseline and negative fixtures
-        run: scripts/proto-breaking.sh --all-fixtures
-
-  browser-parity:
-    name: Generated player browser journeys
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - name: Check out clean source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            go.sum
-            tools/buf/go.sum
-            tools/protoc-gen-connect-go/go.sum
-            tools/protoc-gen-go/go.sum
-            tools/wails/go.sum
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            client/package-lock.json
-            tests/browser/package-lock.json
-
-      - name: Install locked browser dependencies
-        run: |
-          npm ci --prefix client
-          npm ci --prefix tests/browser
-
-      - name: Install Playwright Chromium
-        run: npm exec --prefix tests/browser -- playwright install --with-deps chromium
-
-      - name: Run generated Connect browser journeys
-        run: npm test --prefix tests/browser
-
-  startup-contract:
-    name: One-command startup contract
-    runs-on: macos-15
-    timeout-minutes: 10
-    steps:
-      - name: Check out clean source
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            go.sum
-            tools/buf/go.sum
-            tools/protoc-gen-connect-go/go.sum
-            tools/protoc-gen-go/go.sum
-            tools/wails/go.sum
-
-      - name: Verify exact isolated tool pins and root-module drift guards
-        run: |
-          scripts/tool-modules-check.sh
-          scripts/tool-modules-check.sh --self-test
-          scripts/wails-v3-contract-check.sh
-          scripts/wails-v3-contract-check.sh --self-test
-
-      - name: Verify repository-root startup configuration
-        run: go test ./internal/buildtool ./internal/platform -run '^(TestBuildPlanHasOneOrderedOwnerAndNoTaskfileTool|TestPackagePlanCompletesResourcesBeforeFinalSignature|TestWailsV3PinsAndGoBuildToolAreOwnedAndExact|TestWailsV3QuickstartHasOneRootDevelopmentCommand)$' -count=1
-
-  unsigned-arm64-app:
-    name: Unsigned Apple Silicon app
-    needs:
-      - go-quality
-      - frontend-build
-      - protobuf-contracts
-      - browser-parity
-      - startup-contract
+  ci:
+    name: Lint, test, protobuf, and app
     runs-on: macos-15
     timeout-minutes: 30
     env:
       MACOSX_DEPLOYMENT_TARGET: "13.0"
+      CGO_CFLAGS: -mmacosx-version-min=13.0
+      CGO_LDFLAGS: -mmacosx-version-min=13.0
     steps:
       - name: Check out clean source
         uses: actions/checkout@v4
@@ -249,33 +56,27 @@ jobs:
             frontend/package-lock.json
             client/package-lock.json
 
-      - name: Install locked frontend dependencies
-        run: |
-          npm ci --prefix frontend
-          npm ci --prefix client
-
-      - name: Build clean unsigned arm64 application
-        run: scripts/reproducible-build-check.sh
-
-      - name: Verify Apple Silicon application gate
-        shell: bash
+      - name: Lint
         run: |
           set -euo pipefail
-          app_path="build/bin/Fallout Terminal.app"
-          executable_path="${app_path}/Contents/MacOS/Fallout Terminal"
-          test -d "${app_path}"
-          test -x "${executable_path}"
-          lipo -archs "${executable_path}" | grep -qw arm64
-          if codesign -dv --verbose=4 "${app_path}" 2>&1 | grep -q "Authority=Developer ID Application"; then
-            echo "Unexpected Developer ID signature on unsigned CI candidate" >&2
+          unformatted="$(gofmt -l .)"
+          if [[ -n "${unformatted}" ]]; then
+            printf 'Go files need formatting:\n%s\n' "${unformatted}" >&2
             exit 1
           fi
-          scripts/verify-macos-app.sh "${app_path}"
+          go vet ./...
 
-      - name: Upload unsigned Apple Silicon app
-        uses: actions/upload-artifact@v4
-        with:
-          name: fallout-terminal-macos-arm64-unsigned
-          path: build/bin/Fallout Terminal.app
-          if-no-files-found: error
-          retention-days: 14
+      - name: Test
+        run: go test ./...
+
+      - name: Build protobuf
+        run: |
+          npm ci --prefix client
+          go tool -modfile=tools/buf/go.mod buf format proto --diff --exit-code
+          go tool -modfile=tools/buf/go.mod buf lint proto
+          go tool -modfile=tools/buf/go.mod buf build proto >/dev/null
+          scripts/proto-generate.sh
+          git diff --exit-code -- internal/gen client/gen
+
+      - name: Build application
+        run: go run ./cmd/build package

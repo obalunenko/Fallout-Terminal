@@ -208,6 +208,42 @@ func TestReproducibleBuildHashesPackagedExecutableAndUsesQuietToolEnvironments(t
 	assert.Contains(t, protoGenerate, `--no-experimental-webstorage`)
 }
 
+func TestCIRunsOnlyMinimalLintTestProtobufAndApplicationBuild(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	workflow := readAcceptanceDocument(t, filepath.Join(root, ".github", "workflows", "wails-macos.yml"))
+	assert.Equal(t, 1, strings.Count(workflow, "\n    runs-on:"), "CI must use one job")
+	for _, required := range []string{
+		"- name: Lint",
+		"gofmt -l .",
+		"go vet ./...",
+		"- name: Test",
+		"go test ./...",
+		"- name: Build protobuf",
+		"buf format proto --diff --exit-code",
+		"buf lint proto",
+		"buf build proto",
+		"scripts/proto-generate.sh",
+		"git diff --exit-code -- internal/gen client/gen",
+		"- name: Build application",
+		"go run ./cmd/build package",
+	} {
+		assert.Contains(t, workflow, required)
+	}
+	for _, forbidden := range []string{
+		"go test -race",
+		"tests/browser",
+		"reproducible-build-check.sh",
+		"secret-leak-check.sh",
+		"legacy-public-access-check.sh",
+		"proto-breaking.sh",
+		"actions/upload-artifact",
+	} {
+		assert.NotContains(t, workflow, forbidden)
+	}
+}
+
 func TestWailsV3RollbackRecordHasIdentitySafetyTriggersAndHonestEvidenceFields(t *testing.T) {
 	t.Parallel()
 

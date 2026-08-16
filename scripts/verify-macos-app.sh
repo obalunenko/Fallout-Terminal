@@ -21,7 +21,7 @@ require_command() {
 
 [[ "$#" -le 1 ]] || fail 'usage: scripts/verify-macos-app.sh [APP_PATH]'
 [[ "$(uname -s)" == Darwin ]] || fail 'verification requires macOS'
-for command in codesign lipo otool plutil rg shasum strings; do
+for command in codesign grep lipo otool plutil shasum strings; do
   require_command "${command}"
 done
 
@@ -54,7 +54,7 @@ grep -Fq '/System/Library/Frameworks/CoreFoundation.framework/' <<<"${linked_fra
 bundled_provider="$(find "${app_path}/Contents" -type f \( -iname 'ngrok' -o -iname 'ngrok.exe' -o -iname 'ngrok-*' \) -print -quit 2>/dev/null || true)"
 [[ -z "${bundled_provider}" ]] || fail 'application bundle contains a provider executable'
 legacy_runtime_markers='NGROK_''BIN|fallout-terminal\.''ngrok\.app|tunnel-''guardian'
-if strings "${executable_path}" | rg -q "${legacy_runtime_markers}"; then
+if strings "${executable_path}" | grep -Eq "${legacy_runtime_markers}"; then
   fail 'application executable contains a legacy CLI, PATH, guardian, or shared-domain runtime marker'
 fi
 
@@ -69,7 +69,7 @@ done
 
 for distribution in "${repository_root}/frontend/dist" "${repository_root}/client/dist"; do
   [[ -s "${distribution}/index.html" ]] || fail "offline distribution is incomplete: ${distribution}"
-  if rg -n 'https://cdn\.|http://localhost:|http://127\.0\.0\.1:5173|@vite/client|frontend/wailsjs|window\.(go|runtime)' "${distribution}"; then
+  if grep -ERIn 'https://cdn\.|http://localhost:|http://127\.0\.0\.1:5173|@vite/client|frontend/wailsjs|window\.(go|runtime)' "${distribution}"; then
     fail "offline distribution contains a development, CDN, or legacy runtime dependency: ${distribution}"
   fi
 done

@@ -21,31 +21,32 @@ scan_tree() {
     return 1
   fi
 
-  matches="$(find "${root}" \( -path '*/.git' -o -path '*/node_modules' -o -path '*/specs' \) -prune -o -type f -name '*.go' ! -name '*_test.go' -print0 \
-    | xargs -0 rg -n 'github\.com/wailsapp/wails/v2|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' || true)"
+  matches="$(find "${root}" \( -path '*/.git' -o -path '*/node_modules' -o -path '*/specs' \) -prune -o -type f -name '*.go' ! -name '*_test.go' \
+    -exec grep -EnH 'github\.com/wailsapp/wails/v2|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' {} + || true)"
   [[ -z "${matches}" ]] || { printf '%s\n' "${matches}" >&2; fail 'active Go source contains v2 or dual-runtime code'; return 1; }
 
-  if rg -n 'github\.com/wailsapp/wails/v2' "${root}/go.mod" "${root}/go.sum"; then
+  if grep -En 'github\.com/wailsapp/wails/v2' "${root}/go.mod" "${root}/go.sum"; then
     fail 'application module still resolves Wails v2'
     return 1
   fi
 
-  matches="$(rg -n 'frontend/wailsjs|window\.(go|runtime)|electronAPI|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' \
+  matches="$(grep -ERIn 'frontend/wailsjs|window\.(go|runtime)|electronAPI|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' \
     "${root}/frontend/src" "${root}/frontend/bindings" "${root}/frontend/dist" 2>/dev/null || true)"
   [[ -z "${matches}" ]] || { printf '%s\n' "${matches}" >&2; fail 'frontend source/generated/bundle contains a v2 global or dual-runtime fallback'; return 1; }
 
-  matches="$(rg -n --hidden \
-    -g '!wails-v3-cutover-check.sh' -g '!wails-bindings-check.sh' -g '!verify-macos-app.sh' \
-    -g '!wails-v3-contract-check.sh' -g '!tool-modules-check.sh' \
-    'go[[:space:]]+install[[:space:]]+github\.com/wailsapp/wails|(^|[[:space:]`;&|])wails[[:space:]]+(dev|build|generate)([[:space:]]|$)|@wailsio/runtime[^\n]*(latest|\^|~|\*)|github\.com/wailsapp/wails/v3@latest' \
-    "${root}/README.md" "${root}/scripts" "${root}/.github/workflows" 2>/dev/null || true)"
+  matches="$(find "${root}/README.md" "${root}/scripts" "${root}/.github/workflows" -type f \
+    ! -name 'wails-v3-cutover-check.sh' ! -name 'wails-bindings-check.sh' ! -name 'verify-macos-app.sh' \
+    ! -name 'wails-v3-contract-check.sh' ! -name 'tool-modules-check.sh' \
+    -exec grep -EnH \
+      'go[[:space:]]+install[[:space:]]+github\.com/wailsapp/wails|(^|[[:space:]`;&|])wails[[:space:]]+(dev|build|generate)([[:space:]]|$)|@wailsio/runtime.*(latest|\^|~|\*)|github\.com/wailsapp/wails/v3@latest' \
+      {} + 2>/dev/null || true)"
   [[ -z "${matches}" ]] || { printf '%s\n' "${matches}" >&2; fail 'active command/documentation uses v2, global, or floating Wails resolution'; return 1; }
 
   [[ -f "${root}/specs/001-wails-v2-migration/spec.md" ]] || { fail 'historical Wails v2 spec is missing'; return 1; }
   [[ -f "${root}/docs/wails-migration-rollback.md" ]] || { fail 'historical Electron-to-Wails rollback record is missing'; return 1; }
-  rg -q 'specs/006-wails-v3-migration/quickstart\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 quickstart'; return 1; }
-  rg -q 'docs/wails-v3-migration-rollback\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 rollback record'; return 1; }
-  rg -qi 'histor' "${root}/README.md" || { fail 'README does not identify earlier migration records as history'; return 1; }
+  grep -Eq 'specs/006-wails-v3-migration/quickstart\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 quickstart'; return 1; }
+  grep -Eq 'docs/wails-v3-migration-rollback\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 rollback record'; return 1; }
+  grep -Eqi 'histor' "${root}/README.md" || { fail 'README does not identify earlier migration records as history'; return 1; }
 }
 
 self_test() {
@@ -94,7 +95,7 @@ case "${1:-}" in
     "${repository_root}/scripts/tool-modules-check.sh"
     "${repository_root}/scripts/wails-bindings-check.sh"
     git -C "${repository_root}" diff --exit-code -- specs/001-wails-v2-migration docs/wails-migration-rollback.md
-    if go -C "${repository_root}" list -m all | rg -n '^github\.com/wailsapp/wails/v2([[:space:]]|$)'; then
+    if go -C "${repository_root}" list -m all | grep -En '^github\.com/wailsapp/wails/v2([[:space:]]|$)'; then
       fail 'resolved module graph still contains Wails v2'
       exit 1
     fi

@@ -1692,6 +1692,7 @@ func TestMacOSPackageVerificationCoversResourcesSignatureAndCanonicalIdentity(t 
 	} {
 		assert.Contains(t, verify, required)
 	}
+	assert.NotRegexp(t, regexp.MustCompile(`(^|[[:space:];|&])rg([[:space:]]|$)`), verify)
 
 	hashRaw, err := os.ReadFile(filepath.Join(root, "scripts", "hash-macos-app.sh"))
 	require.NoError(t, err)
@@ -1729,6 +1730,7 @@ func TestActiveWailsV3DocumentsStaySeparateFromHistoricalEvidence(t *testing.T) 
 	} {
 		assert.Contains(t, scanner, required)
 	}
+	assert.NotRegexp(t, regexp.MustCompile(`(^|[[:space:];|&])rg([[:space:]]|$)`), scanner)
 }
 
 func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
