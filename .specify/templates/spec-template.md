@@ -66,7 +66,7 @@ crosses the Wails/Go, HTTP, or WebSocket boundary.
 - How do multiple connected players remain synchronized and respect controller authority?
 - How are malformed, stale, duplicate, oversized, or unexpected Wails/WebSocket inputs handled?
 - What happens when persistent JSON is missing a new field, references another file, or uses an older version?
-- What happens when filesystem, player-server startup, packaging, or ngrok operations fail?
+- What happens when filesystem, player-server startup, packaging, or an optional public provider fails?
 - [Feature-specific boundary, concurrency, or error case]
 
 ## Requirements *(mandatory)*
@@ -90,7 +90,7 @@ Mark material ambiguity inline, for example:
 - **Domain and canonical state (`internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, `internal/control/`)**: [Affected/not affected — models, validation, state transitions, coordination, or public projections]
 - **Persistence (`internal/session/`, `internal/playerconfig/`, `sessions/`)**: [Affected/not affected — JSON shape, validation, file references, storage behavior, or examples]
 - **Player transport (`internal/player/`)**: [Affected/not affected — HTTP routes, WebSocket protocol, validation, broadcast, or reconnect behavior]
-- **Platform and public access (`internal/platform/`, `internal/tunnel/`)**: [Affected/not affected — macOS paths, desktop operations, owned processes, or ngrok behavior]
+- **Platform and public access (`internal/platform/`, `internal/tunnel/`)**: [Affected/not affected — macOS paths, desktop operations, embedded endpoint ownership, Keychain secrets, or provider behavior]
 - **Master UI (`frontend/src/`)**: [Affected/not affected — game-master editing/control workflow or Wails bridge consumer]
 - **Player UI (`client/`)**: [Affected/not affected — browser behavior, presentation, audio, or WebSocket consumer]
 - **Tests and fixtures (`internal/**/*_test.go`, `tests/browser/`, `internal/testutil/`)**: [Affected/not affected — automated coverage or fixtures]
@@ -109,7 +109,7 @@ Mark material ambiguity inline, for example:
 
 - [Wails method exposure, CSP, external URL, filesystem path, or untrusted payload validation]
 - [WebSocket origin, input-size, authorization, or public-projection implications]
-- [ngrok authentication, credentials, owned process, and temporary-file handling]
+- [Public-endpoint authentication, Keychain-backed credentials, embedded resource ownership, and ephemeral-secret handling]
 - [Data that MUST remain server-side, process-local, or user-controlled]
 
 ### Verification Requirements *(mandatory)*
@@ -117,7 +117,7 @@ Mark material ambiguity inline, for example:
 - **Go tests**: [Affected packages and observable behavior, or N/A]
 - **Race testing**: [Affected concurrent services and required command, or N/A]
 - **Browser tests**: [Playwright journey under `tests/browser/`, or N/A]
-- **Interactive verification**: [Affected `wails dev` master/player journey]
+- **Interactive verification**: [Affected `go run ./cmd/build dev` master/player journey]
 - **Packaging/release verification**: [arm64 app, signing/notarization, or N/A]
 
 No numeric coverage threshold or repository-wide linter is currently defined.
@@ -147,7 +147,7 @@ Specify concrete behavioral checks rather than inventing either gate.
 - [Assumption about the game-master/player environment or local network]
 - [Assumption about compatible session or player-configuration versions]
 - [Assumption about connected-player count or supported macOS profile]
-- [Dependency on existing Wails, Go service, browser, or ngrok behavior]
+- [Dependency on existing Wails, Go service, browser, or optional public-provider behavior]
 
 ## Out of Scope
 

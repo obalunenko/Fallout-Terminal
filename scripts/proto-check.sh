@@ -5,6 +5,9 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 export BUF_CACHE_DIR="${BUF_CACHE_DIR:-${TMPDIR:-/tmp}/fallout-terminal-buf-cache}"
 export GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/fallout-terminal-go-cache}"
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+export CGO_CFLAGS="${CGO_CFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"
+export CGO_LDFLAGS="${CGO_LDFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"
 
 generated_revision() {
   find internal/gen client/gen -type f -print \
@@ -14,12 +17,9 @@ generated_revision() {
     | awk '{print $1}'
 }
 
-(
-  cd proto
-  go tool buf format --diff --exit-code
-  go tool buf lint
-  go tool buf build >/dev/null
-)
+go tool -modfile=tools/buf/go.mod buf format proto --diff --exit-code
+go tool -modfile=tools/buf/go.mod buf lint proto
+go tool -modfile=tools/buf/go.mod buf build proto >/dev/null
 
 checked_in_revision="$(generated_revision)"
 scripts/proto-generate.sh
@@ -56,12 +56,12 @@ if [[ -e proto/toolchain.env || -e scripts/ensure-protoc.sh ]]; then
   printf 'standalone protoc distribution metadata remains in the repository\n' >&2
   exit 1
 fi
-if rg -n 'ensure-protoc\.sh|proto/toolchain\.env|libprotoc 35\.0|protoc v7\.35\.0' scripts/proto-generate.sh .github/workflows/wails-macos.yml; then
+if grep -En 'ensure-protoc\.sh|proto/toolchain\.env|libprotoc 35\.0|protoc v7\.35\.0' scripts/proto-generate.sh .github/workflows/wails-macos.yml; then
   printf 'an active generation or CI path still requires standalone protoc\n' >&2
   exit 1
 fi
 
-if rg -n 'fallout/terminal/(private|persistence|config)/' proto/fallout/terminal/player client/gen; then
+if grep -ERn 'fallout/terminal/(private|persistence|config)/' proto/fallout/terminal/player client/gen; then
   printf 'the public descriptor or browser graph imports a non-public contract\n' >&2
   exit 1
 fi
@@ -75,7 +75,7 @@ go test ./internal/session ./internal/playerconfig
 go test ./internal/platform -run '^TestProtobuf'
 go test . -run '^TestPrivate'
 npm run build --prefix client
-if rg -n 'fallout\.terminal\.(private|persistence|config)|internal/gen/fallout/terminal/(private|persistence|config)' client/dist; then
+if grep -ERn 'fallout\.terminal\.(private|persistence|config)|internal/gen/fallout/terminal/(private|persistence|config)' client/dist; then
   printf 'the browser bundle contains a private contract reference\n' >&2
   exit 1
 fi

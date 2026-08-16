@@ -132,6 +132,67 @@ test('three tabs share one recognition handle and converge after one generated s
   await context.close();
 });
 
+test('four through seven generated players converge across mixed navigation, reconnect, replay, and sound-safe state', async ({ browser, request }) => {
+  let acceptedActions = 0;
+  let reconnects = 0;
+
+  for (let playerCount = 4; playerCount <= 7; playerCount += 1) {
+    const reset = await request.post('/__fixture/reset');
+    expect(reset.status()).toBe(204);
+    const contexts = await Promise.all(Array.from({ length: playerCount }, () => browser.newContext()));
+    await Promise.all(contexts.map(context => installPlayerDiagnostics(context)));
+    const pages = await Promise.all(contexts.map(context => context.newPage()));
+    await Promise.all(pages.map(page => page.goto('/')));
+    await Promise.all(pages.map(page => expect(page.locator('#connOverlay')).toBeHidden()));
+
+    const handles = await Promise.all(pages.map(page => page.evaluate(key => localStorage.getItem(key), TOKEN_KEY)));
+    expect(new Set(handles).size).toBe(playerCount);
+    const characters = [];
+    for (const page of pages) characters.push(await selectFirstAvailable(page));
+    expect(new Set(characters).size).toBe(playerCount);
+    await expect(pages[0].locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+    await Promise.all(pages.slice(1).map(page => expect(page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ')));
+    const observerRequests = typedPlayerRequests(pages[1]);
+
+    for (let round = 0; round < 4; round += 1) {
+      await pages[0].locator('.term-row', { hasText: 'DOCS' }).click();
+      await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible()));
+      acceptedActions += 1;
+
+      const observerRequestCount = observerRequests.length;
+      await pages[1].locator('#backBtn').click({ force: true });
+      expect(observerRequests.length).toBe(observerRequestCount);
+      await pages[0].locator('#backBtn').click();
+      await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'DOCS' })).toBeVisible()));
+      acceptedActions += 1;
+    }
+
+    if (reconnects < 3) {
+      const page = pages[reconnects % playerCount];
+      const handle = await page.evaluate(key => localStorage.getItem(key), TOKEN_KEY);
+      await page.reload();
+      await expect(page.locator('#connOverlay')).toBeHidden();
+      expect(await page.evaluate(key => localStorage.getItem(key), TOKEN_KEY)).toBe(handle);
+      expect(await page.evaluate(() => window.__audioStarts || 0)).toBe(0);
+      reconnects += 1;
+    }
+
+    for (const page of pages) {
+      const storage = await page.evaluate(() => Object.fromEntries(
+        Array.from({ length: localStorage.length }, (_, index) => {
+          const key = localStorage.key(index);
+          return [key, localStorage.getItem(key)];
+        }),
+      ));
+      expect(Object.keys(storage)).toEqual([TOKEN_KEY]);
+    }
+    await Promise.all(contexts.map(context => context.close()));
+  }
+
+  expect(acceptedActions).toBeGreaterThanOrEqual(25);
+  expect(reconnects).toBe(3);
+});
+
 test('recognized reload retains identity while an unknown opaque handle receives a safe replacement', async ({ browser, page }) => {
   await openPlayer(page);
   const handle = await page.evaluate(key => localStorage.getItem(key), TOKEN_KEY);

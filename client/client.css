@@ -69,7 +69,7 @@ html, body {
 .scanlines {
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: inherit;
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
@@ -84,7 +84,7 @@ html, body {
 .vignette {
   position: absolute;
   inset: 0;
-  border-radius: 14px;
+  border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
 }

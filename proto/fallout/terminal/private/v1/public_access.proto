@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package fallout.terminal.private.v1;
+
+import "fallout/terminal/config/v1/public_access.proto";
+
+option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1";
+
+enum PublicAccessLifecycleState {
+  PUBLIC_ACCESS_LIFECYCLE_STATE_UNSPECIFIED = 0;
+  PUBLIC_ACCESS_LIFECYCLE_STATE_DISABLED = 1;
+  PUBLIC_ACCESS_LIFECYCLE_STATE_STARTING = 2;
+  PUBLIC_ACCESS_LIFECYCLE_STATE_READY = 3;
+  PUBLIC_ACCESS_LIFECYCLE_STATE_STOPPING = 4;
+  PUBLIC_ACCESS_LIFECYCLE_STATE_FAILED = 5;
+}
+
+enum SecretPresence {
+  SECRET_PRESENCE_UNSPECIFIED = 0;
+  SECRET_PRESENCE_ABSENT = 1;
+  SECRET_PRESENCE_PRESENT = 2;
+  SECRET_PRESENCE_UNKNOWN = 3;
+}
+
+enum PublicAccessErrorCategory {
+  PUBLIC_ACCESS_ERROR_CATEGORY_UNSPECIFIED = 0;
+  PUBLIC_ACCESS_ERROR_CATEGORY_VALIDATION = 1;
+  PUBLIC_ACCESS_ERROR_CATEGORY_SETTINGS_CORRUPT = 2;
+  PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_LOCKED = 3;
+  PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_DENIED = 4;
+  PUBLIC_ACCESS_ERROR_CATEGORY_SECRET_STORE_UNAVAILABLE = 5;
+  PUBLIC_ACCESS_ERROR_CATEGORY_CREDENTIAL_MISSING = 6;
+  PUBLIC_ACCESS_ERROR_CATEGORY_PROVIDER_AUTHENTICATION = 7;
+  PUBLIC_ACCESS_ERROR_CATEGORY_DOMAIN_UNAVAILABLE = 8;
+  PUBLIC_ACCESS_ERROR_CATEGORY_NETWORK_UNAVAILABLE = 9;
+  PUBLIC_ACCESS_ERROR_CATEGORY_TIMEOUT = 10;
+  PUBLIC_ACCESS_ERROR_CATEGORY_PROVIDER_FAILURE = 11;
+  PUBLIC_ACCESS_ERROR_CATEGORY_SHUTDOWN_TIMEOUT = 12;
+  PUBLIC_ACCESS_ERROR_CATEGORY_CONFLICT = 13;
+}
+
+message PublicAccessStatus {
+  PublicAccessLifecycleState state = 1;
+  uint64 generation = 2;
+  uint64 settings_revision = 3;
+  optional string public_url = 4;
+  PublicAccessErrorCategory error_category = 5;
+  optional string error_message = 6;
+}
+
+message PublicAccessSnapshot {
+  fallout.terminal.config.v1.PublicAccessPreferences preferences = 1;
+  SecretPresence provider_token_presence = 2;
+  SecretPresence player_password_presence = 3;
+  PublicAccessStatus status = 4;
+}
+
+message GetPublicAccessRequest {}
+
+message PublicAccessStatusEvent {
+  PublicAccessSnapshot snapshot = 1;
+}
+
+message PublicAccessCommandResult {
+  bool ok = 1;
+  optional string error = 2;
+  PublicAccessSnapshot snapshot = 3;
+}
+
+message SavePublicAccessSettingsRequest {
+  uint64 expected_revision = 1;
+  bool enabled_preference = 2;
+  optional string reserved_domain = 3;
+  string username = 4;
+  oneof provider_token_change {
+    string replacement_provider_token = 5;
+    bool delete_provider_token = 6;
+  }
+  oneof player_password_change {
+    string replacement_player_password = 7;
+    bool delete_player_password = 8;
+  }
+}
+
+message GeneratePlayerPasswordRequest {
+  uint64 expected_revision = 1;
+}
+
+message GeneratedPlayerPasswordResult {
+  bool ok = 1;
+  optional string error = 2;
+  optional string generated_password = 3;
+  uint64 settings_revision = 4;
+}
+
+message PublicAccessCommandRequest {
+  uint64 expected_revision = 1;
+}

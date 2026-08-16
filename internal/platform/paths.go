@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
@@ -16,6 +17,7 @@ const (
 	productDirectoryName     = "Fallout Terminal"
 	bundledSessionsDirectory = "sessions"
 	bundledDemoFilename      = "demo.json"
+	publicAccessFilename     = "public-access.json"
 )
 
 // SessionLocations separates user-owned session documents, the immutable
@@ -27,6 +29,16 @@ type SessionLocations struct {
 	DocumentsDefault   string
 	BundledDemo        string
 	ApplicationSupport string
+}
+
+// PublicAccessSettingsPath resolves the separate version-1 non-secret settings file.
+// It has no filesystem side effects and never points into session or player-config storage.
+func PublicAccessSettingsPath(applicationSupportDirectory string) (string, error) {
+	directory, err := cleanAbsolutePath("application support directory", applicationSupportDirectory)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(directory, publicAccessFilename), nil
 }
 
 // DefaultSessionLocations resolves locations for the current user beneath
@@ -69,4 +81,31 @@ func cleanAbsolutePath(name, path string) (string, error) {
 		return "", fmt.Errorf("%s must be absolute", name)
 	}
 	return cleaned, nil
+}
+
+// dialogLocation resolves a suggested native-dialog location without creating
+// directories. Missing paths fall back to the nearest existing ancestor.
+func dialogLocation(path string, pathIncludesFilename bool) (directory, filename string) {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if path == "." || path == "" {
+		return "", ""
+	}
+	if pathIncludesFilename {
+		directory = filepath.Dir(path)
+		filename = filepath.Base(path)
+	} else {
+		directory = path
+	}
+	for directory != "" && directory != "." {
+		info, err := os.Stat(directory)
+		if err == nil && info.IsDir() {
+			return directory, filename
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			break
+		}
+		directory = parent
+	}
+	return "", filename
 }

@@ -20,7 +20,7 @@
 
 **Testing**: Colocated Go `*_test.go` tests with deterministic fakes; Playwright specs under `tests/browser/*.spec.mjs`; no numeric coverage threshold or repository-wide linter detected
 
-**Target Platform**: Wails desktop application on macOS 13+ / Apple Silicon (`arm64`), with modern browser clients on the local network or an authenticated ngrok endpoint
+**Target Platform**: Wails desktop application on macOS 13+ / Apple Silicon (`arm64`), with modern browser clients on the local network or an authenticated public endpoint
 
 **Project Type**: Go modular desktop monolith with a Wails master frontend and embedded HTTP/WebSocket player frontend
 
@@ -37,7 +37,7 @@
 - [ ] Runtime ownership remains within `main.go`/`app.go`, the relevant `internal/` packages, `frontend/src/`, `client/`, and `sessions/` boundaries.
 - [ ] Cross-boundary Wails, HTTP, and WebSocket contracts document producer, consumer, payload, validation, failure, ordering, and reconnect behavior.
 - [ ] Shared navigation, hacking, roster, and controller behavior remains server-authoritative and reconnect-safe.
-- [ ] Wails method exposure, CSP, external URL handling, WebSocket origin/input checks, and ngrok credential protections are preserved where applicable.
+- [ ] Wails method exposure, CSP, external URL handling, player-origin/input checks, and public-access secret protections are preserved where applicable.
 - [ ] Session or player-configuration changes define versioning, defaults, references, migration, and backward compatibility.
 - [ ] Runtime-only state remains outside persistent JSON unless persistence is explicitly approved.
 - [ ] New dependencies or structural changes have a concrete, documented need and reproducible pinning.
@@ -74,7 +74,7 @@ internal/
 ├── playerconfig/               # Player configuration persistence and references
 ├── player/                     # HTTP assets, WebSocket server, public protocol
 ├── platform/                   # Wails desktop adapter and macOS paths
-├── tunnel/                     # Optional ngrok process and policy lifecycle
+├── tunnel/                     # Optional embedded public-endpoint lifecycle
 └── testutil/                   # Shared deterministic test fakes and fixtures
 frontend/
 ├── src/
@@ -123,7 +123,7 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 
 ### Platform, Tunnel, and Packaging
 
-[Describe macOS paths/dialogs, owned processes, credentials, temporary material, embedding, build, or release implications, or N/A]
+[Describe macOS paths/dialogs, embedded provider resources, Keychain-backed secrets, temporary material, embedding, build, or release implications, or N/A]
 
 ## Implementation Phases
 
@@ -158,7 +158,7 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 
 - [Verify multi-client synchronization, reconnection, persistence, security, and shutdown]
 - [Verify Vite embedding and Wails startup/build behavior]
-- [Verify ngrok or signed-release behavior only when affected and the environment is available]
+- [Verify credential-gated public-provider or signed-release behavior only when affected and prerequisites are available]
 
 ## Verification Plan
 
@@ -167,14 +167,14 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 | Go domain/services | `go test ./...` | [Focused scenario if needed] | [Result] |
 | Concurrent runtime | `go test -race ./...` when affected | [Stress/reconnect scenario] | [Result] |
 | Go quality | `gofmt -l .` and `go vet ./...` | N/A | No formatting paths; vet succeeds |
-| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `wails dev` + [game-master journey] | [Result] |
+| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `go run ./cmd/build dev` + [game-master journey] | [Result] |
 | Player browser(s) | `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected | [Multi-client/audio/reconnect journey] | [Result] |
-| Unsigned package | `wails build -clean -platform darwin/arm64` when affected | [Packaged `.app` smoke] | [Result] |
-| Signed release/ngrok | [Configured preflight or N/A] | [Credential-dependent journey] | [Result or explicitly unavailable] |
+| Unsigned package | `go run ./cmd/build package` when affected | [Packaged `.app` smoke] | [Result] |
+| Signed release/public provider | [Configured preflight or N/A] | [Credential-dependent journey] | [Result or explicitly unavailable] |
 
 ## Project-Specific Complexity Factors
 
-- Concurrent lifecycle and shutdown across Wails, persistence workers, HTTP/WebSocket clients, and optional tunnel processes
+- Concurrent lifecycle and shutdown across Wails, persistence workers, HTTP/ConnectRPC clients, and optional embedded public endpoints
 - Server-authoritative state projections shared across master and player presentation surfaces
 - Backward-compatible user-owned JSON files and cross-file player-configuration references
 - Browser identity, multi-tab recognition, controller authority, revisions, and reconnect convergence

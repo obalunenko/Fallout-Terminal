@@ -4,8 +4,8 @@ package testutil
 import (
 	"context"
 	"io/fs"
-	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 )
@@ -16,6 +16,7 @@ type FakeClock struct {
 	mu     sync.Mutex
 	now    time.Time
 	sleeps []time.Duration
+	timers []fakeClockTimer
 }
 
 // NewFakeClock returns a clock initialized to now.
@@ -35,6 +36,7 @@ func (c *FakeClock) Advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.now = c.now.Add(d)
+	c.fireTimersLocked()
 }
 
 // Sleep records d and advances the clock by that duration without blocking.
@@ -43,6 +45,7 @@ func (c *FakeClock) Sleep(d time.Duration) {
 	defer c.mu.Unlock()
 	c.sleeps = append(c.sleeps, d)
 	c.now = c.now.Add(d)
+	c.fireTimersLocked()
 }
 
 // SleepCalls returns a copy of the durations passed to Sleep.
@@ -78,6 +81,8 @@ type FakeFileSystem struct {
 
 	files map[string][]byte
 	dirs  map[string]fs.FileMode
+	modes map[string]fs.FileMode
+	temps int
 
 	ReadErrors   map[string]error
 	WriteErrors  map[string]error
@@ -97,6 +102,7 @@ func NewFakeFileSystem() *FakeFileSystem {
 	return &FakeFileSystem{
 		files:        make(map[string][]byte),
 		dirs:         make(map[string]fs.FileMode),
+		modes:        make(map[string]fs.FileMode),
 		ReadErrors:   make(map[string]error),
 		WriteErrors:  make(map[string]error),
 		RenameErrors: make(map[string]error),
@@ -157,6 +163,10 @@ func (f *FakeFileSystem) Rename(oldPath, newPath string) error {
 	}
 	f.files[newPath] = data
 	delete(f.files, oldPath)
+	if mode, ok := f.modes[oldPath]; ok {
+		f.modes[newPath] = mode
+		delete(f.modes, oldPath)
+	}
 	return nil
 }
 
@@ -208,6 +218,30 @@ func (f *FakeFileSystem) File(path string) ([]byte, bool) {
 	return append([]byte(nil), data...), ok
 }
 
+// Mode returns the most recently applied mode for a fake file or directory.
+func (f *FakeFileSystem) Mode(path string) (fs.FileMode, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.ensureMaps()
+	mode, ok := f.modes[path]
+	if !ok {
+		mode, ok = f.dirs[path]
+	}
+	return mode, ok
+}
+
+// Paths returns all fake file paths in stable order.
+func (f *FakeFileSystem) Paths() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	paths := make([]string, 0, len(f.files))
+	for path := range f.files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 // ReadCalls returns paths passed to ReadFile in call order.
 func (f *FakeFileSystem) ReadCalls() []string {
 	f.mu.Lock()
@@ -254,6 +288,9 @@ func (f *FakeFileSystem) ensureMaps() {
 	}
 	if f.dirs == nil {
 		f.dirs = make(map[string]fs.FileMode)
+	}
+	if f.modes == nil {
+		f.modes = make(map[string]fs.FileMode)
 	}
 	if f.ReadErrors == nil {
 		f.ReadErrors = make(map[string]error)
@@ -334,110 +371,6 @@ func (b *FakeBrowser) URLs() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]string(nil), b.urls...)
-}
-
-// ProcessStart records one process start request.
-type ProcessStart struct {
-	Name string
-	Args []string
-}
-
-// FakeProcessRunner returns a configured FakeProcess and records start calls.
-type FakeProcessRunner struct {
-	mu sync.Mutex
-
-	Process  *FakeProcess
-	StartErr error
-	starts   []ProcessStart
-}
-
-// Start records a process request. It returns a fresh FakeProcess when Process
-// has not been configured.
-func (r *FakeProcessRunner) Start(_ context.Context, name string, args ...string) (*FakeProcess, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.starts = append(r.starts, ProcessStart{Name: name, Args: append([]string(nil), args...)})
-	if r.StartErr != nil {
-		return nil, r.StartErr
-	}
-	if r.Process == nil {
-		r.Process = NewFakeProcess()
-	}
-	return r.Process, nil
-}
-
-// StartCalls returns process starts in call order.
-func (r *FakeProcessRunner) StartCalls() []ProcessStart {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := make([]ProcessStart, len(r.starts))
-	for i, call := range r.starts {
-		result[i] = ProcessStart{Name: call.Name, Args: append([]string(nil), call.Args...)}
-	}
-	return result
-}
-
-// FakeProcess is a controllable process handle with deterministic Wait, Signal,
-// and Kill behavior.
-type FakeProcess struct {
-	mu sync.Mutex
-
-	WaitErr   error
-	SignalErr error
-	KillErr   error
-	waited    int
-	signals   []os.Signal
-	killed    int
-}
-
-// NewFakeProcess returns an idle fake process.
-func NewFakeProcess() *FakeProcess {
-	return &FakeProcess{}
-}
-
-// Wait records the call and returns WaitErr immediately.
-func (p *FakeProcess) Wait() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.waited++
-	return p.WaitErr
-}
-
-// Signal records signal and returns SignalErr.
-func (p *FakeProcess) Signal(signal os.Signal) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.signals = append(p.signals, signal)
-	return p.SignalErr
-}
-
-// Kill records the call and returns KillErr.
-func (p *FakeProcess) Kill() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.killed++
-	return p.KillErr
-}
-
-// WaitCalls returns the number of Wait calls.
-func (p *FakeProcess) WaitCalls() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.waited
-}
-
-// Signals returns signals in call order.
-func (p *FakeProcess) Signals() []os.Signal {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return append([]os.Signal(nil), p.signals...)
-}
-
-// KillCalls returns the number of Kill calls.
-func (p *FakeProcess) KillCalls() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.killed
 }
 
 // FakePlayerServer is a typed lifecycle fake. Info may be instantiated with the

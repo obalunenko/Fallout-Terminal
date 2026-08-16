@@ -8,11 +8,262 @@ import (
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	privatev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
+	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 )
 
 // The private protobuf graph governs trusted desktop semantics only. These
 // adapters are invoked inside App while Wails continues carrying the existing
 // native DTOs; no protobuf bytes, ProtoJSON, or generic envelope crosses Wails.
+
+func routeSavePublicAccessSettingsRequest(payload SavePublicAccessSettingsPayload) (SavePublicAccessSettingsPayload, error) {
+	if payload.ReplacementProviderToken != "" && payload.DeleteProviderToken {
+		return SavePublicAccessSettingsPayload{}, fmt.Errorf("provider credential change is ambiguous")
+	}
+	if payload.ReplacementPlayerPassword != "" && payload.DeletePlayerPassword {
+		return SavePublicAccessSettingsPayload{}, fmt.Errorf("player credential change is ambiguous")
+	}
+	semantic := &privatev1.SavePublicAccessSettingsRequest{
+		ExpectedRevision: payload.ExpectedRevision, EnabledPreference: payload.EnabledPreference,
+		Username: payload.Username,
+	}
+	if payload.ReservedDomain != "" {
+		domain := payload.ReservedDomain
+		semantic.ReservedDomain = &domain
+	}
+	switch {
+	case payload.ReplacementProviderToken != "":
+		semantic.ProviderTokenChange = &privatev1.SavePublicAccessSettingsRequest_ReplacementProviderToken{ReplacementProviderToken: payload.ReplacementProviderToken}
+	case payload.DeleteProviderToken:
+		semantic.ProviderTokenChange = &privatev1.SavePublicAccessSettingsRequest_DeleteProviderToken{DeleteProviderToken: true}
+	}
+	switch {
+	case payload.ReplacementPlayerPassword != "":
+		semantic.PlayerPasswordChange = &privatev1.SavePublicAccessSettingsRequest_ReplacementPlayerPassword{ReplacementPlayerPassword: payload.ReplacementPlayerPassword}
+	case payload.DeletePlayerPassword:
+		semantic.PlayerPasswordChange = &privatev1.SavePublicAccessSettingsRequest_DeletePlayerPassword{DeletePlayerPassword: true}
+	}
+	routed := SavePublicAccessSettingsPayload{
+		ExpectedRevision: semantic.GetExpectedRevision(), EnabledPreference: semantic.GetEnabledPreference(),
+		ReservedDomain: semantic.GetReservedDomain(), Username: semantic.GetUsername(),
+	}
+	switch change := semantic.ProviderTokenChange.(type) {
+	case nil:
+	case *privatev1.SavePublicAccessSettingsRequest_ReplacementProviderToken:
+		routed.ReplacementProviderToken = change.ReplacementProviderToken
+	case *privatev1.SavePublicAccessSettingsRequest_DeleteProviderToken:
+		routed.DeleteProviderToken = change.DeleteProviderToken
+	default:
+		return SavePublicAccessSettingsPayload{}, fmt.Errorf("unsupported provider credential change")
+	}
+	switch change := semantic.PlayerPasswordChange.(type) {
+	case nil:
+	case *privatev1.SavePublicAccessSettingsRequest_ReplacementPlayerPassword:
+		routed.ReplacementPlayerPassword = change.ReplacementPlayerPassword
+	case *privatev1.SavePublicAccessSettingsRequest_DeletePlayerPassword:
+		routed.DeletePlayerPassword = change.DeletePlayerPassword
+	default:
+		return SavePublicAccessSettingsPayload{}, fmt.Errorf("unsupported player credential change")
+	}
+	return routed, nil
+}
+
+func routePublicAccessCommandRequest(payload PublicAccessCommandPayload) PublicAccessCommandPayload {
+	semantic := &privatev1.PublicAccessCommandRequest{ExpectedRevision: payload.ExpectedRevision}
+	return PublicAccessCommandPayload{ExpectedRevision: semantic.GetExpectedRevision()}
+}
+
+func publicAccessSnapshotToPrivate(snapshot tunnelservice.PublicAccessSnapshot) *privatev1.PublicAccessSnapshot {
+	return &privatev1.PublicAccessSnapshot{
+		Preferences:            tunnelservice.PreferencesToProto(snapshot.Preferences),
+		ProviderTokenPresence:  secretPresenceToPrivate(snapshot.ProviderTokenPresence),
+		PlayerPasswordPresence: secretPresenceToPrivate(snapshot.PlayerPasswordPresence),
+		Status:                 publicAccessStatusToPrivate(snapshot.Status),
+	}
+}
+
+func routePublicAccessSnapshot(snapshot tunnelservice.PublicAccessSnapshot) PublicAccessSnapshot {
+	semantic := (&privatev1.PublicAccessStatusEvent{Snapshot: publicAccessSnapshotToPrivate(snapshot)}).GetSnapshot()
+	preferences, err := tunnelservice.PreferencesFromProto(semantic.GetPreferences())
+	if err != nil {
+		preferences = tunnelservice.DefaultPublicAccessPreferences()
+	}
+	return PublicAccessSnapshot{
+		Preferences: PublicAccessPreferences{
+			Version: preferences.Version, EnabledPreference: preferences.EnabledPreference,
+			ReservedDomain: preferences.ReservedDomain, Username: preferences.Username,
+			ProviderTokenPresentHint:  preferences.ProviderTokenPresentHint,
+			PlayerPasswordPresentHint: preferences.PlayerPasswordPresentHint, Revision: preferences.Revision,
+		},
+		ProviderTokenPresence:  secretPresenceFromPrivate(semantic.GetProviderTokenPresence()),
+		PlayerPasswordPresence: secretPresenceFromPrivate(semantic.GetPlayerPasswordPresence()),
+		Status:                 publicAccessStatusFromPrivate(semantic.GetStatus()),
+	}
+}
+
+func publicAccessStatusToPrivate(status tunnelservice.PublicAccessStatus) *privatev1.PublicAccessStatus {
+	semantic := &privatev1.PublicAccessStatus{
+		State: publicAccessLifecycleToPrivate(status.State), Generation: status.Generation,
+		SettingsRevision: status.SettingsRevision, ErrorCategory: publicAccessErrorToPrivate(status.ErrorCategory),
+	}
+	if status.PublicURL != "" {
+		semantic.PublicUrl = &status.PublicURL
+	}
+	if status.ErrorMessage != "" {
+		semantic.ErrorMessage = &status.ErrorMessage
+	}
+	return semantic
+}
+
+func publicAccessStatusFromPrivate(status *privatev1.PublicAccessStatus) PublicAccessStatus {
+	if status == nil {
+		return PublicAccessStatus{}
+	}
+	return PublicAccessStatus{
+		State: publicAccessLifecycleFromPrivate(status.GetState()), Generation: status.GetGeneration(),
+		SettingsRevision: status.GetSettingsRevision(), PublicURL: status.GetPublicUrl(),
+		ErrorCategory: publicAccessErrorFromPrivate(status.GetErrorCategory()), ErrorMessage: status.GetErrorMessage(),
+	}
+}
+
+func routePublicAccessCommandResult(result PublicAccessCommandResult) PublicAccessCommandResult {
+	semantic := &privatev1.PublicAccessCommandResult{Ok: result.OK}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	nativeSnapshot := tunnelservice.PublicAccessSnapshot{
+		Preferences: tunnelservice.PublicAccessPreferences{
+			Version: result.Snapshot.Preferences.Version, EnabledPreference: result.Snapshot.Preferences.EnabledPreference,
+			ReservedDomain: result.Snapshot.Preferences.ReservedDomain, Username: result.Snapshot.Preferences.Username,
+			ProviderTokenPresentHint:  result.Snapshot.Preferences.ProviderTokenPresentHint,
+			PlayerPasswordPresentHint: result.Snapshot.Preferences.PlayerPasswordPresentHint, Revision: result.Snapshot.Preferences.Revision,
+		},
+		ProviderTokenPresence:  secretPresenceFromNative(result.Snapshot.ProviderTokenPresence),
+		PlayerPasswordPresence: secretPresenceFromNative(result.Snapshot.PlayerPasswordPresence),
+		Status:                 publicAccessStatusFromNative(result.Snapshot.Status),
+	}
+	semantic.Snapshot = publicAccessSnapshotToPrivate(nativeSnapshot)
+	return PublicAccessCommandResult{OK: semantic.GetOk(), Error: semantic.GetError(), Snapshot: routePublicAccessSnapshot(nativeSnapshot)}
+}
+
+func routeGeneratedPlayerPasswordResult(result GeneratedPlayerPasswordResult) GeneratedPlayerPasswordResult {
+	semantic := &privatev1.GeneratedPlayerPasswordResult{Ok: result.OK, SettingsRevision: result.SettingsRevision}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	if result.GeneratedPassword != "" {
+		semantic.GeneratedPassword = &result.GeneratedPassword
+	}
+	return GeneratedPlayerPasswordResult{OK: semantic.GetOk(), Error: semantic.GetError(), GeneratedPassword: semantic.GetGeneratedPassword(), SettingsRevision: semantic.GetSettingsRevision()}
+}
+
+func publicAccessLifecycleToPrivate(state tunnelservice.LifecycleState) privatev1.PublicAccessLifecycleState {
+	switch state {
+	case tunnelservice.LifecycleDisabled:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_DISABLED
+	case tunnelservice.LifecycleStarting:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_STARTING
+	case tunnelservice.LifecycleReady:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_READY
+	case tunnelservice.LifecycleStopping:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_STOPPING
+	case tunnelservice.LifecycleFailed:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_FAILED
+	default:
+		return privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_UNSPECIFIED
+	}
+}
+
+func publicAccessLifecycleFromPrivate(state privatev1.PublicAccessLifecycleState) string {
+	switch state {
+	case privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_DISABLED:
+		return "stopped"
+	case privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_STARTING:
+		return "starting"
+	case privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_READY:
+		return "ready"
+	case privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_STOPPING:
+		return "stopping"
+	case privatev1.PublicAccessLifecycleState_PUBLIC_ACCESS_LIFECYCLE_STATE_FAILED:
+		return "error"
+	default:
+		return ""
+	}
+}
+
+func secretPresenceToPrivate(presence tunnelservice.SecretPresence) privatev1.SecretPresence {
+	switch presence {
+	case tunnelservice.SecretAbsent:
+		return privatev1.SecretPresence_SECRET_PRESENCE_ABSENT
+	case tunnelservice.SecretPresent:
+		return privatev1.SecretPresence_SECRET_PRESENCE_PRESENT
+	case tunnelservice.SecretUnknown:
+		return privatev1.SecretPresence_SECRET_PRESENCE_UNKNOWN
+	default:
+		return privatev1.SecretPresence_SECRET_PRESENCE_UNSPECIFIED
+	}
+}
+
+func secretPresenceFromPrivate(presence privatev1.SecretPresence) string {
+	switch presence {
+	case privatev1.SecretPresence_SECRET_PRESENCE_ABSENT:
+		return "absent"
+	case privatev1.SecretPresence_SECRET_PRESENCE_PRESENT:
+		return "present"
+	case privatev1.SecretPresence_SECRET_PRESENCE_UNKNOWN:
+		return "unknown"
+	default:
+		return ""
+	}
+}
+
+func secretPresenceFromNative(presence string) tunnelservice.SecretPresence {
+	switch presence {
+	case "absent":
+		return tunnelservice.SecretAbsent
+	case "present":
+		return tunnelservice.SecretPresent
+	default:
+		return tunnelservice.SecretUnknown
+	}
+}
+
+func publicAccessErrorToPrivate(category tunnelservice.ErrorCategory) privatev1.PublicAccessErrorCategory {
+	if !category.Valid() {
+		return privatev1.PublicAccessErrorCategory_PUBLIC_ACCESS_ERROR_CATEGORY_UNSPECIFIED
+	}
+	return privatev1.PublicAccessErrorCategory(category)
+}
+
+func publicAccessErrorFromPrivate(category privatev1.PublicAccessErrorCategory) string {
+	if category == privatev1.PublicAccessErrorCategory_PUBLIC_ACCESS_ERROR_CATEGORY_UNSPECIFIED {
+		return ""
+	}
+	native := tunnelservice.ErrorCategory(category)
+	if !native.Valid() {
+		return ""
+	}
+	names := [...]string{"", "validation", "settings_corrupt", "secret_store_locked", "secret_store_denied", "secret_store_unavailable", "credential_missing", "provider_authentication", "domain_unavailable", "network_unavailable", "timeout", "provider_failure", "shutdown_timeout", "conflict"}
+	return names[native]
+}
+
+func publicAccessErrorFromNative(category string) tunnelservice.ErrorCategory {
+	for candidate := tunnelservice.ErrorValidation; candidate <= tunnelservice.ErrorConflict; candidate++ {
+		if publicAccessErrorFromPrivate(privatev1.PublicAccessErrorCategory(candidate)) == category {
+			return candidate
+		}
+	}
+	return 0
+}
+
+func publicAccessStatusFromNative(status PublicAccessStatus) tunnelservice.PublicAccessStatus {
+	states := map[string]tunnelservice.LifecycleState{
+		"disabled": tunnelservice.LifecycleDisabled, "stopped": tunnelservice.LifecycleDisabled,
+		"starting": tunnelservice.LifecycleStarting, "ready": tunnelservice.LifecycleReady,
+		"stopping": tunnelservice.LifecycleStopping,
+		"failed":   tunnelservice.LifecycleFailed, "error": tunnelservice.LifecycleFailed,
+	}
+	return tunnelservice.PublicAccessStatus{State: states[status.State], Generation: status.Generation, SettingsRevision: status.SettingsRevision, PublicURL: status.PublicURL, ErrorCategory: publicAccessErrorFromNative(status.ErrorCategory), ErrorMessage: status.ErrorMessage}
+}
 
 func routeAddCharacterRequest(name string) string {
 	return (&privatev1.AddCharacterRequest{DisplayName: name}).GetDisplayName()
@@ -147,6 +398,8 @@ func restoreContentNodeShape(node *domain.ContentNode, template domain.ContentNo
 }
 
 func runtimeStatusToPrivate(status RuntimeStatus) *privatev1.RuntimeStatus {
+	// Lifecycle phase is intentionally not serialized. Existing server-info and
+	// startup-error fields are the complete master-visible startup projection.
 	result := &privatev1.RuntimeStatus{
 		ClientCount: uint32(max(status.ClientCount, 0)), SaveState: status.SaveState,
 		RequestedRevision: status.RequestedRevision,

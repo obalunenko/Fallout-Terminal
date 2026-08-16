@@ -11,6 +11,7 @@ client/dist/*
 
 # Go/Wails build output
 build/bin/
+build/dev/
 frontend/dist/*
 !frontend/dist/.keep
 frontend/node_modules/

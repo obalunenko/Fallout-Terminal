@@ -2,6 +2,9 @@
   "name": "fallout-terminal-player",
   "version": "1.0.0",
   "private": true,
+  "allowScripts": {
+    "fsevents": false
+  },
   "type": "module",
   "scripts": {
     "generate": "../scripts/proto-generate.sh --sync-revision",

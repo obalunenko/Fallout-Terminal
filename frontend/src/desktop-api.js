@@ -1,78 +1,78 @@
 'use strict';
 
-// Prefer Wails' generated App module when it exists. The glob deliberately
-// tolerates a pre-generation checkout so `npm run build` remains usable while
-// Wails still replaces the fallback with generated bindings in real builds.
-const generatedAppModules = typeof import.meta.glob === 'function'
-  ? import.meta.glob('../wailsjs/go/main/App.js', { eager: true })
-  : {};
-const generatedAppBindings = Object.values(generatedAppModules)[0];
+import { Clipboard, Events } from '@wailsio/runtime';
+import * as desktopService from '../bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js';
 
 const APP_METHODS = Object.freeze({
-  getRuntimeStatus: 'GetRuntimeStatus',
-  newSession: 'NewSession',
-  openSession: 'OpenSession',
-  saveSession: 'SaveSession',
-  loadReferencedPlayerConfig: 'LoadReferencedPlayerConfig',
-  newPlayerConfig: 'NewPlayerConfig',
-  openPlayerConfig: 'OpenPlayerConfig',
-  requestTerminalActivation: 'RequestTerminalActivation',
-  updateLiveTerminal: 'UpdateLiveTerminal',
-  requestTerminalClear: 'RequestTerminalClear',
-  resolveTerminalSwitch: 'ResolveTerminalSwitch',
-  forceHackSuccess: 'ForceHackSuccess',
-  resetFailedHack: 'ResetFailedHack',
-  addCharacter: 'AddCharacter',
-  renameCharacter: 'RenameCharacter',
-  deleteCharacter: 'DeleteCharacter',
-  renameLogicalSession: 'RenameLogicalSession',
-  assignCharacter: 'AssignCharacter',
-  releaseCharacter: 'ReleaseCharacter',
-  moveCharacter: 'MoveCharacter',
-  setActiveController: 'SetActiveController',
-  startBroadcast: 'StartBroadcast',
-  endBroadcast: 'EndBroadcast',
-  openUrl: 'OpenURL',
+  getRuntimeStatus: desktopService.GetRuntimeStatus,
+  newSession: desktopService.NewSession,
+  openSession: desktopService.OpenSession,
+  saveSession: desktopService.SaveSession,
+  loadReferencedPlayerConfig: desktopService.LoadReferencedPlayerConfig,
+  newPlayerConfig: desktopService.NewPlayerConfig,
+  openPlayerConfig: desktopService.OpenPlayerConfig,
+  requestTerminalActivation: desktopService.RequestTerminalActivation,
+  updateLiveTerminal: desktopService.UpdateLiveTerminal,
+  requestTerminalClear: desktopService.RequestTerminalClear,
+  resolveTerminalSwitch: desktopService.ResolveTerminalSwitch,
+  forceHackSuccess: desktopService.ForceHackSuccess,
+  resetFailedHack: desktopService.ResetFailedHack,
+  addCharacter: desktopService.AddCharacter,
+  renameCharacter: desktopService.RenameCharacter,
+  deleteCharacter: desktopService.DeleteCharacter,
+  renameLogicalSession: desktopService.RenameLogicalSession,
+  assignCharacter: desktopService.AssignCharacter,
+  releaseCharacter: desktopService.ReleaseCharacter,
+  moveCharacter: desktopService.MoveCharacter,
+  setActiveController: desktopService.SetActiveController,
+  startBroadcast: desktopService.StartBroadcast,
+  endBroadcast: desktopService.EndBroadcast,
+  openUrl: desktopService.OpenURL,
+  getPublicAccess: desktopService.GetPublicAccess,
+  savePublicAccessSettings: desktopService.SavePublicAccessSettings,
+  generatePlayerPassword: desktopService.GeneratePlayerPassword,
+  startPublicAccess: desktopService.StartPublicAccess,
+  stopPublicAccess: desktopService.StopPublicAccess,
 });
 
 const DISPOSE = Symbol.for('fallout-terminal.desktop-api.dispose');
 const subscriptions = new Set();
+const eventSubscriptions = new Map();
+const requiredEvents = Object.freeze([
+  ['server-info', 'serverInfo'],
+  ['client-count', 'clientCount'],
+  ['hack-state', 'hackState'],
+  ['coordination-state', 'coordinationState'],
+]);
 
-function appBindings() {
-  // Generated methods are thin wrappers around this exact narrow namespace;
-  // the fallback exists only until the generator has populated frontend/wailsjs.
-  const bindings = generatedAppBindings ?? window.go?.main?.App;
-  if (!bindings) {
-    throw new Error('Wails App bindings are unavailable');
-  }
-  return bindings;
-}
-
-function invoke(method, ...args) {
+function invoke(binding, ...args) {
   try {
-    const binding = appBindings()[method];
-    if (typeof binding !== 'function') {
-      throw new Error(`Wails App.${method} binding is unavailable`);
-    }
+    if (typeof binding !== 'function') throw new Error('Wails desktop binding is unavailable');
     return Promise.resolve(binding(...args));
   } catch (error) {
     return Promise.reject(error);
   }
 }
 
-function command(method, ...args) {
-  return invoke(method, ...args).catch((error) => ({
+function command(binding, ...args) {
+  return invoke(binding, ...args).catch((error) => ({
     ok: false,
     error: error instanceof Error ? error.message : String(error),
   }));
 }
 
-const TERMINAL_SWITCH_STATUSES = new Set([
-  'activated',
-  'cleared',
-  'decision-required',
-  'cancelled',
-]);
+async function writeClipboardText(value) {
+  if (typeof value !== 'string' || value === '') return false;
+  try {
+    if (typeof Clipboard?.SetText !== 'function') return false;
+    await Clipboard.SetText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const TERMINAL_SWITCH_STATUSES = new Set(['activated', 'cleared', 'decision-required', 'cancelled']);
 
 function normalizeSwitchCommandResult(result) {
   const value = result && typeof result === 'object' ? result : {};
@@ -84,12 +84,11 @@ function normalizeSwitchCommandResult(result) {
   const state = value.state && typeof value.state === 'object' ? value.state : null;
   let error = typeof value.error === 'string' ? value.error : '';
   if (!ok && !error) error = 'Terminal switch command failed';
-
   return Object.freeze({ ok, error, status, switchId, state });
 }
 
-function switchCommand(method, ...args) {
-  return command(method, ...args).then(normalizeSwitchCommandResult);
+function switchCommand(binding, ...args) {
+  return command(binding, ...args).then(normalizeSwitchCommandResult);
 }
 
 function normalizePlayerConfigResult(result) {
@@ -104,98 +103,227 @@ function normalizePlayerConfigResult(result) {
   return Object.freeze({ ok, canceled, error, config, session, state });
 }
 
-function playerConfigCommand(method, ...args) {
-  return command(method, ...args).then(normalizePlayerConfigResult);
+function playerConfigCommand(binding, ...args) {
+  return command(binding, ...args).then(normalizePlayerConfigResult);
 }
 
-let runtimeStatusPromise;
-function runtimeStatus() {
-  runtimeStatusPromise ??= command(APP_METHODS.getRuntimeStatus);
-  return runtimeStatusPromise;
+const PUBLIC_ACCESS_STATES = Object.freeze({
+  disabled: 'stopped',
+  starting: 'starting',
+  ready: 'ready',
+  stopping: 'stopping',
+  failed: 'error',
+  stopped: 'stopped',
+  error: 'error',
+});
+const SECRET_PRESENCES = new Set(['absent', 'present', 'unknown']);
+
+function normalizePublicAccessSnapshot(snapshot) {
+  const value = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const rawPreferences = value.preferences && typeof value.preferences === 'object' ? value.preferences : {};
+  const rawStatus = value.status && typeof value.status === 'object' ? value.status : {};
+  const preferences = Object.freeze({
+    version: Number.isInteger(rawPreferences.version) ? rawPreferences.version : 1,
+    enabledPreference: rawPreferences.enabledPreference === true,
+    reservedDomain: typeof rawPreferences.reservedDomain === 'string' ? rawPreferences.reservedDomain : '',
+    username: typeof rawPreferences.username === 'string' && rawPreferences.username ? rawPreferences.username : 'players',
+    providerTokenPresentHint: rawPreferences.providerTokenPresentHint === true,
+    playerPasswordPresentHint: rawPreferences.playerPasswordPresentHint === true,
+    revision: Number.isSafeInteger(rawPreferences.revision) ? rawPreferences.revision : 0,
+  });
+  const state = PUBLIC_ACCESS_STATES[rawStatus.state] ?? '';
+  const status = Object.freeze({
+    state,
+    generation: Number.isSafeInteger(rawStatus.generation) ? rawStatus.generation : 0,
+    settingsRevision: Number.isSafeInteger(rawStatus.settingsRevision)
+      ? rawStatus.settingsRevision
+      : preferences.revision,
+    publicUrl: state === 'ready' && typeof rawStatus.publicUrl === 'string' ? rawStatus.publicUrl : '',
+    errorCategory: state === 'error' && typeof rawStatus.errorCategory === 'string' ? rawStatus.errorCategory : '',
+    errorMessage: state === 'error' && typeof rawStatus.errorMessage === 'string' ? rawStatus.errorMessage : '',
+  });
+  const presence = (candidate) => SECRET_PRESENCES.has(candidate) ? candidate : 'unknown';
+  return Object.freeze({
+    preferences,
+    providerTokenPresence: presence(value.providerTokenPresence),
+    playerPasswordPresence: presence(value.playerPasswordPresence),
+    status,
+  });
+}
+
+function normalizePublicAccessCommandResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  let error = typeof value.error === 'string' ? value.error : '';
+  if (!ok && !error) error = 'Public access command failed';
+  return Object.freeze({ ok, error, snapshot: normalizePublicAccessSnapshot(value.snapshot) });
+}
+
+let latestPublicAccessSnapshot = null;
+
+function retainLatestPublicAccessSnapshot(snapshot) {
+  if (!latestPublicAccessSnapshot) {
+    latestPublicAccessSnapshot = snapshot;
+    return snapshot;
+  }
+  const candidate = publicAccessVersion(snapshot);
+  const latest = publicAccessVersion(latestPublicAccessSnapshot);
+  if (versionIsNewer(candidate, latest) || (candidate[0] === latest[0] && candidate[1] === latest[1])) {
+    latestPublicAccessSnapshot = snapshot;
+  }
+  return latestPublicAccessSnapshot;
+}
+
+function publicAccessCommand(binding, payload) {
+  return command(binding, payload).then((value) => {
+    const result = normalizePublicAccessCommandResult(value);
+    return Object.freeze({
+      ok: result.ok,
+      error: result.error,
+      snapshot: retainLatestPublicAccessSnapshot(result.snapshot),
+    });
+  });
+}
+
+function publicAccessVersion(snapshot) {
+  return [snapshot.status.generation, snapshot.status.settingsRevision];
+}
+
+function versionIsNewer(candidate, baseline) {
+  return candidate[0] > baseline[0] || (candidate[0] === baseline[0] && candidate[1] > baseline[1]);
+}
+
+function clearSecretMutationFields(value) {
+  if (!value || typeof value !== 'object') return;
+  if (Object.hasOwn(value, 'replacementProviderToken')) value.replacementProviderToken = '';
+  if (Object.hasOwn(value, 'replacementPlayerPassword')) value.replacementPlayerPassword = '';
 }
 
 let latestServerInfo = null;
 
 function normalizeServerInfo(payload) {
   if (!payload || typeof payload !== 'object') return null;
-
   const url = typeof payload.url === 'string' ? payload.url : '';
   const tunnel = Boolean(payload.tunnel);
   const previousLocalUrl = latestServerInfo?.localUrl
     || (latestServerInfo && !latestServerInfo.tunnel ? latestServerInfo.url : '');
   const suppliedLocalUrl = typeof payload.localUrl === 'string' ? payload.localUrl : '';
-  const localUrl = suppliedLocalUrl || (!tunnel ? url : previousLocalUrl);
-
   latestServerInfo = Object.freeze({
     ip: typeof payload.ip === 'string' ? payload.ip : '',
     port: Number.isInteger(payload.port) ? payload.port : 0,
     url,
-    localUrl,
+    localUrl: suppliedLocalUrl || (!tunnel ? url : previousLocalUrl),
     tunnel,
     tunnelError: typeof payload.tunnelError === 'string' ? payload.tunnelError : '',
   });
   return latestServerInfo;
 }
 
-function subscribe(eventName, statusField, callback, project = (payload) => payload) {
-  if (typeof callback !== 'function') {
-    throw new TypeError(`${eventName} listener must be a function`);
-  }
+function unwrapEvent(event) {
+  return event && typeof event === 'object' && Object.hasOwn(event, 'data') ? event.data : event;
+}
 
-  let active = true;
-  let eventReceived = false;
-  let releaseRuntime = () => {};
+let runtimeStatusPromise = null;
 
-  const listener = (payload) => {
-    if (!active) return;
-    const projected = project(payload);
-    if (statusField === 'serverInfo' && projected == null) return;
-    eventReceived = true;
-    callback(projected);
-  };
-
-  const eventsOn = window.runtime?.EventsOn;
-  if (typeof eventsOn === 'function') {
-    const release = eventsOn(eventName, listener);
-    if (typeof release === 'function') {
-      releaseRuntime = release;
+function beginStatusSnapshotWhenReady() {
+  if (runtimeStatusPromise || !requiredEvents.every(([name]) => eventSubscriptions.has(name))) return;
+  runtimeStatusPromise = command(APP_METHODS.getRuntimeStatus);
+  void runtimeStatusPromise.then((status) => {
+    if (!status || status.ok === false) return;
+    for (const [eventName, field] of requiredEvents) {
+      for (const subscription of eventSubscriptions.get(eventName) ?? []) {
+        if (!subscription.active || subscription.eventReceived) continue;
+        subscription.deliver(status[field]);
+      }
     }
-  }
-
-  // domReady can emit before this module is evaluated. Replaying the status
-  // snapshot fills that gap, but never overwrites a newer event.
-  void runtimeStatus().then((status) => {
-    if (!active || eventReceived || !status || status.ok === false) return;
-    const payload = status[statusField];
-    if (statusField === 'serverInfo' && payload == null) return;
-    const projected = project(payload);
-    if (statusField === 'serverInfo' && projected == null) return;
-    callback(projected);
   });
+}
+
+function subscribe(eventName, statusField, callback, project = (payload) => payload) {
+  if (typeof callback !== 'function') throw new TypeError(`${eventName} listener must be a function`);
+
+  const bucket = eventSubscriptions.get(eventName) ?? new Set();
+  eventSubscriptions.set(eventName, bucket);
+  const subscription = {
+    active: true,
+    eventReceived: false,
+    released: false,
+    deliver(payload) {
+      if (!this.active) return;
+      const projected = project(payload);
+      if (statusField === 'serverInfo' && projected == null) return;
+      callback(projected);
+    },
+    releaseRuntime: () => {},
+  };
+  subscription.releaseRuntime = Events.On(eventName, (event) => {
+    if (!subscription.active) return;
+    subscription.eventReceived = true;
+    subscription.deliver(unwrapEvent(event));
+  });
+  bucket.add(subscription);
 
   const unsubscribe = () => {
-    if (!active) return;
-    active = false;
+    if (!subscription.active) return;
+    subscription.active = false;
+    bucket.delete(subscription);
     subscriptions.delete(unsubscribe);
-    releaseRuntime();
+    if (!subscription.released) {
+      subscription.released = true;
+      subscription.releaseRuntime();
+    }
   };
   subscriptions.add(unsubscribe);
+  beginStatusSnapshotWhenReady();
   return unsubscribe;
 }
 
 const previousFacade = window.desktopAPI;
-if (typeof previousFacade?.[DISPOSE] === 'function') {
-  previousFacade[DISPOSE]();
-}
+if (typeof previousFacade?.[DISPOSE] === 'function') previousFacade[DISPOSE]();
 
 const desktopAPI = {
   onServerInfo: (callback) => subscribe('server-info', 'serverInfo', callback, normalizeServerInfo),
   onClientCount: (callback) => subscribe('client-count', 'clientCount', callback),
   onHackState: (callback) => subscribe('hack-state', 'hackState', callback),
   onCoordinationState: (callback) => subscribe('coordination-state', 'coordinationState', callback),
-  // Deliberately perform no privileged browser operation here. App.OpenURL
-  // parses and validates the final HTTP(S) URL immediately before opening it.
+  onPublicAccessStatus: (callback) => {
+    if (typeof callback !== 'function') throw new TypeError('public-access-status listener must be a function');
+    let active = true;
+    let released = false;
+    let latestEventVersion = [-1, -1];
+    const releaseRuntime = Events.On('public-access-status', (event) => {
+      if (!active) return;
+      const snapshot = normalizePublicAccessSnapshot(unwrapEvent(event));
+      const candidate = publicAccessVersion(snapshot);
+      if (!versionIsNewer(candidate, latestEventVersion)) return;
+      latestEventVersion = candidate;
+      callback(retainLatestPublicAccessSnapshot(snapshot));
+    });
+    void command(APP_METHODS.getPublicAccess).then((value) => {
+      if (!active || value?.ok === false) return;
+      const snapshot = normalizePublicAccessSnapshot(value);
+      const candidate = publicAccessVersion(snapshot);
+      if (latestEventVersion[0] >= 0 && !versionIsNewer(candidate, latestEventVersion)) return;
+      callback(retainLatestPublicAccessSnapshot(snapshot));
+    });
+    const unsubscribe = () => {
+      if (!active) return;
+      active = false;
+      subscriptions.delete(unsubscribe);
+      if (!released) {
+        released = true;
+        releaseRuntime();
+      }
+    };
+    subscriptions.add(unsubscribe);
+    return unsubscribe;
+  },
+  getRuntimeStatus: () => {
+    beginStatusSnapshotWhenReady();
+    return runtimeStatusPromise ?? command(APP_METHODS.getRuntimeStatus);
+  },
   openUrl: (url) => command(APP_METHODS.openUrl, url),
+  writeClipboardText,
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),
   saveSession: (session) => command(APP_METHODS.saveSession, session),
@@ -218,6 +346,43 @@ const desktopAPI = {
   setActiveController: (sessionId) => command(APP_METHODS.setActiveController, sessionId),
   startBroadcast: () => command(APP_METHODS.startBroadcast),
   endBroadcast: () => command(APP_METHODS.endBroadcast),
+  getPublicAccess: () => command(APP_METHODS.getPublicAccess)
+    .then(normalizePublicAccessSnapshot)
+    .then(retainLatestPublicAccessSnapshot),
+  savePublicAccessSettings: (request) => {
+    const source = request && typeof request === 'object' ? request : {};
+    const nativeRequest = {
+      expectedRevision: Number.isSafeInteger(source.expectedRevision) ? source.expectedRevision : 0,
+      enabledPreference: source.enabledPreference === true,
+      reservedDomain: typeof source.reservedDomain === 'string' ? source.reservedDomain : '',
+      username: typeof source.username === 'string' ? source.username : '',
+      replacementProviderToken: typeof source.replacementProviderToken === 'string' ? source.replacementProviderToken : '',
+      deleteProviderToken: source.deleteProviderToken === true,
+      replacementPlayerPassword: typeof source.replacementPlayerPassword === 'string' ? source.replacementPlayerPassword : '',
+      deletePlayerPassword: source.deletePlayerPassword === true,
+    };
+    const pending = publicAccessCommand(APP_METHODS.savePublicAccessSettings, nativeRequest);
+    clearSecretMutationFields(nativeRequest);
+    clearSecretMutationFields(source);
+    return pending;
+  },
+  generatePlayerPassword: (request) => command(APP_METHODS.generatePlayerPassword, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }).then((result) => {
+    const value = result && typeof result === 'object' ? result : {};
+    return {
+      ok: value.ok === true,
+      error: typeof value.error === 'string' ? value.error : '',
+      generatedPassword: typeof value.generatedPassword === 'string' ? value.generatedPassword : '',
+      settingsRevision: Number.isSafeInteger(value.settingsRevision) ? value.settingsRevision : 0,
+    };
+  }),
+  startPublicAccess: (request) => publicAccessCommand(APP_METHODS.startPublicAccess, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }),
+  stopPublicAccess: (request) => publicAccessCommand(APP_METHODS.stopPublicAccess, {
+    expectedRevision: Number.isSafeInteger(request?.expectedRevision) ? request.expectedRevision : 0,
+  }),
 };
 
 Object.defineProperty(desktopAPI, DISPOSE, {

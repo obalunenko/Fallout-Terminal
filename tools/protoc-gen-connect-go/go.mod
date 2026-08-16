@@ -1,0 +1,9 @@
+module github.com/obalunenko/Fallout-Terminal/tools/protoc-gen-connect-go
+
+go 1.26
+
+tool connectrpc.com/connect/cmd/protoc-gen-connect-go
+
+require connectrpc.com/connect v1.20.0
+
+require google.golang.org/protobuf v1.36.11 // indirect

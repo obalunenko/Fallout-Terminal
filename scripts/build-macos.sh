@@ -37,7 +37,7 @@ test "$#" -le 1 || fail "usage: scripts/build-macos.sh [--preflight]"
 test "$(uname -s)" = "Darwin" || fail "release builds require macOS"
 test "$(uname -m)" = "arm64" || fail "release builds require an Apple Silicon host"
 test -f "$repository_root/go.mod" || fail "repository root is missing go.mod"
-test -f "$repository_root/wails.json" || fail "repository root is missing wails.json"
+test -f "$repository_root/cmd/build/main.go" || fail "repository Go build command is missing"
 test -f "$entitlements_path" || fail "missing entitlements: $entitlements_path"
 /usr/bin/plutil -lint "$entitlements_path" >/dev/null || fail "invalid entitlements plist"
 
@@ -45,19 +45,6 @@ for command_name in go npm xcrun security codesign spctl hdiutil ditto lipo shas
   require_command "$command_name"
 done
 
-wails_binary=$(command -v wails 2>/dev/null || true)
-if [ -z "$wails_binary" ]; then
-  wails_binary="$(go env GOPATH)/bin/wails"
-fi
-test -x "$wails_binary" || fail "required command not found: wails (install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0)"
-case "$wails_binary" in
-  /*) ;;
-  *) fail "Wails CLI path must be absolute: $wails_binary" ;;
-esac
-case "$("$wails_binary" version 2>/dev/null)" in
-  *v2.13.0*) ;;
-  *) fail "Wails CLI v2.13.0 is required (install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0)" ;;
-esac
 case "$(go version)" in
   *' go1.26.'*) ;;
   *) fail "Go 1.26.x is required" ;;
@@ -104,18 +91,13 @@ export CGO_ENABLED=1
 export MACOSX_DEPLOYMENT_TARGET=13.0
 
 cd "$repository_root"
-npm ci --prefix frontend
-npm ci --prefix client
-scripts/proto-check.sh
-npm run build --prefix frontend
-npm run build --prefix client
-"$wails_binary" build -clean -platform darwin/arm64
+go run ./cmd/build package
 
 test -d "$app_path" || fail "Wails did not create the expected app: $app_path"
 test -x "$app_executable" || fail "app executable is missing: $app_executable"
 lipo -archs "$app_executable" | grep -qw arm64 || fail "application executable is not arm64"
 
-# Wails' post-build hook installs the final resources and ad-hoc signs the
+# The Go package command installs every resource and ad-hoc signs the completed
 # development candidate. Replace that signature with the release identity.
 codesign --force --deep --options runtime --timestamp \
   --entitlements "$entitlements_path" \

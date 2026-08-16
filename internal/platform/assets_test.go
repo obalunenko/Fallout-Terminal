@@ -17,7 +17,7 @@ import (
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/config/v1"
 	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
-	_ "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
+	privatev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -86,17 +86,23 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	})
 
 	optionalFields := map[protoreflect.FullName]bool{
-		"fallout.terminal.player.v1.PlayerState.broadcast_id":                     true,
-		"fallout.terminal.player.v1.PlayerState.active_terminal_id":               true,
-		"fallout.terminal.player.v1.SubscribeRequest.recognition_handle":          true,
-		"fallout.terminal.player.v1.NavigationState.view_entry_id":                true,
-		"fallout.terminal.player.v1.NavigationState.command_node_id":              true,
-		"fallout.terminal.persistence.v1.Session.player_config":                   true,
-		"fallout.terminal.config.v1.TunnelConfig.policy_parent":                   true,
-		"fallout.terminal.private.v1.CharacterState.logical_session_id":           true,
-		"fallout.terminal.private.v1.LogicalSessionState.character_id":            true,
-		"fallout.terminal.private.v1.BroadcastState.active_controller_session_id": true,
-		"fallout.terminal.private.v1.BroadcastState.active_terminal_id":           true,
+		"fallout.terminal.player.v1.PlayerState.broadcast_id":                          true,
+		"fallout.terminal.player.v1.PlayerState.active_terminal_id":                    true,
+		"fallout.terminal.player.v1.SubscribeRequest.recognition_handle":               true,
+		"fallout.terminal.player.v1.NavigationState.view_entry_id":                     true,
+		"fallout.terminal.player.v1.NavigationState.command_node_id":                   true,
+		"fallout.terminal.persistence.v1.Session.player_config":                        true,
+		"fallout.terminal.config.v1.PublicAccessPreferences.reserved_domain":           true,
+		"fallout.terminal.private.v1.CharacterState.logical_session_id":                true,
+		"fallout.terminal.private.v1.LogicalSessionState.character_id":                 true,
+		"fallout.terminal.private.v1.BroadcastState.active_controller_session_id":      true,
+		"fallout.terminal.private.v1.BroadcastState.active_terminal_id":                true,
+		"fallout.terminal.private.v1.PublicAccessStatus.public_url":                    true,
+		"fallout.terminal.private.v1.PublicAccessStatus.error_message":                 true,
+		"fallout.terminal.private.v1.PublicAccessCommandResult.error":                  true,
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.reserved_domain":  true,
+		"fallout.terminal.private.v1.GeneratedPlayerPasswordResult.error":              true,
+		"fallout.terminal.private.v1.GeneratedPlayerPasswordResult.generated_password": true,
 	}
 	for name := range optionalFields {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
@@ -117,6 +123,8 @@ func TestProtobufContractShapeAndSeparation(t *testing.T) {
 		"fallout.terminal.player.v1.ContentNode.content",
 		"fallout.terminal.player.v1.TerminalPresentation.presentation",
 		"fallout.terminal.persistence.v1.ContentNode.content",
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.provider_token_change",
+		"fallout.terminal.private.v1.SavePublicAccessSettingsRequest.player_password_change",
 	} {
 		descriptor, err := protoregistry.GlobalFiles.FindDescriptorByName(name)
 		if err != nil {
@@ -166,6 +174,36 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
+func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
+	t.Parallel()
+
+	descriptor := (&privatev1.RuntimeStatus{}).ProtoReflect().Descriptor()
+	wantFields := []string{
+		"server_info", "client_count", "hack_state", "startup_error",
+		"save_state", "requested_revision", "saved_revision", "coordination_state",
+	}
+	gotFields := make([]string, 0, descriptor.Fields().Len())
+	for index := range descriptor.Fields().Len() {
+		gotFields = append(gotFields, string(descriptor.Fields().Get(index).Name()))
+	}
+	require.Equal(t, wantFields, gotFields)
+	require.Nil(t, descriptor.Fields().ByName("phase"))
+	require.Zero(t, descriptor.ParentFile().Enums().Len())
+
+	root := assetRepositoryRoot(t)
+	wantDigests := map[string]string{
+		"proto/fallout/terminal/private/v1/runtime.proto": "41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741",
+		"proto/schema-revision.txt":                       "1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06",
+		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
+	}
+	for relative, want := range wantDigests {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		require.NoError(t, err)
+		got := sha256.Sum256(raw)
+		require.Equal(t, want, hex.EncodeToString(got[:]), relative)
+	}
+}
+
 func checkEnumZeroValues(t *testing.T, enums protoreflect.EnumDescriptors) {
 	t.Helper()
 	for index := 0; index < enums.Len(); index++ {
@@ -191,6 +229,43 @@ func checkMessageContractShape(t *testing.T, messages protoreflect.MessageDescri
 
 		}
 	}
+}
+
+func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(relative string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+	html := read("frontend/src/index.html")
+	css := read("frontend/src/master.css")
+	javascript := read("frontend/src/master.js")
+
+	for _, fragment := range []string{
+		`id="publicAccessSection"`, `for="publicAccessDomain"`, `for="publicAccessUsername"`,
+		`for="publicAccessProviderToken"`, `for="publicAccessPlayerPassword"`,
+		`id="publicAccessProviderToken" type="password"`, `id="publicAccessPlayerPassword" type="password"`,
+		`id="publicAccessGuide"`, `КАК НАСТРОИТЬ ЧЕРЕЗ NGROK`,
+		`СОХРАНИТЬ ДОСТУП`, `ВКЛЮЧИТЬ`, `Basic Auth`,
+		`id="publicAccessStatus" role="status" aria-live="polite"`,
+		`id="publicAccessError" role="alert" aria-live="assertive"`,
+		`id="generatedPasswordDialog"`, `aria-modal="true"`,
+	} {
+		assert.Contains(t, html, fragment)
+	}
+	for _, forbidden := range []string{"RevealSecret", "GetSecret", ">REVEAL<", ">ПОКАЗАТЬ ПАРОЛЬ<"} {
+		assert.NotContains(t, html+javascript, forbidden)
+	}
+	assert.Contains(t, html, `id="publicAccessUsername"`)
+	assert.Contains(t, html, `value="players"`)
+	assert.Contains(t, css, ".public-access")
+	assert.Contains(t, javascript, "generatePlayerPassword")
+	assert.Contains(t, javascript, "public-access-status")
+	assert.Contains(t, read("frontend/src/desktop-api.js"), "Clipboard.SetText")
 }
 
 func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
@@ -527,10 +602,10 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 	facade := read("frontend/src/desktop-api.js")
 	app := read("app.go")
 	for _, required := range []string{
-		"requestTerminalActivation: 'RequestTerminalActivation'",
-		"requestTerminalClear: 'RequestTerminalClear'",
-		"updateLiveTerminal: 'UpdateLiveTerminal'",
-		"forceHackSuccess: 'ForceHackSuccess'",
+		"requestTerminalActivation: desktopService.RequestTerminalActivation",
+		"requestTerminalClear: desktopService.RequestTerminalClear",
+		"updateLiveTerminal: desktopService.UpdateLiveTerminal",
+		"forceHackSuccess: desktopService.ForceHackSuccess",
 	} {
 		assert.Falsef(t, !strings.Contains(facade, required),
 			"master desktop facade is missing coordinator-owned command %q", required)
@@ -825,7 +900,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	js := read("client/client.js")
 	start := strings.Index(js, "function renderHackScreen()")
-	end := strings.Index(js, "function buildColumnHtml")
+	end := strings.Index(js, "function hackRevealIdentity")
 	require.False(t, start < 0 || end <= start,
 		"player script is missing the hacking render boundary")
 
@@ -934,8 +1009,13 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 
 	}
 	for _, required := range []string{
-		`class="hcell word" data-target="${esc(wid)}" tabindex="0"`,
-		`class="hcell filler" data-target="${colIndex}:${i}" data-row="${rowBase + r}" data-offset="${i - rowStart}" tabindex="0"`,
+		"cell.className = `hcell ${className}`",
+		"cell.dataset.target = String(target)",
+		"cell.tabIndex = 0",
+		"createHackCell('word', wid, col.text.slice(i, j))",
+		"createHackCell('filler', `${colIndex}:${i}`, col.text[i])",
+		"cell.dataset.row = String(rowBase + rowIndex)",
+		"cell.dataset.offset = String(i - rowStart)",
 		"const lines = Array.isArray(hack.log) ? hack.log : []",
 	} {
 		assert.Falsef(t, !strings.Contains(js, required),
@@ -1015,8 +1095,8 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		"if (beginPattern(pattern.id)) playEnter();",
 		"if (pattern) return;",
 		"if (beginGuess(cell.dataset.target)) playEnter();",
-		"class=\"hcell word\"",
-		"class=\"hcell filler\"",
+		"createHackCell('word', wid, col.text.slice(i, j))",
+		"createHackCell('filler', `${colIndex}:${i}`, col.text[i])",
 	} {
 		assert.Falsef(t, !strings.Contains(playerScript, required),
 			"bundled player is missing camouflage interaction contract %q", required)
@@ -1079,7 +1159,7 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		`id="btnHackSuccess"`,
 		"desktopAPI.forceHackSuccess()",
 		"h.solved || h.failed",
-		"forceHackSuccess: 'ForceHackSuccess'",
+		"forceHackSuccess: desktopService.ForceHackSuccess",
 		"func (app *App) ForceHackSuccess() CommandResult",
 	} {
 		assert.Falsef(t, !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required),
@@ -1123,7 +1203,7 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		`id="btnResetFailedHack"`,
 		`ПОВТОРИТЬ ВЗЛОМ`,
 		`desktopAPI.resetFailedHack(`,
-		`resetFailedHack: 'ResetFailedHack'`,
+		`resetFailedHack: desktopService.ResetFailedHack`,
 		`func (app *App) ResetFailedHack(`,
 		`ResetFailedHack`,
 	} {
@@ -1388,6 +1468,192 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 
 }
 
+func TestPlayerCRTVisualShellAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+
+	html := read("client/index.html")
+	css := read("client/client.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+
+	for _, fragment := range []string{
+		`class="crt"`,
+		`class="screen" id="screen"`,
+		`class="scanlines" aria-hidden="true"`,
+		`class="vignette" aria-hidden="true"`,
+		`class="conn-overlay" id="connOverlay"`,
+		`default-src 'self'`,
+		`object-src 'none'`,
+		`frame-ancestors 'none'`,
+	} {
+		assert.Contains(t, html, fragment)
+	}
+
+	for _, fragment := range []string{
+		".screen{position:relative;",
+		"background:#020a02;",
+		"border:2pxsolid#0c2e0c;",
+		"color:#57ff6e;",
+		".scanlines{position:absolute;inset:0;border-radius:inherit;pointer-events:none;",
+		".vignette{position:absolute;inset:0;border-radius:inherit;pointer-events:none;",
+		".term-row.sel{background:#57ff6e;color:#021002;text-shadow:none;}",
+		".hcell.hi{background:#57ff6e;color:#021002;text-shadow:none;}",
+		".character-option:hover,.character-option:focus-visible{border-color:#d8ffb8;background:rgba(87,255,110,.16);outline:none;}",
+		".back-btn:focus-visible,.page-btn:focus-visible{outline:2pxsolid#d8ffb8;",
+	} {
+		assert.Contains(t, compactCSS, fragment)
+	}
+
+	for _, forbidden := range []string{"@wailsio/runtime", "window.desktopAPI", "electronAPI", "genericDispatch"} {
+		assert.NotContains(t, html+css, forbidden)
+	}
+}
+
+func TestPlayerCRTMotionAndRevealAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+
+	css := read("client/client.css")
+	js := read("client/client.js")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
+
+	for _, fragment := range []string{
+		"animation:flicker6sinfinite;",
+		"@keyframesflicker{0%,96%,100%{opacity:1;}97%{opacity:.92;}98%{opacity:1;}99%{opacity:.96;}}",
+		".blink{animation:blink1ssteps(1)infinite;}",
+		"@keyframesblink{0%,49%{opacity:1;}50%,100%{opacity:0;}}",
+		"animation:selection-pending1ssteps(2)infinite;",
+		"@keyframesselection-pending{0%,49%{border-color:#57ff6e;}50%,100%{border-color:#144d18;}}",
+	} {
+		assert.Contains(t, compactCSS, fragment)
+	}
+	assert.NotContains(t, strings.ToLower(css), "prefers-reduced-motion")
+
+	for _, fragment := range []string{
+		"const REVEAL_DELAY_MS = 40",
+		"const activeRevealControllers = new Set()",
+		"container._revealGeneration",
+		"controller.complete",
+		"controller.cancel",
+		"container.replaceChildren()",
+		"lastRenderedFolderKey",
+		"lastRenderedEntryId",
+		"lastRenderedCommandKey",
+	} {
+		assert.Contains(t, js, fragment)
+	}
+	assert.NotContains(t, strings.ToLower(js), "prefers-reduced-motion")
+}
+
+func TestPlayerCRTHackingRevealAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let lastRenderedHackKey",
+		"function hackRevealIdentity(hackState)",
+		"function createHackCell(className, target, text)",
+		"cell.textContent = text",
+		"function buildHackColumn(col, colIndex, rowBase)",
+		"address.textContent = col.addresses[rowIndex] || ''",
+		"function revealInto(container, elements, animate, contentIdentity = '', options = {})",
+		"const appendElement = options.appendElement ||",
+		"revealInto(hackColumns, built.rows, animate, hackKey, {",
+		"appendElement: descriptor => descriptor.parent.appendChild(descriptor.row)",
+		"cancelReveal(hackColumns)",
+	} {
+		assert.Contains(t, js, fragment, "player script is missing hacking reveal contract %q", fragment)
+	}
+
+	assert.NotContains(t, js, "hackColumns.innerHTML")
+	assert.NotContains(t, js, "function buildColumnHtml")
+}
+
+func TestPlayerCRTDudReconciliationAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let lastRenderedHackRows = new Map()",
+		"function hackBoardSnapshot(hackState)",
+		"function reconcileHackRow(current, replacement)",
+		"function reconcileHackColumns(hackState)",
+		"if (current.row.isConnected)",
+		"current.row.replaceChildren(...replacement.row.childNodes)",
+		"current.row = replacement.row",
+		"if (!animate && lastRenderedHackRows.size !== 0)",
+	} {
+		assert.Contains(t, js, fragment, "player script is missing dud reconciliation contract %q", fragment)
+	}
+
+	identityStart := strings.Index(js, "function hackRevealIdentity(hackState)")
+	identityEnd := strings.Index(js, "function createHackCell(className, target, text)")
+	require.NotEqual(t, -1, identityStart)
+	require.Greater(t, identityEnd, identityStart)
+	identity := js[identityStart:identityEnd]
+	assert.NotContains(t, identity, "hackState.columns")
+	assert.NotContains(t, identity, "boardText")
+}
+
+func TestPlayerCRTRevealSkipAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let consumedRevealKey = null",
+		"function completeVisibleReveals()",
+		"function consumeRevealKeydown(event)",
+		"function releaseConsumedRevealKey(event)",
+		"event.preventDefault()",
+		"event.stopImmediatePropagation()",
+		"event.repeat && key === consumedRevealKey",
+		"document.addEventListener('keydown', consumeRevealKeydown, { capture: true })",
+		"document.addEventListener('keyup', releaseConsumedRevealKey, { capture: true })",
+		"controller.complete()",
+		"d.textContent = text",
+		"row.textContent = '> ' + node.name",
+	} {
+		assert.Contains(t, js, fragment)
+	}
+
+	for _, forbidden := range []string{
+		"localStorage.setItem('crt",
+		"localStorage.setItem(\"crt",
+		"playerRPC.reveal",
+		"innerHTML = node.name",
+		"innerHTML = node.description",
+		"innerHTML = commandOutput",
+	} {
+		assert.NotContains(t, js, forbidden)
+	}
+}
+
 func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 	t.Parallel()
 
@@ -1413,6 +1679,44 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 			"active production frontend is missing runtime-neutral facade contract %q", required)
 
 	}
+	adapterSource := string(adapter)
+	masterSource := string(master)
+	for _, forbidden := range []string{"window.go", "window.runtime", "frontend/wailsjs", "../wailsjs", "CopyDemo", "copyDemo"} {
+		assert.NotContains(t, activeSource, forbidden,
+			"active production frontend exposes legacy/global or unauthored capability %q", forbidden)
+	}
+	assert.Contains(t, adapterSource, "import * as desktopService from '../bindings/")
+	assert.Contains(t, adapterSource, "import { Clipboard, Events } from '@wailsio/runtime'")
+	assert.NotContains(t, masterSource, "@wailsio/runtime")
+	assert.NotContains(t, masterSource, "desktopService.")
+	assert.Contains(t, masterSource, "const desktopAPI = window.desktopAPI")
+	for _, presentation := range []string{"ready-local", "ready-public", "warning", "failed", "startupError", "tunnelError"} {
+		assert.Contains(t, masterSource, presentation,
+			"master startup presentation is missing existing-status projection %q", presentation)
+	}
+	assert.NotContains(t, masterSource, "status.phase")
+}
+
+func TestPackagedCompositionIgnoresExactDevelopmentPublicAccessEnvironment(t *testing.T) {
+	t.Parallel()
+	root := assetRepositoryRoot(t)
+	mainSource, err := os.ReadFile(filepath.Join(root, "main.go"))
+	require.NoError(t, err)
+	overrideSource, err := os.ReadFile(filepath.Join(root, "internal", "tunnel", "test_override.go"))
+	require.NoError(t, err)
+
+	active := string(mainSource) + "\n" + string(overrideSource)
+	for _, name := range []string{
+		"FALLOUT_NGROK_AUTHTOKEN", "FALLOUT_NGROK_RESERVED_DOMAIN",
+		"FALLOUT_PUBLIC_TEST_USERNAME", "FALLOUT_PUBLIC_TEST_PASSWORD",
+	} {
+		assert.Contains(t, active, name)
+	}
+	assert.Contains(t, string(mainSource), "publicAccessStoresForProfile(publicSettings, publicSecrets, packaged, os.LookupEnv)")
+	assert.Contains(t, string(mainSource), "packaged := isPackagedApplication()")
+	assert.Contains(t, string(mainSource), "if packaged")
+	assert.NotContains(t, string(overrideSource), "os.Environ")
+	assert.NotContains(t, active, `"NGROK_AUTHTOKEN"`)
 }
 
 func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
@@ -1453,8 +1757,7 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 		"//go:embed all:client/dist\nvar playerSource embed.FS",
 		`fs.Sub(frontendSource, "frontend/dist")`,
 		`fs.Sub(playerSource, "client/dist")`,
-		"Assets: frontendAssets",
-		"composeApplication(playerAssets)",
+		"composeApplication(host, playerAssets)",
 	}
 	for _, fragment := range requiredFragments {
 		assert.Falsef(t, !strings.Contains(source, fragment),
@@ -1466,6 +1769,23 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	assert.False(t, strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
 		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist"),
 		"master and remote-player assets share one embed directive; their serving boundaries must remain separate")
+
+	hostRaw, err := os.ReadFile(filepath.Join(root, "wails_host.go"))
+	require.NoError(t, err)
+	hostSource := string(hostRaw)
+	for _, fragment := range []string{
+		"application.New(wailsApplicationOptions(frontendAssets))",
+		"Handler: application.AssetFileServerFS(frontendAssets)",
+		"ApplicationShouldTerminateAfterLastWindowClosed: true",
+		"host.Window.NewWithOptions(masterWindowOptions())",
+		"host.RegisterService(application.NewService(newWailsLifecycleService(core)))",
+		"host.RegisterService(application.NewService(newDesktopService(core)))",
+	} {
+		assert.Contains(t, hostSource, fragment)
+	}
+	assert.NotContains(t, hostSource, "playerAssets")
+	assert.NotContains(t, hostSource, "PlayerService")
+	assert.Equal(t, 1, strings.Count(hostSource, "host.Window.NewWithOptions("))
 
 	viteConfig, err := os.ReadFile(filepath.Join(root, "frontend", "vite.config.js"))
 	if err != nil {
@@ -1538,6 +1858,70 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 	assert.False(t, !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`),
 		"production does not embed only the complete built player application")
 
+}
+
+func TestMacOSPackageVerificationCoversResourcesSignatureAndCanonicalIdentity(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	verifyRaw, err := os.ReadFile(filepath.Join(root, "scripts", "verify-macos-app.sh"))
+	require.NoError(t, err)
+	verify := string(verifyRaw)
+	for _, required := range []string{
+		"Contents/MacOS/Fallout Terminal",
+		"Contents/Info.plist",
+		"Contents/Resources",
+		"lipo -archs",
+		"LSMinimumSystemVersion",
+		"LC_BUILD_VERSION",
+		"icon.icns",
+		"sessions/demo.json",
+		"codesign -d --entitlements",
+		"codesign --verify --deep --strict",
+		"TestPackagePlanCompletesResourcesBeforeFinalSignature",
+		"hash-macos-app.sh",
+	} {
+		assert.Contains(t, verify, required)
+	}
+	assert.NotRegexp(t, regexp.MustCompile(`(^|[[:space:];|&])rg([[:space:]]|$)`), verify)
+
+	hashRaw, err := os.ReadFile(filepath.Join(root, "scripts", "hash-macos-app.sh"))
+	require.NoError(t, err)
+	hashSource := string(hashRaw)
+	for _, required := range []string{"LC_ALL=C sort -z", "stat -f '%Lp'", "shasum -a 256", "readlink", "bundle inventory changed while hashing", "--self-test"} {
+		assert.Contains(t, hashSource, required)
+	}
+}
+
+func TestActiveWailsV3DocumentsStaySeparateFromHistoricalEvidence(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	readmeRaw, err := os.ReadFile(filepath.Join(root, "README.md"))
+	require.NoError(t, err)
+	readme := string(readmeRaw)
+	assert.Contains(t, readme, "specs/006-wails-v3-migration/quickstart.md")
+	assert.Contains(t, readme, "docs/wails-v3-migration-rollback.md")
+	assert.Contains(t, readme, "неизменяемые исторические evidence")
+	assert.Contains(t, readme, "specs/001-wails-v2-migration/")
+	assert.Contains(t, readme, "docs/wails-migration-rollback.md")
+
+	scannerRaw, err := os.ReadFile(filepath.Join(root, "scripts", "wails-v3-cutover-check.sh"))
+	require.NoError(t, err)
+	scanner := string(scannerRaw)
+	for _, required := range []string{
+		"active Go source contains v2 or dual-runtime code",
+		"application module still resolves Wails v2",
+		"frontend source/generated/bundle contains a v2 global or dual-runtime fallback",
+		"active command/documentation uses v2, global, or floating Wails resolution",
+		"historical Wails v2 spec is missing",
+		"historical Electron-to-Wails rollback record is missing",
+		"git -C \"${repository_root}\" diff --exit-code -- specs/001-wails-v2-migration docs/wails-migration-rollback.md",
+		"go -C \"${repository_root}\" list -m all",
+	} {
+		assert.Contains(t, scanner, required)
+	}
+	assert.NotRegexp(t, regexp.MustCompile(`(^|[[:space:];|&])rg([[:space:]]|$)`), scanner)
 }
 
 func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
@@ -1682,6 +2066,13 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 			"master asset is missing terminal-switch resolution contract %q", fragment)
 
 	}
+	startBroadcast := strings.Index(masterJS, "btnStartBroadcast.addEventListener")
+	require.NotEqual(t, -1, startBroadcast, "master asset is missing the start-broadcast handler")
+	endBroadcast := strings.Index(masterJS[startBroadcast:], "btnEndBroadcast.addEventListener")
+	require.NotEqual(t, -1, endBroadcast, "master asset is missing the end-broadcast handler")
+	startBroadcastHandler := masterJS[startBroadcast : startBroadcast+endBroadcast]
+	assert.Contains(t, startBroadcastHandler, "renderTreeHeader()",
+		"start-broadcast success must refresh terminal controls after authoritative broadcast state changes")
 	for _, fragment := range []string{
 		`id="playerConfigStatus"`,
 		`id="btnOpenPlayerConfig"`,
@@ -1751,6 +2142,7 @@ func TestPlayerBundleImportsOnlyPublicGeneratedContractsAndNoGenericPrivateCarri
 		for _, forbidden := range []string{
 			"fallout/terminal/private", "fallout/terminal/persistence", "protojson", "base64",
 			"genericdispatch", "generic-dispatch", "forcehacksuccess", "resetfailedhack",
+			"@wailsio/runtime", "wailsjs", "window.desktopapi", "window.runtime", "websocket(",
 		} {
 			assert.Falsef(t, strings.Contains(source, forbidden),
 				"%s imports or carries private desktop semantic %q", relative, forbidden)
@@ -1766,7 +2158,7 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 	paths := []string{
 		"client/client.js", "client/sound.js", "client/index.html",
 		"internal/player", "internal/testutil/testdata", "tests/browser/fixture-server",
-		"go.mod", "README.md", "docs",
+		"README.md", "docs",
 	}
 	legacyIdentifiers := []string{
 		"SESSION_HELLO", "CHARACTER_SELECT", "NAV_ACTION", "HACK_GUESS", "HACK_PATTERN",
@@ -1817,6 +2209,16 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 				"active player surface %s retains a generic message dispatcher", candidate)
 
 		}
+	}
+
+	moduleRaw, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	require.NoError(t, err)
+	module := string(moduleRaw)
+	assert.False(t, regexp.MustCompile(`(?m)^\s*github\.com/coder/websocket\s+v\S+\s*$`).MatchString(module),
+		"the application must not directly depend on the removed public WebSocket transport")
+	if strings.Contains(module, "github.com/coder/websocket") {
+		assert.Contains(t, module, "github.com/coder/websocket v1.8.14 // indirect",
+			"only Wails v3's pinned private runtime transitive dependency may retain coder/websocket")
 	}
 	{
 
