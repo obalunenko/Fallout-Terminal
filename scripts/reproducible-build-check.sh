@@ -5,6 +5,8 @@ set -euo pipefail
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 
+application_bundle="build/bin/Fallout Terminal.app"
+application_executable="${application_bundle}/Contents/MacOS/Fallout Terminal"
 temporary="$(mktemp -d "${TMPDIR:-/tmp}/fallout-reproducible-build.XXXXXX")"
 trap 'rm -rf "${temporary}"' EXIT HUP INT TERM
 
@@ -44,9 +46,9 @@ run_once() {
   tree_digest frontend/bindings >"${temporary}/${run}.bindings"
   tree_digest client/dist >"${temporary}/${run}.client-dist"
   tree_digest frontend/dist >"${temporary}/${run}.frontend-dist"
-  shasum -a 256 "build/bin/Fallout Terminal" | awk '{print $1}' >"${temporary}/${run}.native"
-  scripts/verify-macos-app.sh "build/bin/Fallout Terminal.app"
-  scripts/hash-macos-app.sh "build/bin/Fallout Terminal.app" >"${temporary}/${run}.app"
+  shasum -a 256 "${application_executable}" | awk '{print $1}' >"${temporary}/${run}.native"
+  scripts/verify-macos-app.sh "${application_bundle}"
+  scripts/hash-macos-app.sh "${application_bundle}" >"${temporary}/${run}.app"
 }
 
 scripts/tool-modules-check.sh

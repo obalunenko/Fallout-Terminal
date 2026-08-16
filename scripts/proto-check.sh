@@ -5,6 +5,9 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repository_root}"
 export BUF_CACHE_DIR="${BUF_CACHE_DIR:-${TMPDIR:-/tmp}/fallout-terminal-buf-cache}"
 export GOCACHE="${GOCACHE:-${TMPDIR:-/tmp}/fallout-terminal-go-cache}"
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+export CGO_CFLAGS="${CGO_CFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"
+export CGO_LDFLAGS="${CGO_LDFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"
 
 generated_revision() {
   find internal/gen client/gen -type f -print \

@@ -190,6 +190,24 @@ func TestGoPackageOutputDeploymentTargetAndFinalSignOrderAreExplicit(t *testing.
 	assert.Less(t, compile, sign)
 }
 
+func TestReproducibleBuildHashesPackagedExecutableAndUsesQuietToolEnvironments(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	reproducible := readAcceptanceDocument(t, filepath.Join(root, "scripts", "reproducible-build-check.sh"))
+	assert.Contains(t, reproducible, `application_executable="${application_bundle}/Contents/MacOS/Fallout Terminal"`)
+	assert.NotContains(t, reproducible, `shasum -a 256 "build/bin/Fallout Terminal"`)
+
+	protoCheck := readAcceptanceDocument(t, filepath.Join(root, "scripts", "proto-check.sh"))
+	assert.Contains(t, protoCheck, `MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"`)
+	assert.Contains(t, protoCheck, `CGO_CFLAGS="${CGO_CFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"`)
+	assert.Contains(t, protoCheck, `CGO_LDFLAGS="${CGO_LDFLAGS:--mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET}}"`)
+
+	protoGenerate := readAcceptanceDocument(t, filepath.Join(root, "scripts", "proto-generate.sh"))
+	assert.Contains(t, protoGenerate, `node_major >= 22`)
+	assert.Contains(t, protoGenerate, `--no-experimental-webstorage`)
+}
+
 func TestWailsV3RollbackRecordHasIdentitySafetyTriggersAndHonestEvidenceFields(t *testing.T) {
 	t.Parallel()
 

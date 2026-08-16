@@ -47,6 +47,14 @@ require_version "protoc-gen-go" "$(go tool -modfile=tools/protoc-gen-go/go.mod p
 require_version "protoc-gen-connect-go" "$(go tool -modfile=tools/protoc-gen-connect-go/go.mod protoc-gen-connect-go --version)" "1.20.0"
 require_version "protoc-gen-es" "$(node -p "require('./client/node_modules/@bufbuild/protoc-gen-es/package.json').version")" "2.13.0"
 
+# Node 22+ exposes experimental Web Storage globals even when no persistence
+# file is configured. TypeScript VFS probes localStorage while protoc-gen-es is
+# loading, which otherwise emits a warning despite generation succeeding.
+node_major="$(node -p "process.versions.node.split('.')[0]")"
+if (( node_major >= 22 )) && [[ " ${NODE_OPTIONS:-} " != *" --no-experimental-webstorage "* ]]; then
+  export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--no-experimental-webstorage"
+fi
+
 actual_revision="$(schema_revision)"
 if [[ "${sync_revision}" == true ]]; then
   printf '%s\n' "${actual_revision}" > proto/schema-revision.txt
