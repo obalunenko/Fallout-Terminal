@@ -11,6 +11,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/control"
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
 	"github.com/obalunenko/Fallout-Terminal/internal/tunnel"
@@ -37,6 +38,88 @@ type publicIngressTransport struct {
 	host     string
 	username string
 	password string
+}
+
+func TestFirstPublicSnapshotRestoresPendingRejectedAndCompletedCommandState(t *testing.T) {
+	t.Parallel()
+
+	const commandID = "command-open-doors"
+	for _, test := range []struct {
+		name          string
+		phase         domain.CommandExecutionPhase
+		completed     bool
+		wantPhase     playerv1.CommandExecutionPhase
+		wantName      string
+		wantResult    string
+		wantCommandID bool
+	}{
+		{name: "pending", phase: domain.CommandExecutionPhasePending, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, wantName: "Open doors", wantResult: "Doors opened"},
+		{name: "rejected", phase: domain.CommandExecutionPhaseRejected, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED, wantName: "Open doors", wantResult: "Doors opened"},
+		{name: "completed", completed: true, wantName: "Doors open", wantResult: "Doors opened", wantCommandID: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			live := commandLifecycleLiveState(test.phase, test.completed)
+			domainSnapshot := &domain.PersonalizedSnapshot{
+				RecognitionHandle: "recognition-reconnect",
+				Revision:          40,
+				PlayerState: &domain.PlayerState{
+					SessionID: "session-controller", FallbackName: "PLAYER 1",
+					Role: domain.PlayerRoleActive, Phase: domain.PlayerPhaseControlling,
+					BroadcastID: "broadcast-1", ActiveTerminalID: "terminal-1",
+				},
+				Terminal: domain.TerminalPresentation{Live: live},
+			}
+			generated, err := SnapshotToProto(domainSnapshot)
+			require.NoError(t, err)
+			stream := NewSubscription(t.Context(), "physical-reconnect", "session-controller", &playerv1.SubscriptionMessage{
+				Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: generated},
+			}, 2)
+			t.Cleanup(stream.Close)
+
+			first := stream.Snapshot().GetSnapshot()
+			require.NotNil(t, first)
+			require.Equal(t, uint64(40), first.GetRevision())
+			require.Equal(t, "recognition-reconnect", first.GetRecognitionHandle())
+			require.Equal(t, playerv1.PlayerRole_PLAYER_ROLE_ACTIVE, first.GetPlayerState().GetRole())
+			terminal := first.GetTerminalPresentation().GetLiveTerminal()
+			require.NotNil(t, terminal)
+			command := terminal.GetTree().GetFolder().GetChildren()[0]
+			require.Equal(t, commandID, command.GetId())
+			require.Equal(t, test.wantName, command.GetName())
+			require.Equal(t, test.wantResult, command.GetCommand().GetText())
+			if test.completed {
+				require.Nil(t, terminal.GetCommandExecution())
+				if test.wantCommandID {
+					require.Equal(t, commandID, terminal.GetNavigation().GetCommandNodeId())
+				}
+			} else {
+				require.Equal(t, test.wantPhase, terminal.GetCommandExecution().GetPhase())
+				require.Equal(t, commandID, terminal.GetCommandExecution().GetCommandNodeId())
+				require.Empty(t, terminal.GetNavigation().GetCommandNodeId())
+			}
+		})
+	}
+}
+
+func commandLifecycleLiveState(phase domain.CommandExecutionPhase, completed bool) *domain.PublicLiveState {
+	const commandID = "command-open-doors"
+	name := "Open doors"
+	if completed {
+		name = "Doors open"
+	}
+	live := &domain.PublicLiveState{
+		TerminalID: "terminal-1", TerminalName: "Overseer",
+		Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{{
+			ID: commandID, Type: domain.NodeCommand, Name: name, Text: "Doors opened",
+		}}},
+		Nav: domain.NavState{Path: []string{"root"}, Mode: "list"},
+	}
+	if completed {
+		live.Nav.CommandNodeID = pointerTo(commandID)
+	} else {
+		live.CommandExecution = &domain.CommandExecutionPresentation{Phase: phase, CommandID: commandID}
+	}
+	return live
 }
 
 func (transport publicIngressTransport) RoundTrip(request *http.Request) (*http.Response, error) {

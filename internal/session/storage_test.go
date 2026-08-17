@@ -81,6 +81,38 @@ func TestStorageWriteAtomicKeepsOldTargetAndCleansTemporaryOnRenameFailure(t *te
 	}
 }
 
+func TestStorageWriteAtomicKeepsOldTargetAndSkipsRenameOnTemporaryWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	base := testutil.NewFakeFileSystem()
+	fileSystem := &writeFailingFileSystem{FakeFileSystem: base, err: errors.New("disk full")}
+	storage := NewStorage(fileSystem)
+	target := "/Users/test/Documents/Fallout Terminal/Sessions/campaign.json"
+	oldData := []byte("old complete document\n")
+	base.SeedFile(target, oldData)
+
+	err := storage.WriteAtomic(target, []byte("new document\n"))
+	if err == nil {
+		t.Fatal("WriteAtomic() error = nil, want temporary write failure")
+	}
+	if got, ok := base.File(target); !ok || !bytes.Equal(got, oldData) {
+		t.Fatalf("failed temporary write changed target: %q, %t", got, ok)
+	}
+	writes := base.WriteCalls()
+	if len(writes) != 1 {
+		t.Fatalf("WriteFile calls = %#v, want one failed temporary write", writes)
+	}
+	if renames := base.RenameCalls(); len(renames) != 0 {
+		t.Fatalf("failed temporary write attempted rename: %#v", renames)
+	}
+	if _, ok := base.File(writes[0].Path); ok {
+		t.Fatalf("failed temporary file %q remains", writes[0].Path)
+	}
+	if got := base.RemoveCalls(); !reflect.DeepEqual(got, []string{writes[0].Path}) {
+		t.Fatalf("Remove calls = %#v, want failed temporary cleanup", got)
+	}
+}
+
 func TestStorageCopyAtomicLeavesBundledDemoUnchanged(t *testing.T) {
 	t.Parallel()
 
@@ -116,4 +148,14 @@ type renameFailingFileSystem struct {
 func (fileSystem *renameFailingFileSystem) Rename(oldPath, newPath string) error {
 	fileSystem.RenameErrors[oldPath] = fileSystem.err
 	return fileSystem.FakeFileSystem.Rename(oldPath, newPath)
+}
+
+type writeFailingFileSystem struct {
+	*testutil.FakeFileSystem
+	err error
+}
+
+func (fileSystem *writeFailingFileSystem) WriteFile(path string, data []byte, perm fs.FileMode) error {
+	fileSystem.WriteErrors[path] = fileSystem.err
+	return fileSystem.FakeFileSystem.WriteFile(path, data, perm)
 }

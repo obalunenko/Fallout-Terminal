@@ -253,6 +253,52 @@ func (ActionReason) EnumDescriptor() ([]byte, []int) {
 	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{3}
 }
 
+type PlayerNoticeKind int32
+
+const (
+	PlayerNoticeKind_PLAYER_NOTICE_KIND_UNSPECIFIED                PlayerNoticeKind = 0
+	PlayerNoticeKind_PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED PlayerNoticeKind = 1
+)
+
+// Enum value maps for PlayerNoticeKind.
+var (
+	PlayerNoticeKind_name = map[int32]string{
+		0: "PLAYER_NOTICE_KIND_UNSPECIFIED",
+		1: "PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED",
+	}
+	PlayerNoticeKind_value = map[string]int32{
+		"PLAYER_NOTICE_KIND_UNSPECIFIED":                0,
+		"PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED": 1,
+	}
+)
+
+func (x PlayerNoticeKind) Enum() *PlayerNoticeKind {
+	p := new(PlayerNoticeKind)
+	*p = x
+	return p
+}
+
+func (x PlayerNoticeKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PlayerNoticeKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_fallout_terminal_player_v1_player_proto_enumTypes[4].Descriptor()
+}
+
+func (PlayerNoticeKind) Type() protoreflect.EnumType {
+	return &file_fallout_terminal_player_v1_player_proto_enumTypes[4]
+}
+
+func (x PlayerNoticeKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PlayerNoticeKind.Descriptor instead.
+func (PlayerNoticeKind) EnumDescriptor() ([]byte, []int) {
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{4}
+}
+
 type RosterEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CharacterId   string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
@@ -365,6 +411,50 @@ func (x *AssignedCharacter) GetDisplayName() string {
 	return ""
 }
 
+type PlayerNotice struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          PlayerNoticeKind       `protobuf:"varint,1,opt,name=kind,proto3,enum=fallout.terminal.player.v1.PlayerNoticeKind" json:"kind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlayerNotice) Reset() {
+	*x = PlayerNotice{}
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlayerNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerNotice) ProtoMessage() {}
+
+func (x *PlayerNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerNotice.ProtoReflect.Descriptor instead.
+func (*PlayerNotice) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PlayerNotice) GetKind() PlayerNoticeKind {
+	if x != nil {
+		return x.Kind
+	}
+	return PlayerNoticeKind_PLAYER_NOTICE_KIND_UNSPECIFIED
+}
+
 type PlayerState struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	LogicalSessionId  string                 `protobuf:"bytes,1,opt,name=logical_session_id,json=logicalSessionId,proto3" json:"logical_session_id,omitempty"`
@@ -375,13 +465,14 @@ type PlayerState struct {
 	BroadcastId       *string                `protobuf:"bytes,6,opt,name=broadcast_id,json=broadcastId,proto3,oneof" json:"broadcast_id,omitempty"`
 	ActiveTerminalId  *string                `protobuf:"bytes,7,opt,name=active_terminal_id,json=activeTerminalId,proto3,oneof" json:"active_terminal_id,omitempty"`
 	Roster            []*RosterEntry         `protobuf:"bytes,8,rep,name=roster,proto3" json:"roster,omitempty"`
+	Notice            *PlayerNotice          `protobuf:"bytes,9,opt,name=notice,proto3,oneof" json:"notice,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *PlayerState) Reset() {
 	*x = PlayerState{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[2]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -393,7 +484,7 @@ func (x *PlayerState) String() string {
 func (*PlayerState) ProtoMessage() {}
 
 func (x *PlayerState) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[2]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -406,7 +497,7 @@ func (x *PlayerState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerState.ProtoReflect.Descriptor instead.
 func (*PlayerState) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{2}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PlayerState) GetLogicalSessionId() string {
@@ -465,6 +556,13 @@ func (x *PlayerState) GetRoster() []*RosterEntry {
 	return nil
 }
 
+func (x *PlayerState) GetNotice() *PlayerNotice {
+	if x != nil {
+		return x.Notice
+	}
+	return nil
+}
+
 type SubscribeRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	RecognitionHandle *string                `protobuf:"bytes,1,opt,name=recognition_handle,json=recognitionHandle,proto3,oneof" json:"recognition_handle,omitempty"`
@@ -474,7 +572,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[3]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +584,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[3]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -499,7 +597,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{3}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SubscribeRequest) GetRecognitionHandle() string {
@@ -521,7 +619,7 @@ type PersonalizedSnapshot struct {
 
 func (x *PersonalizedSnapshot) Reset() {
 	*x = PersonalizedSnapshot{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[4]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -533,7 +631,7 @@ func (x *PersonalizedSnapshot) String() string {
 func (*PersonalizedSnapshot) ProtoMessage() {}
 
 func (x *PersonalizedSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[4]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -546,7 +644,7 @@ func (x *PersonalizedSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PersonalizedSnapshot.ProtoReflect.Descriptor instead.
 func (*PersonalizedSnapshot) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{4}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PersonalizedSnapshot) GetRecognitionHandle() string {
@@ -590,7 +688,7 @@ type CompoundUpdate struct {
 
 func (x *CompoundUpdate) Reset() {
 	*x = CompoundUpdate{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[5]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +700,7 @@ func (x *CompoundUpdate) String() string {
 func (*CompoundUpdate) ProtoMessage() {}
 
 func (x *CompoundUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[5]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +713,7 @@ func (x *CompoundUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompoundUpdate.ProtoReflect.Descriptor instead.
 func (*CompoundUpdate) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{5}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CompoundUpdate) GetRevision() uint64 {
@@ -666,7 +764,7 @@ type SubscriptionMessage struct {
 
 func (x *SubscriptionMessage) Reset() {
 	*x = SubscriptionMessage{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[6]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +776,7 @@ func (x *SubscriptionMessage) String() string {
 func (*SubscriptionMessage) ProtoMessage() {}
 
 func (x *SubscriptionMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[6]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +789,7 @@ func (x *SubscriptionMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscriptionMessage.ProtoReflect.Descriptor instead.
 func (*SubscriptionMessage) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{6}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SubscriptionMessage) GetPayload() isSubscriptionMessage_Payload {
@@ -747,7 +845,7 @@ type SelectCharacterRequest struct {
 
 func (x *SelectCharacterRequest) Reset() {
 	*x = SelectCharacterRequest{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[7]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +857,7 @@ func (x *SelectCharacterRequest) String() string {
 func (*SelectCharacterRequest) ProtoMessage() {}
 
 func (x *SelectCharacterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[7]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +870,7 @@ func (x *SelectCharacterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SelectCharacterRequest.ProtoReflect.Descriptor instead.
 func (*SelectCharacterRequest) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{7}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SelectCharacterRequest) GetRecognitionHandle() string {
@@ -815,7 +913,7 @@ type ActionResult struct {
 
 func (x *ActionResult) Reset() {
 	*x = ActionResult{}
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[8]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -827,7 +925,7 @@ func (x *ActionResult) String() string {
 func (*ActionResult) ProtoMessage() {}
 
 func (x *ActionResult) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[8]
+	mi := &file_fallout_terminal_player_v1_player_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -840,7 +938,7 @@ func (x *ActionResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResult.ProtoReflect.Descriptor instead.
 func (*ActionResult) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{8}
+	return file_fallout_terminal_player_v1_player_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ActionResult) GetRequestId() string {
@@ -882,7 +980,9 @@ const file_fallout_terminal_player_v1_player_proto_rawDesc = "" +
 	"\favailability\x18\x03 \x01(\x0e2..fallout.terminal.player.v1.RosterAvailabilityR\favailability\"Y\n" +
 	"\x11AssignedCharacter\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\"\xfd\x03\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\"P\n" +
+	"\fPlayerNotice\x12@\n" +
+	"\x04kind\x18\x01 \x01(\x0e2,.fallout.terminal.player.v1.PlayerNoticeKindR\x04kind\"\xcf\x04\n" +
 	"\vPlayerState\x12,\n" +
 	"\x12logical_session_id\x18\x01 \x01(\tR\x10logicalSessionId\x12#\n" +
 	"\rfallback_name\x18\x02 \x01(\tR\ffallbackName\x12\\\n" +
@@ -891,9 +991,11 @@ const file_fallout_terminal_player_v1_player_proto_rawDesc = "" +
 	"\x05phase\x18\x05 \x01(\x0e2'.fallout.terminal.player.v1.PlayerPhaseR\x05phase\x12&\n" +
 	"\fbroadcast_id\x18\x06 \x01(\tH\x00R\vbroadcastId\x88\x01\x01\x121\n" +
 	"\x12active_terminal_id\x18\a \x01(\tH\x01R\x10activeTerminalId\x88\x01\x01\x12?\n" +
-	"\x06roster\x18\b \x03(\v2'.fallout.terminal.player.v1.RosterEntryR\x06rosterB\x0f\n" +
+	"\x06roster\x18\b \x03(\v2'.fallout.terminal.player.v1.RosterEntryR\x06roster\x12E\n" +
+	"\x06notice\x18\t \x01(\v2(.fallout.terminal.player.v1.PlayerNoticeH\x02R\x06notice\x88\x01\x01B\x0f\n" +
 	"\r_broadcast_idB\x15\n" +
-	"\x13_active_terminal_id\"]\n" +
+	"\x13_active_terminal_idB\t\n" +
+	"\a_notice\"]\n" +
 	"\x10SubscribeRequest\x122\n" +
 	"\x12recognition_handle\x18\x01 \x01(\tH\x00R\x11recognitionHandle\x88\x01\x01B\x15\n" +
 	"\x13_recognition_handle\"\x94\x02\n" +
@@ -955,7 +1057,10 @@ const file_fallout_terminal_player_v1_player_proto_rawDesc = "" +
 	"\x1cACTION_REASON_INVALID_ACTION\x10\b\x12\x1a\n" +
 	"\x16ACTION_REASON_CONFLICT\x10\t\x12\x1b\n" +
 	"\x17ACTION_REASON_DUPLICATE\x10\n" +
-	"2\x95\x05\n" +
+	"*i\n" +
+	"\x10PlayerNoticeKind\x12\"\n" +
+	"\x1ePLAYER_NOTICE_KIND_UNSPECIFIED\x10\x00\x121\n" +
+	"-PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED\x10\x012\x95\x05\n" +
 	"\rPlayerService\x12l\n" +
 	"\tSubscribe\x12,.fallout.terminal.player.v1.SubscribeRequest\x1a/.fallout.terminal.player.v1.SubscriptionMessage0\x01\x12o\n" +
 	"\x0fSelectCharacter\x122.fallout.terminal.player.v1.SelectCharacterRequest\x1a(.fallout.terminal.player.v1.ActionResult\x12a\n" +
@@ -976,63 +1081,67 @@ func file_fallout_terminal_player_v1_player_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_player_v1_player_proto_rawDescData
 }
 
-var file_fallout_terminal_player_v1_player_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_fallout_terminal_player_v1_player_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_fallout_terminal_player_v1_player_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_fallout_terminal_player_v1_player_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_fallout_terminal_player_v1_player_proto_goTypes = []any{
 	(PlayerRole)(0),                // 0: fallout.terminal.player.v1.PlayerRole
 	(PlayerPhase)(0),               // 1: fallout.terminal.player.v1.PlayerPhase
 	(RosterAvailability)(0),        // 2: fallout.terminal.player.v1.RosterAvailability
 	(ActionReason)(0),              // 3: fallout.terminal.player.v1.ActionReason
-	(*RosterEntry)(nil),            // 4: fallout.terminal.player.v1.RosterEntry
-	(*AssignedCharacter)(nil),      // 5: fallout.terminal.player.v1.AssignedCharacter
-	(*PlayerState)(nil),            // 6: fallout.terminal.player.v1.PlayerState
-	(*SubscribeRequest)(nil),       // 7: fallout.terminal.player.v1.SubscribeRequest
-	(*PersonalizedSnapshot)(nil),   // 8: fallout.terminal.player.v1.PersonalizedSnapshot
-	(*CompoundUpdate)(nil),         // 9: fallout.terminal.player.v1.CompoundUpdate
-	(*SubscriptionMessage)(nil),    // 10: fallout.terminal.player.v1.SubscriptionMessage
-	(*SelectCharacterRequest)(nil), // 11: fallout.terminal.player.v1.SelectCharacterRequest
-	(*ActionResult)(nil),           // 12: fallout.terminal.player.v1.ActionResult
-	(*TerminalPresentation)(nil),   // 13: fallout.terminal.player.v1.TerminalPresentation
-	(*NavigationState)(nil),        // 14: fallout.terminal.player.v1.NavigationState
-	(*PublicHackState)(nil),        // 15: fallout.terminal.player.v1.PublicHackState
-	(*NavigateRequest)(nil),        // 16: fallout.terminal.player.v1.NavigateRequest
-	(*GuessRequest)(nil),           // 17: fallout.terminal.player.v1.GuessRequest
-	(*ActivatePatternRequest)(nil), // 18: fallout.terminal.player.v1.ActivatePatternRequest
-	(*SoundManifestRequest)(nil),   // 19: fallout.terminal.player.v1.SoundManifestRequest
-	(*SoundManifestResponse)(nil),  // 20: fallout.terminal.player.v1.SoundManifestResponse
+	(PlayerNoticeKind)(0),          // 4: fallout.terminal.player.v1.PlayerNoticeKind
+	(*RosterEntry)(nil),            // 5: fallout.terminal.player.v1.RosterEntry
+	(*AssignedCharacter)(nil),      // 6: fallout.terminal.player.v1.AssignedCharacter
+	(*PlayerNotice)(nil),           // 7: fallout.terminal.player.v1.PlayerNotice
+	(*PlayerState)(nil),            // 8: fallout.terminal.player.v1.PlayerState
+	(*SubscribeRequest)(nil),       // 9: fallout.terminal.player.v1.SubscribeRequest
+	(*PersonalizedSnapshot)(nil),   // 10: fallout.terminal.player.v1.PersonalizedSnapshot
+	(*CompoundUpdate)(nil),         // 11: fallout.terminal.player.v1.CompoundUpdate
+	(*SubscriptionMessage)(nil),    // 12: fallout.terminal.player.v1.SubscriptionMessage
+	(*SelectCharacterRequest)(nil), // 13: fallout.terminal.player.v1.SelectCharacterRequest
+	(*ActionResult)(nil),           // 14: fallout.terminal.player.v1.ActionResult
+	(*TerminalPresentation)(nil),   // 15: fallout.terminal.player.v1.TerminalPresentation
+	(*NavigationState)(nil),        // 16: fallout.terminal.player.v1.NavigationState
+	(*PublicHackState)(nil),        // 17: fallout.terminal.player.v1.PublicHackState
+	(*NavigateRequest)(nil),        // 18: fallout.terminal.player.v1.NavigateRequest
+	(*GuessRequest)(nil),           // 19: fallout.terminal.player.v1.GuessRequest
+	(*ActivatePatternRequest)(nil), // 20: fallout.terminal.player.v1.ActivatePatternRequest
+	(*SoundManifestRequest)(nil),   // 21: fallout.terminal.player.v1.SoundManifestRequest
+	(*SoundManifestResponse)(nil),  // 22: fallout.terminal.player.v1.SoundManifestResponse
 }
 var file_fallout_terminal_player_v1_player_proto_depIdxs = []int32{
 	2,  // 0: fallout.terminal.player.v1.RosterEntry.availability:type_name -> fallout.terminal.player.v1.RosterAvailability
-	5,  // 1: fallout.terminal.player.v1.PlayerState.assigned_character:type_name -> fallout.terminal.player.v1.AssignedCharacter
-	0,  // 2: fallout.terminal.player.v1.PlayerState.role:type_name -> fallout.terminal.player.v1.PlayerRole
-	1,  // 3: fallout.terminal.player.v1.PlayerState.phase:type_name -> fallout.terminal.player.v1.PlayerPhase
-	4,  // 4: fallout.terminal.player.v1.PlayerState.roster:type_name -> fallout.terminal.player.v1.RosterEntry
-	6,  // 5: fallout.terminal.player.v1.PersonalizedSnapshot.player_state:type_name -> fallout.terminal.player.v1.PlayerState
-	13, // 6: fallout.terminal.player.v1.PersonalizedSnapshot.terminal_presentation:type_name -> fallout.terminal.player.v1.TerminalPresentation
-	6,  // 7: fallout.terminal.player.v1.CompoundUpdate.player_state:type_name -> fallout.terminal.player.v1.PlayerState
-	13, // 8: fallout.terminal.player.v1.CompoundUpdate.terminal_presentation:type_name -> fallout.terminal.player.v1.TerminalPresentation
-	14, // 9: fallout.terminal.player.v1.CompoundUpdate.navigation:type_name -> fallout.terminal.player.v1.NavigationState
-	15, // 10: fallout.terminal.player.v1.CompoundUpdate.hacking:type_name -> fallout.terminal.player.v1.PublicHackState
-	8,  // 11: fallout.terminal.player.v1.SubscriptionMessage.snapshot:type_name -> fallout.terminal.player.v1.PersonalizedSnapshot
-	9,  // 12: fallout.terminal.player.v1.SubscriptionMessage.update:type_name -> fallout.terminal.player.v1.CompoundUpdate
-	3,  // 13: fallout.terminal.player.v1.ActionResult.reason:type_name -> fallout.terminal.player.v1.ActionReason
-	7,  // 14: fallout.terminal.player.v1.PlayerService.Subscribe:input_type -> fallout.terminal.player.v1.SubscribeRequest
-	11, // 15: fallout.terminal.player.v1.PlayerService.SelectCharacter:input_type -> fallout.terminal.player.v1.SelectCharacterRequest
-	16, // 16: fallout.terminal.player.v1.PlayerService.Navigate:input_type -> fallout.terminal.player.v1.NavigateRequest
-	17, // 17: fallout.terminal.player.v1.PlayerService.Guess:input_type -> fallout.terminal.player.v1.GuessRequest
-	18, // 18: fallout.terminal.player.v1.PlayerService.ActivatePattern:input_type -> fallout.terminal.player.v1.ActivatePatternRequest
-	19, // 19: fallout.terminal.player.v1.PlayerService.SoundManifest:input_type -> fallout.terminal.player.v1.SoundManifestRequest
-	10, // 20: fallout.terminal.player.v1.PlayerService.Subscribe:output_type -> fallout.terminal.player.v1.SubscriptionMessage
-	12, // 21: fallout.terminal.player.v1.PlayerService.SelectCharacter:output_type -> fallout.terminal.player.v1.ActionResult
-	12, // 22: fallout.terminal.player.v1.PlayerService.Navigate:output_type -> fallout.terminal.player.v1.ActionResult
-	12, // 23: fallout.terminal.player.v1.PlayerService.Guess:output_type -> fallout.terminal.player.v1.ActionResult
-	12, // 24: fallout.terminal.player.v1.PlayerService.ActivatePattern:output_type -> fallout.terminal.player.v1.ActionResult
-	20, // 25: fallout.terminal.player.v1.PlayerService.SoundManifest:output_type -> fallout.terminal.player.v1.SoundManifestResponse
-	20, // [20:26] is the sub-list for method output_type
-	14, // [14:20] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	4,  // 1: fallout.terminal.player.v1.PlayerNotice.kind:type_name -> fallout.terminal.player.v1.PlayerNoticeKind
+	6,  // 2: fallout.terminal.player.v1.PlayerState.assigned_character:type_name -> fallout.terminal.player.v1.AssignedCharacter
+	0,  // 3: fallout.terminal.player.v1.PlayerState.role:type_name -> fallout.terminal.player.v1.PlayerRole
+	1,  // 4: fallout.terminal.player.v1.PlayerState.phase:type_name -> fallout.terminal.player.v1.PlayerPhase
+	5,  // 5: fallout.terminal.player.v1.PlayerState.roster:type_name -> fallout.terminal.player.v1.RosterEntry
+	7,  // 6: fallout.terminal.player.v1.PlayerState.notice:type_name -> fallout.terminal.player.v1.PlayerNotice
+	8,  // 7: fallout.terminal.player.v1.PersonalizedSnapshot.player_state:type_name -> fallout.terminal.player.v1.PlayerState
+	15, // 8: fallout.terminal.player.v1.PersonalizedSnapshot.terminal_presentation:type_name -> fallout.terminal.player.v1.TerminalPresentation
+	8,  // 9: fallout.terminal.player.v1.CompoundUpdate.player_state:type_name -> fallout.terminal.player.v1.PlayerState
+	15, // 10: fallout.terminal.player.v1.CompoundUpdate.terminal_presentation:type_name -> fallout.terminal.player.v1.TerminalPresentation
+	16, // 11: fallout.terminal.player.v1.CompoundUpdate.navigation:type_name -> fallout.terminal.player.v1.NavigationState
+	17, // 12: fallout.terminal.player.v1.CompoundUpdate.hacking:type_name -> fallout.terminal.player.v1.PublicHackState
+	10, // 13: fallout.terminal.player.v1.SubscriptionMessage.snapshot:type_name -> fallout.terminal.player.v1.PersonalizedSnapshot
+	11, // 14: fallout.terminal.player.v1.SubscriptionMessage.update:type_name -> fallout.terminal.player.v1.CompoundUpdate
+	3,  // 15: fallout.terminal.player.v1.ActionResult.reason:type_name -> fallout.terminal.player.v1.ActionReason
+	9,  // 16: fallout.terminal.player.v1.PlayerService.Subscribe:input_type -> fallout.terminal.player.v1.SubscribeRequest
+	13, // 17: fallout.terminal.player.v1.PlayerService.SelectCharacter:input_type -> fallout.terminal.player.v1.SelectCharacterRequest
+	18, // 18: fallout.terminal.player.v1.PlayerService.Navigate:input_type -> fallout.terminal.player.v1.NavigateRequest
+	19, // 19: fallout.terminal.player.v1.PlayerService.Guess:input_type -> fallout.terminal.player.v1.GuessRequest
+	20, // 20: fallout.terminal.player.v1.PlayerService.ActivatePattern:input_type -> fallout.terminal.player.v1.ActivatePatternRequest
+	21, // 21: fallout.terminal.player.v1.PlayerService.SoundManifest:input_type -> fallout.terminal.player.v1.SoundManifestRequest
+	12, // 22: fallout.terminal.player.v1.PlayerService.Subscribe:output_type -> fallout.terminal.player.v1.SubscriptionMessage
+	14, // 23: fallout.terminal.player.v1.PlayerService.SelectCharacter:output_type -> fallout.terminal.player.v1.ActionResult
+	14, // 24: fallout.terminal.player.v1.PlayerService.Navigate:output_type -> fallout.terminal.player.v1.ActionResult
+	14, // 25: fallout.terminal.player.v1.PlayerService.Guess:output_type -> fallout.terminal.player.v1.ActionResult
+	14, // 26: fallout.terminal.player.v1.PlayerService.ActivatePattern:output_type -> fallout.terminal.player.v1.ActionResult
+	22, // 27: fallout.terminal.player.v1.PlayerService.SoundManifest:output_type -> fallout.terminal.player.v1.SoundManifestResponse
+	22, // [22:28] is the sub-list for method output_type
+	16, // [16:22] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_player_v1_player_proto_init() }
@@ -1044,9 +1153,9 @@ func file_fallout_terminal_player_v1_player_proto_init() {
 	file_fallout_terminal_player_v1_navigation_proto_init()
 	file_fallout_terminal_player_v1_sound_proto_init()
 	file_fallout_terminal_player_v1_terminal_proto_init()
-	file_fallout_terminal_player_v1_player_proto_msgTypes[2].OneofWrappers = []any{}
 	file_fallout_terminal_player_v1_player_proto_msgTypes[3].OneofWrappers = []any{}
-	file_fallout_terminal_player_v1_player_proto_msgTypes[6].OneofWrappers = []any{
+	file_fallout_terminal_player_v1_player_proto_msgTypes[4].OneofWrappers = []any{}
+	file_fallout_terminal_player_v1_player_proto_msgTypes[7].OneofWrappers = []any{
 		(*SubscriptionMessage_Snapshot)(nil),
 		(*SubscriptionMessage_Update)(nil),
 	}
@@ -1055,8 +1164,8 @@ func file_fallout_terminal_player_v1_player_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_player_v1_player_proto_rawDesc), len(file_fallout_terminal_player_v1_player_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   9,
+			NumEnums:      5,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

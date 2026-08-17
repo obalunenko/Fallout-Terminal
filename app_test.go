@@ -957,6 +957,167 @@ func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *t
 
 }
 
+func TestCommandStateResetRejectsBlankStableIDsBeforeMutation(t *testing.T) {
+	recorder := &callRecorder{}
+	sessions := &recordingCommandStateSession{recordingSessionService: recordingSessionService{recorder: recorder}}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Events:   &recordingEventSink{recorder: recorder},
+		Player:   &recordingPlayerServer{recorder: recorder},
+	})
+
+	for _, payload := range []ResetCommandStatePayload{
+		{TerminalID: " ", CommandID: "command-stable-1"},
+		{TerminalID: "terminal-stable-1", CommandID: "\t"},
+	} {
+		result := app.ResetCommandState(payload)
+		require.False(t, result.OK)
+		require.NotEmpty(t, result.Error)
+		require.Zero(t, result.Revision)
+		require.Nil(t, result.Session)
+	}
+
+	terminalResult := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: "\n"})
+	require.False(t, terminalResult.OK)
+	require.NotEmpty(t, terminalResult.Error)
+	require.Empty(t, sessions.resetOneCalls)
+	require.Empty(t, sessions.resetTerminalCalls)
+	require.Empty(t, recorder.Calls())
+}
+
+func TestResetCommandStatePublishesCanonicalSessionAfterDurabilityAndRefreshesActiveTerminalOnce(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	delete(session.Terminals[0].CommandStates, "command-stable-1")
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 41, Session: &session,
+		},
+	}
+	activeTerminalID := "terminal-stable-1"
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 9,
+			Broadcast: &domain.MasterBroadcastState{
+				ID: "broadcast-1", ActiveTerminalID: &activeTerminalID,
+			},
+		}},
+		order: recorder,
+	}
+	events := &recordingEventSink{recorder: recorder}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination, Events: events,
+		Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{
+		TerminalID: " terminal-stable-1 ", CommandID: " command-stable-1 ",
+	})
+	require.True(t, result.OK)
+	require.Empty(t, result.Error)
+	require.Equal(t, uint64(41), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, [][2]string{{"terminal-stable-1", "command-stable-1"}}, sessions.resetOneCalls)
+	require.Equal(t, 1, coordination.updateCalls)
+	require.Equal(t, session.Terminals[0].Root, coordination.updateTree)
+	calls := recorder.Calls()
+	require.NotEmpty(t, calls)
+	require.Equal(t, "session:reset-command-state:terminal-stable-1:command-stable-1", calls[0])
+	require.Equal(t, "coordinator:update-live-terminal:terminal-stable-1", calls[1])
+	require.ElementsMatch(t, []string{"event:coordination-state", "event:session-state"}, calls[2:])
+
+	records := events.Records()
+	require.Len(t, records, 2)
+	require.Equal(t, coordinationStateEvent, records[0].Name)
+	require.Equal(t, sessionStateEvent, records[1].Name)
+	event, ok := records[1].Payload.(SessionStateEvent)
+	require.True(t, ok, "session-state payload = %#v", records[1].Payload)
+	require.Equal(t, uint64(41), event.Revision)
+	require.Equal(t, &session, event.Session)
+}
+
+func TestResetCommandStateNoOpReturnsCanonicalRevisionWithoutPublication(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	delete(session.Terminals[0].CommandStates, "command-stable-1")
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult: sessionservice.CommandStateResult{
+			OK: true, Changed: false, Revision: 19, Session: &session,
+		},
+	}
+	activeTerminalID := "terminal-stable-1"
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: &recordingEventSink{recorder: recorder}, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{TerminalID: "terminal-stable-1", CommandID: "command-stable-1"})
+	require.True(t, result.OK)
+	require.Equal(t, uint64(19), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, []string{"session:reset-command-state:terminal-stable-1:command-stable-1"}, recorder.Calls())
+}
+
+func TestResetTerminalCommandStatesUsesOneMutationAndDoesNotRefreshInactiveTerminal(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	session.Terminals[0].CommandStates = nil
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetTerminalResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 52, Session: &session,
+		},
+	}
+	activeTerminalID := "another-terminal"
+	events := &recordingEventSink{recorder: recorder}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: events, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: " terminal-stable-1 "})
+	require.True(t, result.OK)
+	require.Equal(t, uint64(52), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, []string{"terminal-stable-1"}, sessions.resetTerminalCalls)
+	require.Equal(t, []string{
+		"session:reset-terminal-command-states:terminal-stable-1",
+		"event:session-state",
+	}, recorder.Calls())
+	require.Len(t, events.Records(), 1)
+}
+
+func TestCommandStateResetFailureDoesNotPublishSessionOrPlayerState(t *testing.T) {
+	recorder := &callRecorder{}
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult:          sessionservice.CommandStateResult{Error: "could not persist command state"},
+	}
+	activeTerminalID := "terminal-stable-1"
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: &recordingEventSink{recorder: recorder}, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{TerminalID: "terminal-stable-1", CommandID: "command-stable-1"})
+	require.False(t, result.OK)
+	require.NotEmpty(t, result.Error)
+	require.Zero(t, result.Revision)
+	require.Nil(t, result.Session)
+	require.Equal(t, []string{"session:reset-command-state:terminal-stable-1:command-stable-1"}, recorder.Calls())
+}
+
 func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *testing.T) {
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
@@ -1439,6 +1600,52 @@ type recordingPlayerServer struct {
 type recordingSessionService struct {
 	recorder      *callRecorder
 	shutdownCalls int
+}
+
+type recordingCommandStateSession struct {
+	recordingSessionService
+	resetOneResult      sessionservice.CommandStateResult
+	resetTerminalResult sessionservice.CommandStateResult
+	resetOneCalls       [][2]string
+	resetTerminalCalls  []string
+}
+
+func (service *recordingCommandStateSession) ResetCommandState(_ context.Context, terminalID, commandID string) sessionservice.CommandStateResult {
+	service.resetOneCalls = append(service.resetOneCalls, [2]string{terminalID, commandID})
+	if service.recorder != nil {
+		service.recorder.Add("session:reset-command-state:" + terminalID + ":" + commandID)
+	}
+	return service.resetOneResult
+}
+
+func (service *recordingCommandStateSession) ResetTerminalCommandStates(_ context.Context, terminalID string) sessionservice.CommandStateResult {
+	service.resetTerminalCalls = append(service.resetTerminalCalls, terminalID)
+	if service.recorder != nil {
+		service.recorder.Add("session:reset-terminal-command-states:" + terminalID)
+	}
+	return service.resetTerminalResult
+}
+
+func commandStateResetSessionFixture() domain.Session {
+	return domain.Session{
+		Version: 1,
+		Name:    "Stable ID reset fixture",
+		Terminals: []domain.Terminal{{
+			ID:        "terminal-stable-1",
+			Name:      "Overseer terminal",
+			HackLevel: 0,
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{{
+					ID: "command-stable-1", Type: domain.NodeCommand, Name: "Open doors", Text: "Doors opened",
+					StateChange: &domain.StateChangeConfig{CompletedName: "Doors open", ConfirmationText: "Open the doors?"},
+				}},
+			},
+			CommandStates: map[string]domain.CommandExecutionState{
+				"command-stable-1": {CompletedName: "Doors open", ResultText: "Doors opened"},
+			},
+		}},
+	}
 }
 
 type recordingPlayerConfigSession struct {

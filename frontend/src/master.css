@@ -362,6 +362,12 @@ button {
 }
 .tree-row:hover { background: #14180f; }
 .tree-row.selected { background: #1c2712; border-color: #6fae55; }
+.tree-row.command-completed .tree-label { color: #ffe08a; }
+.tree-row.command-completed .tree-label::after {
+  content: ' · ВЫПОЛНЕНО';
+  color: #6f9a5f;
+  font-size: 9px;
+}
 .tree-caret { width: 12px; display: inline-block; color: #6f9a5f; font-size: 10px; }
 .tree-icon { color: #d0a63a; font-size: 12px; width: 46px; display: inline-block; }
 .tree-icon.folder { color: #7fc0ff; }
@@ -396,6 +402,58 @@ button {
 .field-textarea { resize: vertical; min-height: 100px; }
 .node-type-label { color: #ffe08a; font-size: 12px; margin-bottom: 4px; }
 .node-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+.state-change-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: #b9ffb0;
+  font-size: 11px;
+  letter-spacing: .5px;
+}
+.state-change-toggle input { accent-color: #6fae55; }
+.state-change-toggle-hint {
+  margin-top: 5px;
+  color: #6f9a5f;
+  font-size: 9px;
+  line-height: 1.35;
+}
+.state-change-fields[hidden] { display: none; }
+.state-change-textarea { min-height: 72px; }
+.node-validation-error {
+  margin-top: 10px;
+  padding: 7px;
+  border: 1px solid #8a3a2a;
+  background: #1d0e0a;
+  color: #ff9a7a;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.node-validation-error[hidden] { display: none; }
+.command-execution-snapshot {
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid #6f9a5f;
+  background: #11170d;
+}
+.command-execution-heading {
+  margin-bottom: 8px;
+  color: #ffe08a;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.command-execution-label {
+  margin-top: 6px;
+  color: #6f9a5f;
+  font-size: 9px;
+}
+.command-execution-value {
+  margin-top: 2px;
+  color: #d8ffb8;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.command-execution-result { white-space: pre-wrap; }
 
 /* ── Public access ─────────────────────────────────────── */
 .public-access {
@@ -530,6 +588,11 @@ button {
   margin-right: 8px;
 }
 .settings-textarea { min-height: 56px; width: 100%; }
+.command-state-terminal-actions {
+  padding-top: 8px;
+  border-top: 1px dashed #253018;
+}
+.command-state-terminal-actions[hidden] { display: none; }
 
 /* ── Hack status (term panel footer) ──────────────────── */
 .hack-status {

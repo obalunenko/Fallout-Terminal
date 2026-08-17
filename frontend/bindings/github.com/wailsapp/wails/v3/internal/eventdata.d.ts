@@ -20,6 +20,7 @@ declare module "@wailsio/runtime" {
             "hack-state": domain$0.PublicHackState | null;
             "public-access-status": main$0.PublicAccessSnapshot;
             "server-info": domain$0.ServerInfo;
+            "session-state": main$0.SessionStateEvent;
         }
     }
 }

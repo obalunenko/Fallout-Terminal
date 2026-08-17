@@ -95,6 +95,12 @@ func TestApplyAction(t *testing.T) {
 			want:   Default(),
 		},
 		{
+			name:   "back at root closes command result",
+			state:  navState([]string{"root"}, "list", "", "root-command"),
+			action: "back",
+			want:   Default(),
+		},
+		{
 			name:   "unknown action is a no-op",
 			state:  Default(),
 			action: "launch",

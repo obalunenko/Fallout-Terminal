@@ -1,3 +1,59 @@
+function stateChangingAuthoringSession() {
+  return {
+    version: 1,
+    name: 'State-changing authoring fixture',
+    terminals: [{
+      id: 'terminal-stateful',
+      name: 'Терминал охраны',
+      hackLevel: 0,
+      introText: '',
+      root: {
+        id: 'root',
+        type: 'folder',
+        name: 'ROOT',
+        children: [
+          {
+            id: 'emergency-lights',
+            type: 'command',
+            name: 'Включить аварийный свет',
+            text: 'Аварийное освещение включено.',
+          },
+          {
+            id: 'doors',
+            type: 'command',
+            name: 'Открыть двери',
+            text: 'Новая редакция результата открытия.',
+            stateChange: {
+              completedName: 'Двери разблокированы',
+              confirmationText: 'Открыть двери?',
+            },
+          },
+          {
+            id: 'alarm',
+            type: 'command',
+            name: 'Включить тревогу',
+            text: 'Сигнал тревоги активирован.',
+            stateChange: {
+              completedName: 'Сигнал тревоги активен',
+              confirmationText: 'Включить тревогу?',
+            },
+          },
+        ],
+      },
+      commandStates: {
+        doors: {
+          completedName: 'Двери открыты',
+          resultText: 'Доступ в сектор разрешён.',
+        },
+        alarm: {
+          completedName: 'Тревога включена',
+          resultText: 'Охрана сектора предупреждена.',
+        },
+      },
+    }],
+  };
+}
+
 const state = globalThis.__desktopFixtureState ??= {
   calls: [],
   listeners: new Map(),
@@ -22,7 +78,11 @@ const state = globalThis.__desktopFixtureState ??= {
   resolveSavePublicAccess: null,
   pendingSavePublicAccess: null,
   clipboardText: '',
+  authoringSession: stateChangingAuthoringSession(),
+  authoringRevision: 1,
 };
+if (!state.authoringSession) state.authoringSession = stateChangingAuthoringSession();
+if (!Number.isSafeInteger(state.authoringRevision)) state.authoringRevision = 1;
 
 const durablePublicAccess = (() => {
   try {
@@ -57,6 +117,42 @@ function persistPublicAccess({ preserveVisiblePreferences = false } = {}) {
 function record(method, args) {
   state.calls.push({ method, args });
   return Promise.resolve({ ok: true, method, args });
+}
+
+function authoringFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-authoring';
+}
+
+function approvalFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-approval/master';
+}
+
+function syncFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-sync/master';
+}
+
+function stateChangingLifecycleBase() {
+  if (approvalFixtureActive()) return '/__fixture/state-changing-command-approval';
+  if (syncFixtureActive()) return '/__fixture/state-changing-command-sync';
+  return '';
+}
+
+async function stateChangingCoordinationState() {
+  const response = await fetch(`${stateChangingLifecycleBase()}/state`);
+  if (!response.ok) throw new Error('state-changing coordination fixture is unavailable');
+  return response.json();
+}
+
+function emitFixtureEvent(name, data) {
+  for (const callback of state.listeners.get(name) ?? []) callback({ data: structuredClone(data) });
+}
+
+function authoringSessionResult() {
+  return {
+    ok: true,
+    revision: state.authoringRevision,
+    session: structuredClone(state.authoringSession),
+  };
 }
 
 globalThis.__desktopFixture = {
@@ -111,10 +207,28 @@ export const Events = {
     const listeners = state.listeners.get(name) ?? new Set();
     listeners.add(callback);
     state.listeners.set(name, listeners);
+    let coordinationPoll = null;
+    if (stateChangingLifecycleBase() && name === 'coordination-state') {
+      let lastProjection = '';
+      const poll = async () => {
+        try {
+          const coordination = await stateChangingCoordinationState();
+          const projection = JSON.stringify(coordination);
+          if (projection === lastProjection) return;
+          lastProjection = projection;
+          callback({ data: coordination });
+        } catch {
+          // The next poll retries while the deterministic fixture is running.
+        }
+      };
+      void poll();
+      coordinationPoll = setInterval(() => { void poll(); }, 25);
+    }
     let active = true;
     return () => {
       if (!active) return;
       active = false;
+      if (coordinationPoll !== null) clearInterval(coordinationPoll);
       listeners.delete(callback);
       state.releases.set(name, (state.releases.get(name) ?? 0) + 1);
     };
@@ -130,6 +244,12 @@ export const Clipboard = {
 
 export function GetRuntimeStatus() {
   state.calls.push({ method: 'GetRuntimeStatus', args: [] });
+  if (stateChangingLifecycleBase()) {
+    return stateChangingCoordinationState().then(coordinationState => ({
+      ...state.status,
+      coordinationState,
+    }));
+  }
   return state.statusPromise ?? Promise.resolve(state.status);
 }
 
@@ -219,7 +339,49 @@ export const MoveCharacter = (...args) => record('MoveCharacter', args);
 export const NewPlayerConfig = (...args) => record('NewPlayerConfig', args);
 export const NewSession = (...args) => record('NewSession', args);
 export const OpenPlayerConfig = (...args) => record('OpenPlayerConfig', args);
-export const OpenSession = (...args) => record('OpenSession', args);
+export function OpenSession(...args) {
+  if (!authoringFixtureActive() && !stateChangingLifecycleBase()) return record('OpenSession', args);
+  state.calls.push({ method: 'OpenSession', args: [] });
+  if (syncFixtureActive()) {
+    return fetch('/__fixture/state-changing-command-sync/session').then(async response => ({
+      ok: response.ok,
+      error: response.ok ? '' : 'synchronization session fixture is unavailable',
+      filePath: '/private/tmp/fallout-state-changing-sync.json',
+      session: response.ok ? await response.json() : null,
+    }));
+  }
+  if (approvalFixtureActive()) {
+    return Promise.resolve({
+      ok: true,
+      filePath: '/private/tmp/fallout-state-changing-approval.json',
+      session: {
+        version: 1,
+        name: 'State-changing approval fixture',
+        terminals: [{
+          id: 'terminal-stateful',
+          name: 'Терминал охраны',
+          hackLevel: 0,
+          introText: '',
+          root: {
+            id: 'root', type: 'folder', name: 'ROOT', children: [{
+              id: 'doors', type: 'command', name: 'Открыть двери',
+              text: 'Доступ в сектор разрешён.',
+              stateChange: {
+                completedName: 'Двери открыты',
+                confirmationText: 'Открыть двери? Это действие нельзя повторить.',
+              },
+            }],
+          },
+        }],
+      },
+    });
+  }
+  return Promise.resolve({
+    ok: true,
+    filePath: '/private/tmp/fallout-state-changing-authoring.json',
+    session: structuredClone(state.authoringSession),
+  });
+}
 export const OpenURL = (...args) => record('OpenURL', args);
 export const ReleaseCharacter = (...args) => record('ReleaseCharacter', args);
 export const RenameCharacter = (...args) => record('RenameCharacter', args);
@@ -227,8 +389,54 @@ export const RenameLogicalSession = (...args) => record('RenameLogicalSession', 
 export const RequestTerminalActivation = (...args) => record('RequestTerminalActivation', args);
 export const RequestTerminalClear = (...args) => record('RequestTerminalClear', args);
 export const ResetFailedHack = (...args) => record('ResetFailedHack', args);
+export async function ResolveCommandExecution(payload) {
+  const fixtureBase = stateChangingLifecycleBase();
+  if (!fixtureBase) return record('ResolveCommandExecution', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResolveCommandExecution', args: [retained] });
+  const response = await fetch(`${fixtureBase}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(retained),
+  });
+  const result = await response.json();
+  return result;
+}
+export function ResetCommandState(payload) {
+  if (!authoringFixtureActive()) return record('ResetCommandState', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResetCommandState', args: [retained] });
+  const terminal = state.authoringSession.terminals.find(candidate => candidate.id === retained.terminalId);
+  if (terminal?.commandStates && Object.hasOwn(terminal.commandStates, retained.commandId)) {
+    delete terminal.commandStates[retained.commandId];
+    state.authoringRevision += 1;
+  }
+  const result = authoringSessionResult();
+  emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
+  return Promise.resolve(result);
+}
+export function ResetTerminalCommandStates(payload) {
+  if (!authoringFixtureActive()) return record('ResetTerminalCommandStates', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResetTerminalCommandStates', args: [retained] });
+  const terminal = state.authoringSession.terminals.find(candidate => candidate.id === retained.terminalId);
+  if (terminal?.commandStates && Object.keys(terminal.commandStates).length > 0) {
+    terminal.commandStates = {};
+    state.authoringRevision += 1;
+  }
+  const result = authoringSessionResult();
+  emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
+  return Promise.resolve(result);
+}
 export const ResolveTerminalSwitch = (...args) => record('ResolveTerminalSwitch', args);
-export const SaveSession = (...args) => record('SaveSession', args);
+export function SaveSession(session) {
+  if (!authoringFixtureActive()) return record('SaveSession', [session]);
+  const retained = structuredClone(session);
+  state.calls.push({ method: 'SaveSession', args: [retained] });
+  state.authoringSession = structuredClone(session);
+  state.authoringRevision += 1;
+  return Promise.resolve({ ok: true, savedRevision: state.authoringRevision });
+}
 export const SetActiveController = (...args) => record('SetActiveController', args);
 export const StartBroadcast = (...args) => record('StartBroadcast', args);
 export const UpdateLiveTerminal = (...args) => record('UpdateLiveTerminal', args);

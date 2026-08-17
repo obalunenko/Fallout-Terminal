@@ -25,6 +25,12 @@ enum TerminalSwitchChoice {
   TERMINAL_SWITCH_CHOICE_CANCEL = 3;
 }
 
+enum CommandExecutionDecision {
+  COMMAND_EXECUTION_DECISION_UNSPECIFIED = 0;
+  COMMAND_EXECUTION_DECISION_APPROVE = 1;
+  COMMAND_EXECUTION_DECISION_REJECT = 2;
+}
+
 message CharacterState {
   string character_id = 1;
   string display_name = 2;
@@ -64,6 +70,15 @@ message PlayerConfigMetadata {
   string name = 4;
 }
 
+message PendingCommandExecution {
+  string request_id = 1;
+  string broadcast_id = 2;
+  string terminal_id = 3;
+  string command_id = 4;
+  string command_name = 5;
+  string confirmation_text = 6;
+}
+
 message CoordinationState {
   repeated CharacterState roster = 1;
   repeated LogicalSessionState logical_sessions = 2;
@@ -71,4 +86,5 @@ message CoordinationState {
   PendingTerminalSwitch pending_terminal_switch = 4;
   uint64 revision = 5;
   PlayerConfigMetadata player_config = 6;
+  optional PendingCommandExecution pending_command_execution = 7;
 }

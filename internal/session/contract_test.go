@@ -48,3 +48,64 @@ func TestSessionContractRejectsMissingOneofAndInvalidReference(t *testing.T) {
 	_, err := SessionToProto(value)
 	require.Error(t, err)
 }
+
+func TestSessionContractKeepsLegacyOptionalFieldsAbsentAndOrdinaryContentUnchanged(t *testing.T) {
+	value := domain.Session{
+		Version: 1,
+		Name:    "Legacy ordinary",
+		Extra:   map[string]json.RawMessage{"futureSession": json.RawMessage(`{"keep":true}`)},
+		Terminals: []domain.Terminal{{
+			ID: "terminal-1", Name: "Overseer",
+			Extra: map[string]json.RawMessage{"futureTerminal": json.RawMessage(`17`)},
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{{
+					ID: "status", Type: domain.NodeCommand, Name: "Read status", Text: "All systems nominal.",
+					Extra: map[string]json.RawMessage{"futureCommand": json.RawMessage(`"keep"`)},
+				}},
+			},
+		}},
+	}
+
+	semantic, err := SessionToProto(value)
+	require.NoError(t, err)
+	require.Equal(t, int32(1), semantic.GetVersion())
+	require.Nil(t, semantic.PlayerConfig)
+	require.Nil(t, semantic.GetTerminals()[0].CommandStates)
+	ordinary := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
+	require.NotNil(t, ordinary)
+	require.Equal(t, "All systems nominal.", ordinary.GetText())
+	require.Nil(t, ordinary.StateChange)
+
+	roundTrip, err := SessionFromProto(semantic, value)
+	require.NoError(t, err)
+	require.Equal(t, value, roundTrip)
+	require.Nil(t, roundTrip.Terminals[0].Root.Children[0].StateChange)
+	require.Empty(t, roundTrip.Terminals[0].CommandStates)
+}
+
+func TestSessionContractRoundTripsStateChangeConfigAndFrozenCommandStates(t *testing.T) {
+	value := stateChangingSession("Vault")
+	value.Terminals[0].CommandStates = map[string]domain.CommandExecutionState{
+		"doors": {
+			CompletedName: "Двери открыты",
+			ResultText:    "Доступ в сектор разрешён.",
+		},
+	}
+
+	semantic, err := SessionToProto(value)
+	require.NoError(t, err)
+	require.Equal(t, int32(1), semantic.GetVersion())
+	require.Equal(t, "Двери открыты", semantic.GetTerminals()[0].GetCommandStates()["doors"].GetCompletedName())
+	require.Equal(t, "Доступ в сектор разрешён.", semantic.GetTerminals()[0].GetCommandStates()["doors"].GetResultText())
+	command := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
+	require.Equal(t, "Двери открыты", command.GetStateChange().GetCompletedName())
+	require.Equal(t, "Открыть двери?", command.GetStateChange().GetConfirmationText())
+
+	roundTrip, err := SessionFromProto(semantic, value)
+	require.NoError(t, err)
+	require.Equal(t, value, roundTrip)
+	roundTripSemantic, err := SessionToProto(roundTrip)
+	require.NoError(t, err)
+	require.Empty(t, cmp.Diff(semantic, roundTripSemantic, protocmp.Transform()))
+}

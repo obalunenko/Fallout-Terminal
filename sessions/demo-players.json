@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "name": "demo-players",
+  "roster": [
+    {
+      "id": "demo_scout",
+      "name": "Пайпер Райт"
+    },
+    {
+      "id": "demo_technician",
+      "name": "Ник Валентайн"
+    },
+    {
+      "id": "demo_medic",
+      "name": "Кюри"
+    },
+    {
+      "id": "demo_guard",
+      "name": "Престон Гарви"
+    }
+  ]
+}

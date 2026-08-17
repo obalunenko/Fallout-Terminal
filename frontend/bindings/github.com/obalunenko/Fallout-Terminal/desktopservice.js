@@ -225,12 +225,42 @@ export function RequestTerminalClear() {
 }
 
 /**
+ * @param {$models.ResetCommandStatePayload} payload
+ * @returns {$CancellablePromise<$models.SessionStateResult>}
+ */
+export function ResetCommandState(payload) {
+    return $Call.ByID(3257636586, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
  * @param {$models.LiveTerminalPayload} payload
  * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
  */
 export function ResetFailedHack(payload) {
     return $Call.ByID(3611622520, payload).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType0($result);
+    }));
+}
+
+/**
+ * @param {$models.ResetTerminalCommandStatesPayload} payload
+ * @returns {$CancellablePromise<$models.SessionStateResult>}
+ */
+export function ResetTerminalCommandStates(payload) {
+    return $Call.ByID(2301755571, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType8($result);
+    }));
+}
+
+/**
+ * @param {$models.CommandExecutionDecisionPayload} payload
+ * @returns {$CancellablePromise<$models.ResolveCommandExecutionResult>}
+ */
+export function ResolveCommandExecution(payload) {
+    return $Call.ByID(3276299750, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType9($result);
     }));
 }
 
@@ -250,7 +280,7 @@ export function ResolveTerminalSwitch(payload) {
  */
 export function SavePublicAccessSettings(payload) {
     return $Call.ByID(2107763802, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -260,7 +290,7 @@ export function SavePublicAccessSettings(payload) {
  */
 export function SaveSession(session) {
     return $Call.ByID(830349524, session).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType9($result);
+        return $$createType11($result);
     }));
 }
 
@@ -289,7 +319,7 @@ export function StartBroadcast() {
  */
 export function StartPublicAccess(payload) {
     return $Call.ByID(2229627868, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -299,7 +329,7 @@ export function StartPublicAccess(payload) {
  */
 export function StopPublicAccess(payload) {
     return $Call.ByID(887374898, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType8($result);
+        return $$createType10($result);
     }));
 }
 
@@ -322,5 +352,7 @@ const $$createType4 = $models.PublicAccessSnapshot.createFrom;
 const $$createType5 = $models.RuntimeStatus.createFrom;
 const $$createType6 = $models.PlayerConfigCommandResult.createFrom;
 const $$createType7 = $models.TerminalSwitchCommandResult.createFrom;
-const $$createType8 = $models.PublicAccessCommandResult.createFrom;
-const $$createType9 = session$0.SaveResult.createFrom;
+const $$createType8 = $models.SessionStateResult.createFrom;
+const $$createType9 = $models.ResolveCommandExecutionResult.createFrom;
+const $$createType10 = $models.PublicAccessCommandResult.createFrom;
+const $$createType11 = session$0.SaveResult.createFrom;

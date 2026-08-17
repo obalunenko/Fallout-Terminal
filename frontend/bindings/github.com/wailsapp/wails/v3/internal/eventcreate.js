@@ -19,6 +19,7 @@ function configure() {
         "hack-state": $$createType3,
         "public-access-status": $$createType4,
         "server-info": $$createType5,
+        "session-state": $$createType6,
     }));
 }
 
@@ -29,5 +30,6 @@ const $$createType2 = domain$0.PublicHackState.createFrom;
 const $$createType3 = $Create.Nullable($$createType2);
 const $$createType4 = main$0.PublicAccessSnapshot.createFrom;
 const $$createType5 = domain$0.ServerInfo.createFrom;
+const $$createType6 = main$0.SessionStateEvent.createFrom;
 
 configure();

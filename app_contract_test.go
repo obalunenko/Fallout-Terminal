@@ -155,6 +155,11 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.TerminalActivationRequest{}, []string{"terminal_id", "terminal_name", "tree", "hack_level", "intro_text"}},
 		{&privatev1.LiveTerminalUpdateRequest{}, []string{"tree", "intro_text"}},
 		{&privatev1.TerminalSwitchDecisionRequest{}, []string{"switch_id", "choice"}},
+		{&privatev1.ResolveCommandExecutionRequest{}, []string{"request_id", "decision"}},
+		{&privatev1.ResolveCommandExecutionResult{}, []string{"ok", "error", "state"}},
+		{&privatev1.ResetCommandStateRequest{}, []string{"terminal_id", "command_id"}},
+		{&privatev1.ResetTerminalCommandStatesRequest{}, []string{"terminal_id"}},
+		{&privatev1.SessionStateResult{}, []string{"ok", "error", "revision", "session"}},
 		{&privatev1.ResetFailedHackRequest{}, []string{"terminal_id", "terminal_name", "tree", "hack_level", "intro_text"}},
 		{&privatev1.AddCharacterRequest{}, []string{"display_name"}},
 		{&privatev1.RenameCharacterRequest{}, []string{"character_id", "display_name"}},
@@ -171,12 +176,14 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.ClientCountEvent{}, []string{"client_count"}},
 		{&privatev1.HackStateEvent{}, []string{"hack_state"}},
 		{&privatev1.CoordinationStateEvent{}, []string{"coordination_state"}},
+		{&privatev1.SessionStateEvent{}, []string{"revision", "session"}},
 		{&privatev1.CharacterState{}, []string{"character_id", "display_name", "logical_session_id"}},
 		{&privatev1.LogicalSessionState{}, []string{"logical_session_id", "fallback_name", "connected", "active_streams", "character_id", "role"}},
 		{&privatev1.BroadcastState{}, []string{"broadcast_id", "active_controller_session_id", "active_terminal_id", "revision"}},
 		{&privatev1.PendingTerminalSwitch{}, []string{"switch_id", "terminal_id", "terminal_name", "requested_terminal", "broadcast_id", "source_terminal_id", "target_terminal_id"}},
+		{&privatev1.PendingCommandExecution{}, []string{"request_id", "broadcast_id", "terminal_id", "command_id", "command_name", "confirmation_text"}},
 		{&privatev1.PlayerConfigMetadata{}, []string{"status", "file_path", "version", "name"}},
-		{&privatev1.CoordinationState{}, []string{"roster", "logical_sessions", "broadcast", "pending_terminal_switch", "revision", "player_config"}},
+		{&privatev1.CoordinationState{}, []string{"roster", "logical_sessions", "broadcast", "pending_terminal_switch", "revision", "player_config", "pending_command_execution"}},
 	}
 	for _, test := range coverage {
 		descriptor := test.message.ProtoReflect().Descriptor()
@@ -190,6 +197,46 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 	require.Equal(t, privatev1.TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_UNSPECIFIED, terminalSwitchStatusToPrivate("unknown"))
 	require.Empty(t, terminalSwitchStatusFromPrivate(privatev1.TerminalSwitchStatus_TERMINAL_SWITCH_STATUS_UNSPECIFIED))
 	require.Empty(t, terminalSwitchChoiceFromPrivate(privatev1.TerminalSwitchChoice_TERMINAL_SWITCH_CHOICE_UNSPECIFIED))
+
+	decision := (&privatev1.ResolveCommandExecutionRequest{}).ProtoReflect().Descriptor().Fields().ByName("decision").Enum()
+	require.Equal(t, []string{
+		"COMMAND_EXECUTION_DECISION_UNSPECIFIED",
+		"COMMAND_EXECUTION_DECISION_APPROVE",
+		"COMMAND_EXECUTION_DECISION_REJECT",
+	}, descriptorEnumNames(decision))
+}
+
+func descriptorEnumNames(descriptor protoreflect.EnumDescriptor) []string {
+	result := make([]string, 0, descriptor.Values().Len())
+	for index := range descriptor.Values().Len() {
+		value := descriptor.Values().Get(index)
+		if value.Number() != protoreflect.EnumNumber(index) {
+			return nil
+		}
+		result = append(result, string(value.Name()))
+	}
+	return result
+}
+
+func TestCommandStateResetPrivateAdaptersPreserveStableIDsDocumentAndRevision(t *testing.T) {
+	t.Parallel()
+	decision := CommandExecutionDecisionPayload{RequestID: "request-stable-1", Decision: domain.CommandExecutionApprove}
+	routedDecision, err := routeCommandExecutionDecisionRequest(decision)
+	require.NoError(t, err)
+	require.Equal(t, decision, routedDecision)
+
+	one := ResetCommandStatePayload{TerminalID: "terminal-stable-1", CommandID: "command-stable-1"}
+	require.Equal(t, one, routeResetCommandStateRequest(one))
+
+	all := ResetTerminalCommandStatesPayload{TerminalID: "terminal-stable-1"}
+	require.Equal(t, all, routeResetTerminalCommandStatesRequest(all))
+
+	session := commandStateResetSessionFixture()
+	result := SessionStateResult{OK: true, Revision: 41, Session: &session}
+	require.Equal(t, result, routeSessionStateResult(result))
+
+	event := SessionStateEvent{Revision: 41, Session: &session}
+	require.Equal(t, event, routeSessionStateEvent(event))
 }
 
 func TestRuntimeStatusDescriptorRemainsFeature005Compatible(t *testing.T) {
@@ -225,6 +272,10 @@ func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *test
 		Sessions:      []domain.MasterSessionEntry{{ID: controller, FallbackName: "PLAYER 1", Connected: true, Character: &domain.PlayerCharacter{ID: "character-1", Name: "Lucy"}, Role: domain.PlayerRoleActive}},
 		Broadcast:     &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &controller, ActiveTerminalID: &terminal},
 		PendingSwitch: &domain.MasterPendingSwitch{SwitchID: "switch-1", BroadcastID: "broadcast-1", SourceTerminalID: terminal, TargetTerminalID: &target},
+		PendingCommandExecution: &domain.MasterPendingCommandExecution{
+			RequestID: "request-1", BroadcastID: "broadcast-1", TerminalID: terminal,
+			CommandID: "command-1", CommandName: "Open doors", ConfirmationText: "Open the doors?",
+		},
 	}
 	status := RuntimeStatus{
 		ServerInfo:  &domain.ServerInfo{URL: "https://fallout.example", LocalURL: "http://127.0.0.1:3690", Tunnel: true},
@@ -238,12 +289,13 @@ func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *test
 	require.Equal(t, 2, routeClientCountEvent(2))
 	require.Equal(t, CommandResult{OK: true}, routeCommandResult(CommandResult{OK: true}))
 	require.Equal(t, CoordinationCommandResult{OK: true, State: state}, routeCoordinationResult(CoordinationCommandResult{OK: true, State: state}))
+	require.Equal(t, ResolveCommandExecutionResult{OK: true, State: state}, routeResolveCommandExecutionResult(ResolveCommandExecutionResult{OK: true, State: state}))
 }
 
 func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.T) {
 	requiredMethods := []string{
 		"GetRuntimeStatus", "NewSession", "OpenSession", "CopyDemo", "SaveSession", "LoadReferencedPlayerConfig", "NewPlayerConfig", "OpenPlayerConfig",
-		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ForceHackSuccess", "ResetFailedHack",
+		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ResolveCommandExecution", "ForceHackSuccess", "ResetFailedHack", "ResetCommandState", "ResetTerminalCommandStates",
 		"AddCharacter", "RenameCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
 		"StartBroadcast", "EndBroadcast", "OpenURL", "GetPublicAccess", "SavePublicAccessSettings", "GeneratePlayerPassword", "StartPublicAccess", "StopPublicAccess",
 	}
@@ -252,7 +304,7 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 	for index := range serviceType.NumMethod() {
 		actualMethods = append(actualMethods, serviceType.Method(index).Name)
 	}
-	require.Len(t, actualMethods, 30)
+	require.Len(t, actualMethods, 33)
 	require.ElementsMatch(t, requiredMethods, actualMethods)
 
 	for _, forbidden := range []string{
@@ -264,7 +316,7 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 		require.NotContains(t, actualMethods, forbidden)
 	}
 
-	require.Equal(t, []string{"server-info", "client-count", "hack-state", "coordination-state", "public-access-status"}, []string{serverInfoEvent, clientCountEvent, hackStateEvent, coordinationStateEvent, publicAccessStatusEvent})
+	require.Equal(t, []string{"server-info", "client-count", "hack-state", "coordination-state", "session-state", "public-access-status"}, []string{serverInfoEvent, clientCountEvent, hackStateEvent, coordinationStateEvent, sessionStateEvent, publicAccessStatusEvent})
 }
 
 func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
@@ -296,7 +348,7 @@ func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
 		forwarded[method.Name.Name] = selector.Sel.Name
 	}
 
-	require.Len(t, forwarded, 30)
+	require.Len(t, forwarded, 33)
 	for exposed, core := range forwarded {
 		require.Equal(t, exposed, core, "%s must not translate into an authored capability", exposed)
 	}
@@ -316,7 +368,9 @@ func TestDetachedDesktopResultShapesPreserveCancellationErrorsAndStatusFields(t 
 		{"save", sessionservice.SaveResult{Error: "safe"}, []string{"ok", "error", "requestedRevision"}},
 		{"player config cancellation", PlayerConfigCommandResult{Canceled: true}, []string{"ok", "canceled", "state"}},
 		{"coordination", CoordinationCommandResult{Error: "safe"}, []string{"ok", "error", "state"}},
+		{"command execution", ResolveCommandExecutionResult{Error: "safe"}, []string{"ok", "error", "state"}},
 		{"terminal switch", TerminalSwitchCommandResult{Error: "safe"}, []string{"ok", "error", "state"}},
+		{"session state", SessionStateResult{Error: "safe", Revision: 7}, []string{"ok", "error", "revision"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

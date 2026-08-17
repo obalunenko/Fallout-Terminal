@@ -46,14 +46,29 @@ type PlayerConfigMetadata struct {
 	Version  int    `json:"version"`
 }
 
+// StateChangeConfig is the optional authored configuration for a command
+// whose first successful execution durably changes its menu presentation.
+type StateChangeConfig struct {
+	CompletedName    string `json:"completedName"`
+	ConfirmationText string `json:"confirmationText"`
+}
+
+// CommandExecutionState is the immutable durable snapshot captured from a
+// state-changing command's first successfully persisted execution.
+type CommandExecutionState struct {
+	CompletedName string `json:"completedName"`
+	ResultText    string `json:"resultText"`
+}
+
 // Terminal is one durable authoring and broadcast target.
 type Terminal struct {
-	ID        string                     `json:"id"`
-	Name      string                     `json:"name"`
-	HackLevel int                        `json:"hackLevel"`
-	IntroText string                     `json:"introText"`
-	Root      ContentNode                `json:"root"`
-	Extra     map[string]json.RawMessage `json:"-"`
+	ID            string                           `json:"id"`
+	Name          string                           `json:"name"`
+	HackLevel     int                              `json:"hackLevel"`
+	IntroText     string                           `json:"introText"`
+	Root          ContentNode                      `json:"root"`
+	CommandStates map[string]CommandExecutionState `json:"commandStates,omitempty"`
+	Extra         map[string]json.RawMessage       `json:"-"`
 }
 
 // ContentNode is a tagged folder, command, or entry node.
@@ -64,6 +79,7 @@ type ContentNode struct {
 	Children    []ContentNode              `json:"children,omitempty"`
 	Text        string                     `json:"text,omitempty"`
 	Description string                     `json:"description,omitempty"`
+	StateChange *StateChangeConfig         `json:"stateChange,omitempty"`
 	Extra       map[string]json.RawMessage `json:"-"`
 }
 
@@ -165,13 +181,14 @@ type LiveState struct {
 
 // PublicLiveState is the immutable client-facing live snapshot.
 type PublicLiveState struct {
-	TerminalID   string           `json:"terminalId"`
-	TerminalName string           `json:"terminalName"`
-	Tree         ContentNode      `json:"tree"`
-	HackLevel    int              `json:"hackLevel"`
-	IntroText    string           `json:"introText"`
-	Nav          NavState         `json:"nav"`
-	Hack         *PublicHackState `json:"hack"`
+	TerminalID       string                        `json:"terminalId"`
+	TerminalName     string                        `json:"terminalName"`
+	Tree             ContentNode                   `json:"tree"`
+	HackLevel        int                           `json:"hackLevel"`
+	IntroText        string                        `json:"introText"`
+	Nav              NavState                      `json:"nav"`
+	Hack             *PublicHackState              `json:"hack"`
+	CommandExecution *CommandExecutionPresentation `json:"commandExecution,omitempty"`
 }
 
 // LogicalSessionID identifies one browser profile for the lifetime of a server process.
@@ -265,6 +282,39 @@ const (
 	TerminalSwitchCancel   TerminalSwitchChoice = "cancel"
 )
 
+// CommandExecutionDecision is the trusted game-master resolution for the
+// exact currently pending state-changing command request.
+type CommandExecutionDecision string
+
+const (
+	CommandExecutionApprove CommandExecutionDecision = "approve"
+	CommandExecutionReject  CommandExecutionDecision = "reject"
+)
+
+// CommandExecutionPhase is the public broadcast-scoped presentation state.
+type CommandExecutionPhase string
+
+const (
+	CommandExecutionPhasePending  CommandExecutionPhase = "pending"
+	CommandExecutionPhaseRejected CommandExecutionPhase = "rejected"
+)
+
+// CommandExecutionPresentation exposes only the shared phase and stable
+// command identity. Master prompt and request identity remain private.
+type CommandExecutionPresentation struct {
+	Phase     CommandExecutionPhase `json:"phase"`
+	CommandID string                `json:"commandId"`
+}
+
+// PlayerNoticeKind is an enum-only, detail-free personalized notice.
+type PlayerNoticeKind string
+
+const PlayerNoticeCommandPersistenceFailed PlayerNoticeKind = "command-persistence-failed"
+
+type PlayerNotice struct {
+	Kind PlayerNoticeKind `json:"kind"`
+}
+
 // ActionReason is a stable public explanation for a player-command outcome.
 type ActionReason string
 
@@ -332,6 +382,7 @@ type LogicalSession struct {
 	FallbackName   string
 	ConnectionIDs  map[ConnectionID]struct{}
 	RequestResults map[RequestID]RequestResultRecord
+	Notice         *PlayerNotice
 }
 
 // CharacterRosterEntry is one stable process-local player identity option.
@@ -354,14 +405,16 @@ type ControllerAssignment struct {
 
 // TerminalRuntime is an exact canonical active or suspended terminal checkpoint.
 type TerminalRuntime struct {
-	TerminalID   string
-	TerminalName string
-	Tree         ContentNode
-	HackLevel    int
-	IntroText    string
-	Nav          NavState
-	Hack         *HackState
-	Lifecycle    TerminalLifecycle
+	TerminalID       string
+	TerminalName     string
+	Tree             ContentNode
+	CommandStates    map[string]CommandExecutionState
+	CommandExecution *CommandExecutionPresentation
+	HackLevel        int
+	IntroText        string
+	Nav              NavState
+	Hack             *HackState
+	Lifecycle        TerminalLifecycle
 }
 
 // LiveBroadcast owns all state whose lifetime ends with the current broadcast.
@@ -376,11 +429,24 @@ type LiveBroadcast struct {
 
 // TerminalTarget is the validated authored payload retained by a pending switch.
 type TerminalTarget struct {
-	TerminalID   string
-	TerminalName string
-	Tree         ContentNode
-	HackLevel    int
-	IntroText    string
+	TerminalID    string
+	TerminalName  string
+	Tree          ContentNode
+	CommandStates map[string]CommandExecutionState
+	HackLevel     int
+	IntroText     string
+}
+
+// PendingCommandExecution is the single broadcast-scoped request awaiting a
+// private game-master decision. ControllerSessionID is coordinator-private.
+type PendingCommandExecution struct {
+	RequestID           string
+	BroadcastID         BroadcastID
+	TerminalID          string
+	CommandID           string
+	CommandName         string
+	ConfirmationText    string
+	ControllerSessionID LogicalSessionID
 }
 
 // TerminalSwitchDecision keeps a switch request ordered against the source runtime.
@@ -403,6 +469,7 @@ type ProcessRuntime struct {
 	ActivePlayerConfig      *PlayerConfigHandle
 	Broadcast               *LiveBroadcast
 	PendingSwitch           *TerminalSwitchDecision
+	PendingCommandExecution *PendingCommandExecution
 }
 
 // PlayerCharacter is the assigned identity visible at a projection boundary.
@@ -430,6 +497,7 @@ type PlayerState struct {
 	BroadcastID      BroadcastID         `json:"-"`
 	ActiveTerminalID string              `json:"-"`
 	Roster           []PlayerRosterEntry `json:"roster"`
+	Notice           *PlayerNotice       `json:"notice,omitempty"`
 }
 
 // TerminalPresentation is an exclusive detached public terminal projection.
@@ -509,6 +577,7 @@ func (state PlayerState) MarshalJSON() ([]byte, error) {
 		BroadcastID      *BroadcastID        `json:"broadcastId"`
 		ActiveTerminalID *string             `json:"activeTerminalId"`
 		Roster           []PlayerRosterEntry `json:"roster"`
+		Notice           *PlayerNotice       `json:"notice,omitempty"`
 	}{
 		Revision:         state.Revision,
 		SessionID:        state.SessionID,
@@ -519,6 +588,7 @@ func (state PlayerState) MarshalJSON() ([]byte, error) {
 		BroadcastID:      broadcastID,
 		ActiveTerminalID: activeTerminalID,
 		Roster:           state.Roster,
+		Notice:           state.Notice,
 	})
 }
 
@@ -553,14 +623,25 @@ type MasterPendingSwitch struct {
 	TargetTerminalID *string     `json:"targetTerminalId"`
 }
 
+// MasterPendingCommandExecution is the complete private prompt projection.
+type MasterPendingCommandExecution struct {
+	RequestID        string      `json:"requestId"`
+	BroadcastID      BroadcastID `json:"broadcastId"`
+	TerminalID       string      `json:"terminalId"`
+	CommandID        string      `json:"commandId"`
+	CommandName      string      `json:"commandName"`
+	ConfirmationText string      `json:"confirmationText"`
+}
+
 // MasterCoordinationState is one detached private-desktop projection.
 type MasterCoordinationState struct {
-	Revision      uint64                `json:"revision"`
-	PlayerConfig  *PlayerConfigMetadata `json:"playerConfig"`
-	Roster        []MasterRosterEntry   `json:"roster"`
-	Sessions      []MasterSessionEntry  `json:"sessions"`
-	Broadcast     *MasterBroadcastState `json:"broadcast"`
-	PendingSwitch *MasterPendingSwitch  `json:"pendingSwitch"`
+	Revision                uint64                         `json:"revision"`
+	PlayerConfig            *PlayerConfigMetadata          `json:"playerConfig"`
+	Roster                  []MasterRosterEntry            `json:"roster"`
+	Sessions                []MasterSessionEntry           `json:"sessions"`
+	Broadcast               *MasterBroadcastState          `json:"broadcast"`
+	PendingSwitch           *MasterPendingSwitch           `json:"pendingSwitch"`
+	PendingCommandExecution *MasterPendingCommandExecution `json:"pendingCommandExecution"`
 }
 
 // CloneMasterCoordinationState returns a deeply detached desktop projection.
@@ -592,6 +673,10 @@ func CloneMasterCoordinationState(state *MasterCoordinationState) *MasterCoordin
 		pending.TargetTerminalID = cloneString(state.PendingSwitch.TargetTerminalID)
 		clone.PendingSwitch = &pending
 	}
+	if state.PendingCommandExecution != nil {
+		pending := *state.PendingCommandExecution
+		clone.PendingCommandExecution = &pending
+	}
 	return &clone
 }
 
@@ -603,6 +688,10 @@ func ClonePlayerState(state *PlayerState) *PlayerState {
 	clone := *state
 	clone.Character = clonePlayerCharacter(state.Character)
 	clone.Roster = append([]PlayerRosterEntry(nil), state.Roster...)
+	if state.Notice != nil {
+		notice := *state.Notice
+		clone.Notice = &notice
+	}
 	return &clone
 }
 
@@ -657,11 +746,19 @@ func clonePublicLiveState(state *PublicLiveState) *PublicLiveState {
 	clone.Nav.ViewEntryID = cloneString(state.Nav.ViewEntryID)
 	clone.Nav.CommandNodeID = cloneString(state.Nav.CommandNodeID)
 	clone.Hack = clonePublicHackState(state.Hack)
+	if state.CommandExecution != nil {
+		execution := *state.CommandExecution
+		clone.CommandExecution = &execution
+	}
 	return &clone
 }
 
 func cloneContentNode(node ContentNode) ContentNode {
 	clone := node
+	if node.StateChange != nil {
+		stateChange := *node.StateChange
+		clone.StateChange = &stateChange
+	}
 	clone.Extra = cloneRawMessages(node.Extra)
 	clone.Children = make([]ContentNode, len(node.Children))
 	for index := range node.Children {

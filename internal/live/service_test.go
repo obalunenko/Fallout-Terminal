@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/Fallout-Terminal/internal/nav"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -612,4 +613,193 @@ func treeWithoutReport() domain.ContentNode {
 	tree := testTree()
 	tree.Children[0].Children = tree.Children[0].Children[1:]
 	return tree
+}
+
+func TestStateChangingCommandProjectsInitialAndFrozenCompletedContent(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	target := stateChangingTarget()
+
+	initialRuntime, initial := service.CreateRuntime(target)
+	require.NotNil(t, initialRuntime)
+	require.NotNil(t, initial)
+	initialCommand := findContentNode(initial.Tree, "doors")
+	require.NotNil(t, initialCommand)
+	assert.Equal(t, "Открыть двери", initialCommand.Name)
+	assert.Equal(t, "Доступ в сектор разрешён.", initialCommand.Text)
+
+	target.CommandStates = map[string]domain.CommandExecutionState{
+		"doors": {CompletedName: "Двери открыты", ResultText: "Проход разблокирован."},
+	}
+	completedRuntime, completed := service.CreateRuntime(target)
+	require.NotNil(t, completedRuntime)
+	require.NotNil(t, completed)
+	completedCommand := findContentNode(completed.Tree, "doors")
+	require.NotNil(t, completedCommand)
+	assert.Equal(t, "Двери открыты", completedCommand.Name)
+	assert.Equal(t, "Проход разблокирован.", completedCommand.Text)
+
+	// The authored source remains detached and retains the values for the next
+	// execution after a master reset.
+	authoredCommand := findContentNode(target.Tree, "doors")
+	require.NotNil(t, authoredCommand)
+	assert.Equal(t, "Открыть двери", authoredCommand.Name)
+	assert.Equal(t, "Доступ в сектор разрешён.", authoredCommand.Text)
+}
+
+func TestPendingCommandBlocksEverySharedRuntimeAction(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	runtime, _ := service.CreateRuntime(stateChangingTarget())
+	require.NotNil(t, runtime)
+	runtime.CommandExecution = &domain.CommandExecutionPresentation{
+		Phase:     domain.CommandExecutionPhasePending,
+		CommandID: "doors",
+	}
+	before := cloneTerminalRuntimeForTest(runtime)
+
+	commands := []domain.RuntimeCommand{
+		{Kind: domain.RuntimeCommandNavigate, Action: "back"},
+		{Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors"},
+		{Kind: domain.RuntimeCommandGuess, TargetID: "guess"},
+		{Kind: domain.RuntimeCommandActivatePattern, PatternID: "pattern"},
+	}
+	for _, command := range commands {
+		projection, accepted := service.Apply(runtime, command)
+		assert.False(t, accepted, "Apply(%+v) accepted while command approval was pending", command)
+		assert.Nil(t, projection)
+		assert.Equal(t, before, runtime)
+	}
+}
+
+func TestRejectedCommandAcceptsOnlyBackAndClearsPresentation(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	runtime, _ := service.CreateRuntime(stateChangingTarget())
+	require.NotNil(t, runtime)
+	runtime.CommandExecution = &domain.CommandExecutionPresentation{
+		Phase:     domain.CommandExecutionPhaseRejected,
+		CommandID: "doors",
+	}
+
+	projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors",
+	})
+	assert.False(t, accepted)
+	assert.Nil(t, projection)
+	require.NotNil(t, runtime.CommandExecution)
+
+	projection, accepted = service.Apply(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.True(t, accepted)
+	require.NotNil(t, projection)
+	assert.Nil(t, runtime.CommandExecution)
+	assert.Nil(t, projection.CommandExecution)
+	assert.Equal(t, nav.Default(), projection.Nav)
+}
+
+func TestCompletedCommandRepeatsFrozenResultWithoutChangingSnapshot(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	target := stateChangingTarget()
+	target.CommandStates = map[string]domain.CommandExecutionState{
+		"doors": {CompletedName: "Двери открыты", ResultText: "Проход разблокирован."},
+	}
+	runtime, _ := service.CreateRuntime(target)
+	require.NotNil(t, runtime)
+
+	for attempt := range 100 {
+		projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
+			Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors",
+		})
+		require.True(t, accepted, "completed repeat %d", attempt)
+		require.NotNil(t, projection, "completed repeat %d", attempt)
+		require.NotNil(t, projection.Nav.CommandNodeID, "completed repeat %d", attempt)
+		assert.Equal(t, "doors", *projection.Nav.CommandNodeID, "completed repeat %d", attempt)
+		command := findContentNode(projection.Tree, "doors")
+		require.NotNil(t, command, "completed repeat %d", attempt)
+		assert.Equal(t, "Двери открыты", command.Name, "completed repeat %d", attempt)
+		assert.Equal(t, "Проход разблокирован.", command.Text, "completed repeat %d", attempt)
+		assert.Equal(t, target.CommandStates, runtime.CommandStates, "completed repeat %d", attempt)
+	}
+}
+
+func TestOrdinaryCommandKeepsLegacyResultPathWithoutExecutionPresentation(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	target := domain.TerminalTarget{
+		TerminalID: "terminal-ordinary", TerminalName: "Diagnostics",
+		Tree: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "diagnostic", Type: domain.NodeCommand,
+				Name: "RUN DIAGNOSTIC", Text: "SYSTEM NOMINAL",
+			}},
+		},
+	}
+	runtime, initial := service.CreateRuntime(target)
+	require.NotNil(t, runtime)
+	require.NotNil(t, initial)
+	require.Nil(t, runtime.CommandExecution)
+	require.Empty(t, runtime.CommandStates)
+
+	for range 2 {
+		projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
+			Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "diagnostic",
+		})
+		require.True(t, accepted)
+		require.NotNil(t, projection)
+		require.Nil(t, projection.CommandExecution)
+		require.NotNil(t, projection.Nav.CommandNodeID)
+		require.Equal(t, "diagnostic", *projection.Nav.CommandNodeID)
+		command := findContentNode(projection.Tree, "diagnostic")
+		require.NotNil(t, command)
+		require.Equal(t, "RUN DIAGNOSTIC", command.Name)
+		require.Equal(t, "SYSTEM NOMINAL", command.Text)
+		require.Empty(t, runtime.CommandStates)
+	}
+}
+
+func stateChangingTarget() domain.TerminalTarget {
+	return domain.TerminalTarget{
+		TerminalID: "terminal-1", TerminalName: "Overseer",
+		Tree: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
+				Text: "Доступ в сектор разрешён.",
+				StateChange: &domain.StateChangeConfig{
+					CompletedName: "Двери разблокированы", ConfirmationText: "Открыть двери?",
+				},
+			}},
+		},
+	}
+}
+
+func findContentNode(root domain.ContentNode, nodeID string) *domain.ContentNode {
+	if root.ID == nodeID {
+		return &root
+	}
+	for _, child := range root.Children {
+		if found := findContentNode(child, nodeID); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func cloneTerminalRuntimeForTest(runtime *domain.TerminalRuntime) *domain.TerminalRuntime {
+	if runtime == nil {
+		return nil
+	}
+	clone := *runtime
+	clone.Tree = cloneNode(runtime.Tree)
+	clone.Nav = cloneNav(runtime.Nav)
+	if runtime.CommandExecution != nil {
+		presentation := *runtime.CommandExecution
+		clone.CommandExecution = &presentation
+	}
+	if runtime.CommandStates != nil {
+		clone.CommandStates = make(map[string]domain.CommandExecutionState, len(runtime.CommandStates))
+		for commandID, state := range runtime.CommandStates {
+			clone.CommandStates[commandID] = state
+		}
+	}
+	return &clone
 }

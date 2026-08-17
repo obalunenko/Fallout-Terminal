@@ -15,8 +15,11 @@ const APP_METHODS = Object.freeze({
   updateLiveTerminal: desktopService.UpdateLiveTerminal,
   requestTerminalClear: desktopService.RequestTerminalClear,
   resolveTerminalSwitch: desktopService.ResolveTerminalSwitch,
+  resolveCommandExecution: desktopService.ResolveCommandExecution,
   forceHackSuccess: desktopService.ForceHackSuccess,
   resetFailedHack: desktopService.ResetFailedHack,
+  resetCommandState: desktopService.ResetCommandState,
+  resetTerminalCommandStates: desktopService.ResetTerminalCommandStates,
   addCharacter: desktopService.AddCharacter,
   renameCharacter: desktopService.RenameCharacter,
   deleteCharacter: desktopService.DeleteCharacter,
@@ -91,6 +94,14 @@ function switchCommand(binding, ...args) {
   return command(binding, ...args).then(normalizeSwitchCommandResult);
 }
 
+function normalizeCommandExecutionResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  const state = value.state && typeof value.state === 'object' ? value.state : null;
+  const error = ok ? '' : 'СОСТОЯНИЕ КОМАНДЫ НЕ УДАЛОСЬ СОХРАНИТЬ';
+  return Object.freeze({ ok, error, state });
+}
+
 function normalizePlayerConfigResult(result) {
   const value = result && typeof result === 'object' ? result : {};
   const ok = value.ok === true;
@@ -105,6 +116,33 @@ function normalizePlayerConfigResult(result) {
 
 function playerConfigCommand(binding, ...args) {
   return command(binding, ...args).then(normalizePlayerConfigResult);
+}
+
+function normalizeSessionStateResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  const revision = Number.isSafeInteger(value.revision) ? value.revision : 0;
+  const session = value.session && typeof value.session === 'object' ? value.session : null;
+  let error = typeof value.error === 'string' ? value.error : '';
+  if (!ok && !error) error = 'Command state mutation failed';
+  return Object.freeze({ ok, error, revision, session });
+}
+
+function sessionStateCommand(binding, payload) {
+  return command(binding, payload).then(normalizeSessionStateResult);
+}
+
+function normalizeSessionStateEvent(event) {
+  const value = event && typeof event === 'object' ? event : {};
+  return Object.freeze({
+    revision: Number.isSafeInteger(value.revision) ? value.revision : 0,
+    session: value.session && typeof value.session === 'object' ? value.session : null,
+  });
+}
+
+function monotonicRevision(value) {
+  const revision = Number(value?.revision);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
 }
 
 const PUBLIC_ACCESS_STATES = Object.freeze({
@@ -232,14 +270,14 @@ function beginStatusSnapshotWhenReady() {
     if (!status || status.ok === false) return;
     for (const [eventName, field] of requiredEvents) {
       for (const subscription of eventSubscriptions.get(eventName) ?? []) {
-        if (!subscription.active || subscription.eventReceived) continue;
+        if (!subscription.active || (subscription.eventReceived && !subscription.revisionOf)) continue;
         subscription.deliver(status[field]);
       }
     }
   });
 }
 
-function subscribe(eventName, statusField, callback, project = (payload) => payload) {
+function subscribe(eventName, statusField, callback, project = (payload) => payload, revisionOf = null) {
   if (typeof callback !== 'function') throw new TypeError(`${eventName} listener must be a function`);
 
   const bucket = eventSubscriptions.get(eventName) ?? new Set();
@@ -248,10 +286,17 @@ function subscribe(eventName, statusField, callback, project = (payload) => payl
     active: true,
     eventReceived: false,
     released: false,
+    revisionOf,
+    latestRevision: null,
     deliver(payload) {
       if (!this.active) return;
       const projected = project(payload);
       if (statusField === 'serverInfo' && projected == null) return;
+      if (this.revisionOf) {
+        const revision = this.revisionOf(projected);
+        if (this.latestRevision != null && revision <= this.latestRevision) return;
+        this.latestRevision = revision;
+      }
       callback(projected);
     },
     releaseRuntime: () => {},
@@ -285,7 +330,10 @@ const desktopAPI = {
   onServerInfo: (callback) => subscribe('server-info', 'serverInfo', callback, normalizeServerInfo),
   onClientCount: (callback) => subscribe('client-count', 'clientCount', callback),
   onHackState: (callback) => subscribe('hack-state', 'hackState', callback),
-  onCoordinationState: (callback) => subscribe('coordination-state', 'coordinationState', callback),
+  onCoordinationState: (callback) => subscribe(
+    'coordination-state', 'coordinationState', callback, (payload) => payload, monotonicRevision,
+  ),
+  onSessionState: (callback) => subscribe('session-state', null, callback, normalizeSessionStateEvent),
   onPublicAccessStatus: (callback) => {
     if (typeof callback !== 'function') throw new TypeError('public-access-status listener must be a function');
     let active = true;
@@ -334,8 +382,21 @@ const desktopAPI = {
   updateLiveTerminal: (payload) => command(APP_METHODS.updateLiveTerminal, payload),
   requestTerminalClear: () => switchCommand(APP_METHODS.requestTerminalClear),
   resolveTerminalSwitch: (payload) => switchCommand(APP_METHODS.resolveTerminalSwitch, payload),
+  resolveCommandExecution: (payload) => command(APP_METHODS.resolveCommandExecution, {
+    requestId: typeof payload?.requestId === 'string' ? payload.requestId : '',
+    decision: payload?.decision === 'approve' || payload?.decision === 'reject'
+      ? payload.decision
+      : '',
+  }).then(normalizeCommandExecutionResult),
   forceHackSuccess: () => command(APP_METHODS.forceHackSuccess),
   resetFailedHack: (payload) => command(APP_METHODS.resetFailedHack, payload),
+  resetCommandState: (payload) => sessionStateCommand(APP_METHODS.resetCommandState, {
+    terminalId: typeof payload?.terminalId === 'string' ? payload.terminalId : '',
+    commandId: typeof payload?.commandId === 'string' ? payload.commandId : '',
+  }),
+  resetTerminalCommandStates: (payload) => sessionStateCommand(APP_METHODS.resetTerminalCommandStates, {
+    terminalId: typeof payload?.terminalId === 'string' ? payload.terminalId : '',
+  }),
   addCharacter: (name) => command(APP_METHODS.addCharacter, name),
   renameCharacter: (payload) => command(APP_METHODS.renameCharacter, payload),
   deleteCharacter: (characterId) => command(APP_METHODS.deleteCharacter, characterId),

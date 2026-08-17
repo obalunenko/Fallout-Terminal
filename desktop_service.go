@@ -65,12 +65,24 @@ func (service *desktopService) ResolveTerminalSwitch(payload TerminalSwitchDecis
 	return service.core.ResolveTerminalSwitch(payload)
 }
 
+func (service *desktopService) ResolveCommandExecution(payload CommandExecutionDecisionPayload) ResolveCommandExecutionResult {
+	return service.core.ResolveCommandExecution(payload)
+}
+
 func (service *desktopService) ForceHackSuccess() CommandResult {
 	return service.core.ForceHackSuccess()
 }
 
 func (service *desktopService) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommandResult {
 	return service.core.ResetFailedHack(payload)
+}
+
+func (service *desktopService) ResetCommandState(payload ResetCommandStatePayload) SessionStateResult {
+	return service.core.ResetCommandState(payload)
+}
+
+func (service *desktopService) ResetTerminalCommandStates(payload ResetTerminalCommandStatesPayload) SessionStateResult {
+	return service.core.ResetTerminalCommandStates(payload)
 }
 
 func (service *desktopService) AddCharacter(name string) CoordinationCommandResult {

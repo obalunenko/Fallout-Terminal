@@ -47,6 +47,45 @@ func TestDecodeEncodeSessionV1Fixture(t *testing.T) {
 	}
 }
 
+func TestDecodeStateChangingSessionV1Fixture(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../testutil/testdata/session-v1-state-changing.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := DecodeSession(raw)
+	if err != nil {
+		t.Fatalf("DecodeSession() error = %v", err)
+	}
+	if session.Version != 1 || len(session.Terminals) != 2 {
+		t.Fatalf("decoded state-changing fixture = %#v", session)
+	}
+	security := session.Terminals[0]
+	if len(security.CommandStates) != 1 {
+		t.Fatalf("security command states = %#v, want one frozen snapshot", security.CommandStates)
+	}
+	snapshot, ok := security.CommandStates["n_doors"]
+	if !ok || snapshot.CompletedName != "Гермодвери открыты" || snapshot.ResultText == "" {
+		t.Fatalf("n_doors frozen snapshot = %#v, exists=%t", snapshot, ok)
+	}
+	if stateChange := security.Root.Children[0].Children[1].StateChange; stateChange == nil || stateChange.CompletedName != "Тревога отключена" {
+		t.Fatalf("unexecuted authored state-changing command = %#v", stateChange)
+	}
+
+	encoded, err := EncodeSession(session)
+	if err != nil {
+		t.Fatalf("EncodeSession() error = %v", err)
+	}
+	roundTrip, err := DecodeSession(encoded)
+	if err != nil {
+		t.Fatalf("DecodeSession(encoded) error = %v", err)
+	}
+	if !reflect.DeepEqual(roundTrip, session) {
+		t.Fatalf("state-changing fixture changed during round trip\ngot:  %#v\nwant: %#v", roundTrip, session)
+	}
+}
+
 func TestUnknownFieldsRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -83,6 +122,161 @@ func TestUnknownFieldsRoundTrip(t *testing.T) {
 		if !bytes.Contains(encoded, []byte(`"`+field+`"`)) {
 			t.Errorf("round trip dropped %s: %s", field, encoded)
 		}
+	}
+}
+
+func TestStateChangingCommandRoundTripPreservesFrozenSnapshotAndUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Stateful extras",
+  "campaignNote": {"keep": true},
+  "terminals": [{
+    "id": "t_security",
+    "name": "Security",
+    "hackLevel": 0,
+    "introText": "",
+    "terminalNote": 42,
+    "root": {
+      "id": "root",
+      "type": "folder",
+      "name": "ROOT",
+      "children": [{
+        "id": "n_doors",
+        "type": "command",
+        "name": "Open doors",
+        "text": "Doors opened.",
+        "stateChange": {
+          "completedName": "Doors open",
+          "confirmationText": "Open the doors?"
+        },
+        "nodeNote": [1, 2]
+      }]
+    },
+    "commandStates": {
+      "n_doors": {
+        "completedName": "Doors were opened",
+        "resultText": "Access to the sector was granted."
+      }
+    }
+  }]
+}`)
+
+	session, err := DecodeSession(raw)
+	if err != nil {
+		t.Fatalf("DecodeSession() error = %v", err)
+	}
+	command := &session.Terminals[0].Root.Children[0]
+	if command.StateChange == nil {
+		t.Fatal("decoded state-changing command has nil StateChange")
+	}
+	if got := *command.StateChange; got != (StateChangeConfig{
+		CompletedName:    "Doors open",
+		ConfirmationText: "Open the doors?",
+	}) {
+		t.Fatalf("StateChange = %#v", got)
+	}
+	snapshot, ok := session.Terminals[0].CommandStates["n_doors"]
+	if !ok {
+		t.Fatal("decoded terminal is missing n_doors command state")
+	}
+	if snapshot != (CommandExecutionState{
+		CompletedName: "Doors were opened",
+		ResultText:    "Access to the sector was granted.",
+	}) {
+		t.Fatalf("command state = %#v", snapshot)
+	}
+
+	// The durable snapshot is a frozen record of the first successful execution,
+	// not a view over the command's subsequently edited authored fields.
+	command.StateChange.CompletedName = "New authored title"
+	command.Text = "New authored result"
+	if got := session.Terminals[0].CommandStates["n_doors"]; got != snapshot {
+		t.Fatalf("editing authored command changed frozen snapshot: %#v", got)
+	}
+
+	encoded, err := EncodeSession(session)
+	if err != nil {
+		t.Fatalf("EncodeSession() error = %v", err)
+	}
+	for _, field := range []string{
+		"stateChange", "completedName", "confirmationText", "commandStates", "resultText",
+		"campaignNote", "terminalNote", "nodeNote",
+	} {
+		if !bytes.Contains(encoded, []byte(`"`+field+`"`)) {
+			t.Errorf("round trip dropped %s: %s", field, encoded)
+		}
+	}
+
+	decoded, err := DecodeSession(encoded)
+	if err != nil {
+		t.Fatalf("DecodeSession(encoded) error = %v", err)
+	}
+	gotSnapshot := decoded.Terminals[0].CommandStates["n_doors"]
+	if gotSnapshot != snapshot {
+		t.Fatalf("frozen snapshot after round trip = %#v, want %#v", gotSnapshot, snapshot)
+	}
+}
+
+func TestLegacyVersionOneSessionDefaultsToOrdinaryCommandsWithoutSnapshots(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Legacy",
+  "terminals": [{
+    "id": "t1",
+    "name": "Terminal",
+    "hackLevel": 0,
+    "introText": "",
+    "root": {
+      "id": "root",
+      "type": "folder",
+      "name": "ROOT",
+      "children": [{
+        "id": "ordinary",
+        "type": "command",
+        "name": "Read status",
+        "text": "All systems nominal."
+      }]
+    }
+  }]
+}`)
+
+	session, err := DecodeSession(raw)
+	if err != nil {
+		t.Fatalf("DecodeSession() error = %v", err)
+	}
+	if got := session.Terminals[0].Root.Children[0].StateChange; got != nil {
+		t.Fatalf("legacy command StateChange = %#v, want nil", got)
+	}
+	if got := len(session.Terminals[0].CommandStates); got != 0 {
+		t.Fatalf("legacy terminal has %d command states, want 0", got)
+	}
+
+	encoded, err := EncodeSession(session)
+	if err != nil {
+		t.Fatalf("EncodeSession() error = %v", err)
+	}
+	for _, absent := range []string{`"stateChange"`, `"commandStates"`} {
+		if bytes.Contains(encoded, []byte(absent)) {
+			t.Errorf("legacy round trip added optional field %s: %s", absent, encoded)
+		}
+	}
+
+	roundTrip, err := DecodeSession(encoded)
+	if err != nil {
+		t.Fatalf("DecodeSession(encoded) error = %v", err)
+	}
+	if roundTrip.Version != 1 {
+		t.Fatalf("legacy round-trip version = %d, want 1", roundTrip.Version)
+	}
+	wantOrdinary := ContentNode{
+		ID: "ordinary", Type: NodeCommand, Name: "Read status", Text: "All systems nominal.",
+	}
+	if got := roundTrip.Terminals[0].Root.Children[0]; !reflect.DeepEqual(got, wantOrdinary) {
+		t.Fatalf("legacy ordinary command changed during round trip\ngot:  %#v\nwant: %#v", got, wantOrdinary)
 	}
 }
 
