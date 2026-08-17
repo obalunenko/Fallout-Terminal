@@ -1,8 +1,12 @@
 # Задачи: команды, изменяющие состояние пунктов меню
 
+**Bugfix**: 2026-08-17 — BUG-001 Updated from bugfix patch
+**Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
+**Bugfix**: 2026-08-17 — BUG-003 Updated from bugfix patch
+
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/)
 
-**Tests**: Конституция и критерии SC-001–SC-015 требуют автоматических domain, persistence, concurrency, contract и multi-client browser проверок. В каждой user-story фазе тестовые задачи выполняются до реализации и должны сначала зафиксировать ожидаемое падение.
+**Tests**: Конституция и критерии SC-001–SC-016 требуют автоматических domain, persistence, concurrency, contract, production-faithful desktop integration и multi-client browser проверок. В каждой user-story фазе тестовые задачи выполняются до реализации и должны сначала зафиксировать ожидаемое падение.
 
 ## Phase 1: Setup — контрактные источники и генерация
 
@@ -71,8 +75,8 @@
 
 **Wave 1 — independent (different files):**
 
-- [x] **T011** [P] [US1] Написать падающие App/private-contract тесты для reset-one/reset-terminal, ID validation, idempotent no-op, active-terminal publication и session-state revision result · `app_test.go`, `app_contract_test.go`
-- [x] **T012** [P] [US1] Написать падающий browser-тест мастерского editor flow: toggle, четыре поля, whitespace errors, frozen display, reset confirm/cancel и reset-all · `tests/browser/state-changing-command-authoring.spec.mjs`
+- [x] **T011** [P] [US1] ⚠️ Reopened — Написать падающие App/private-contract тесты для reset-one/reset-terminal, ID validation, idempotent no-op, active-terminal publication и session-state revision result (reopened — BUG-002; reopened — BUG-003) · `app_test.go`, `app_contract_test.go`
+- [x] **T012** [P] [US1] ⚠️ Reopened — Написать падающий browser-тест мастерского editor flow: toggle, четыре поля, whitespace errors, frozen display, reset confirm/cancel и reset-all (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003) · `tests/browser/state-changing-command-authoring.spec.mjs`
 
 ### Implementation
 
@@ -80,14 +84,14 @@
 
 **Wave 2 — independent (different files):**
 
-- [x] **T013** [P] [US1] Реализовать master property editor для state-change toggle/полей, completed snapshot-индикации и reset-one/reset-terminal controls · `frontend/src/master.js`, `frontend/src/master.css`
-- [x] **T014** [P] [US1] Реализовать private reset façades, повторную backend-валидацию, atomic store gate и active-runtime refresh · `app.go`, `app_contract.go`, `desktop_service.go`, `wails_host.go`
+- [x] **T013** [P] [US1] ⚠️ Reopened — Реализовать master property editor для state-change toggle/полей, completed snapshot-индикации и reset-one/reset-terminal controls (reopened — BUG-001) · `frontend/src/master.js`, `frontend/src/master.css`
+- [x] **T014** [P] [US1] ⚠️ Reopened — Реализовать private reset façades, повторную backend-валидацию, atomic store gate и active-runtime refresh (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003) · `app.go`, `app_contract.go`, `desktop_service.go`, `wails_host.go`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — desktop integration join:**
 
-- [x] **T015** [US1] Подключить reset/session-state методы и события к generated Wails bindings, desktop API allowlist и browser fixture contract · `frontend/src/desktop-api.js`, `frontend/bindings/`, `scripts/wails-bindings-check.sh`, `tests/browser/fixtures/desktop-bindings.js`
+- [x] **T015** [US1] ⚠️ Reopened — Подключить reset/session-state методы и события к generated Wails bindings, desktop API allowlist и browser fixture contract (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003) · `frontend/src/desktop-api.js`, `frontend/bindings/`, `scripts/wails-bindings-check.sh`, `tests/browser/fixtures/desktop-bindings.js`
 
 **Checkpoint**: User Story 1 независимо демонстрируется в master UI и после reopen; reset меняет ровно выбранный durable scope и синхронизирует активную проекцию.
 
@@ -207,9 +211,9 @@
 
 **Wave 2 — single-owner validation:**
 
-- [x] **T040** Выполнить single-owner Success Criteria validation: форматирование, vet, unit/race, protobuf format/generation/breaking/drift, Wails binding allowlist, frontend/client builds и полный Playwright suite; задокументировать только реально выполненные результаты · `Makefile`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh`, `scripts/proto-drift-test.sh`, `scripts/wails-bindings-check.sh`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
+- [x] **T040** ⚠️ Reopened — Выполнить single-owner Success Criteria validation: форматирование, vet, unit/race, protobuf format/generation/breaking/drift, Wails binding allowlist, frontend/client builds, полный Playwright suite и обязательный native master-click reset gate; задокументировать только реально выполненные результаты (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003) · `Makefile`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh`, `scripts/proto-drift-test.sh`, `scripts/wails-bindings-check.sh`, `scripts/state-changing-reset-native-smoke.sh`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
 
-**Checkpoint**: SC-001–SC-015 подтверждены автоматическими проверками либо явно отмечены как недоступные; generated drift отсутствует, public/private capability boundary сохранена.
+**Checkpoint**: SC-001–SC-016 подтверждены автоматическими проверками либо явно отмечены как недоступные; generated drift отсутствует, public/private capability boundary сохранена.
 
 ---
 
@@ -225,6 +229,25 @@ Phase 1 Setup
               → Phase 5 US3 Sync/lifecycle
                   → Phase 6 US4 Compatibility
                       → Phase 7 Polish/validation
+
+BUG-001 overlay
+  T009/T011 audit + reopened T012
+    → T049 regression reproduction
+        → reopened T013/T014/T015 + T050 correction
+            → T051 focused verification
+                → reopened T040 full-suite validation
+
+BUG-002 overlay
+  T009 audit + reopened T011/T012/T049/T054 + T056 production-faithful reproduction
+    → reopened T014/T015/T050 + T057 correction
+        → reopened T051 + T058 focused verification
+            → reopened T040 full-suite validation
+
+BUG-003 overlay
+  T009 audit + reopened T011/T012/T049/T054/T056/T058 + T059 native-click reproduction
+    → reopened T014/T015/T050/T057 + T060 correction
+        → reopened T051 + T061 native focused verification
+            → reopened T040 full-suite validation
 ```
 
 - Phase 1: T001/T002/T003 parallel → T004 generation join.
@@ -234,6 +257,9 @@ Phase 1 Setup
 - Phase 5: T027/T028/T029 parallel → T030/T031/T032 parallel by owned files → T033 integration.
 - Phase 6: T034/T035 parallel → T036/T037 parallel by owned packages → T038 fixtures.
 - Phase 7: T039 after story checkpoints → T040 is the sole full-suite validation owner.
+- Phase 10 (BUG-001 overlay): audit T009/T011 and complete reopened T012 → T049 → reopened T013/T014/T015 with T050 → T051 → reopened T040.
+- Phase 13 (BUG-002 overlay): audit T009 and complete reopened T011/T012/T049/T054 with T056 → reopened T014/T015/T050 with T057 → reopened T051 with T058 → reopened T040.
+- Phase 14 (BUG-003 overlay): audit T009 and complete reopened T011/T012/T049/T054/T056/T058 with T059 → reopened T014/T015/T050/T057 with T060 → reopened T051 with T061 → reopened T040.
 
 ### Parallel opportunities
 
@@ -259,3 +285,73 @@ Phase 4 завершает минимальный вертикальный пр�
 
 - [x] T047 Добавить 100 одновременных distinct requests к уже completed-команде и доказать, что все обращения получают frozen result без нового pending/master effect, а счётчики execution и durable write остаются равны одному · `internal/control/service_test.go` per SC-004, T041 (partial)
 - [x] T048 Провести полную 100-command матрицу стадиями над каждой командой: rename/move и authored edit сохраняют frozen snapshot, reset/re-execute применяет новые тексты, а последующее удаление всех команд и создание 100 новых ID не наследует ни одного состояния · `internal/session/service_test.go` per SC-010, SC-012, T046 (partial)
+
+## Phase 10: Bugfix BUG-001 — восстановление индивидуального и общего сброса
+
+**Goal**: Доказать и восстановить полный путь подтверждённого сброса от мастерского интерфейса до долговечного состояния и активной runtime-проекции.
+
+**Wave 1 — regression reproduction:**
+
+- [x] **T049** [US1] ⚠️ Reopened — Добавить падающее сквозное воспроизведение BUG-001 на реально выполненной stateful-команде для «Сбросить состояние» и «Сбросить все состояния» с проверкой удаления нужных `commandStates`, новой document revision и обновления master/player runtime-проекций (reopened — BUG-002; reopened — BUG-003) · `tests/browser/state-changing-command-authoring.spec.mjs`, `app_test.go`, `app_contract_test.go`
+
+**⟶ T049 and the T009/T011 audit must finish before Wave 2:**
+
+**Wave 2 — correction:**
+
+- [x] **T050** [US1] ⚠️ Reopened — Локализовать и исправить общий reset-путь `master UI → confirmation → desktop API/Wails binding → private handler → session mutation → session-state/active-runtime refresh`, сохранив ID-валидацию, idempotent no-op, атомарность и точную область reset-one/reset-terminal (reopened — BUG-002; reopened — BUG-003) · `frontend/src/master.js`, `frontend/src/desktop-api.js`, `app.go`, `app_contract.go`, `desktop_service.go`, `wails_host.go`, `internal/session/service.go`
+
+**⟶ T050 and reopened T012–T015 must finish before Wave 3:**
+
+**Wave 3 — focused verification:**
+
+- [x] **T051** [US1] ⚠️ Reopened — Проверить индивидуальный и общий подтверждённый сброс, отмену без мутации, синхронизацию активных представлений и сохранение исходного состояния после повторного открытия того же session JSON; затем передать результат в переоткрытую T040 (reopened — BUG-002; reopened — BUG-003) · `tests/browser/state-changing-command-authoring.spec.mjs`, `internal/session/service_test.go`, `app_test.go`
+
+## Phase 11: Convergence
+
+- [x] T052 CRITICAL: Заменить `context.Background()`/`context.TODO()` в feature-scoped session tests на `t.Context()` и корректно производные test-scoped cleanup/timeout contexts · `internal/session/service_test.go` per Constitution: Testing and Quality Gates (contradicts)
+- [x] T053 CRITICAL: Перевести handwritten `t.Fatal`/`t.Error` и `reflect.DeepEqual` assertions в feature-scoped domain/session/storage tests на `testify/assert` или `testify/require`, сохранив table-driven cases и protobuf-aware сравнения там, где применимо · `internal/domain/model_test.go`, `internal/domain/validate_test.go`, `internal/session/service_test.go`, `internal/session/storage_test.go` per Constitution: Testing and Quality Gates (contradicts)
+- [x] T054 ⚠️ Reopened — Добавить исполняемый `npm test --prefix frontend` suite для master validation, единственного approval dialog, approve/reject/close, production-faithful reset и revision ordering и зарегистрировать `test` script в `frontend/package.json` (reopened — BUG-002; reopened — BUG-003) per plan: Verification Plan / Master frontend, Native reset integration (partial)
+
+## Phase 12: Convergence
+
+- [x] T055 CRITICAL: Перевести три handwritten `t.Fatalf`/`reflect.DeepEqual` проверки feature-scoped navigation tests на `testify/assert` или `testify/require`, удалить импорт `reflect` и сохранить существующие table-driven cases · `internal/nav/nav_test.go` per Constitution: Testing and Quality Gates (contradicts)
+
+## Phase 13: Bugfix BUG-002 — production-faithful общий сброс активного терминала
+
+**Goal**: Воспроизвести и устранить повторную регрессию общего сброса через реальный desktop/backend path, доказав каноническое долговечное и runtime-состояние без fixture-only мутации.
+
+**Wave 1 — regression reproduction:**
+
+- [x] **T056** [US1] ⚠️ Reopened — Добавить падающее production-faithful воспроизведение общего сброса активного терминала в writable-сессии: реальный `App` + session service + coordinator, вызов `ResetTerminalCommandStates` через desktop contract, новая document revision, отсутствие прежних `commandStates` и обновление master/controller/observer; browser binding MUST проксировать вызов к Go fixture/backend, а не очищать JS fixture самостоятельно (reopened — BUG-003) · `app_test.go`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/state-changing-command-authoring.spec.mjs` per FR-023, SC-009, SC-016
+
+**⟶ T056 and reopened T011/T012/T049/T054 must fail for the observed regression before Wave 2:**
+
+**Wave 2 — correction:**
+
+- [x] **T057** [US1] ⚠️ Reopened — По падающему T056 локализовать и исправить ответственный production-слой общего reset path, принимать успех только из канонического backend result с более новой revision и пустым terminal `commandStates`, затем синхронизировать active runtime и master/player projections без optimistic state (reopened — BUG-003) · `frontend/src/master.js`, `frontend/src/desktop-api.js`, `app.go`, `app_contract.go`, `desktop_service.go`, `wails_host.go`, `internal/session/service.go`, `internal/control/service.go` per FR-023, SC-016
+
+**⟶ T057 and reopened T014/T015/T050 must finish before Wave 3:**
+
+**Wave 3 — focused verification:**
+
+- [x] **T058** [US1] ⚠️ Reopened — Проверить общий reset активного writable-терминала для нескольких completed-команд: точный terminal scope, одна durable revision, master/controller/observer initial ≤1 s, отсутствие stale completed result после navigation/frontend reload и сохранение initial после reopen того же JSON; затем передать доказательство в переоткрытую T040 (reopened — BUG-003) · `app_test.go`, `internal/session/service_test.go`, `internal/control/service_test.go`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs` per SC-009, SC-016
+
+## Phase 14: Bugfix BUG-003 — реальный native-клик общего сброса
+
+**Goal**: Воспроизвести и устранить BUG-003 через ту же пользовательскую последовательность, которая остаётся сломанной: фактический клик и подтверждение reset-all в собранном приложении мастера с наблюдением канонического backend-состояния и активных player-представлений.
+
+**Wave 1 — native regression reproduction:**
+
+- [x] **T059** [US1] Добавить падающий автоматизируемый native smoke: запустить собранное приложение с реальным writable session file и completed-командой, подключить controller и observer, нажать и подтвердить «Сбросить все состояния» в master UI и зафиксировать для одного terminal ID факт generated Wails-вызова, backend result/error, document revision, канонические `commandStates`, `session-state` event, runtime revision и master/player DOM; direct App invocation и browser fixture не засчитываются вместо клика · `scripts/state-changing-reset-native-smoke.sh`, `app_test.go`, `frontend/src/master.js` per FR-023/BUG-003, SC-009, SC-016
+
+**⟶ T059 and the T009 audit plus reopened T011/T012/T049/T054/T056/T058 must reproduce the observed failure before Wave 2:**
+
+**Wave 2 — correction:**
+
+- [x] **T060** [US1] По доказательствам T059 локализовать первое расходящееся звено и исправить только ответственный production path `master control → confirmation → generated Wails binding → desktop façade → App/private contract → session mutation → session-state/runtime publication → master/player rendering`; отсутствие вызова, backend error/no-op и непринятая revision MUST быть видимыми ошибками, а успех допустим только для канонического `INITIAL` · `frontend/src/master.js`, `frontend/src/desktop-api.js`, `frontend/bindings/`, `desktop_service.go`, `app.go`, `app_contract.go`, `internal/session/service.go`, `internal/control/service.go` per FR-023/BUG-003, SC-016
+
+**⟶ T060 and reopened T014/T015/T050/T057 must finish before Wave 3:**
+
+**Wave 3 — native focused verification:**
+
+- [x] **T061** [US1] Повторить native master-click gate для нескольких completed-команд выбранного терминала и отдельного нетронутого терминала; доказать одну новую durable revision, master/controller/observer `INITIAL` ≤1 s без reload, сохранение другого terminal scope, отсутствие stale result после navigation и сохранение результата после полного закрытия приложения и reopen того же JSON, затем передать доказательство в T040 · `scripts/state-changing-reset-native-smoke.sh`, `app_test.go`, `tests/browser/state-changing-command-sync.spec.mjs` per SC-009, SC-016

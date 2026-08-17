@@ -1095,6 +1095,215 @@ func TestResetTerminalCommandStatesUsesOneMutationAndDoesNotRefreshInactiveTermi
 	require.Len(t, events.Records(), 1)
 }
 
+func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T) {
+	live := liveservice.New(nil, nil)
+	var effects []controlservice.Effect
+	coordination := controlservice.New(controlservice.Config{
+		Runtime: live, Terminals: live, TrustedHack: live,
+		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
+	})
+	master, err := coordination.AddCharacter("Mara")
+	require.NoError(t, err)
+	characterID := master.Roster[0].ID
+	master, err = coordination.StartBroadcast()
+	require.NoError(t, err)
+	require.NotNil(t, master.Broadcast)
+	connectionID := domain.ConnectionID("reset-terminal-controller")
+	controller := coordination.CreateSession(connectionID)
+	selected := coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: connectionID,
+		SessionID:    controller.SessionID,
+		RequestID:    "reset-terminal-select-controller",
+		BroadcastID:  master.Broadcast.ID,
+		CharacterID:  characterID,
+	})
+	require.True(t, selected.Accepted)
+
+	session := commandStateResetSessionFixture()
+	terminal := session.Terminals[0]
+	_, err = coordination.RequestTerminalActivation(domain.TerminalTarget{
+		TerminalID: terminal.ID, TerminalName: terminal.Name, Tree: terminal.Root,
+		CommandStates: cloneCommandExecutionStates(terminal.CommandStates),
+		HackLevel:     terminal.HackLevel, IntroText: terminal.IntroText,
+	})
+	require.NoError(t, err)
+	shown := coordination.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+		RequestID:   "show-completed-command",
+		BroadcastID: master.Broadcast.ID,
+		TerminalID:  terminal.ID,
+		Kind:        domain.RuntimeCommandNavigate,
+		Action:      "command",
+		NodeID:      "command-stable-1",
+	})
+	require.True(t, shown.Accepted)
+	require.NotEmpty(t, effects)
+	var beforeReset *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			beforeReset = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, beforeReset)
+	require.NotNil(t, beforeReset.Nav.CommandNodeID)
+
+	terminal.CommandStates = nil
+	session.Terminals[0] = terminal
+	sessions := &recordingCommandStateSession{
+		resetTerminalResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 52, Session: &session,
+		},
+	}
+	effects = nil
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination,
+		Events: &recordingEventSink{recorder: &callRecorder{}},
+	})
+
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: terminal.ID})
+	require.True(t, result.OK, "ResetTerminalCommandStates() = %#v", result)
+	require.Equal(t, uint64(52), result.Revision)
+	require.Empty(t, result.Session.Terminals[0].CommandStates)
+	require.NotEmpty(t, effects)
+	var afterReset *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			afterReset = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, afterReset)
+	require.Equal(t, "Open doors", afterReset.Tree.Children[0].Name)
+	require.Nil(t, afterReset.Nav.CommandNodeID, "reset terminal retained the completed command result view")
+}
+
+func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTerminal(t *testing.T) {
+	target := "/Campaigns/reset-terminal-production.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	seed := commandStateResetSessionFixture()
+	seed.Terminals[0].Root.Children = append(seed.Terminals[0].Root.Children, domain.ContentNode{
+		ID: "command-stable-2", Type: domain.NodeCommand, Name: "Enable alarm", Text: "Alarm enabled",
+		StateChange: &domain.StateChangeConfig{CompletedName: "Alarm enabled", ConfirmationText: "Enable the alarm?"},
+	})
+	seed.Terminals[0].CommandStates["command-stable-2"] = domain.CommandExecutionState{
+		CompletedName: "Alarm enabled", ResultText: "Alarm enabled",
+	}
+	seed.Terminals = append(seed.Terminals, domain.Terminal{
+		ID: "terminal-stable-2", Name: "Reserve terminal",
+		Root: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "reserve-command", Type: domain.NodeCommand, Name: "Unlock reserve", Text: "Reserve unlocked",
+				StateChange: &domain.StateChangeConfig{CompletedName: "Reserve unlocked", ConfirmationText: "Unlock reserve?"},
+			}},
+		},
+		CommandStates: map[string]domain.CommandExecutionState{
+			"reserve-command": {CompletedName: "Reserve unlocked", ResultText: "Reserve unlocked"},
+		},
+	})
+	encoded, err := domain.EncodeSession(seed)
+	require.NoError(t, err)
+	fileSystem.SeedFile(target, encoded)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Campaigns", BundledDemo: "/Applications/Fallout/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	opened := sessions.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
+
+	live := liveservice.New(nil, nil)
+	var effects []controlservice.Effect
+	coordination := controlservice.New(controlservice.Config{
+		Runtime: live, Terminals: live, TrustedHack: live,
+		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
+	})
+	master, err := coordination.AddCharacter("Mara")
+	require.NoError(t, err)
+	master, err = coordination.AddCharacter("Boone")
+	require.NoError(t, err)
+	controllerCharacterID := master.Roster[0].ID
+	observerCharacterID := master.Roster[1].ID
+	master, err = coordination.StartBroadcast()
+	require.NoError(t, err)
+	connectionID := domain.ConnectionID("production-reset-controller")
+	controller := coordination.CreateSession(connectionID)
+	selected := coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: connectionID, SessionID: controller.SessionID,
+		RequestID: "production-reset-select", BroadcastID: master.Broadcast.ID,
+		CharacterID: controllerCharacterID,
+	})
+	require.True(t, selected.Accepted)
+	observerConnectionID := domain.ConnectionID("production-reset-observer")
+	observer := coordination.CreateSession(observerConnectionID)
+	selected = coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: observerConnectionID, SessionID: observer.SessionID,
+		RequestID: "production-reset-select-observer", BroadcastID: master.Broadcast.ID,
+		CharacterID: observerCharacterID,
+	})
+	require.True(t, selected.Accepted)
+	terminal := opened.Session.Terminals[0]
+	_, err = coordination.RequestTerminalActivation(domain.TerminalTarget{
+		TerminalID: terminal.ID, TerminalName: terminal.Name, Tree: terminal.Root,
+		CommandStates: cloneCommandExecutionStates(terminal.CommandStates),
+		HackLevel:     terminal.HackLevel, IntroText: terminal.IntroText,
+	})
+	require.NoError(t, err)
+	shown := coordination.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+		RequestID: "production-show-completed", BroadcastID: master.Broadcast.ID,
+		TerminalID: terminal.ID, Kind: domain.RuntimeCommandNavigate,
+		Action: "command", NodeID: "command-stable-1",
+	})
+	require.True(t, shown.Accepted)
+
+	effects = nil
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination,
+		Events: &recordingEventSink{recorder: &callRecorder{}},
+	})
+	resetStarted := time.Now()
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: terminal.ID})
+	require.Less(t, time.Since(resetStarted), time.Second)
+	require.True(t, result.OK, "ResetTerminalCommandStates() = %#v", result)
+	require.Equal(t, uint64(1), result.Revision)
+	require.Empty(t, result.Session.Terminals[0].CommandStates)
+	require.Contains(t, result.Session.Terminals[1].CommandStates, "reserve-command")
+
+	durableBytes, ok := fileSystem.File(target)
+	require.True(t, ok)
+	durable, err := domain.DecodeSession(durableBytes)
+	require.NoError(t, err)
+	require.Empty(t, durable.Terminals[0].CommandStates)
+	require.Contains(t, durable.Terminals[1].CommandStates, "reserve-command")
+	require.Equal(t, uint64(1), sessions.Snapshot().SavedRevision)
+
+	var projection *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			projection = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, projection)
+	require.Equal(t, "Open doors", projection.Tree.Children[0].Name)
+	require.Equal(t, "Enable alarm", projection.Tree.Children[1].Name)
+	require.Nil(t, projection.Nav.CommandNodeID, "production reset retained the completed command result view")
+	masterAfterReset := coordination.Snapshot()
+	require.Len(t, masterAfterReset.Sessions, 2)
+	require.ElementsMatch(t, []domain.PlayerRole{domain.PlayerRoleActive, domain.PlayerRoleObserver}, []domain.PlayerRole{
+		masterAfterReset.Sessions[0].Role, masterAfterReset.Sessions[1].Role,
+	})
+
+	reopened := sessions.Open(t.Context())
+	require.True(t, reopened.OK, "reopen reset session = %#v", reopened)
+	require.Empty(t, reopened.Session.Terminals[0].CommandStates)
+	require.Contains(t, reopened.Session.Terminals[1].CommandStates, "reserve-command")
+}
+
 func TestCommandStateResetFailureDoesNotPublishSessionOrPlayerState(t *testing.T) {
 	recorder := &callRecorder{}
 	sessions := &recordingCommandStateSession{

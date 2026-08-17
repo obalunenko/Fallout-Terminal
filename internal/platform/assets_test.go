@@ -174,6 +174,34 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
+func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "sessions", "demo.json"))
+	require.NoError(t, err)
+	demo, err := domain.DecodeSession(raw)
+	require.NoError(t, err)
+
+	stateChangingCommands := 0
+	for _, terminal := range demo.Terminals {
+		require.Empty(t, terminal.CommandStates,
+			"read-only bundled demo must not expose reset controls for snapshots it cannot mutate")
+		var visit func(domain.ContentNode)
+		visit = func(node domain.ContentNode) {
+			if node.Type == domain.NodeCommand && node.StateChange != nil {
+				stateChangingCommands++
+			}
+			for _, child := range node.Children {
+				visit(child)
+			}
+		}
+		visit(terminal.Root)
+	}
+	require.GreaterOrEqual(t, stateChangingCommands, 1,
+		"bundled demo must retain an initial-state example of the feature")
+}
+
 func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	t.Parallel()
 

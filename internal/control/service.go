@@ -1065,6 +1065,18 @@ func (service *Service) RefreshActiveTerminal(target domain.TerminalTarget) (*do
 			refreshErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
 			return transition{}
 		}
+		// A durable reset removes the frozen snapshot that made the current
+		// command result view valid. Clear only that stale completed view before
+		// applying the canonical target; ordinary command results and completed
+		// commands whose snapshots remain are preserved.
+		if active.Nav.CommandNodeID != nil {
+			commandID := *active.Nav.CommandNodeID
+			_, wasCompleted := active.CommandStates[commandID]
+			_, remainsCompleted := target.CommandStates[commandID]
+			if wasCompleted && !remainsCompleted {
+				active.Nav.CommandNodeID = nil
+			}
+		}
 		projection := service.terminals.UpdateRuntime(active, target)
 		if projection == nil {
 			state = masterSnapshot(runtime)

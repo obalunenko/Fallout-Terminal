@@ -48,6 +48,110 @@ type fixtureCommandStateStore struct {
 	failNext      bool
 }
 
+type fixtureAuthoringStore struct {
+	mu       sync.Mutex
+	session  domain.Session
+	revision uint64
+}
+
+type fixtureSessionStateResult struct {
+	OK       bool            `json:"ok"`
+	Error    string          `json:"error,omitempty"`
+	Revision uint64          `json:"revision"`
+	Session  *domain.Session `json:"session,omitempty"`
+}
+
+type fixtureResetCommandRequest struct {
+	TerminalID string `json:"terminalId"`
+	CommandID  string `json:"commandId"`
+}
+
+type fixtureResetTerminalRequest struct {
+	TerminalID string `json:"terminalId"`
+}
+
+func (store *fixtureAuthoringStore) reset() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.session = stateChangingAuthoringSession()
+	store.revision = 1
+}
+
+func (store *fixtureAuthoringStore) snapshot() fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) save(session domain.Session) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.session = cloneFixtureSession(session)
+	store.revision++
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resetCommand(request fixtureResetCommandRequest) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	terminal := fixtureTerminalByID(&store.session, strings.TrimSpace(request.TerminalID))
+	if terminal == nil {
+		return fixtureSessionStateResult{Error: "terminal does not exist", Revision: store.revision}
+	}
+	commandID := strings.TrimSpace(request.CommandID)
+	if _, exists := terminal.CommandStates[commandID]; exists {
+		delete(terminal.CommandStates, commandID)
+		if len(terminal.CommandStates) == 0 {
+			terminal.CommandStates = nil
+		}
+		store.revision++
+	}
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resetTerminal(request fixtureResetTerminalRequest) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	terminal := fixtureTerminalByID(&store.session, strings.TrimSpace(request.TerminalID))
+	if terminal == nil {
+		return fixtureSessionStateResult{Error: "terminal does not exist", Revision: store.revision}
+	}
+	if len(terminal.CommandStates) != 0 {
+		terminal.CommandStates = nil
+		store.revision++
+	}
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resultLocked() fixtureSessionStateResult {
+	session := cloneFixtureSession(store.session)
+	return fixtureSessionStateResult{OK: true, Revision: store.revision, Session: &session}
+}
+
+func fixtureTerminalByID(session *domain.Session, terminalID string) *domain.Terminal {
+	if session == nil {
+		return nil
+	}
+	for index := range session.Terminals {
+		if session.Terminals[index].ID == terminalID {
+			return &session.Terminals[index]
+		}
+	}
+	return nil
+}
+
+func cloneFixtureSession(session domain.Session) domain.Session {
+	data, err := domain.EncodeSession(session)
+	if err != nil {
+		panic(err)
+	}
+	clone, err := domain.DecodeSession(data)
+	if err != nil {
+		panic(err)
+	}
+	return clone
+}
+
 func (store *fixtureCommandStateStore) reset() {
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -373,6 +477,8 @@ func run() error {
 	fixtureHackRandom := &fixtureRandom{state: fixtureRandomSeed}
 	approvalStore := &fixtureCommandStateStore{}
 	approvalStore.reset()
+	authoringStore := &fixtureAuthoringStore{}
+	authoringStore.reset()
 	liveService := live.New(fixtureHackRandom, nil)
 	var connectPlayer *player.ConnectService
 	service := control.New(control.Config{
@@ -440,6 +546,41 @@ func run() error {
 		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
 		response.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset", func(response http.ResponseWriter, _ *http.Request) {
+		authoringStore.reset()
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-authoring/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.snapshot())
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/save", func(response http.ResponseWriter, request *http.Request) {
+		var session domain.Session
+		if err := json.NewDecoder(request.Body).Decode(&session); err != nil {
+			http.Error(response, "invalid authoring session", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.save(session))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset-command", func(response http.ResponseWriter, request *http.Request) {
+		var payload fixtureResetCommandRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid reset-command request", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.resetCommand(payload))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset-terminal", func(response http.ResponseWriter, request *http.Request) {
+		var payload fixtureResetTerminalRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid reset-terminal request", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.resetTerminal(payload))
 	})
 	mux.HandleFunc("GET /__fixture/state-changing-command-approval/master", func(response http.ResponseWriter, _ *http.Request) {
 		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
@@ -837,6 +978,43 @@ func stateChangingApprovalSession(states map[string]domain.CommandExecutionState
 			ID: target.TerminalID, Name: target.TerminalName, HackLevel: target.HackLevel,
 			IntroText: target.IntroText, Root: target.Tree,
 			CommandStates: cloneFixtureCommandStates(states),
+		}},
+	}
+}
+
+func stateChangingAuthoringSession() domain.Session {
+	return domain.Session{
+		Version: 1,
+		Name:    "State-changing authoring fixture",
+		Terminals: []domain.Terminal{{
+			ID: "terminal-stateful", Name: "Терминал охраны",
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{
+					{
+						ID: "emergency-lights", Type: domain.NodeCommand,
+						Name: "Включить аварийный свет", Text: "Аварийное освещение включено.",
+					},
+					{
+						ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
+						Text: "Новая редакция результата открытия.",
+						StateChange: &domain.StateChangeConfig{
+							CompletedName: "Двери разблокированы", ConfirmationText: "Открыть двери?",
+						},
+					},
+					{
+						ID: "alarm", Type: domain.NodeCommand, Name: "Включить тревогу",
+						Text: "Сигнал тревоги активирован.",
+						StateChange: &domain.StateChangeConfig{
+							CompletedName: "Сигнал тревоги активен", ConfirmationText: "Включить тревогу?",
+						},
+					},
+				},
+			},
+			CommandStates: map[string]domain.CommandExecutionState{
+				"doors": {CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."},
+				"alarm": {CompletedName: "Тревога включена", ResultText: "Охрана сектора предупреждена."},
+			},
 		}},
 	}
 }

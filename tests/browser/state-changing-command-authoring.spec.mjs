@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 const FIXTURE_URL = '/__fixture/state-changing-command-authoring';
 const TERMINAL_ID = 'terminal-stateful';
+const BUNDLED_DEMO_URL = new URL('../../sessions/demo.json', import.meta.url);
 
 async function openAuthoringFixture(page) {
   await page.goto(FIXTURE_URL);
@@ -42,8 +44,20 @@ async function commandFromLastSave(page, commandID) {
   }, { id: commandID });
 }
 
+async function authoringDurableState(page) {
+  return page.evaluate(() => __desktopFixture.authoringDurableState());
+}
+
 test.beforeEach(async ({ page }) => {
+  const reset = await page.request.post(`${FIXTURE_URL}/reset`);
+  expect(reset.ok()).toBe(true);
   await openAuthoringFixture(page);
+});
+
+test('bundled read-only demo exposes state-changing examples only in their initial state', async () => {
+  const demo = JSON.parse(await readFile(BUNDLED_DEMO_URL, 'utf8'));
+  const completed = demo.terminals.flatMap(terminal => Object.keys(terminal.commandStates ?? {}));
+  expect(completed).toEqual([]);
 });
 
 test('state-change toggle requires all four authored texts and persists an optional config', async ({ page }) => {
@@ -138,46 +152,110 @@ test('individual and terminal resets require confirmation and update only the in
   await selectCommand(page, 'Двери открыты');
   const form = page.locator('#nodeForm');
   const resetOne = form.getByRole('button', { name: 'СБРОСИТЬ СОСТОЯНИЕ' });
+  const initialDurable = await authoringDurableState(page);
+  expect(Object.keys(initialDurable.commandStates).sort()).toEqual(['alarm', 'doors']);
 
-  page.once('dialog', async dialog => {
-    expect(dialog.message()).toMatch(/сбросить.*двер/i);
-    await dialog.dismiss();
-  });
   await resetOne.click();
+  const resetConfirmation = page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ СБРОСА' });
+  await expect(resetConfirmation).toContainText(/сбросить.*двер/i);
+  await resetConfirmation.getByRole('button', { name: 'ОТМЕНИТЬ' }).click();
   await expect.poll(() => desktopCallCount(page, 'ResetCommandState')).toBe(0);
+  await expect.poll(() => authoringDurableState(page)).toEqual(initialDurable);
   await expect(page.locator('.tree-row', { hasText: 'Двери открыты' })).toHaveCount(1);
   await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(1);
 
-  page.once('dialog', async dialog => {
-    expect(dialog.message()).toMatch(/сбросить.*двер/i);
-    await dialog.accept();
-  });
   await resetOne.click();
+  await expect(resetConfirmation).toContainText(/сбросить.*двер/i);
+  await resetConfirmation.getByRole('button', { name: 'ПОДТВЕРДИТЬ' }).click();
   await expect.poll(() => desktopCallCount(page, 'ResetCommandState')).toBe(1);
   expect(await lastDesktopCall(page, 'ResetCommandState')).toMatchObject({
     args: [{ terminalId: TERMINAL_ID, commandId: 'doors' }],
+  });
+  await expect.poll(() => authoringDurableState(page)).toEqual({
+    revision: initialDurable.revision + 1,
+    commandStates: { alarm: initialDurable.commandStates.alarm },
   });
   await expect(page.locator('.tree-row', { hasText: 'Открыть двери' })).toHaveCount(1);
   await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(1);
 
   const resetAll = page.getByRole('button', { name: 'СБРОСИТЬ ВСЕ СОСТОЯНИЯ' });
-  page.once('dialog', async dialog => {
-    expect(dialog.message()).toMatch(/сбросить.*все.*терминал/i);
-    await dialog.dismiss();
-  });
   await resetAll.click();
+  await expect(resetConfirmation).toContainText(/сбросить.*все.*терминал/i);
+  await resetConfirmation.getByRole('button', { name: 'ОТМЕНИТЬ' }).click();
   await expect.poll(() => desktopCallCount(page, 'ResetTerminalCommandStates')).toBe(0);
+  await expect.poll(() => authoringDurableState(page)).toEqual({
+    revision: initialDurable.revision + 1,
+    commandStates: { alarm: initialDurable.commandStates.alarm },
+  });
   await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(1);
 
-  page.once('dialog', async dialog => {
-    expect(dialog.message()).toMatch(/сбросить.*все.*терминал/i);
-    await dialog.accept();
-  });
   await resetAll.click();
+  await expect(resetConfirmation).toContainText(/сбросить.*все.*терминал/i);
+  await resetConfirmation.getByRole('button', { name: 'ПОДТВЕРДИТЬ' }).click();
   await expect.poll(() => desktopCallCount(page, 'ResetTerminalCommandStates')).toBe(1);
   expect(await lastDesktopCall(page, 'ResetTerminalCommandStates')).toMatchObject({
     args: [{ terminalId: TERMINAL_ID }],
   });
+  await expect.poll(() => authoringDurableState(page)).toEqual({
+    revision: initialDurable.revision + 2,
+    commandStates: {},
+  });
   await expect(page.locator('.tree-row', { hasText: 'Включить тревогу' })).toHaveCount(1);
   await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(0);
+
+  await page.reload();
+  await openAuthoringFixture(page);
+  await expect(page.locator('.tree-row', { hasText: 'Открыть двери' })).toHaveCount(1);
+  await expect(page.locator('.tree-row', { hasText: 'Включить тревогу' })).toHaveCount(1);
+  await expect.poll(() => authoringDurableState(page)).toEqual({
+    revision: initialDurable.revision + 2,
+    commandStates: {},
+  });
+});
+
+test('terminal reset rejects a stale backend success even when its session looks reset', async ({ page }) => {
+  const durableBefore = await authoringDurableState(page);
+  const snapshotResponse = await page.request.get(`${FIXTURE_URL}/session`);
+  expect(snapshotResponse.ok()).toBe(true);
+  const stale = await snapshotResponse.json();
+  stale.revision = 0;
+  stale.session.terminals.find(terminal => terminal.id === TERMINAL_ID).commandStates = {};
+
+  await page.route(`**${FIXTURE_URL}/reset-terminal`, route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(stale),
+  }));
+  await page.getByRole('button', { name: 'СБРОСИТЬ ВСЕ СОСТОЯНИЯ' }).click();
+  await page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ СБРОСА' })
+    .getByRole('button', { name: 'ПОДТВЕРДИТЬ' }).click();
+
+  await expect(page.locator('#saveStatus')).toHaveClass(/err/);
+  await expect(page.locator('#saveStatus')).toContainText(/не подтвердил канонический сброс/i);
+  await expect(page.locator('.tree-row', { hasText: 'Двери открыты' })).toHaveCount(1);
+  await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(1);
+  await expect.poll(() => authoringDurableState(page)).toEqual(durableBefore);
+});
+
+test('terminal reset rejects a newer backend result that still contains completed snapshots', async ({ page }) => {
+  const durableBefore = await authoringDurableState(page);
+  const snapshotResponse = await page.request.get(`${FIXTURE_URL}/session`);
+  expect(snapshotResponse.ok()).toBe(true);
+  const nonCanonical = await snapshotResponse.json();
+  nonCanonical.revision = durableBefore.revision + 1;
+
+  await page.route(`**${FIXTURE_URL}/reset-terminal`, route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(nonCanonical),
+  }));
+  await page.getByRole('button', { name: 'СБРОСИТЬ ВСЕ СОСТОЯНИЯ' }).click();
+  await page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ СБРОСА' })
+    .getByRole('button', { name: 'ПОДТВЕРДИТЬ' }).click();
+
+  await expect(page.locator('#saveStatus')).toHaveClass(/err/);
+  await expect(page.locator('#saveStatus')).toContainText(/не подтвердил канонический сброс/i);
+  await expect(page.locator('.tree-row', { hasText: 'Двери открыты' })).toHaveCount(1);
+  await expect(page.locator('.tree-row', { hasText: 'Тревога включена' })).toHaveCount(1);
+  await expect.poll(() => authoringDurableState(page)).toEqual(durableBefore);
 });

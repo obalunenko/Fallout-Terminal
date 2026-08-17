@@ -1,5 +1,9 @@
 # План реализации: команды, изменяющие состояние пунктов меню
 
+**Bugfix**: 2026-08-17 — BUG-001 Updated from bugfix patch
+**Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
+**Bugfix**: 2026-08-17 — BUG-003 Updated from bugfix patch
+
 **Feature**: `009-state-changing-menu-commands` | **Date**: 2026-08-17 | **Spec**: [spec.md](./spec.md)
 
 ## Summary
@@ -240,6 +244,8 @@ scripts/wails-bindings-check.sh
 | Master frontend | `npm ci --prefix frontend`, `npm test --prefix frontend`, `npm run build --prefix frontend` | Валидация полей, один dialog/request ID, approve/reject/close, stale callback, reset и revision ordering |
 | Player/browser | `npm ci --prefix tests/browser`, `npm test --prefix tests/browser` | Controller + 2 observers видят pending/rejected/result ≤1 s; actions блокируются; disconnect/reconnect/lifecycle корректны |
 | Desktop lifecycle | Целевой app integration test и ручной smoke того же файла | End broadcast, terminal switch, app close/open сохраняют выполненное имя; reset активного терминала синхронен |
+| Native reset integration | Production-faithful App/session/coordinator integration test с writable session и реальным `ResetTerminalCommandStates` path; browser binding не мутирует fixture state самостоятельно | Общий reset активного терминала возвращает каноническую новую document revision без прежних `commandStates`, обновляет master/controller/observer и переживает reopen того же файла |
+| Native master click regression | Автоматизируемый smoke собранного desktop-приложения с реальным кликом и подтверждением «Сбросить все состояния», writable session file и подключёнными controller/observer | Доказана непрерывная цепочка `master control → generated Wails binding → private backend → canonical session-state/runtime revisions → master/player initial`; отсутствие вызова, backend error/no-op или completed-состояние в любом представлении проваливает gate |
 
 Если signed packaging или внешний public provider не затрагиваются изменениями, соответствующие credential-dependent проверки отмечаются `N/A`, а не заявляются выполненными.
 
@@ -257,3 +263,5 @@ scripts/wails-bindings-check.sh
 | Master frontend остаётся на старом документе | Private `session-state` с монотонной document revision и session-side merge как защита очереди |
 | Состояние теряется при activation/reconnect | Runtime гидратируется из backend session; snapshot строится из effective tree |
 | Публичная схема раскрывает private state | Public contract содержит только effective value/prompt; descriptor separation test расширяется |
+| Fixture подтверждает reset, обходя production desktop/backend path | Reset-all regression gate проходит через реальный App, session worker и coordinator refresh; browser fixture только транспортирует вызов и проверяет канонический ответ/event |
+| App/backend integration проходит, но реальная native-кнопка не вызывает тот же путь | Отдельный native master-click gate запускает собранное приложение, нажимает и подтверждает reset-all и проверяет Wails-вызов, terminal ID, backend result, document/runtime revisions и master/player rendering |

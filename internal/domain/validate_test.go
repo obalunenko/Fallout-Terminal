@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateSessionRejectsInvalidKnownShape(t *testing.T) {
@@ -48,9 +51,7 @@ func TestValidateSessionRejectsInvalidKnownShape(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(valid)
 			test.mutate(&candidate)
-			if err := ValidateSession(candidate); err == nil {
-				t.Fatal("ValidateSession() error = nil")
-			}
+			require.Error(t, ValidateSession(candidate))
 		})
 	}
 }
@@ -66,9 +67,7 @@ func TestValidateSessionRejectsDocumentLimits(t *testing.T) {
 			Root: ContentNode{ID: "root", Type: NodeFolder, Name: "ROOT", Children: []ContentNode{}},
 		}
 	}
-	if err := ValidateSession(Session{Version: 1, Name: "Too many", Terminals: terminals}); err == nil {
-		t.Fatal("ValidateSession() accepted too many terminals")
-	}
+	assert.Error(t, ValidateSession(Session{Version: 1, Name: "Too many", Terminals: terminals}))
 
 	root := ContentNode{ID: "root", Type: NodeFolder, Name: "ROOT", Children: []ContentNode{}}
 	cursor := &root
@@ -77,9 +76,7 @@ func TestValidateSessionRejectsDocumentLimits(t *testing.T) {
 		cursor = &cursor.Children[0]
 	}
 	tooDeep := Session{Version: 1, Name: "Deep", Terminals: []Terminal{{ID: "t1", Name: "T", Root: root}}}
-	if err := ValidateSession(tooDeep); err == nil {
-		t.Fatal("ValidateSession() accepted excessive nesting")
-	}
+	assert.Error(t, ValidateSession(tooDeep))
 }
 
 func TestValidateSessionAcceptsStateChangingCommandStateByStableID(t *testing.T) {
@@ -94,12 +91,8 @@ func TestValidateSessionAcceptsStateChangingCommandStateByStableID(t *testing.T)
 		{ID: "moved", Type: NodeFolder, Name: "MOVED", Children: []ContentNode{command}},
 	}
 
-	if err := ValidateSession(session); err != nil {
-		t.Fatalf("ValidateSession() rejected rename/reorder with stable command ID: %v", err)
-	}
-	if _, ok := session.Terminals[0].CommandStates[command.ID]; !ok {
-		t.Fatalf("command state is not keyed by stable ID %q", command.ID)
-	}
+	require.NoError(t, ValidateSession(session))
+	assert.Contains(t, session.Terminals[0].CommandStates, command.ID)
 }
 
 func TestValidateSessionRejectsInvalidStateChangingCommandShapes(t *testing.T) {
@@ -139,9 +132,7 @@ func TestValidateSessionRejectsInvalidStateChangingCommandShapes(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
 			test.mutate(&candidate)
-			if err := ValidateSession(candidate); err == nil {
-				t.Fatal("ValidateSession() error = nil")
-			}
+			require.Error(t, ValidateSession(candidate))
 		})
 	}
 }
@@ -204,9 +195,7 @@ func TestValidateSessionRejectsInvalidCommandExecutionStates(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
 			test.mutate(&candidate)
-			if err := ValidateSession(candidate); err == nil {
-				t.Fatal("ValidateSession() error = nil")
-			}
+			require.Error(t, ValidateSession(candidate))
 		})
 	}
 }
@@ -231,9 +220,7 @@ func TestValidateSessionRejectsStateChangeKnownFieldsInExtras(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
 			test.mutate(&candidate)
-			if err := ValidateSession(candidate); err == nil {
-				t.Fatal("ValidateSession() accepted a known field shadowed by Extra")
-			}
+			require.Error(t, ValidateSession(candidate))
 		})
 	}
 }

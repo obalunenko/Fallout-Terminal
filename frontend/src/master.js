@@ -153,6 +153,52 @@ const commandExecutionDialogError = document.getElementById('commandExecutionDia
 const btnApproveCommandExecution = document.getElementById('btnApproveCommandExecution');
 const btnRejectCommandExecution = document.getElementById('btnRejectCommandExecution');
 
+let resetConfirmationResolve = null;
+const resetConfirmationDialog = document.createElement('dialog');
+resetConfirmationDialog.className = 'terminal-switch-dialog command-state-reset-dialog';
+resetConfirmationDialog.id = 'resetConfirmationDialog';
+resetConfirmationDialog.hidden = true;
+resetConfirmationDialog.setAttribute('aria-modal', 'true');
+resetConfirmationDialog.setAttribute('aria-labelledby', 'resetConfirmationDialogTitle');
+resetConfirmationDialog.setAttribute('aria-describedby', 'resetConfirmationDialogDescription');
+resetConfirmationDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="resetConfirmationDialogTitle">ПОДТВЕРЖДЕНИЕ СБРОСА</h2>
+    <p class="terminal-switch-dialog-description" id="resetConfirmationDialogDescription"></p>
+    <div class="terminal-switch-actions" role="group" aria-label="Подтверждение сброса состояния команды" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-danger" id="btnConfirmCommandStateReset" type="button">ПОДТВЕРДИТЬ</button>
+      <button class="btn" id="btnCancelCommandStateReset" type="button">ОТМЕНИТЬ</button>
+    </div>
+  </div>`;
+document.body.appendChild(resetConfirmationDialog);
+const resetConfirmationDialogDescription = document.getElementById('resetConfirmationDialogDescription');
+const btnConfirmCommandStateReset = document.getElementById('btnConfirmCommandStateReset');
+const btnCancelCommandStateReset = document.getElementById('btnCancelCommandStateReset');
+
+function finishResetConfirmation(confirmed) {
+  const resolve = resetConfirmationResolve;
+  resetConfirmationResolve = null;
+  if (resetConfirmationDialog.open) resetConfirmationDialog.close();
+  resetConfirmationDialog.hidden = true;
+  if (resolve) resolve(confirmed);
+}
+
+function confirmCommandStateReset(message) {
+  if (resetConfirmationResolve) return Promise.resolve(false);
+  resetConfirmationDialogDescription.textContent = message;
+  resetConfirmationDialog.hidden = false;
+  resetConfirmationDialog.showModal();
+  btnCancelCommandStateReset.focus();
+  return new Promise(resolve => { resetConfirmationResolve = resolve; });
+}
+
+btnConfirmCommandStateReset.addEventListener('click', () => finishResetConfirmation(true));
+btnCancelCommandStateReset.addEventListener('click', () => finishResetConfirmation(false));
+resetConfirmationDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  finishResetConfirmation(false);
+});
+
 function renderStartupPresentation(status) {
   startupStatus = status && typeof status === 'object' ? status : {};
   const info = startupStatus.serverInfo && typeof startupStatus.serverInfo === 'object'
@@ -570,9 +616,14 @@ function effectiveNodeName(term, node) {
   return typeof completedName === 'string' && completedName ? completedName : node.name;
 }
 
-function renderSessionStateResult(result, successMessage) {
+function renderSessionStateResult(result, successMessage, acceptsCanonicalResult = null) {
   if (!result?.ok || !result.session) {
     saveStatus.textContent = 'Ошибка изменения состояния: ' + (result?.error || 'сессия не обновлена');
+    saveStatus.classList.add('err');
+    return false;
+  }
+  if (typeof acceptsCanonicalResult === 'function' && !acceptsCanonicalResult(result)) {
+    saveStatus.textContent = 'Ошибка изменения состояния: backend не подтвердил канонический сброс';
     saveStatus.classList.add('err');
     return false;
   }
@@ -587,14 +638,14 @@ function renderSessionStateResult(result, successMessage) {
   return true;
 }
 
-async function runSessionStateCommand(command, successMessage) {
+async function runSessionStateCommand(command, successMessage, acceptsCanonicalResult = null) {
   if (sessionStateCommandPending) return;
   sessionStateCommandPending = true;
   renderSettingsPanel();
   renderNodeForm();
   try {
     const result = await command();
-    renderSessionStateResult(result, successMessage);
+    renderSessionStateResult(result, successMessage, acceptsCanonicalResult);
   } catch (error) {
     saveStatus.textContent = 'Ошибка изменения состояния: '
       + (error instanceof Error ? error.message : String(error));
@@ -1225,13 +1276,20 @@ function renderSettingsPanel() {
   btnResetTerminalCommandStates.disabled = !term || completedCount === 0 || sessionStateCommandPending;
 }
 
-btnResetTerminalCommandStates.addEventListener('click', () => {
+btnResetTerminalCommandStates.addEventListener('click', async () => {
   const term = getEditTerminal();
   if (!term || sessionStateCommandPending) return;
-  if (!window.confirm(`Сбросить все выполненные состояния команд терминала "${term.name}"?`)) return;
+  if (!await confirmCommandStateReset(`Сбросить все выполненные состояния команд терминала "${term.name}"?`)) return;
+  const revisionBeforeReset = newestDurableRevision;
   runSessionStateCommand(
     () => desktopAPI.resetTerminalCommandStates({ terminalId: term.id }),
-    'СОСТОЯНИЯ КОМАНД ТЕРМИНАЛА СБРОШЕНЫ'
+    'СОСТОЯНИЯ КОМАНД ТЕРМИНАЛА СБРОШЕНЫ',
+    (result) => {
+      const revision = Number(result?.revision || 0);
+      const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+      return revision > revisionBeforeReset && canonicalTerminal &&
+        Object.keys(canonicalTerminal.commandStates ?? {}).length === 0;
+    }
   );
 });
 
@@ -1486,13 +1544,20 @@ function renderNodeForm() {
   const btnResetCommandState = document.getElementById('btnResetCommandState');
   if (btnResetCommandState) {
     btnResetCommandState.disabled = sessionStateCommandPending;
-    btnResetCommandState.addEventListener('click', () => {
+    btnResetCommandState.addEventListener('click', async () => {
       if (sessionStateCommandPending) return;
       const displayedName = snapshot?.completedName || node.name;
-      if (!window.confirm(`Сбросить выполненное состояние команды "${displayedName}"?`)) return;
+      if (!await confirmCommandStateReset(`Сбросить выполненное состояние команды "${displayedName}"?`)) return;
+      const revisionBeforeReset = newestDurableRevision;
       runSessionStateCommand(
         () => desktopAPI.resetCommandState({ terminalId: term.id, commandId: node.id }),
-        'СОСТОЯНИЕ КОМАНДЫ СБРОШЕНО'
+        'СОСТОЯНИЕ КОМАНДЫ СБРОШЕНО',
+        (result) => {
+          const revision = Number(result?.revision || 0);
+          const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+          return revision > revisionBeforeReset && canonicalTerminal &&
+            !Object.hasOwn(canonicalTerminal.commandStates ?? {}, node.id);
+        }
       );
     });
   }

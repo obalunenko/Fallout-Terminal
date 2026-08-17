@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,6 +15,8 @@ import (
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var testLocations = Locations{
@@ -59,22 +60,18 @@ func TestCanceledSessionDialogsDoNotChangeStateOrFilesystem(t *testing.T) {
 			fileSystem := testutil.NewFakeFileSystem()
 			dialog := &testutil.FakeDialog{}
 			service := NewService(NewStorage(fileSystem), dialog, testLocations)
-			t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+			t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-			result := test.invoke(context.Background(), service)
-			if result.OK || !result.Canceled || result.Error != "" || result.FilePath != "" || result.Session != nil {
-				t.Fatalf("canceled result = %#v", result)
-			}
-			if got, want := dialog.Calls(), []testutil.DialogCall{{Kind: test.wantKind, DefaultPath: test.wantDefault}}; !reflect.DeepEqual(got, want) {
-				t.Fatalf("dialog calls = %#v, want %#v", got, want)
-			}
+			result := test.invoke(t.Context(), service)
+			assert.False(t, result.OK)
+			assert.True(t, result.Canceled)
+			assert.Empty(t, result.Error)
+			assert.Empty(t, result.FilePath)
+			assert.Nil(t, result.Session)
+			assert.Equal(t, []testutil.DialogCall{{Kind: test.wantKind, DefaultPath: test.wantDefault}}, dialog.Calls())
 			assertInactive(t, service.Snapshot())
-			if calls := fileSystem.MkdirCalls(); len(calls) != 0 {
-				t.Fatalf("cancellation created directories: %#v", calls)
-			}
-			if calls := fileSystem.WriteCalls(); len(calls) != 0 {
-				t.Fatalf("cancellation wrote files: %#v", calls)
-			}
+			assert.Empty(t, fileSystem.MkdirCalls(), "cancellation created directories")
+			assert.Empty(t, fileSystem.WriteCalls(), "cancellation wrote files")
 		})
 	}
 }
@@ -86,29 +83,26 @@ func TestCreateUsesDocumentsSuggestionAndActivatesChosenPathAfterWrite(t *testin
 	target := "/Volumes/Campaigns/My Wasteland.json"
 	dialog := &testutil.FakeDialog{SaveResult: target}
 	service := NewService(NewStorage(fileSystem), dialog, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	result := service.Create(context.Background())
-	if !result.OK || result.Canceled || result.Error != "" || result.FilePath != target || result.Session == nil {
-		t.Fatalf("Create() = %#v", result)
-	}
-	if result.Session.Name != "My Wasteland" || result.Session.Version != 1 || len(result.Session.Terminals) != 1 {
-		t.Fatalf("created session = %#v", result.Session)
-	}
-	if err := domain.ValidateSession(*result.Session); err != nil {
-		t.Fatalf("created session is invalid: %v", err)
-	}
+	result := service.Create(t.Context())
+	require.True(t, result.OK, "Create() = %#v", result)
+	assert.False(t, result.Canceled)
+	assert.Empty(t, result.Error)
+	assert.Equal(t, target, result.FilePath)
+	require.NotNil(t, result.Session)
+	assert.Equal(t, "My Wasteland", result.Session.Name)
+	assert.Equal(t, 1, result.Session.Version)
+	assert.Len(t, result.Session.Terminals, 1)
+	require.NoError(t, domain.ValidateSession(*result.Session))
 	written, ok := fileSystem.File(target)
-	if !ok {
-		t.Fatalf("chosen target %q was not written", target)
-	}
-	if !bytes.HasSuffix(written, []byte("\n")) || bytes.Contains(written, []byte("\t")) {
-		t.Fatalf("created JSON is not human-readable with a final newline:\n%s", written)
-	}
+	require.True(t, ok, "chosen target %q was not written", target)
+	assert.True(t, bytes.HasSuffix(written, []byte("\n")), "created JSON must have a final newline")
+	assert.NotContains(t, string(written), "\t", "created JSON must not contain tabs")
 	snapshot := service.Snapshot()
-	if snapshot.Path != target || snapshot.Session == nil || snapshot.Session.Name != "My Wasteland" {
-		t.Fatalf("active session = %#v", snapshot)
-	}
+	assert.Equal(t, target, snapshot.Path)
+	require.NotNil(t, snapshot.Session)
+	assert.Equal(t, "My Wasteland", snapshot.Session.Name)
 	assertNoApplicationSupportWrites(t, fileSystem)
 }
 
@@ -119,31 +113,28 @@ func TestInvalidOpenRetainsPreviousActiveSessionAndPath(t *testing.T) {
 	validPath := "/Volumes/Campaigns/valid.json"
 	invalidPath := "/Volumes/Campaigns/invalid.json"
 	validData, err := domain.EncodeSession(validSession("safe"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	fileSystem.SeedFile(validPath, validData)
 	fileSystem.SeedFile(invalidPath, []byte(`{"version":2,"name":"bad","terminals":[]}`))
 	dialog := &testutil.FakeDialog{OpenResult: validPath}
 	service := NewService(NewStorage(fileSystem), dialog, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil || opened.FilePath != validPath {
-		t.Fatalf("first Open() = %#v", opened)
-	}
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "first Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
+	assert.Equal(t, validPath, opened.FilePath)
 	dialog.OpenResult = invalidPath
-	failed := service.Open(context.Background())
-	if failed.OK || failed.Canceled || failed.Error == "" || failed.Session != nil {
-		t.Fatalf("invalid Open() = %#v", failed)
-	}
-	if strings.Contains(failed.Error, string(fileSystemFileData(t, fileSystem, invalidPath))) {
-		t.Fatalf("Open() error disclosed file contents: %q", failed.Error)
-	}
+	failed := service.Open(t.Context())
+	assert.False(t, failed.OK)
+	assert.False(t, failed.Canceled)
+	assert.NotEmpty(t, failed.Error)
+	assert.Nil(t, failed.Session)
+	assert.NotContains(t, failed.Error, string(fileSystemFileData(t, fileSystem, invalidPath)))
 	snapshot := service.Snapshot()
-	if snapshot.Path != validPath || snapshot.Session == nil || snapshot.Session.Name != "safe" {
-		t.Fatalf("failed open replaced active state: %#v", snapshot)
-	}
+	assert.Equal(t, validPath, snapshot.Path)
+	require.NotNil(t, snapshot.Session)
+	assert.Equal(t, "safe", snapshot.Session.Name)
 }
 
 func TestOpenAndSavePreserveUnknownFieldsAtExplicitPath(t *testing.T) {
@@ -167,35 +158,27 @@ func TestOpenAndSavePreserveUnknownFieldsAtExplicitPath(t *testing.T) {
 	fileSystem.SeedFile(target, raw)
 	dialog := &testutil.FakeDialog{OpenResult: target}
 	service := NewService(NewStorage(fileSystem), dialog, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
 	edited := *opened.Session
 	edited.Name = "after"
-	saved := service.Save(context.Background(), edited, 1)
-	if !saved.OK || saved.Error != "" || saved.RequestedRevision != 1 || saved.SavedRevision != 1 {
-		t.Fatalf("Save() = %#v", saved)
-	}
+	saved := service.Save(t.Context(), edited, 1)
+	require.True(t, saved.OK, "Save() = %#v", saved)
+	assert.Empty(t, saved.Error)
+	assert.Equal(t, uint64(1), saved.RequestedRevision)
+	assert.Equal(t, uint64(1), saved.SavedRevision)
 	written := fileSystemFileData(t, fileSystem, target)
 	for _, field := range []string{"campaignNote", "terminalNote", "nodeNote"} {
-		if !bytes.Contains(written, []byte(`"`+field+`"`)) {
-			t.Errorf("save dropped unknown field %q:\n%s", field, written)
-		}
+		assert.Contains(t, string(written), `"`+field+`"`)
 	}
 	decoded, err := domain.DecodeSession(written)
-	if err != nil {
-		t.Fatalf("saved document does not reopen: %v", err)
-	}
-	if decoded.Name != "after" {
-		t.Fatalf("saved name = %q, want after", decoded.Name)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "after", decoded.Name)
 	for _, rename := range fileSystem.RenameCalls() {
-		if rename.NewPath != target {
-			t.Fatalf("autosave moved explicit target: %#v", rename)
-		}
+		assert.Equal(t, target, rename.NewPath)
 	}
 	assertNoApplicationSupportWrites(t, fileSystem)
 }
@@ -231,43 +214,31 @@ func TestOpenAndSaveLegacyVersionOnePreservesOrdinaryContentWithoutAddingStateFi
 }`)
 	fileSystem.SeedFile(target, raw)
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
 	ordinary := opened.Session.Terminals[0].Root.Children[0]
-	if ordinary.StateChange != nil || len(opened.Session.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("legacy open synthesized state fields: command=%#v states=%#v", ordinary, opened.Session.Terminals[0].CommandStates)
-	}
+	assert.Nil(t, ordinary.StateChange)
+	assert.Empty(t, opened.Session.Terminals[0].CommandStates)
 
-	saved := service.Save(context.Background(), *opened.Session, 1)
-	if !saved.OK || saved.RequestedRevision != 1 || saved.SavedRevision != 1 {
-		t.Fatalf("Save() = %#v", saved)
-	}
+	saved := service.Save(t.Context(), *opened.Session, 1)
+	require.True(t, saved.OK, "Save() = %#v", saved)
+	assert.Equal(t, uint64(1), saved.RequestedRevision)
+	assert.Equal(t, uint64(1), saved.SavedRevision)
 	written := fileSystemFileData(t, fileSystem, target)
 	for _, absent := range []string{`"stateChange"`, `"commandStates"`} {
-		if bytes.Contains(written, []byte(absent)) {
-			t.Errorf("legacy save added optional field %s:\n%s", absent, written)
-		}
+		assert.NotContains(t, string(written), absent)
 	}
 	for _, extra := range []string{`"futureSession"`, `"futureTerminal"`, `"futureCommand"`} {
-		if !bytes.Contains(written, []byte(extra)) {
-			t.Errorf("legacy save dropped unknown field %s:\n%s", extra, written)
-		}
+		assert.Contains(t, string(written), extra)
 	}
 
 	roundTrip, err := domain.DecodeSession(written)
-	if err != nil {
-		t.Fatalf("saved legacy document does not reopen: %v", err)
-	}
-	if roundTrip.Version != 1 {
-		t.Fatalf("saved legacy version = %d, want 1", roundTrip.Version)
-	}
-	if got := roundTrip.Terminals[0].Root.Children[0]; !reflect.DeepEqual(got, ordinary) {
-		t.Fatalf("ordinary content changed during service round trip\ngot:  %#v\nwant: %#v", got, ordinary)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 1, roundTrip.Version)
+	assert.Equal(t, ordinary, roundTrip.Terminals[0].Root.Children[0])
 }
 
 func TestAssociatePlayerConfigPersistsRelativeReferenceAndKeepsActiveSession(t *testing.T) {
@@ -276,33 +247,25 @@ func TestAssociatePlayerConfigPersistsRelativeReferenceAndKeepsActiveSession(t *
 	fs := testutil.NewFakeFileSystem()
 	sessionPath := "/Campaigns/Chapter One/session.json"
 	data, err := domain.EncodeSession(validSession("chapter one"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	fs.SeedFile(sessionPath, data)
 	service := NewService(NewStorage(fs), &testutil.FakeDialog{OpenResult: sessionPath}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	if opened := service.Open(context.Background()); !opened.OK {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
 
 	configPath := "/Campaigns/Players/shared.json"
-	result := service.AssociatePlayerConfig(context.Background(), configPath)
-	if !result.OK || result.Session == nil {
-		t.Fatalf("AssociatePlayerConfig() = %#v", result)
-	}
+	result := service.AssociatePlayerConfig(t.Context(), configPath)
+	require.True(t, result.OK, "AssociatePlayerConfig() = %#v", result)
+	require.NotNil(t, result.Session)
 	want := filepath.Join("..", "Players", "shared.json")
-	if result.Session.PlayerConfig != want {
-		t.Fatalf("playerConfig = %q, want %q", result.Session.PlayerConfig, want)
-	}
+	assert.Equal(t, want, result.Session.PlayerConfig)
 
 	written, err := domain.DecodeSession(fileSystemFileData(t, fs, sessionPath))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if written.PlayerConfig != want || service.Snapshot().Session.PlayerConfig != want {
-		t.Fatalf("association was not durable and active: written=%q active=%q", written.PlayerConfig, service.Snapshot().Session.PlayerConfig)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, want, written.PlayerConfig)
+	require.NotNil(t, service.Snapshot().Session)
+	assert.Equal(t, want, service.Snapshot().Session.PlayerConfig)
 }
 
 func TestSaveWithoutActivePathFailsWithoutWriting(t *testing.T) {
@@ -310,15 +273,15 @@ func TestSaveWithoutActivePathFailsWithoutWriting(t *testing.T) {
 
 	fileSystem := testutil.NewFakeFileSystem()
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	result := service.Save(context.Background(), validSession("orphan"), 1)
-	if result.OK || result.Error == "" || result.RequestedRevision != 1 || result.SavedRevision != 0 {
-		t.Fatalf("Save() without active path = %#v", result)
-	}
-	if len(fileSystem.WriteCalls()) != 0 || len(fileSystem.RenameCalls()) != 0 {
-		t.Fatalf("Save() without active path mutated filesystem")
-	}
+	result := service.Save(t.Context(), validSession("orphan"), 1)
+	assert.False(t, result.OK)
+	assert.NotEmpty(t, result.Error)
+	assert.Equal(t, uint64(1), result.RequestedRevision)
+	assert.Zero(t, result.SavedRevision)
+	assert.Empty(t, fileSystem.WriteCalls())
+	assert.Empty(t, fileSystem.RenameCalls())
 	assertInactive(t, service.Snapshot())
 }
 
@@ -329,9 +292,7 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	demo := validSession("demo")
 	demo.PlayerConfig = "demo-players.json"
 	demoData, err := domain.EncodeSession(demo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	playerConfigData, err := domain.EncodePlayerConfig(domain.PlayerConfig{
 		Version: 1,
 		Name:    "demo-players",
@@ -340,37 +301,29 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 			{ID: "medic", Name: "Медик"},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	fileSystem.SeedFile(testLocations.BundledDemo, demoData)
 	bundledPlayerConfig := filepath.Join(filepath.Dir(testLocations.BundledDemo), demo.PlayerConfig)
 	fileSystem.SeedFile(bundledPlayerConfig, playerConfigData)
 	destination := "/Volumes/Campaigns/demo-copy.json"
 	dialog := &testutil.FakeDialog{SaveResult: destination}
 	service := NewService(NewStorage(fileSystem), dialog, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
 
-	result := service.CopyDemo(context.Background())
-	if !result.OK || result.Canceled || result.Error != "" || result.FilePath != destination || result.Session == nil {
-		t.Fatalf("CopyDemo() = %#v", result)
-	}
-	if got := fileSystemFileData(t, fileSystem, testLocations.BundledDemo); !bytes.Equal(got, demoData) {
-		t.Fatalf("bundled demo changed:\n%s", got)
-	}
-	if got := fileSystemFileData(t, fileSystem, bundledPlayerConfig); !bytes.Equal(got, playerConfigData) {
-		t.Fatalf("bundled demo player config changed:\n%s", got)
-	}
-	if got := fileSystemFileData(t, fileSystem, destination); !bytes.Equal(got, demoData) {
-		t.Fatalf("writable copy = %s, want %s", got, demoData)
-	}
+	result := service.CopyDemo(t.Context())
+	require.True(t, result.OK, "CopyDemo() = %#v", result)
+	assert.False(t, result.Canceled)
+	assert.Empty(t, result.Error)
+	assert.Equal(t, destination, result.FilePath)
+	require.NotNil(t, result.Session)
+	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, testLocations.BundledDemo))
+	assert.Equal(t, playerConfigData, fileSystemFileData(t, fileSystem, bundledPlayerConfig))
+	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, destination))
 	destinationPlayerConfig := filepath.Join(filepath.Dir(destination), demo.PlayerConfig)
-	if got := fileSystemFileData(t, fileSystem, destinationPlayerConfig); !bytes.Equal(got, playerConfigData) {
-		t.Fatalf("writable player config copy = %s, want %s", got, playerConfigData)
-	}
-	if snapshot := service.Snapshot(); snapshot.Path != destination || snapshot.Session == nil {
-		t.Fatalf("active demo copy = %#v", snapshot)
-	}
+	assert.Equal(t, playerConfigData, fileSystemFileData(t, fileSystem, destinationPlayerConfig))
+	snapshot := service.Snapshot()
+	assert.Equal(t, destination, snapshot.Path)
+	assert.NotNil(t, snapshot.Session)
 }
 
 func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
@@ -379,10 +332,9 @@ func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
 	store.seed(target, mustEncodeSession(t, validSession("initial")))
 	dialog := &testutil.FakeDialog{OpenResult: target}
 	service := NewService(store, dialog, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	if result := service.Open(context.Background()); !result.OK {
-		t.Fatalf("Open() = %#v", result)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	result := service.Open(t.Context())
+	require.True(t, result.OK, "Open() = %#v", result)
 
 	type completion struct {
 		revision uint64
@@ -392,7 +344,7 @@ func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
 	startSave := func(revision uint64) {
 		session := validSession(fmt.Sprintf("revision-%02d", revision))
 		go func() {
-			completions <- completion{revision: revision, result: service.Save(context.Background(), session, revision)}
+			completions <- completion{revision: revision, result: service.Save(t.Context(), session, revision)}
 		}()
 	}
 
@@ -400,7 +352,7 @@ func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
 	select {
 	case <-store.firstWriteStarted:
 	case <-time.After(2 * time.Second):
-		t.Fatal("first revision did not begin writing")
+		require.FailNow(t, "first revision did not begin writing")
 	}
 	t.Cleanup(store.release)
 	for revision := uint64(2); revision <= 20; revision++ {
@@ -415,32 +367,26 @@ func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
 		case completion := <-completions:
 			results[completion.revision] = completion.result
 		case <-time.After(2 * time.Second):
-			t.Fatalf("only %d of 20 saves completed", len(results))
+			require.FailNowf(t, "saves did not complete", "only %d of 20 saves completed", len(results))
 		}
 	}
 	for revision := uint64(1); revision <= 20; revision++ {
 		result := results[revision]
-		if !result.OK || result.Error != "" || result.RequestedRevision != revision {
-			t.Errorf("revision %d result = %#v", revision, result)
-		}
-		if result.SavedRevision < revision || result.SavedRevision > 20 {
-			t.Errorf("revision %d durable result = %d, want [%d,20]", revision, result.SavedRevision, revision)
-		}
+		assert.True(t, result.OK, "revision %d result = %#v", revision, result)
+		assert.Empty(t, result.Error, "revision %d", revision)
+		assert.Equal(t, revision, result.RequestedRevision)
+		assert.GreaterOrEqual(t, result.SavedRevision, revision)
+		assert.LessOrEqual(t, result.SavedRevision, uint64(20))
 	}
-	if results[20].SavedRevision != 20 {
-		t.Fatalf("newest result = %#v, want durable revision 20", results[20])
-	}
+	assert.Equal(t, uint64(20), results[20].SavedRevision)
 	final, err := domain.DecodeSession(store.file(target))
-	if err != nil {
-		t.Fatalf("final saved file is invalid: %v", err)
-	}
-	if final.Name != "revision-20" {
-		t.Fatalf("final session name = %q, want revision-20", final.Name)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "revision-20", final.Name)
 	snapshot := service.Snapshot()
-	if snapshot.Path != target || snapshot.RequestedRevision != 20 || snapshot.SavedRevision != 20 || snapshot.SaveState != SaveStateSaved {
-		t.Fatalf("final active state = %#v", snapshot)
-	}
+	assert.Equal(t, target, snapshot.Path)
+	assert.Equal(t, uint64(20), snapshot.RequestedRevision)
+	assert.Equal(t, uint64(20), snapshot.SavedRevision)
+	assert.Equal(t, SaveStateSaved, snapshot.SaveState)
 }
 
 func TestCommandStateMutationsAllocateMonotonicDocumentRevisions(t *testing.T) {
@@ -450,49 +396,47 @@ func TestCommandStateMutationsAllocateMonotonicDocumentRevisions(t *testing.T) {
 	target := "/Volumes/Campaigns/state-mutations.json"
 	fileSystem.SeedFile(target, mustEncodeSession(t, stateChangingSession("chapter")))
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	if opened := service.Open(context.Background()); !opened.OK {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
 
-	doors := service.ExecuteCommandState(context.Background(), "t1", "doors")
-	if !doors.OK || !doors.Changed || doors.Error != "" || doors.Revision != 1 || doors.Session == nil {
-		t.Fatalf("ExecuteCommandState(doors) = %#v", doors)
-	}
-	if got := doors.Session.Terminals[0].CommandStates["doors"]; got.CompletedName != "Двери открыты" || got.ResultText != "Доступ в сектор разрешён." {
-		t.Fatalf("durable doors snapshot = %#v", got)
-	}
+	doors := service.ExecuteCommandState(t.Context(), "t1", "doors")
+	require.True(t, doors.OK, "ExecuteCommandState(doors) = %#v", doors)
+	assert.True(t, doors.Changed)
+	assert.Empty(t, doors.Error)
+	assert.Equal(t, uint64(1), doors.Revision)
+	require.NotNil(t, doors.Session)
+	assert.Equal(t, domain.CommandExecutionState{CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."}, doors.Session.Terminals[0].CommandStates["doors"])
 
-	alarm := service.ExecuteCommandState(context.Background(), "t1", "alarm")
-	if !alarm.OK || !alarm.Changed || alarm.Revision != 2 {
-		t.Fatalf("ExecuteCommandState(alarm) = %#v", alarm)
-	}
-	one := service.ResetCommandState(context.Background(), "t1", "doors")
-	if !one.OK || !one.Changed || one.Revision != 3 || one.Session == nil {
-		t.Fatalf("ResetCommandState() = %#v", one)
-	}
-	if _, exists := one.Session.Terminals[0].CommandStates["doors"]; exists {
-		t.Fatalf("reset-one retained doors snapshot: %#v", one.Session.Terminals[0].CommandStates)
-	}
-	if _, exists := one.Session.Terminals[0].CommandStates["alarm"]; !exists {
-		t.Fatalf("reset-one removed sibling snapshot: %#v", one.Session.Terminals[0].CommandStates)
-	}
+	alarm := service.ExecuteCommandState(t.Context(), "t1", "alarm")
+	require.True(t, alarm.OK, "ExecuteCommandState(alarm) = %#v", alarm)
+	assert.True(t, alarm.Changed)
+	assert.Equal(t, uint64(2), alarm.Revision)
+	one := service.ResetCommandState(t.Context(), "t1", "doors")
+	require.True(t, one.OK, "ResetCommandState() = %#v", one)
+	assert.True(t, one.Changed)
+	assert.Equal(t, uint64(3), one.Revision)
+	require.NotNil(t, one.Session)
+	assert.NotContains(t, one.Session.Terminals[0].CommandStates, "doors")
+	assert.Contains(t, one.Session.Terminals[0].CommandStates, "alarm")
 
-	all := service.ResetTerminalCommandStates(context.Background(), "t1")
-	if !all.OK || !all.Changed || all.Revision != 4 || all.Session == nil || len(all.Session.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("ResetTerminalCommandStates() = %#v", all)
-	}
+	all := service.ResetTerminalCommandStates(t.Context(), "t1")
+	require.True(t, all.OK, "ResetTerminalCommandStates() = %#v", all)
+	assert.True(t, all.Changed)
+	assert.Equal(t, uint64(4), all.Revision)
+	require.NotNil(t, all.Session)
+	assert.Empty(t, all.Session.Terminals[0].CommandStates)
 	writesBeforeNoOp := len(fileSystem.WriteCalls())
-	noOp := service.ResetTerminalCommandStates(context.Background(), "t1")
-	if !noOp.OK || noOp.Changed || noOp.Revision != 4 || noOp.Session == nil {
-		t.Fatalf("idempotent ResetTerminalCommandStates() = %#v", noOp)
-	}
-	if writes := len(fileSystem.WriteCalls()); writes != writesBeforeNoOp {
-		t.Fatalf("idempotent reset wrote file: writes %d -> %d", writesBeforeNoOp, writes)
-	}
-	if snapshot := service.Snapshot(); snapshot.RequestedRevision != 4 || snapshot.SavedRevision != 4 || snapshot.SaveState != SaveStateSaved {
-		t.Fatalf("active document revisions = %#v", snapshot)
-	}
+	noOp := service.ResetTerminalCommandStates(t.Context(), "t1")
+	require.True(t, noOp.OK, "idempotent ResetTerminalCommandStates() = %#v", noOp)
+	assert.False(t, noOp.Changed)
+	assert.Equal(t, uint64(4), noOp.Revision)
+	require.NotNil(t, noOp.Session)
+	assert.Equal(t, writesBeforeNoOp, len(fileSystem.WriteCalls()))
+	snapshot := service.Snapshot()
+	assert.Equal(t, uint64(4), snapshot.RequestedRevision)
+	assert.Equal(t, uint64(4), snapshot.SavedRevision)
+	assert.Equal(t, SaveStateSaved, snapshot.SaveState)
 }
 
 func TestStaleFullSavePreservesCanonicalFrozenStateAndAppliesAuthoredEdits(t *testing.T) {
@@ -502,17 +446,16 @@ func TestStaleFullSavePreservesCanonicalFrozenStateAndAppliesAuthoredEdits(t *te
 	target := "/Volumes/Campaigns/stale-save.json"
 	fileSystem.SeedFile(target, mustEncodeSession(t, stateChangingSession("before")))
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
 	stale := *opened.Session
 
-	executed := service.ExecuteCommandState(context.Background(), "t1", "doors")
-	if !executed.OK || !executed.Changed || executed.Revision != 1 {
-		t.Fatalf("ExecuteCommandState() = %#v", executed)
-	}
+	executed := service.ExecuteCommandState(t.Context(), "t1", "doors")
+	require.True(t, executed.OK, "ExecuteCommandState() = %#v", executed)
+	assert.True(t, executed.Changed)
+	assert.Equal(t, uint64(1), executed.Revision)
 	stale.Name = "after"
 	stale.Terminals[0].Root.Children[0].Name = "Открыть гермодвери"
 	stale.Terminals[0].Root.Children[0].Text = "Новый результат для следующего выполнения."
@@ -521,29 +464,22 @@ func TestStaleFullSavePreservesCanonicalFrozenStateAndAppliesAuthoredEdits(t *te
 		"doors": {CompletedName: "ПОДДЕЛКА", ResultText: "ПОДДЕЛКА"},
 	}
 
-	saved := service.Save(context.Background(), stale, 2)
-	if !saved.OK || saved.RequestedRevision != 2 || saved.SavedRevision != 2 {
-		t.Fatalf("Save(stale) = %#v", saved)
-	}
+	saved := service.Save(t.Context(), stale, 2)
+	require.True(t, saved.OK, "Save(stale) = %#v", saved)
+	assert.Equal(t, uint64(2), saved.RequestedRevision)
+	assert.Equal(t, uint64(2), saved.SavedRevision)
 	active := service.Snapshot()
-	if active.Session == nil || active.Session.Name != "after" {
-		t.Fatalf("active authored document = %#v", active)
-	}
+	require.NotNil(t, active.Session)
+	assert.Equal(t, "after", active.Session.Name)
 	command := active.Session.Terminals[0].Root.Children[0]
-	if command.Name != "Открыть гермодвери" || command.StateChange.CompletedName != "Гермодвери открыты" {
-		t.Fatalf("authored edits were not applied: %#v", command)
-	}
+	assert.Equal(t, "Открыть гермодвери", command.Name)
+	require.NotNil(t, command.StateChange)
+	assert.Equal(t, "Гермодвери открыты", command.StateChange.CompletedName)
 	wantFrozen := domain.CommandExecutionState{CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."}
-	if got := active.Session.Terminals[0].CommandStates["doors"]; !reflect.DeepEqual(got, wantFrozen) {
-		t.Fatalf("stale save replaced frozen state: got %#v want %#v", got, wantFrozen)
-	}
+	assert.Equal(t, wantFrozen, active.Session.Terminals[0].CommandStates["doors"])
 	reopened, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, target))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := reopened.Terminals[0].CommandStates["doors"]; !reflect.DeepEqual(got, wantFrozen) {
-		t.Fatalf("durable stale-save merge = %#v, want %#v", got, wantFrozen)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, wantFrozen, reopened.Terminals[0].CommandStates["doors"])
 }
 
 func TestFullSavePrunesFrozenStateWhenCommandIsDeleted(t *testing.T) {
@@ -553,30 +489,24 @@ func TestFullSavePrunesFrozenStateWhenCommandIsDeleted(t *testing.T) {
 	target := "/Volumes/Campaigns/delete-command.json"
 	fileSystem.SeedFile(target, mustEncodeSession(t, stateChangingSession("before")))
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	if opened := service.Open(context.Background()); !opened.OK {
-		t.Fatalf("Open() = %#v", opened)
-	}
-	if result := service.ExecuteCommandState(context.Background(), "t1", "doors"); !result.OK || result.Revision != 1 {
-		t.Fatalf("ExecuteCommandState() = %#v", result)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	result := service.ExecuteCommandState(t.Context(), "t1", "doors")
+	require.True(t, result.OK, "ExecuteCommandState() = %#v", result)
+	assert.Equal(t, uint64(1), result.Revision)
 
 	candidate := *service.Snapshot().Session
 	candidate.Terminals[0].Root.Children = append([]domain.ContentNode(nil), candidate.Terminals[0].Root.Children[1:]...)
-	if result := service.Save(context.Background(), candidate, 2); !result.OK || result.SavedRevision != 2 {
-		t.Fatalf("Save(with deletion) = %#v", result)
-	}
+	saveResult := service.Save(t.Context(), candidate, 2)
+	require.True(t, saveResult.OK, "Save(with deletion) = %#v", saveResult)
+	assert.Equal(t, uint64(2), saveResult.SavedRevision)
 	active := service.Snapshot()
-	if active.Session == nil || len(active.Session.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("deleted command retained canonical state: %#v", active.Session)
-	}
+	require.NotNil(t, active.Session)
+	assert.Empty(t, active.Session.Terminals[0].CommandStates)
 	written, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, target))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(written.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("deleted command retained durable state: %#v", written.Terminals[0].CommandStates)
-	}
+	require.NoError(t, err)
+	assert.Empty(t, written.Terminals[0].CommandStates)
 }
 
 func TestStableIDAndFrozenStateRulesAcross100CompletedCommands(t *testing.T) {
@@ -586,11 +516,10 @@ func TestStableIDAndFrozenStateRulesAcross100CompletedCommands(t *testing.T) {
 	target := "/Volumes/Campaigns/one-hundred-completed-commands.json"
 	fileSystem.SeedFile(target, mustEncodeSession(t, stateChangingSessionWith100CompletedCommands()))
 	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = service.Shutdown(context.Background()) })
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
 
 	candidate := *opened.Session
 	moved := domain.ContentNode{ID: "moved-folder", Type: domain.NodeFolder, Name: "MOVED COMMANDS"}
@@ -604,47 +533,39 @@ func TestStableIDAndFrozenStateRulesAcross100CompletedCommands(t *testing.T) {
 	}
 	candidate.Terminals[0].Root.Children = []domain.ContentNode{moved}
 
-	saved := service.Save(context.Background(), candidate, 1)
-	if !saved.OK || saved.SavedRevision != 1 {
-		t.Fatalf("Save(rename/move/delete 100 commands) = %#v", saved)
-	}
+	saved := service.Save(t.Context(), candidate, 1)
+	require.True(t, saved.OK, "Save(rename/move/delete 100 commands) = %#v", saved)
+	assert.Equal(t, uint64(1), saved.SavedRevision)
 	active := service.Snapshot()
-	if active.Session == nil || len(active.Session.Terminals[0].CommandStates) != 100 {
-		t.Fatalf("stable-ID merge retained %d states, want 100", len(active.Session.Terminals[0].CommandStates))
-	}
+	require.NotNil(t, active.Session)
+	require.Len(t, active.Session.Terminals[0].CommandStates, 100)
 	for index := range 100 {
 		commandID := fmt.Sprintf("command-%03d", index)
 		wantFrozen := domain.CommandExecutionState{
 			CompletedName: fmt.Sprintf("Frozen completed %03d", index),
 			ResultText:    fmt.Sprintf("Frozen result %03d", index),
 		}
-		if got := active.Session.Terminals[0].CommandStates[commandID]; !reflect.DeepEqual(got, wantFrozen) {
-			t.Fatalf("renamed/moved command %q snapshot = %#v, want %#v", commandID, got, wantFrozen)
-		}
+		assert.Equal(t, wantFrozen, active.Session.Terminals[0].CommandStates[commandID], "command %q", commandID)
 	}
 
 	for index := range 100 {
 		commandID := fmt.Sprintf("command-%03d", index)
-		reset := service.ResetCommandState(context.Background(), "t100", commandID)
-		if !reset.OK || !reset.Changed {
-			t.Fatalf("ResetCommandState(%q) = %#v", commandID, reset)
-		}
-		executed := service.ExecuteCommandState(context.Background(), "t100", commandID)
-		if !executed.OK || !executed.Changed || executed.Session == nil {
-			t.Fatalf("ExecuteCommandState(%q) after reset = %#v", commandID, executed)
-		}
+		reset := service.ResetCommandState(t.Context(), "t100", commandID)
+		require.True(t, reset.OK, "ResetCommandState(%q) = %#v", commandID, reset)
+		assert.True(t, reset.Changed, "command %q", commandID)
+		executed := service.ExecuteCommandState(t.Context(), "t100", commandID)
+		require.True(t, executed.OK, "ExecuteCommandState(%q) after reset = %#v", commandID, executed)
+		assert.True(t, executed.Changed, "command %q", commandID)
+		require.NotNil(t, executed.Session)
 		wantNext := domain.CommandExecutionState{
 			CompletedName: fmt.Sprintf("Next completed %03d", index),
 			ResultText:    fmt.Sprintf("Next result %03d", index),
 		}
-		if got := executed.Session.Terminals[0].CommandStates[commandID]; !reflect.DeepEqual(got, wantNext) {
-			t.Fatalf("re-executed command %q snapshot = %#v, want %#v", commandID, got, wantNext)
-		}
+		assert.Equal(t, wantNext, executed.Session.Terminals[0].CommandStates[commandID], "command %q", commandID)
 	}
 	active = service.Snapshot()
-	if active.Session == nil || len(active.Session.Terminals[0].CommandStates) != 100 {
-		t.Fatalf("reset/re-execute retained %d states, want 100", len(active.Session.Terminals[0].CommandStates))
-	}
+	require.NotNil(t, active.Session)
+	require.Len(t, active.Session.Terminals[0].CommandStates, 100)
 
 	replacements := domain.ContentNode{ID: "replacement-folder", Type: domain.NodeFolder, Name: "REPLACEMENTS"}
 	for index := range 100 {
@@ -662,32 +583,22 @@ func TestStableIDAndFrozenStateRulesAcross100CompletedCommands(t *testing.T) {
 	deletedCandidate := *active.Session
 	deletedCandidate.Terminals[0].Root.Children = []domain.ContentNode{replacements}
 	deleteRevision := active.RequestedRevision + 1
-	deleted := service.Save(context.Background(), deletedCandidate, deleteRevision)
-	if !deleted.OK || deleted.SavedRevision != deleteRevision {
-		t.Fatalf("Save(delete all 100 commands and add replacements) = %#v", deleted)
-	}
+	deleted := service.Save(t.Context(), deletedCandidate, deleteRevision)
+	require.True(t, deleted.OK, "Save(delete all 100 commands and add replacements) = %#v", deleted)
+	assert.Equal(t, deleteRevision, deleted.SavedRevision)
 	active = service.Snapshot()
-	if active.Session == nil || len(active.Session.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("deleting all 100 commands retained snapshots: %#v", active.Session)
-	}
+	require.NotNil(t, active.Session)
+	assert.Empty(t, active.Session.Terminals[0].CommandStates)
 	for index := range 100 {
 		commandID := fmt.Sprintf("command-%03d", index)
 		replacementID := fmt.Sprintf("replacement-%03d", index)
-		if _, exists := active.Session.Terminals[0].CommandStates[commandID]; exists {
-			t.Fatalf("deleted command %q retained a snapshot", commandID)
-		}
-		if _, exists := active.Session.Terminals[0].CommandStates[replacementID]; exists {
-			t.Fatalf("replacement command %q inherited a deleted snapshot", replacementID)
-		}
+		assert.NotContains(t, active.Session.Terminals[0].CommandStates, commandID)
+		assert.NotContains(t, active.Session.Terminals[0].CommandStates, replacementID)
 	}
 
 	reopened, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, target))
-	if err != nil {
-		t.Fatalf("DecodeSession(after 100-command lifecycle) error = %v", err)
-	}
-	if len(reopened.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("durable deletion retained %d command states, want 0", len(reopened.Terminals[0].CommandStates))
-	}
+	require.NoError(t, err)
+	assert.Empty(t, reopened.Terminals[0].CommandStates)
 }
 
 func TestFailedCommandStateMutationKeepsPriorDocumentAndRevision(t *testing.T) {
@@ -697,36 +608,33 @@ func TestFailedCommandStateMutationKeepsPriorDocumentAndRevision(t *testing.T) {
 	initial := mustEncodeSession(t, stateChangingSession("safe"))
 	store := &failingMutationStore{path: target, data: initial, err: fmt.Errorf("injected atomic replacement failure")}
 	service := NewService(store, &testutil.FakeDialog{OpenResult: target}, testLocations)
-	if opened := service.Open(context.Background()); !opened.OK {
-		t.Fatalf("Open() = %#v", opened)
-	}
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
 
 	for attempt := range 100 {
-		result := service.ExecuteCommandState(context.Background(), "t1", "doors")
-		if result.OK || result.Changed || result.Error == "" || result.Revision != 0 || result.Session != nil {
-			t.Fatalf("failed ExecuteCommandState() attempt %d = %#v", attempt, result)
-		}
-		if store.writes != attempt+1 || !bytes.Equal(store.data, initial) {
-			t.Fatalf("failed mutation attempt %d changed durable document: writes=%d data=%s", attempt, store.writes, store.data)
-		}
+		result := service.ExecuteCommandState(t.Context(), "t1", "doors")
+		assert.False(t, result.OK, "attempt %d", attempt)
+		assert.False(t, result.Changed, "attempt %d", attempt)
+		assert.NotEmpty(t, result.Error, "attempt %d", attempt)
+		assert.Zero(t, result.Revision, "attempt %d", attempt)
+		assert.Nil(t, result.Session, "attempt %d", attempt)
+		assert.Equal(t, attempt+1, store.writes, "attempt %d", attempt)
+		assert.Equal(t, initial, store.data, "attempt %d", attempt)
 		active := service.Snapshot()
-		if active.RequestedRevision != 0 || active.SavedRevision != 0 || active.Session == nil || len(active.Session.Terminals[0].CommandStates) != 0 {
-			t.Fatalf("failed mutation attempt %d changed active state: %#v", attempt, active)
-		}
+		assert.Zero(t, active.RequestedRevision, "attempt %d", attempt)
+		assert.Zero(t, active.SavedRevision, "attempt %d", attempt)
+		require.NotNil(t, active.Session)
+		assert.Empty(t, active.Session.Terminals[0].CommandStates, "attempt %d", attempt)
 	}
-	if err := service.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() error = %v", err)
-	}
+	require.NoError(t, service.Shutdown(t.Context()))
 
 	restarted := NewService(store, &testutil.FakeDialog{OpenResult: target}, testLocations)
-	t.Cleanup(func() { _ = restarted.Shutdown(context.Background()) })
-	reopened := restarted.Open(context.Background())
-	if !reopened.OK || reopened.Session == nil || len(reopened.Session.Terminals[0].CommandStates) != 0 {
-		t.Fatalf("reopen after 100 failed mutations = %#v", reopened)
-	}
-	if !bytes.Equal(store.data, initial) {
-		t.Fatalf("reopen after failures observed a changed document: %s", store.data)
-	}
+	t.Cleanup(func() { _ = restarted.Shutdown(context.WithoutCancel(t.Context())) })
+	reopened := restarted.Open(t.Context())
+	require.True(t, reopened.OK, "reopen after 100 failed mutations = %#v", reopened)
+	require.NotNil(t, reopened.Session)
+	assert.Empty(t, reopened.Session.Terminals[0].CommandStates)
+	assert.Equal(t, initial, store.data)
 }
 
 func TestCompletedCommandStateSurvivesFreshProcessReopen(t *testing.T) {
@@ -734,34 +642,24 @@ func TestCompletedCommandStateSurvivesFreshProcessReopen(t *testing.T) {
 
 	target := filepath.Join(t.TempDir(), "process-restart-session.json")
 	initial := mustEncodeSession(t, stateChangingSession("process restart"))
-	if err := os.WriteFile(target, initial, 0o600); err != nil {
-		t.Fatalf("seed process-restart session: %v", err)
-	}
+	require.NoError(t, os.WriteFile(target, initial, 0o600))
 	executable, err := os.Executable()
-	if err != nil {
-		t.Fatalf("os.Executable() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	for _, mode := range []string{"execute", "reopen"} {
-		command := exec.Command(executable, "-test.run=^TestCommandStateFreshProcessHelper$", "-test.v")
+		command := exec.CommandContext(t.Context(), executable, "-test.run=^TestCommandStateFreshProcessHelper$", "-test.v")
 		command.Env = append(os.Environ(),
 			"FALLOUT_COMMAND_STATE_PROCESS_MODE="+mode,
 			"FALLOUT_COMMAND_STATE_PROCESS_PATH="+target,
 		)
 		output, runErr := command.CombinedOutput()
-		if runErr != nil {
-			t.Fatalf("fresh process %q failed: %v\n%s", mode, runErr, output)
-		}
+		require.NoError(t, runErr, "fresh process %q failed:\n%s", mode, output)
 	}
 
 	durable, err := domain.DecodeSession(mustReadFile(t, target))
-	if err != nil {
-		t.Fatalf("DecodeSession(after process restart) error = %v", err)
-	}
+	require.NoError(t, err)
 	want := domain.CommandExecutionState{CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."}
-	if got := durable.Terminals[0].CommandStates["doors"]; !reflect.DeepEqual(got, want) {
-		t.Fatalf("durable process-restart snapshot = %#v, want %#v", got, want)
-	}
+	assert.Equal(t, want, durable.Terminals[0].CommandStates["doors"])
 }
 
 func TestCommandStateFreshProcessHelper(t *testing.T) {
@@ -770,40 +668,31 @@ func TestCommandStateFreshProcessHelper(t *testing.T) {
 		t.Skip("helper runs only in a fresh subprocess")
 	}
 	target := os.Getenv("FALLOUT_COMMAND_STATE_PROCESS_PATH")
-	if target == "" {
-		t.Fatal("FALLOUT_COMMAND_STATE_PROCESS_PATH is empty")
-	}
+	require.NotEmpty(t, target, "FALLOUT_COMMAND_STATE_PROCESS_PATH is empty")
 
 	service := NewService(NewStorage(nil), &testutil.FakeDialog{OpenResult: target}, testLocations)
-	opened := service.Open(context.Background())
-	if !opened.OK || opened.Session == nil {
-		t.Fatalf("Open() in %s process = %#v", mode, opened)
-	}
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() in %s process = %#v", mode, opened)
+	require.NotNil(t, opened.Session)
 	switch mode {
 	case "execute":
-		result := service.ExecuteCommandState(context.Background(), "t1", "doors")
-		if !result.OK || !result.Changed || result.Session == nil {
-			t.Fatalf("ExecuteCommandState() in fresh process = %#v", result)
-		}
+		result := service.ExecuteCommandState(t.Context(), "t1", "doors")
+		require.True(t, result.OK, "ExecuteCommandState() in fresh process = %#v", result)
+		assert.True(t, result.Changed)
+		require.NotNil(t, result.Session)
 	case "reopen":
 		want := domain.CommandExecutionState{CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."}
-		if got := opened.Session.Terminals[0].CommandStates["doors"]; !reflect.DeepEqual(got, want) {
-			t.Fatalf("fresh process reopened snapshot = %#v, want %#v", got, want)
-		}
+		assert.Equal(t, want, opened.Session.Terminals[0].CommandStates["doors"])
 	default:
-		t.Fatalf("unknown helper mode %q", mode)
+		require.Failf(t, "unknown helper mode", "%q", mode)
 	}
-	if err := service.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown() in %s process = %v", mode, err)
-	}
+	require.NoError(t, service.Shutdown(t.Context()), "mode %s", mode)
 }
 
 func mustReadFile(t *testing.T, path string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile(%q) error = %v", path, err)
-	}
+	require.NoError(t, err, "ReadFile(%q)", path)
 	return data
 }
 
@@ -884,35 +773,31 @@ func validSession(name string) domain.Session {
 
 func assertInactive(t *testing.T, snapshot ActiveSession) {
 	t.Helper()
-	if snapshot.Path != "" || snapshot.Session != nil || snapshot.RequestedRevision != 0 || snapshot.SavedRevision != 0 || snapshot.SaveState != SaveStateIdle {
-		t.Fatalf("active state = %#v, want idle and empty", snapshot)
-	}
+	assert.Empty(t, snapshot.Path)
+	assert.Nil(t, snapshot.Session)
+	assert.Zero(t, snapshot.RequestedRevision)
+	assert.Zero(t, snapshot.SavedRevision)
+	assert.Equal(t, SaveStateIdle, snapshot.SaveState)
 }
 
 func assertNoApplicationSupportWrites(t *testing.T, fileSystem *testutil.FakeFileSystem) {
 	t.Helper()
 	for _, write := range fileSystem.WriteCalls() {
-		if strings.HasPrefix(write.Path, testLocations.ApplicationSupport+string(filepath.Separator)) {
-			t.Fatalf("session content written to Application Support: %q", write.Path)
-		}
+		assert.False(t, strings.HasPrefix(write.Path, testLocations.ApplicationSupport+string(filepath.Separator)), "session content written to Application Support: %q", write.Path)
 	}
 }
 
 func fileSystemFileData(t *testing.T, fileSystem *testutil.FakeFileSystem, path string) []byte {
 	t.Helper()
 	data, ok := fileSystem.File(path)
-	if !ok {
-		t.Fatalf("file %q does not exist", path)
-	}
+	require.True(t, ok, "file %q does not exist", path)
 	return data
 }
 
 func mustEncodeSession(t *testing.T, session domain.Session) []byte {
 	t.Helper()
 	data, err := domain.EncodeSession(session)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return data
 }
 
@@ -925,7 +810,7 @@ func waitForRequestedRevision(t *testing.T, service *Service, want uint64) {
 		}
 		runtime.Gosched()
 	}
-	t.Fatalf("requested revision never reached %d; state = %#v", want, service.Snapshot())
+	require.GreaterOrEqual(t, service.Snapshot().RequestedRevision, want, "requested revision never reached; state = %#v", service.Snapshot())
 }
 
 type blockingStore struct {

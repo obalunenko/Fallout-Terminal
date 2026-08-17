@@ -83,6 +83,26 @@ const state = globalThis.__desktopFixtureState ??= {
 };
 if (!state.authoringSession) state.authoringSession = stateChangingAuthoringSession();
 if (!Number.isSafeInteger(state.authoringRevision)) state.authoringRevision = 1;
+try {
+  const durableAuthoring = JSON.parse(globalThis.localStorage?.getItem('fallout-fixture-authoring-session') ?? 'null');
+  if (durableAuthoring?.session && Number.isSafeInteger(durableAuthoring.revision)) {
+    state.authoringSession = durableAuthoring.session;
+    state.authoringRevision = durableAuthoring.revision;
+  }
+} catch {
+  // A fresh fixture remains available when browser storage is unavailable.
+}
+
+function persistAuthoringState() {
+  try {
+    globalThis.localStorage?.setItem('fallout-fixture-authoring-session', JSON.stringify({
+      session: state.authoringSession,
+      revision: state.authoringRevision,
+    }));
+  } catch {
+    // The in-memory authoring fixture remains authoritative for this page.
+  }
+}
 
 const durablePublicAccess = (() => {
   try {
@@ -123,6 +143,23 @@ function authoringFixtureActive() {
   return globalThis.location?.pathname === '/__fixture/state-changing-command-authoring';
 }
 
+const authoringFixtureBase = '/__fixture/state-changing-command-authoring';
+
+async function authoringFixtureCommand(path, payload) {
+  const response = await fetch(`${authoringFixtureBase}/${path}`, {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: payload === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`authoring fixture ${path} failed`);
+  const result = await response.json();
+  if (result?.session) {
+    state.authoringSession = structuredClone(result.session);
+    state.authoringRevision = Number(result.revision || state.authoringRevision);
+  }
+  return result;
+}
+
 function approvalFixtureActive() {
   return globalThis.location?.pathname === '/__fixture/state-changing-command-approval/master';
 }
@@ -158,6 +195,13 @@ function authoringSessionResult() {
 globalThis.__desktopFixture = {
   calls: state.calls,
   timeline: state.calls,
+  async authoringDurableState() {
+    if (authoringFixtureActive()) await authoringFixtureCommand('session');
+    return {
+      revision: state.authoringRevision,
+      commandStates: structuredClone(state.authoringSession.terminals[0].commandStates ?? {}),
+    };
+  },
   emit(name, data) {
 	if (name === 'public-access-status' && data?.preferences && data?.status) {
 	  state.publicAccess = structuredClone(data);
@@ -339,7 +383,7 @@ export const MoveCharacter = (...args) => record('MoveCharacter', args);
 export const NewPlayerConfig = (...args) => record('NewPlayerConfig', args);
 export const NewSession = (...args) => record('NewSession', args);
 export const OpenPlayerConfig = (...args) => record('OpenPlayerConfig', args);
-export function OpenSession(...args) {
+export async function OpenSession(...args) {
   if (!authoringFixtureActive() && !stateChangingLifecycleBase()) return record('OpenSession', args);
   state.calls.push({ method: 'OpenSession', args: [] });
   if (syncFixtureActive()) {
@@ -376,11 +420,12 @@ export function OpenSession(...args) {
       },
     });
   }
-  return Promise.resolve({
+  const result = await authoringFixtureCommand('session');
+  return {
     ok: true,
     filePath: '/private/tmp/fallout-state-changing-authoring.json',
-    session: structuredClone(state.authoringSession),
-  });
+    session: structuredClone(result.session),
+  };
 }
 export const OpenURL = (...args) => record('OpenURL', args);
 export const ReleaseCharacter = (...args) => record('ReleaseCharacter', args);
@@ -402,40 +447,29 @@ export async function ResolveCommandExecution(payload) {
   const result = await response.json();
   return result;
 }
-export function ResetCommandState(payload) {
+export async function ResetCommandState(payload) {
   if (!authoringFixtureActive()) return record('ResetCommandState', [payload]);
   const retained = structuredClone(payload ?? {});
   state.calls.push({ method: 'ResetCommandState', args: [retained] });
-  const terminal = state.authoringSession.terminals.find(candidate => candidate.id === retained.terminalId);
-  if (terminal?.commandStates && Object.hasOwn(terminal.commandStates, retained.commandId)) {
-    delete terminal.commandStates[retained.commandId];
-    state.authoringRevision += 1;
-  }
-  const result = authoringSessionResult();
+  const result = await authoringFixtureCommand('reset-command', retained);
   emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
-  return Promise.resolve(result);
+  return result;
 }
-export function ResetTerminalCommandStates(payload) {
+export async function ResetTerminalCommandStates(payload) {
   if (!authoringFixtureActive()) return record('ResetTerminalCommandStates', [payload]);
   const retained = structuredClone(payload ?? {});
   state.calls.push({ method: 'ResetTerminalCommandStates', args: [retained] });
-  const terminal = state.authoringSession.terminals.find(candidate => candidate.id === retained.terminalId);
-  if (terminal?.commandStates && Object.keys(terminal.commandStates).length > 0) {
-    terminal.commandStates = {};
-    state.authoringRevision += 1;
-  }
-  const result = authoringSessionResult();
+  const result = await authoringFixtureCommand('reset-terminal', retained);
   emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
-  return Promise.resolve(result);
+  return result;
 }
 export const ResolveTerminalSwitch = (...args) => record('ResolveTerminalSwitch', args);
-export function SaveSession(session) {
+export async function SaveSession(session) {
   if (!authoringFixtureActive()) return record('SaveSession', [session]);
   const retained = structuredClone(session);
   state.calls.push({ method: 'SaveSession', args: [retained] });
-  state.authoringSession = structuredClone(session);
-  state.authoringRevision += 1;
-  return Promise.resolve({ ok: true, savedRevision: state.authoringRevision });
+  const result = await authoringFixtureCommand('save', retained);
+  return { ok: result.ok === true, error: result.error || '', savedRevision: result.revision };
 }
 export const SetActiveController = (...args) => record('SetActiveController', args);
 export const StartBroadcast = (...args) => record('StartBroadcast', args);
