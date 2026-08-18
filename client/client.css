@@ -381,7 +381,6 @@ html, body {
   overflow-wrap: anywhere;
   overflow: hidden;
 }
-
 /* ── Decorative bottom input line (normal screens) ────── */
 .term-prompt {
   flex: 0 0 auto;
@@ -411,6 +410,7 @@ html, body {
 }
 .back-btn:hover, .page-btn:hover { background: rgba(87, 255, 110, .12); }
 .back-btn:active, .page-btn:active { background: #57ff6e; color: #021002; }
+.back-btn.layout-placeholder { visibility: hidden; pointer-events: none; }
 .back-btn:focus-visible, .page-btn:focus-visible {
   outline: 2px solid #d8ffb8;
   outline-offset: 2px;
@@ -511,6 +511,12 @@ html, body {
 
 #screen.shared-input-pending :is(.term-row, .back-btn, .hcell) {
   filter: saturate(.55);
+}
+
+#screen.shared-command-rejected :is(.term-row, .hcell) {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: .72;
 }
 
 .hack-log-panel {

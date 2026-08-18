@@ -8,6 +8,7 @@ export {
 export {
     AssignmentPayload,
     CharacterRenamePayload,
+    CommandExecutionDecisionPayload,
     CommandResult,
     CoordinationCommandResult,
     GeneratedPlayerPasswordResult,
@@ -21,8 +22,13 @@ export {
     PublicAccessPreferences,
     PublicAccessSnapshot,
     PublicAccessStatus,
+    ResetCommandStatePayload,
+    ResetTerminalCommandStatesPayload,
+    ResolveCommandExecutionResult,
     RuntimeStatus,
     SavePublicAccessSettingsPayload,
+    SessionStateEvent,
+    SessionStateResult,
     TerminalSwitchCommandResult,
     TerminalSwitchDecisionPayload
 } from "./models.js";

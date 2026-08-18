@@ -70,6 +70,33 @@ message TerminalSwitchDecisionRequest {
   TerminalSwitchChoice choice = 2;
 }
 
+message ResolveCommandExecutionRequest {
+  string request_id = 1;
+  CommandExecutionDecision decision = 2;
+}
+
+message ResolveCommandExecutionResult {
+  bool ok = 1;
+  optional string error = 2;
+  CoordinationState state = 3;
+}
+
+message ResetCommandStateRequest {
+  string terminal_id = 1;
+  string command_id = 2;
+}
+
+message ResetTerminalCommandStatesRequest {
+  string terminal_id = 1;
+}
+
+message SessionStateResult {
+  bool ok = 1;
+  optional string error = 2;
+  uint64 revision = 3;
+  fallout.terminal.persistence.v1.Session session = 4;
+}
+
 message ResetFailedHackRequest {
   string terminal_id = 1;
   string terminal_name = 2;

@@ -7,6 +7,17 @@ import "fallout/terminal/player/v1/navigation.proto";
 
 option go_package = "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1";
 
+enum CommandExecutionPhase {
+  COMMAND_EXECUTION_PHASE_UNSPECIFIED = 0;
+  COMMAND_EXECUTION_PHASE_PENDING = 1;
+  COMMAND_EXECUTION_PHASE_REJECTED = 2;
+}
+
+message CommandExecutionPresentation {
+  CommandExecutionPhase phase = 1;
+  string command_node_id = 2;
+}
+
 message ContentFolder {
   repeated ContentNode children = 1;
 }
@@ -37,6 +48,7 @@ message LiveTerminal {
   string intro_text = 5;
   NavigationState navigation = 6;
   PublicHackState hacking = 7;
+  optional CommandExecutionPresentation command_execution = 8;
 }
 
 message NoLiveTerminal {}

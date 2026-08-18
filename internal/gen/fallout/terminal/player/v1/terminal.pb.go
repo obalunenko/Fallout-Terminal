@@ -21,6 +21,107 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type CommandExecutionPhase int32
+
+const (
+	CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED CommandExecutionPhase = 0
+	CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING     CommandExecutionPhase = 1
+	CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED    CommandExecutionPhase = 2
+)
+
+// Enum value maps for CommandExecutionPhase.
+var (
+	CommandExecutionPhase_name = map[int32]string{
+		0: "COMMAND_EXECUTION_PHASE_UNSPECIFIED",
+		1: "COMMAND_EXECUTION_PHASE_PENDING",
+		2: "COMMAND_EXECUTION_PHASE_REJECTED",
+	}
+	CommandExecutionPhase_value = map[string]int32{
+		"COMMAND_EXECUTION_PHASE_UNSPECIFIED": 0,
+		"COMMAND_EXECUTION_PHASE_PENDING":     1,
+		"COMMAND_EXECUTION_PHASE_REJECTED":    2,
+	}
+)
+
+func (x CommandExecutionPhase) Enum() *CommandExecutionPhase {
+	p := new(CommandExecutionPhase)
+	*p = x
+	return p
+}
+
+func (x CommandExecutionPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CommandExecutionPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_fallout_terminal_player_v1_terminal_proto_enumTypes[0].Descriptor()
+}
+
+func (CommandExecutionPhase) Type() protoreflect.EnumType {
+	return &file_fallout_terminal_player_v1_terminal_proto_enumTypes[0]
+}
+
+func (x CommandExecutionPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CommandExecutionPhase.Descriptor instead.
+func (CommandExecutionPhase) EnumDescriptor() ([]byte, []int) {
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{0}
+}
+
+type CommandExecutionPresentation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phase         CommandExecutionPhase  `protobuf:"varint,1,opt,name=phase,proto3,enum=fallout.terminal.player.v1.CommandExecutionPhase" json:"phase,omitempty"`
+	CommandNodeId string                 `protobuf:"bytes,2,opt,name=command_node_id,json=commandNodeId,proto3" json:"command_node_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandExecutionPresentation) Reset() {
+	*x = CommandExecutionPresentation{}
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandExecutionPresentation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandExecutionPresentation) ProtoMessage() {}
+
+func (x *CommandExecutionPresentation) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandExecutionPresentation.ProtoReflect.Descriptor instead.
+func (*CommandExecutionPresentation) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CommandExecutionPresentation) GetPhase() CommandExecutionPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED
+}
+
+func (x *CommandExecutionPresentation) GetCommandNodeId() string {
+	if x != nil {
+		return x.CommandNodeId
+	}
+	return ""
+}
+
 type ContentFolder struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Children      []*ContentNode         `protobuf:"bytes,1,rep,name=children,proto3" json:"children,omitempty"`
@@ -30,7 +131,7 @@ type ContentFolder struct {
 
 func (x *ContentFolder) Reset() {
 	*x = ContentFolder{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[0]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +143,7 @@ func (x *ContentFolder) String() string {
 func (*ContentFolder) ProtoMessage() {}
 
 func (x *ContentFolder) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[0]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +156,7 @@ func (x *ContentFolder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContentFolder.ProtoReflect.Descriptor instead.
 func (*ContentFolder) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{0}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ContentFolder) GetChildren() []*ContentNode {
@@ -74,7 +175,7 @@ type ContentCommand struct {
 
 func (x *ContentCommand) Reset() {
 	*x = ContentCommand{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[1]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +187,7 @@ func (x *ContentCommand) String() string {
 func (*ContentCommand) ProtoMessage() {}
 
 func (x *ContentCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[1]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -99,7 +200,7 @@ func (x *ContentCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContentCommand.ProtoReflect.Descriptor instead.
 func (*ContentCommand) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{1}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ContentCommand) GetText() string {
@@ -118,7 +219,7 @@ type ContentEntry struct {
 
 func (x *ContentEntry) Reset() {
 	*x = ContentEntry{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[2]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +231,7 @@ func (x *ContentEntry) String() string {
 func (*ContentEntry) ProtoMessage() {}
 
 func (x *ContentEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[2]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -143,7 +244,7 @@ func (x *ContentEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContentEntry.ProtoReflect.Descriptor instead.
 func (*ContentEntry) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{2}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ContentEntry) GetDescription() string {
@@ -169,7 +270,7 @@ type ContentNode struct {
 
 func (x *ContentNode) Reset() {
 	*x = ContentNode{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[3]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -181,7 +282,7 @@ func (x *ContentNode) String() string {
 func (*ContentNode) ProtoMessage() {}
 
 func (x *ContentNode) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[3]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -194,7 +295,7 @@ func (x *ContentNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContentNode.ProtoReflect.Descriptor instead.
 func (*ContentNode) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{3}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ContentNode) GetId() string {
@@ -268,21 +369,22 @@ func (*ContentNode_Command) isContentNode_Content() {}
 func (*ContentNode_Entry) isContentNode_Content() {}
 
 type LiveTerminal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TerminalId    string                 `protobuf:"bytes,1,opt,name=terminal_id,json=terminalId,proto3" json:"terminal_id,omitempty"`
-	TerminalName  string                 `protobuf:"bytes,2,opt,name=terminal_name,json=terminalName,proto3" json:"terminal_name,omitempty"`
-	Tree          *ContentNode           `protobuf:"bytes,3,opt,name=tree,proto3" json:"tree,omitempty"`
-	HackLevel     int32                  `protobuf:"varint,4,opt,name=hack_level,json=hackLevel,proto3" json:"hack_level,omitempty"`
-	IntroText     string                 `protobuf:"bytes,5,opt,name=intro_text,json=introText,proto3" json:"intro_text,omitempty"`
-	Navigation    *NavigationState       `protobuf:"bytes,6,opt,name=navigation,proto3" json:"navigation,omitempty"`
-	Hacking       *PublicHackState       `protobuf:"bytes,7,opt,name=hacking,proto3" json:"hacking,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState        `protogen:"open.v1"`
+	TerminalId       string                        `protobuf:"bytes,1,opt,name=terminal_id,json=terminalId,proto3" json:"terminal_id,omitempty"`
+	TerminalName     string                        `protobuf:"bytes,2,opt,name=terminal_name,json=terminalName,proto3" json:"terminal_name,omitempty"`
+	Tree             *ContentNode                  `protobuf:"bytes,3,opt,name=tree,proto3" json:"tree,omitempty"`
+	HackLevel        int32                         `protobuf:"varint,4,opt,name=hack_level,json=hackLevel,proto3" json:"hack_level,omitempty"`
+	IntroText        string                        `protobuf:"bytes,5,opt,name=intro_text,json=introText,proto3" json:"intro_text,omitempty"`
+	Navigation       *NavigationState              `protobuf:"bytes,6,opt,name=navigation,proto3" json:"navigation,omitempty"`
+	Hacking          *PublicHackState              `protobuf:"bytes,7,opt,name=hacking,proto3" json:"hacking,omitempty"`
+	CommandExecution *CommandExecutionPresentation `protobuf:"bytes,8,opt,name=command_execution,json=commandExecution,proto3,oneof" json:"command_execution,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *LiveTerminal) Reset() {
 	*x = LiveTerminal{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[4]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +396,7 @@ func (x *LiveTerminal) String() string {
 func (*LiveTerminal) ProtoMessage() {}
 
 func (x *LiveTerminal) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[4]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +409,7 @@ func (x *LiveTerminal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LiveTerminal.ProtoReflect.Descriptor instead.
 func (*LiveTerminal) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{4}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LiveTerminal) GetTerminalId() string {
@@ -359,6 +461,13 @@ func (x *LiveTerminal) GetHacking() *PublicHackState {
 	return nil
 }
 
+func (x *LiveTerminal) GetCommandExecution() *CommandExecutionPresentation {
+	if x != nil {
+		return x.CommandExecution
+	}
+	return nil
+}
+
 type NoLiveTerminal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -367,7 +476,7 @@ type NoLiveTerminal struct {
 
 func (x *NoLiveTerminal) Reset() {
 	*x = NoLiveTerminal{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[5]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -379,7 +488,7 @@ func (x *NoLiveTerminal) String() string {
 func (*NoLiveTerminal) ProtoMessage() {}
 
 func (x *NoLiveTerminal) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[5]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -392,7 +501,7 @@ func (x *NoLiveTerminal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NoLiveTerminal.ProtoReflect.Descriptor instead.
 func (*NoLiveTerminal) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{5}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{6}
 }
 
 type TerminalPresentation struct {
@@ -408,7 +517,7 @@ type TerminalPresentation struct {
 
 func (x *TerminalPresentation) Reset() {
 	*x = TerminalPresentation{}
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[6]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -420,7 +529,7 @@ func (x *TerminalPresentation) String() string {
 func (*TerminalPresentation) ProtoMessage() {}
 
 func (x *TerminalPresentation) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[6]
+	mi := &file_fallout_terminal_player_v1_terminal_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -433,7 +542,7 @@ func (x *TerminalPresentation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalPresentation.ProtoReflect.Descriptor instead.
 func (*TerminalPresentation) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{6}
+	return file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TerminalPresentation) GetPresentation() isTerminalPresentation_Presentation {
@@ -481,7 +590,10 @@ var File_fallout_terminal_player_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_fallout_terminal_player_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	")fallout/terminal/player/v1/terminal.proto\x12\x1afallout.terminal.player.v1\x1a(fallout/terminal/player/v1/hacking.proto\x1a+fallout/terminal/player/v1/navigation.proto\"T\n" +
+	")fallout/terminal/player/v1/terminal.proto\x12\x1afallout.terminal.player.v1\x1a(fallout/terminal/player/v1/hacking.proto\x1a+fallout/terminal/player/v1/navigation.proto\"\x8f\x01\n" +
+	"\x1cCommandExecutionPresentation\x12G\n" +
+	"\x05phase\x18\x01 \x01(\x0e21.fallout.terminal.player.v1.CommandExecutionPhaseR\x05phase\x12&\n" +
+	"\x0fcommand_node_id\x18\x02 \x01(\tR\rcommandNodeId\"T\n" +
 	"\rContentFolder\x12C\n" +
 	"\bchildren\x18\x01 \x03(\v2'.fallout.terminal.player.v1.ContentNodeR\bchildren\"$\n" +
 	"\x0eContentCommand\x12\x12\n" +
@@ -494,7 +606,7 @@ const file_fallout_terminal_player_v1_terminal_proto_rawDesc = "" +
 	"\x06folder\x18\x03 \x01(\v2).fallout.terminal.player.v1.ContentFolderH\x00R\x06folder\x12F\n" +
 	"\acommand\x18\x04 \x01(\v2*.fallout.terminal.player.v1.ContentCommandH\x00R\acommand\x12@\n" +
 	"\x05entry\x18\x05 \x01(\v2(.fallout.terminal.player.v1.ContentEntryH\x00R\x05entryB\t\n" +
-	"\acontent\"\xe3\x02\n" +
+	"\acontent\"\xe5\x03\n" +
 	"\fLiveTerminal\x12\x1f\n" +
 	"\vterminal_id\x18\x01 \x01(\tR\n" +
 	"terminalId\x12#\n" +
@@ -507,12 +619,18 @@ const file_fallout_terminal_player_v1_terminal_proto_rawDesc = "" +
 	"\n" +
 	"navigation\x18\x06 \x01(\v2+.fallout.terminal.player.v1.NavigationStateR\n" +
 	"navigation\x12E\n" +
-	"\ahacking\x18\a \x01(\v2+.fallout.terminal.player.v1.PublicHackStateR\ahacking\"\x10\n" +
+	"\ahacking\x18\a \x01(\v2+.fallout.terminal.player.v1.PublicHackStateR\ahacking\x12j\n" +
+	"\x11command_execution\x18\b \x01(\v28.fallout.terminal.player.v1.CommandExecutionPresentationH\x00R\x10commandExecution\x88\x01\x01B\x14\n" +
+	"\x12_command_execution\"\x10\n" +
 	"\x0eNoLiveTerminal\"\xcf\x01\n" +
 	"\x14TerminalPresentation\x12O\n" +
 	"\rlive_terminal\x18\x01 \x01(\v2(.fallout.terminal.player.v1.LiveTerminalH\x00R\fliveTerminal\x12V\n" +
 	"\x10no_live_terminal\x18\x02 \x01(\v2*.fallout.terminal.player.v1.NoLiveTerminalH\x00R\x0enoLiveTerminalB\x0e\n" +
-	"\fpresentationBYZWgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1b\x06proto3"
+	"\fpresentation*\x8b\x01\n" +
+	"\x15CommandExecutionPhase\x12'\n" +
+	"#COMMAND_EXECUTION_PHASE_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fCOMMAND_EXECUTION_PHASE_PENDING\x10\x01\x12$\n" +
+	" COMMAND_EXECUTION_PHASE_REJECTED\x10\x02BYZWgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1;playerv1b\x06proto3"
 
 var (
 	file_fallout_terminal_player_v1_terminal_proto_rawDescOnce sync.Once
@@ -526,33 +644,38 @@ func file_fallout_terminal_player_v1_terminal_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_player_v1_terminal_proto_rawDescData
 }
 
-var file_fallout_terminal_player_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_fallout_terminal_player_v1_terminal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_fallout_terminal_player_v1_terminal_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_fallout_terminal_player_v1_terminal_proto_goTypes = []any{
-	(*ContentFolder)(nil),        // 0: fallout.terminal.player.v1.ContentFolder
-	(*ContentCommand)(nil),       // 1: fallout.terminal.player.v1.ContentCommand
-	(*ContentEntry)(nil),         // 2: fallout.terminal.player.v1.ContentEntry
-	(*ContentNode)(nil),          // 3: fallout.terminal.player.v1.ContentNode
-	(*LiveTerminal)(nil),         // 4: fallout.terminal.player.v1.LiveTerminal
-	(*NoLiveTerminal)(nil),       // 5: fallout.terminal.player.v1.NoLiveTerminal
-	(*TerminalPresentation)(nil), // 6: fallout.terminal.player.v1.TerminalPresentation
-	(*NavigationState)(nil),      // 7: fallout.terminal.player.v1.NavigationState
-	(*PublicHackState)(nil),      // 8: fallout.terminal.player.v1.PublicHackState
+	(CommandExecutionPhase)(0),           // 0: fallout.terminal.player.v1.CommandExecutionPhase
+	(*CommandExecutionPresentation)(nil), // 1: fallout.terminal.player.v1.CommandExecutionPresentation
+	(*ContentFolder)(nil),                // 2: fallout.terminal.player.v1.ContentFolder
+	(*ContentCommand)(nil),               // 3: fallout.terminal.player.v1.ContentCommand
+	(*ContentEntry)(nil),                 // 4: fallout.terminal.player.v1.ContentEntry
+	(*ContentNode)(nil),                  // 5: fallout.terminal.player.v1.ContentNode
+	(*LiveTerminal)(nil),                 // 6: fallout.terminal.player.v1.LiveTerminal
+	(*NoLiveTerminal)(nil),               // 7: fallout.terminal.player.v1.NoLiveTerminal
+	(*TerminalPresentation)(nil),         // 8: fallout.terminal.player.v1.TerminalPresentation
+	(*NavigationState)(nil),              // 9: fallout.terminal.player.v1.NavigationState
+	(*PublicHackState)(nil),              // 10: fallout.terminal.player.v1.PublicHackState
 }
 var file_fallout_terminal_player_v1_terminal_proto_depIdxs = []int32{
-	3, // 0: fallout.terminal.player.v1.ContentFolder.children:type_name -> fallout.terminal.player.v1.ContentNode
-	0, // 1: fallout.terminal.player.v1.ContentNode.folder:type_name -> fallout.terminal.player.v1.ContentFolder
-	1, // 2: fallout.terminal.player.v1.ContentNode.command:type_name -> fallout.terminal.player.v1.ContentCommand
-	2, // 3: fallout.terminal.player.v1.ContentNode.entry:type_name -> fallout.terminal.player.v1.ContentEntry
-	3, // 4: fallout.terminal.player.v1.LiveTerminal.tree:type_name -> fallout.terminal.player.v1.ContentNode
-	7, // 5: fallout.terminal.player.v1.LiveTerminal.navigation:type_name -> fallout.terminal.player.v1.NavigationState
-	8, // 6: fallout.terminal.player.v1.LiveTerminal.hacking:type_name -> fallout.terminal.player.v1.PublicHackState
-	4, // 7: fallout.terminal.player.v1.TerminalPresentation.live_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
-	5, // 8: fallout.terminal.player.v1.TerminalPresentation.no_live_terminal:type_name -> fallout.terminal.player.v1.NoLiveTerminal
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	0,  // 0: fallout.terminal.player.v1.CommandExecutionPresentation.phase:type_name -> fallout.terminal.player.v1.CommandExecutionPhase
+	5,  // 1: fallout.terminal.player.v1.ContentFolder.children:type_name -> fallout.terminal.player.v1.ContentNode
+	2,  // 2: fallout.terminal.player.v1.ContentNode.folder:type_name -> fallout.terminal.player.v1.ContentFolder
+	3,  // 3: fallout.terminal.player.v1.ContentNode.command:type_name -> fallout.terminal.player.v1.ContentCommand
+	4,  // 4: fallout.terminal.player.v1.ContentNode.entry:type_name -> fallout.terminal.player.v1.ContentEntry
+	5,  // 5: fallout.terminal.player.v1.LiveTerminal.tree:type_name -> fallout.terminal.player.v1.ContentNode
+	9,  // 6: fallout.terminal.player.v1.LiveTerminal.navigation:type_name -> fallout.terminal.player.v1.NavigationState
+	10, // 7: fallout.terminal.player.v1.LiveTerminal.hacking:type_name -> fallout.terminal.player.v1.PublicHackState
+	1,  // 8: fallout.terminal.player.v1.LiveTerminal.command_execution:type_name -> fallout.terminal.player.v1.CommandExecutionPresentation
+	6,  // 9: fallout.terminal.player.v1.TerminalPresentation.live_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
+	7,  // 10: fallout.terminal.player.v1.TerminalPresentation.no_live_terminal:type_name -> fallout.terminal.player.v1.NoLiveTerminal
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_player_v1_terminal_proto_init() }
@@ -562,12 +685,13 @@ func file_fallout_terminal_player_v1_terminal_proto_init() {
 	}
 	file_fallout_terminal_player_v1_hacking_proto_init()
 	file_fallout_terminal_player_v1_navigation_proto_init()
-	file_fallout_terminal_player_v1_terminal_proto_msgTypes[3].OneofWrappers = []any{
+	file_fallout_terminal_player_v1_terminal_proto_msgTypes[4].OneofWrappers = []any{
 		(*ContentNode_Folder)(nil),
 		(*ContentNode_Command)(nil),
 		(*ContentNode_Entry)(nil),
 	}
-	file_fallout_terminal_player_v1_terminal_proto_msgTypes[6].OneofWrappers = []any{
+	file_fallout_terminal_player_v1_terminal_proto_msgTypes[5].OneofWrappers = []any{}
+	file_fallout_terminal_player_v1_terminal_proto_msgTypes[7].OneofWrappers = []any{
 		(*TerminalPresentation_LiveTerminal)(nil),
 		(*TerminalPresentation_NoLiveTerminal)(nil),
 	}
@@ -576,13 +700,14 @@ func file_fallout_terminal_player_v1_terminal_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_player_v1_terminal_proto_rawDesc), len(file_fallout_terminal_player_v1_terminal_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   7,
+			NumEnums:      1,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_fallout_terminal_player_v1_terminal_proto_goTypes,
 		DependencyIndexes: file_fallout_terminal_player_v1_terminal_proto_depIdxs,
+		EnumInfos:         file_fallout_terminal_player_v1_terminal_proto_enumTypes,
 		MessageInfos:      file_fallout_terminal_player_v1_terminal_proto_msgTypes,
 	}.Build()
 	File_fallout_terminal_player_v1_terminal_proto = out.File

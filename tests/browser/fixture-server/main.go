@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	fixtureAddress      = "127.0.0.1:34119"
-	fixtureEdgeUsername = "players"
-	fixtureEdgePassword = "password-long-enough"
-	fixtureRandomSeed   = uint64(0x435254)
+	fixtureAddress           = "127.0.0.1:34119"
+	fixtureEdgeUsername      = "players"
+	fixtureEdgePassword      = "password-long-enough"
+	fixtureRandomSeed        = uint64(0x435254)
+	fixtureApprovalRequestID = "approval-request-1"
 )
 
 type ids struct{ next atomic.Uint64 }
@@ -37,6 +38,230 @@ type fixtureRandom struct {
 	mu     sync.Mutex
 	state  uint64
 	forced []int
+}
+
+type fixtureCommandStateStore struct {
+	mu            sync.Mutex
+	states        map[string]domain.CommandExecutionState
+	revision      uint64
+	executeWrites int
+	failNext      bool
+}
+
+var fixtureCommandResult = "Доступ в сектор разрешён.\n" +
+	"ПРОТОКОЛ ДОСТУПА:\n" +
+	strings.Repeat("Состояние гермозатвора подтверждено. Контрольные цепи переведены в штатный режим. "+
+		"Маршрут эвакуации свободен. Аварийные блокировки сняты. Диагностический журнал сохранён.\n", 80) +
+	"Конец отчёта."
+
+type fixtureAuthoringStore struct {
+	mu       sync.Mutex
+	session  domain.Session
+	revision uint64
+}
+
+type fixtureSessionStateResult struct {
+	OK       bool            `json:"ok"`
+	Error    string          `json:"error,omitempty"`
+	Revision uint64          `json:"revision"`
+	Session  *domain.Session `json:"session,omitempty"`
+}
+
+type fixtureResetCommandRequest struct {
+	TerminalID string `json:"terminalId"`
+	CommandID  string `json:"commandId"`
+}
+
+type fixtureResetTerminalRequest struct {
+	TerminalID string `json:"terminalId"`
+}
+
+func (store *fixtureAuthoringStore) reset() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.session = stateChangingAuthoringSession()
+	store.revision = 1
+}
+
+func (store *fixtureAuthoringStore) snapshot() fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) save(session domain.Session) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.session = cloneFixtureSession(session)
+	store.revision++
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resetCommand(request fixtureResetCommandRequest) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	terminal := fixtureTerminalByID(&store.session, strings.TrimSpace(request.TerminalID))
+	if terminal == nil {
+		return fixtureSessionStateResult{Error: "terminal does not exist", Revision: store.revision}
+	}
+	commandID := strings.TrimSpace(request.CommandID)
+	if _, exists := terminal.CommandStates[commandID]; exists {
+		delete(terminal.CommandStates, commandID)
+		if len(terminal.CommandStates) == 0 {
+			terminal.CommandStates = nil
+		}
+		store.revision++
+	}
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resetTerminal(request fixtureResetTerminalRequest) fixtureSessionStateResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	terminal := fixtureTerminalByID(&store.session, strings.TrimSpace(request.TerminalID))
+	if terminal == nil {
+		return fixtureSessionStateResult{Error: "terminal does not exist", Revision: store.revision}
+	}
+	if len(terminal.CommandStates) != 0 {
+		terminal.CommandStates = nil
+		store.revision++
+	}
+	return store.resultLocked()
+}
+
+func (store *fixtureAuthoringStore) resultLocked() fixtureSessionStateResult {
+	session := cloneFixtureSession(store.session)
+	return fixtureSessionStateResult{OK: true, Revision: store.revision, Session: &session}
+}
+
+func fixtureTerminalByID(session *domain.Session, terminalID string) *domain.Terminal {
+	if session == nil {
+		return nil
+	}
+	for index := range session.Terminals {
+		if session.Terminals[index].ID == terminalID {
+			return &session.Terminals[index]
+		}
+	}
+	return nil
+}
+
+func cloneFixtureSession(session domain.Session) domain.Session {
+	data, err := domain.EncodeSession(session)
+	if err != nil {
+		panic(err)
+	}
+	clone, err := domain.DecodeSession(data)
+	if err != nil {
+		panic(err)
+	}
+	return clone
+}
+
+func (store *fixtureCommandStateStore) reset() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.states = nil
+	store.revision = 1
+	store.executeWrites = 0
+	store.failNext = false
+}
+
+func (store *fixtureCommandStateStore) failNextSave() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.failNext = true
+}
+
+func (store *fixtureCommandStateStore) ExecuteCommandState(terminalID, commandID string) (control.CommandStateMutation, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.failNext {
+		store.failNext = false
+		return control.CommandStateMutation{}, errors.New("fixture atomic persistence failed")
+	}
+	if terminalID != "terminal-stateful" || commandID != "doors" {
+		return control.CommandStateMutation{}, errors.New("fixture command identity is invalid")
+	}
+	changed := false
+	if _, completed := store.states[commandID]; !completed {
+		if store.states == nil {
+			store.states = make(map[string]domain.CommandExecutionState)
+		}
+		store.states[commandID] = domain.CommandExecutionState{
+			CompletedName: "Двери открыты",
+			ResultText:    fixtureCommandResult,
+		}
+		store.revision++
+		store.executeWrites++
+		changed = true
+	}
+	return store.mutationLocked(changed), nil
+}
+
+func (store *fixtureCommandStateStore) ResetCommandState(terminalID, commandID string) (control.CommandStateMutation, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if terminalID != "terminal-stateful" || commandID != "doors" {
+		return control.CommandStateMutation{}, errors.New("fixture command identity is invalid")
+	}
+	_, changed := store.states[commandID]
+	if changed {
+		delete(store.states, commandID)
+		store.revision++
+	}
+	return store.mutationLocked(changed), nil
+}
+
+func (store *fixtureCommandStateStore) ResetTerminalCommandStates(terminalID string) (control.CommandStateMutation, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if terminalID != "terminal-stateful" {
+		return control.CommandStateMutation{}, errors.New("fixture terminal identity is invalid")
+	}
+	changed := len(store.states) != 0
+	if changed {
+		store.states = nil
+		store.revision++
+	}
+	return store.mutationLocked(changed), nil
+}
+
+func (store *fixtureCommandStateStore) mutationLocked(changed bool) control.CommandStateMutation {
+	return control.CommandStateMutation{
+		Changed:  changed,
+		Revision: store.revision,
+		Session:  stateChangingApprovalSession(store.states),
+	}
+}
+
+func (store *fixtureCommandStateStore) target() domain.TerminalTarget {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	target := stateChangingApprovalTarget()
+	target.CommandStates = cloneFixtureCommandStates(store.states)
+	return target
+}
+
+func (store *fixtureCommandStateStore) syncTarget() domain.TerminalTarget {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	target := stateChangingSyncTarget()
+	target.CommandStates = cloneFixtureCommandStates(store.states)
+	return target
+}
+
+func (store *fixtureCommandStateStore) syncSession() domain.Session {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return stateChangingSyncSession(store.states)
+}
+
+func (store *fixtureCommandStateStore) audit() (int, bool) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	_, completed := store.states["doors"]
+	return store.executeWrites, completed
 }
 
 func (random *fixtureRandom) Intn(limit int) int {
@@ -221,6 +446,28 @@ func activateCRTTerminal(service *control.Service, response http.ResponseWriter,
 	return true
 }
 
+func activateLifecycleTerminal(service *control.Service, target domain.TerminalTarget) error {
+	state, err := service.RequestTerminalActivation(target)
+	if err != nil {
+		return err
+	}
+	if state.PendingSwitch == nil {
+		return nil
+	}
+	_, err = service.ResolveTerminalSwitch(state.PendingSwitch.SwitchID, domain.TerminalSwitchDiscard)
+	return err
+}
+
+func restartStateChangingBroadcast(service *control.Service, target domain.TerminalTarget) error {
+	if _, err := service.EndBroadcast(); err != nil {
+		return err
+	}
+	if _, err := service.StartBroadcast(); err != nil {
+		return err
+	}
+	return activateLifecycleTerminal(service, target)
+}
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -234,13 +481,18 @@ func run() error {
 		return fmt.Errorf("open built player assets: %w", err)
 	}
 	fixtureHackRandom := &fixtureRandom{state: fixtureRandomSeed}
+	approvalStore := &fixtureCommandStateStore{}
+	approvalStore.reset()
+	authoringStore := &fixtureAuthoringStore{}
+	authoringStore.reset()
 	liveService := live.New(fixtureHackRandom, nil)
 	var connectPlayer *player.ConnectService
 	service := control.New(control.Config{
-		IDs:         &ids{},
-		Runtime:     liveService,
-		Terminals:   liveService,
-		TrustedHack: liveService,
+		IDs:               &ids{},
+		Runtime:           liveService,
+		Terminals:         liveService,
+		TrustedHack:       liveService,
+		CommandStateStore: approvalStore,
 		Enqueue: func(effect control.Effect) {
 			if connectPlayer != nil {
 				connectPlayer.PublishEffect(effect)
@@ -286,6 +538,222 @@ func run() error {
 		page = strings.Replace(page, `id="mainLayout" style="display:none"`, `id="mainLayout" style="display:flex"`, 1)
 		response.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-authoring", func(response http.ResponseWriter, _ *http.Request) {
+		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
+		if readErr != nil {
+			http.Error(response, "fixture master page is unavailable", http.StatusInternalServerError)
+			return
+		}
+		page := strings.Replace(string(raw), `<head>`, `<head>
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>`, 1)
+		page = strings.ReplaceAll(page, `./master.css`, `/__fixture/master.css`)
+		page = strings.ReplaceAll(page, `./master.js`, `/__fixture/master.js`)
+		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset", func(response http.ResponseWriter, _ *http.Request) {
+		authoringStore.reset()
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-authoring/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.snapshot())
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/save", func(response http.ResponseWriter, request *http.Request) {
+		var session domain.Session
+		if err := json.NewDecoder(request.Body).Decode(&session); err != nil {
+			http.Error(response, "invalid authoring session", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.save(session))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset-command", func(response http.ResponseWriter, request *http.Request) {
+		var payload fixtureResetCommandRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid reset-command request", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.resetCommand(payload))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-authoring/reset-terminal", func(response http.ResponseWriter, request *http.Request) {
+		var payload fixtureResetTerminalRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid reset-terminal request", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(authoringStore.resetTerminal(payload))
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-approval/master", func(response http.ResponseWriter, _ *http.Request) {
+		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
+		if readErr != nil {
+			http.Error(response, "fixture master page is unavailable", http.StatusInternalServerError)
+			return
+		}
+		page := strings.Replace(string(raw), `<head>`, `<head>
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>`, 1)
+		page = strings.ReplaceAll(page, `./master.css`, `/__fixture/master.css`)
+		page = strings.ReplaceAll(page, `./master.js`, `/__fixture/master.js`)
+		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-approval/state", func(response http.ResponseWriter, _ *http.Request) {
+		state := service.Snapshot()
+		if state.PendingCommandExecution != nil {
+			state.PendingCommandExecution.RequestID = fixtureApprovalRequestID
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(state)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-approval/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(stateChangingApprovalSession(nil))
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-approval/reset", func(response http.ResponseWriter, _ *http.Request) {
+		approvalStore.reset()
+		if _, err := service.EndBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		if _, err := service.StartBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if _, err := service.RequestTerminalActivation(approvalStore.target()); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-approval/reemit-pending", func(response http.ResponseWriter, _ *http.Request) {
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-approval/fail-next-save", func(response http.ResponseWriter, _ *http.Request) {
+		approvalStore.failNextSave()
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-approval/resolve", func(response http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			RequestID string `json:"requestId"`
+			Decision  string `json:"decision"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid fixture command decision", http.StatusBadRequest)
+			return
+		}
+		requestID := payload.RequestID
+		if requestID == fixtureApprovalRequestID {
+			if current := service.Snapshot().PendingCommandExecution; current != nil {
+				requestID = current.RequestID
+			}
+		}
+		state, _, resolveErr := service.ResolveCommandExecution(requestID, domain.CommandExecutionDecision(payload.Decision))
+		result := map[string]any{"ok": resolveErr == nil, "state": state}
+		if resolveErr != nil {
+			result["error"] = resolveErr.Error()
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(result)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-sync/master", func(response http.ResponseWriter, _ *http.Request) {
+		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
+		if readErr != nil {
+			http.Error(response, "fixture master page is unavailable", http.StatusInternalServerError)
+			return
+		}
+		page := strings.Replace(string(raw), `<head>`, `<head>
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>`, 1)
+		page = strings.ReplaceAll(page, `./master.css`, `/__fixture/master.css`)
+		page = strings.ReplaceAll(page, `./master.js`, `/__fixture/master.js`)
+		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-sync/state", func(response http.ResponseWriter, _ *http.Request) {
+		state := service.Snapshot()
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(state)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-sync/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(approvalStore.syncSession())
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/reset", func(response http.ResponseWriter, _ *http.Request) {
+		approvalStore.reset()
+		if err := restartStateChangingBroadcast(service, approvalStore.syncTarget()); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/resolve", func(response http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			RequestID string `json:"requestId"`
+			Decision  string `json:"decision"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			http.Error(response, "invalid fixture command decision", http.StatusBadRequest)
+			return
+		}
+		requestID := payload.RequestID
+		if requestID == fixtureApprovalRequestID {
+			if current := service.Snapshot().PendingCommandExecution; current != nil {
+				requestID = current.RequestID
+			}
+		}
+		state, _, resolveErr := service.ResolveCommandExecution(requestID, domain.CommandExecutionDecision(payload.Decision))
+		result := map[string]any{"ok": resolveErr == nil, "state": state}
+		if resolveErr != nil {
+			result["error"] = resolveErr.Error()
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(result)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/switch-away", func(response http.ResponseWriter, _ *http.Request) {
+		if err := activateLifecycleTerminal(service, stateChangingSyncReserveTarget()); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/switch-back", func(response http.ResponseWriter, _ *http.Request) {
+		if err := activateLifecycleTerminal(service, approvalStore.syncTarget()); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/restart-broadcast", func(response http.ResponseWriter, _ *http.Request) {
+		if err := restartStateChangingBroadcast(service, approvalStore.syncTarget()); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/state-changing-command-sync/reopen-session", func(response http.ResponseWriter, _ *http.Request) {
+		if err := restartStateChangingBroadcast(service, approvalStore.syncTarget()); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-sync/audit", func(response http.ResponseWriter, _ *http.Request) {
+		executeWrites, completed := approvalStore.audit()
+		pendingRequests := 0
+		if service.Snapshot().PendingCommandExecution != nil {
+			pendingRequests = 1
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(map[string]any{
+			"executeWrites":   executeWrites,
+			"pendingRequests": pendingRequests,
+			"completed":       completed,
+		})
 	})
 	mux.HandleFunc("GET /__fixture/master.css", func(response http.ResponseWriter, request *http.Request) {
 		http.ServeFile(response, request, "../../frontend/src/master.css")
@@ -494,6 +962,136 @@ func fixtureTerminal() domain.TerminalTarget {
 	}
 }
 
+func stateChangingApprovalTarget() domain.TerminalTarget {
+	return domain.TerminalTarget{
+		TerminalID: "terminal-stateful", TerminalName: "Терминал охраны", HackLevel: 0,
+		Tree: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{
+				{
+					ID: "approval-guide", Type: domain.NodeFolder, Name: "СПРАВКА",
+					Children: []domain.ContentNode{{
+						ID: "archive-note", Type: domain.NodeEntry, Name: "ПАМЯТКА",
+						Description: "Команды требуют разрешения смотрителя.",
+					}},
+				},
+				{
+					ID: "renderer-reference", Type: domain.NodeEntry, Name: "ЭТАЛОН РЕНДЕРА",
+					Description: fixtureCommandResult,
+				},
+				{
+					ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
+					Text: "Доступ в сектор разрешён.",
+					StateChange: &domain.StateChangeConfig{
+						CompletedName:    "Двери открыты",
+						ConfirmationText: "Разрешить доступ в защищённый сектор?",
+					},
+				},
+			},
+		},
+	}
+}
+
+func stateChangingApprovalSession(states map[string]domain.CommandExecutionState) domain.Session {
+	target := stateChangingApprovalTarget()
+	return domain.Session{
+		Version: 1,
+		Name:    "State-changing approval fixture",
+		Terminals: []domain.Terminal{{
+			ID: target.TerminalID, Name: target.TerminalName, HackLevel: target.HackLevel,
+			IntroText: target.IntroText, Root: target.Tree,
+			CommandStates: cloneFixtureCommandStates(states),
+		}},
+	}
+}
+
+func stateChangingAuthoringSession() domain.Session {
+	return domain.Session{
+		Version: 1,
+		Name:    "State-changing authoring fixture",
+		Terminals: []domain.Terminal{{
+			ID: "terminal-stateful", Name: "Терминал охраны",
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{
+					{
+						ID: "emergency-lights", Type: domain.NodeCommand,
+						Name: "Включить аварийный свет", Text: "Аварийное освещение включено.",
+					},
+					{
+						ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
+						Text: "Новая редакция результата открытия.",
+						StateChange: &domain.StateChangeConfig{
+							CompletedName: "Двери разблокированы", ConfirmationText: "Открыть двери?",
+						},
+					},
+					{
+						ID: "alarm", Type: domain.NodeCommand, Name: "Включить тревогу",
+						Text: "Сигнал тревоги активирован.",
+						StateChange: &domain.StateChangeConfig{
+							CompletedName: "Сигнал тревоги активен", ConfirmationText: "Включить тревогу?",
+						},
+					},
+				},
+			},
+			CommandStates: map[string]domain.CommandExecutionState{
+				"doors": {CompletedName: "Двери открыты", ResultText: "Доступ в сектор разрешён."},
+				"alarm": {CompletedName: "Тревога включена", ResultText: "Охрана сектора предупреждена."},
+			},
+		}},
+	}
+}
+
+func stateChangingSyncTarget() domain.TerminalTarget {
+	target := stateChangingApprovalTarget()
+	target.TerminalName = "Терминал синхронизации"
+	target.Tree.Children = append(target.Tree.Children, domain.ContentNode{
+		ID: "archive", Type: domain.NodeFolder, Name: "АРХИВ",
+		Children: []domain.ContentNode{{
+			ID: "journal", Type: domain.NodeEntry, Name: "ЖУРНАЛ",
+			Description: "Состояние дверей зарегистрировано.",
+		}},
+	})
+	return target
+}
+
+func stateChangingSyncReserveTarget() domain.TerminalTarget {
+	return domain.TerminalTarget{
+		TerminalID: "terminal-reserve", TerminalName: "Резервный терминал", HackLevel: 0,
+		Tree: domain.ContentNode{
+			ID: "reserve-root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "reserve-status", Type: domain.NodeEntry, Name: "РЕЗЕРВНЫЙ СТАТУС",
+				Description: "Резервный канал активен.",
+			}},
+		},
+	}
+}
+
+func stateChangingSyncSession(states map[string]domain.CommandExecutionState) domain.Session {
+	target := stateChangingSyncTarget()
+	return domain.Session{
+		Version: 1,
+		Name:    "State-changing synchronization fixture",
+		Terminals: []domain.Terminal{{
+			ID: target.TerminalID, Name: target.TerminalName, HackLevel: target.HackLevel,
+			IntroText: target.IntroText, Root: target.Tree,
+			CommandStates: cloneFixtureCommandStates(states),
+		}},
+	}
+}
+
+func cloneFixtureCommandStates(states map[string]domain.CommandExecutionState) map[string]domain.CommandExecutionState {
+	if len(states) == 0 {
+		return nil
+	}
+	clone := make(map[string]domain.CommandExecutionState, len(states))
+	for commandID, state := range states {
+		clone[commandID] = state
+	}
+	return clone
+}
+
 func crtFixtureTerminal() domain.TerminalTarget {
 	children := make([]domain.ContentNode, 0, 25)
 	for index := 1; index <= 21; index++ {
@@ -512,7 +1110,7 @@ func crtFixtureTerminal() domain.TerminalTarget {
 		},
 		domain.ContentNode{
 			ID: "crt-command", Type: domain.NodeCommand, Name: "RUN DIAGNOSTIC",
-			Text: strings.Repeat("DIAGNOSTIC OUTPUT\n", 36) + "DIAGNOSTIC COMPLETE",
+			Text: strings.Repeat("DIAGNOSTIC OUTPUT\n", 96) + "DIAGNOSTIC COMPLETE",
 		},
 		domain.ContentNode{
 			ID: "crt-literal", Type: domain.NodeEntry, Name: `<img data-crt-injected src=x onerror="window.__crtInjected=true">`,

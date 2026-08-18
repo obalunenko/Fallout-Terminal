@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "demo",
+  "playerConfig": "demo-players.json",
   "terminals": [
     {
       "id": "t_demo1",
@@ -8,20 +9,14 @@
       "hackLevel": 0,
       "introText": "Добро пожаловать, дорогой житель Убежища 76.\n  Приятного вам дня.",
       "root": {
-        "id": "root",
-        "type": "folder",
-        "name": "ROOT",
         "children": [
           {
+            "children": [],
             "id": "n_folder_1",
-            "type": "folder",
             "name": "1",
-            "children": []
+            "type": "folder"
           },
           {
-            "id": "n_folder_2",
-            "type": "folder",
-            "name": "2",
             "children": [
               {
                 "id": "n_entry_1",
@@ -29,21 +24,41 @@
                 "name": "запись",
                 "description": "Здесь может быть любое описание, которое мастер захочет показать игрокам."
               }
-            ]
+            ],
+            "id": "n_folder_2",
+            "name": "2",
+            "type": "folder"
           },
           {
+            "children": [],
             "id": "n_folder_3",
-            "type": "folder",
             "name": "3",
-            "children": []
+            "type": "folder"
           },
           {
             "id": "n_cmd_1",
             "type": "command",
-            "name": "Открыть дверь",
-            "text": "Дверь открыта"
+            "name": "Включить освещение у входа",
+            "text": "Освещение у входа включено. Проход хорошо виден.",
+            "stateChange": {
+              "completedName": "Освещение у входа включено",
+              "confirmationText": "Разрешить подачу питания на входное освещение?"
+            }
+          },
+          {
+            "id": "n_cmd_state_change_1",
+            "type": "command",
+            "name": "Разблокировать входную дверь",
+            "text": "Замки входной двери отключены. Дверь разблокирована.",
+            "stateChange": {
+              "completedName": "Входная дверь разблокирована",
+              "confirmationText": "Разрешить снятие блокировки входного шлюза?"
+            }
           }
-        ]
+        ],
+        "id": "root",
+        "name": "ROOT",
+        "type": "folder"
       }
     },
     {
@@ -52,14 +67,8 @@
       "hackLevel": 2,
       "introText": "",
       "root": {
-        "id": "root",
-        "type": "folder",
-        "name": "ROOT",
         "children": [
           {
-            "id": "n_folder_locked",
-            "type": "folder",
-            "name": "СЕКРЕТНЫЕ ФАЙЛЫ",
             "children": [
               {
                 "id": "n_entry_locked",
@@ -67,9 +76,15 @@
                 "name": "протокол эвакуации",
                 "description": "Доступ разрешён. Протокол эвакуации: сектор Б, лифт 3."
               }
-            ]
+            ],
+            "id": "n_folder_locked",
+            "name": "СЕКРЕТНЫЕ ФАЙЛЫ",
+            "type": "folder"
           }
-        ]
+        ],
+        "id": "root",
+        "name": "ROOT",
+        "type": "folder"
       }
     }
   ]

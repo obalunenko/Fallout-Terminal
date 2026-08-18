@@ -1,9 +1,11 @@
 package player
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -41,4 +43,121 @@ func TestGeneratedMutationFingerprintsAreDeterministicProcedureQualifiedAndUnkno
 	require.NoError(t, err)
 	require.NotEqual(t, first.Command.PayloadFingerprint, guess.Command.PayloadFingerprint)
 	require.False(t, strings.Contains(guess.Command.PayloadFingerprint, "Guess"))
+}
+
+func TestLiveToProtoMapsPendingAndRejectedCommandExecutionPresentation(t *testing.T) {
+	tests := []struct {
+		name      string
+		domain    string
+		generated playerv1.CommandExecutionPhase
+	}{
+		{name: "pending", domain: "pending", generated: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING},
+		{name: "rejected", domain: "rejected", generated: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			state := &domain.PublicLiveState{
+				TerminalID: "terminal-1", TerminalName: "Overseer",
+				Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT"},
+				Nav:  domain.NavState{Path: []string{"root"}, Mode: "list"},
+			}
+			setDomainCommandExecution(t, state, test.domain, "doors")
+
+			got := LiveToProto(state)
+			require.NotNil(t, got)
+			require.NotNil(t, got.GetCommandExecution())
+			require.Equal(t, test.generated, got.GetCommandExecution().GetPhase())
+			require.Equal(t, "doors", got.GetCommandExecution().GetCommandNodeId())
+		})
+	}
+}
+
+func TestPlayerStateToProtoMapsSafePersistenceNoticeAndClearsItWithoutStickyDetails(t *testing.T) {
+	state := &domain.PlayerState{
+		SessionID: "controller-session", FallbackName: "Игрок 1",
+		Role: domain.PlayerRoleActive, Phase: domain.PlayerPhaseControlling,
+	}
+	setDomainPlayerNotice(t, state, "command-persistence-failed")
+
+	failed := PlayerStateToProto(state)
+	require.NotNil(t, failed.GetNotice())
+	require.Equal(t,
+		playerv1.PlayerNoticeKind_PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED,
+		failed.GetNotice().GetKind(),
+	)
+	require.Equal(t, 1, failed.GetNotice().ProtoReflect().Descriptor().Fields().Len(),
+		"the player notice must remain an enum-only safe projection")
+
+	clearDomainOptionalField(t, state, "Notice")
+	cleared := PlayerStateToProto(state)
+	require.Nil(t, cleared.GetNotice(), "a later authoritative state without a notice must clear it")
+}
+
+func TestOrdinaryCommandProjectionRemainsUnchangedAndHasNoExecutionPresentation(t *testing.T) {
+	state := &domain.PublicLiveState{
+		TerminalID: "terminal-1", TerminalName: "Overseer",
+		Tree: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "diagnostic", Type: domain.NodeCommand,
+				Name: "RUN DIAGNOSTIC", Text: "SYSTEM NOMINAL",
+			}},
+		},
+		Nav: domain.NavState{Path: []string{"root"}, Mode: "list"},
+	}
+
+	got := LiveToProto(state)
+	require.Nil(t, got.GetCommandExecution())
+	require.Equal(t, "RUN DIAGNOSTIC", got.GetTree().GetFolder().GetChildren()[0].GetName())
+	require.Equal(t, "SYSTEM NOMINAL", got.GetTree().GetFolder().GetChildren()[0].GetCommand().GetText())
+}
+
+// The runtime projection types are introduced by the implementation wave
+// after these RED tests. Reflection keeps the package buildable while still
+// pinning their required field names, pointer presence, and string enum values.
+func setDomainCommandExecution(t *testing.T, state *domain.PublicLiveState, phase, commandNodeID string) {
+	t.Helper()
+	field := requireDomainOptionalStructField(t, state, "CommandExecution")
+	presentation := reflect.New(field.Type().Elem())
+	setDomainStringField(t, presentation.Elem(), "Phase", phase)
+	setDomainStringField(t, presentation.Elem(), "CommandID", commandNodeID)
+	field.Set(presentation)
+}
+
+func setDomainPlayerNotice(t *testing.T, state *domain.PlayerState, kind string) {
+	t.Helper()
+	field := requireDomainOptionalStructField(t, state, "Notice")
+	notice := reflect.New(field.Type().Elem())
+	setDomainStringField(t, notice.Elem(), "Kind", kind)
+	field.Set(notice)
+}
+
+func clearDomainOptionalField(t *testing.T, target any, fieldName string) {
+	t.Helper()
+	field := reflect.ValueOf(target).Elem().FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "domain %T must expose %s", target, fieldName)
+	require.Equal(t, reflect.Pointer, field.Kind())
+	field.SetZero()
+}
+
+func requireDomainOptionalStructField(t *testing.T, target any, fieldName string) reflect.Value {
+	t.Helper()
+	value := reflect.ValueOf(target)
+	require.Equal(t, reflect.Pointer, value.Kind())
+	field := value.Elem().FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "domain %T must expose %s", target, fieldName)
+	require.Truef(t, field.CanSet(), "domain %T field %s must be settable", target, fieldName)
+	require.Equal(t, reflect.Pointer, field.Kind())
+	require.Equal(t, reflect.Struct, field.Type().Elem().Kind())
+	return field
+}
+
+func setDomainStringField(t *testing.T, value reflect.Value, fieldName, content string) {
+	t.Helper()
+	field := value.FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "%s must expose %s", value.Type(), fieldName)
+	require.Truef(t, field.CanSet(), "%s.%s must be settable", value.Type(), fieldName)
+	require.Equal(t, reflect.String, field.Kind())
+	field.SetString(content)
 }

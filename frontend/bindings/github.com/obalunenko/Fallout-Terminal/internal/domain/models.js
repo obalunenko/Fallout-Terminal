@@ -17,6 +17,22 @@ import { Create as $Create } from "@wailsio/runtime";
  */
 
 /**
+ * CommandExecutionDecision is the trusted game-master resolution for the
+ * exact currently pending state-changing command request.
+ * @readonly
+ * @enum {string}
+ */
+export const CommandExecutionDecision = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    CommandExecutionApprove: "approve",
+    CommandExecutionReject: "reject",
+};
+
+/**
  * ContentNode is a tagged folder, command, or entry node.
  * @typedef {any} ContentNode
  */
@@ -220,6 +236,13 @@ export class MasterCoordinationState {
              */
             this["pendingSwitch"] = null;
         }
+        if (!("pendingCommandExecution" in $$source)) {
+            /**
+             * @member
+             * @type {MasterPendingCommandExecution | null}
+             */
+            this["pendingCommandExecution"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -235,6 +258,7 @@ export class MasterCoordinationState {
         const $$createField3_0 = $$createType8;
         const $$createField4_0 = $$createType10;
         const $$createField5_0 = $$createType12;
+        const $$createField6_0 = $$createType14;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("playerConfig" in $$parsedSource) {
             $$parsedSource["playerConfig"] = $$createField1_0($$parsedSource["playerConfig"]);
@@ -251,7 +275,76 @@ export class MasterCoordinationState {
         if ("pendingSwitch" in $$parsedSource) {
             $$parsedSource["pendingSwitch"] = $$createField5_0($$parsedSource["pendingSwitch"]);
         }
+        if ("pendingCommandExecution" in $$parsedSource) {
+            $$parsedSource["pendingCommandExecution"] = $$createField6_0($$parsedSource["pendingCommandExecution"]);
+        }
         return new MasterCoordinationState(/** @type {Partial<MasterCoordinationState>} */($$parsedSource));
+    }
+}
+
+/**
+ * MasterPendingCommandExecution is the complete private prompt projection.
+ */
+export class MasterPendingCommandExecution {
+    /**
+     * Creates a new MasterPendingCommandExecution instance.
+     * @param {Partial<MasterPendingCommandExecution>} [$$source = {}] - The source object to create the MasterPendingCommandExecution.
+     */
+    constructor($$source = {}) {
+        if (!("requestId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["requestId"] = "";
+        }
+        if (!("broadcastId" in $$source)) {
+            /**
+             * @member
+             * @type {BroadcastID}
+             */
+            this["broadcastId"] = "";
+        }
+        if (!("terminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["terminalId"] = "";
+        }
+        if (!("commandId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandId"] = "";
+        }
+        if (!("commandName" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandName"] = "";
+        }
+        if (!("confirmationText" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["confirmationText"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MasterPendingCommandExecution instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {MasterPendingCommandExecution}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MasterPendingCommandExecution(/** @type {Partial<MasterPendingCommandExecution>} */($$parsedSource));
     }
 }
 
@@ -406,7 +499,7 @@ export class MasterSessionEntry {
      * @returns {MasterSessionEntry}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType14;
+        const $$createField3_0 = $$createType16;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("character" in $$parsedSource) {
             $$parsedSource["character"] = $$createField3_0($$parsedSource["character"]);
@@ -663,8 +756,8 @@ export class PublicHackState {
      */
     static createFrom($$source = {}) {
         const $$createField6_0 = $$createType0;
-        const $$createField7_0 = $$createType16;
-        const $$createField8_0 = $$createType18;
+        const $$createField7_0 = $$createType18;
+        const $$createField8_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("log" in $$parsedSource) {
             $$parsedSource["log"] = $$createField6_0($$parsedSource["log"]);
@@ -785,9 +878,11 @@ const $$createType9 = MasterBroadcastState.createFrom;
 const $$createType10 = $Create.Nullable($$createType9);
 const $$createType11 = MasterPendingSwitch.createFrom;
 const $$createType12 = $Create.Nullable($$createType11);
-const $$createType13 = PlayerCharacter.createFrom;
+const $$createType13 = MasterPendingCommandExecution.createFrom;
 const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = HackColumn.createFrom;
-const $$createType16 = $Create.Array($$createType15);
-const $$createType17 = PublicHackPattern.createFrom;
+const $$createType15 = PlayerCharacter.createFrom;
+const $$createType16 = $Create.Nullable($$createType15);
+const $$createType17 = HackColumn.createFrom;
 const $$createType18 = $Create.Array($$createType17);
+const $$createType19 = PublicHackPattern.createFrom;
+const $$createType20 = $Create.Array($$createType19);

@@ -174,6 +174,34 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
+func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "sessions", "demo.json"))
+	require.NoError(t, err)
+	demo, err := domain.DecodeSession(raw)
+	require.NoError(t, err)
+
+	stateChangingCommands := 0
+	for _, terminal := range demo.Terminals {
+		require.Empty(t, terminal.CommandStates,
+			"read-only bundled demo must not expose reset controls for snapshots it cannot mutate")
+		var visit func(domain.ContentNode)
+		visit = func(node domain.ContentNode) {
+			if node.Type == domain.NodeCommand && node.StateChange != nil {
+				stateChangingCommands++
+			}
+			for _, child := range node.Children {
+				visit(child)
+			}
+		}
+		visit(terminal.Root)
+	}
+	require.GreaterOrEqual(t, stateChangingCommands, 1,
+		"bundled demo must retain an initial-state example of the feature")
+}
+
 func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	t.Parallel()
 
@@ -192,8 +220,8 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
-		"proto/fallout/terminal/private/v1/runtime.proto": "41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741",
-		"proto/schema-revision.txt":                       "1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06",
+		"proto/fallout/terminal/private/v1/runtime.proto": "4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9",
+		"proto/schema-revision.txt":                       "e1ccd2d6b5669c4a431aae2c1cb7eece07df2ab177d1140b8c9983820b9006e1",
 		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {
@@ -828,7 +856,8 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"pageNext.hidden = pagedView.index >= pagedView.pages.length - 1",
 		"pageIndicator.value = `${pagedView.index + 1} / ${pagedView.pages.length}`",
 		"activatePagination('entry', viewEntryId",
-		"activatePagination('command', currentCommandNodeId",
+		"function renderCommandRecordSurface({ kind, key, title, text, showBack })",
+		"activatePagination(kind, key, text, entryBody, isNewCommand)",
 		"e.key === 'ArrowLeft' || e.key === 'PageUp'",
 		"e.key === 'ArrowRight' || e.key === 'PageDown'",
 		"window.addEventListener('resize', scheduleRepagination)",
@@ -1733,6 +1762,13 @@ func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 		"bundled demo is not a valid version-1 session: %v", err)
 	require.Falsef(t, session.Version != 1 || len(session.Terminals) == 0,
 		"bundled demo = version %d with %d terminals, want version 1 with content", session.Version, len(session.Terminals))
+	require.Equal(t, "demo-players.json", session.PlayerConfig)
+	playerConfigRaw, err := os.ReadFile(filepath.Join(filepath.Dir(demoPath), session.PlayerConfig))
+	require.NoError(t, err)
+	playerConfig, err := domain.DecodePlayerConfig(playerConfigRaw)
+	require.NoError(t, err)
+	require.Equal(t, 1, playerConfig.Version)
+	require.Len(t, playerConfig.Roster, 4)
 
 	locations, err := NewSessionLocations(filepath.Join(root, ".manifest-home"), root)
 	if err != nil {

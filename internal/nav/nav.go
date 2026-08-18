@@ -41,6 +41,8 @@ func ApplyAction(state domain.NavState, tree domain.ContentNode, action, nodeID 
 		} else if len(next.Path) > 1 {
 			next.Path = next.Path[:len(next.Path)-1]
 			next.CommandNodeID = nil
+		} else if next.CommandNodeID != nil {
+			next.CommandNodeID = nil
 		}
 
 	case "entry":

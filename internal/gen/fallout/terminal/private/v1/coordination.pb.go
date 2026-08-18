@@ -138,6 +138,55 @@ func (TerminalSwitchChoice) EnumDescriptor() ([]byte, []int) {
 	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{1}
 }
 
+type CommandExecutionDecision int32
+
+const (
+	CommandExecutionDecision_COMMAND_EXECUTION_DECISION_UNSPECIFIED CommandExecutionDecision = 0
+	CommandExecutionDecision_COMMAND_EXECUTION_DECISION_APPROVE     CommandExecutionDecision = 1
+	CommandExecutionDecision_COMMAND_EXECUTION_DECISION_REJECT      CommandExecutionDecision = 2
+)
+
+// Enum value maps for CommandExecutionDecision.
+var (
+	CommandExecutionDecision_name = map[int32]string{
+		0: "COMMAND_EXECUTION_DECISION_UNSPECIFIED",
+		1: "COMMAND_EXECUTION_DECISION_APPROVE",
+		2: "COMMAND_EXECUTION_DECISION_REJECT",
+	}
+	CommandExecutionDecision_value = map[string]int32{
+		"COMMAND_EXECUTION_DECISION_UNSPECIFIED": 0,
+		"COMMAND_EXECUTION_DECISION_APPROVE":     1,
+		"COMMAND_EXECUTION_DECISION_REJECT":      2,
+	}
+)
+
+func (x CommandExecutionDecision) Enum() *CommandExecutionDecision {
+	p := new(CommandExecutionDecision)
+	*p = x
+	return p
+}
+
+func (x CommandExecutionDecision) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CommandExecutionDecision) Descriptor() protoreflect.EnumDescriptor {
+	return file_fallout_terminal_private_v1_coordination_proto_enumTypes[2].Descriptor()
+}
+
+func (CommandExecutionDecision) Type() protoreflect.EnumType {
+	return &file_fallout_terminal_private_v1_coordination_proto_enumTypes[2]
+}
+
+func (x CommandExecutionDecision) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CommandExecutionDecision.Descriptor instead.
+func (CommandExecutionDecision) EnumDescriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{2}
+}
+
 type CharacterState struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	CharacterId      string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
@@ -510,21 +559,106 @@ func (x *PlayerConfigMetadata) GetName() string {
 	return ""
 }
 
+type PendingCommandExecution struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	RequestId        string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	BroadcastId      string                 `protobuf:"bytes,2,opt,name=broadcast_id,json=broadcastId,proto3" json:"broadcast_id,omitempty"`
+	TerminalId       string                 `protobuf:"bytes,3,opt,name=terminal_id,json=terminalId,proto3" json:"terminal_id,omitempty"`
+	CommandId        string                 `protobuf:"bytes,4,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	CommandName      string                 `protobuf:"bytes,5,opt,name=command_name,json=commandName,proto3" json:"command_name,omitempty"`
+	ConfirmationText string                 `protobuf:"bytes,6,opt,name=confirmation_text,json=confirmationText,proto3" json:"confirmation_text,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PendingCommandExecution) Reset() {
+	*x = PendingCommandExecution{}
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingCommandExecution) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingCommandExecution) ProtoMessage() {}
+
+func (x *PendingCommandExecution) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingCommandExecution.ProtoReflect.Descriptor instead.
+func (*PendingCommandExecution) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *PendingCommandExecution) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetBroadcastId() string {
+	if x != nil {
+		return x.BroadcastId
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetTerminalId() string {
+	if x != nil {
+		return x.TerminalId
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetCommandName() string {
+	if x != nil {
+		return x.CommandName
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetConfirmationText() string {
+	if x != nil {
+		return x.ConfirmationText
+	}
+	return ""
+}
+
 type CoordinationState struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Roster                []*CharacterState      `protobuf:"bytes,1,rep,name=roster,proto3" json:"roster,omitempty"`
-	LogicalSessions       []*LogicalSessionState `protobuf:"bytes,2,rep,name=logical_sessions,json=logicalSessions,proto3" json:"logical_sessions,omitempty"`
-	Broadcast             *BroadcastState        `protobuf:"bytes,3,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
-	PendingTerminalSwitch *PendingTerminalSwitch `protobuf:"bytes,4,opt,name=pending_terminal_switch,json=pendingTerminalSwitch,proto3" json:"pending_terminal_switch,omitempty"`
-	Revision              uint64                 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
-	PlayerConfig          *PlayerConfigMetadata  `protobuf:"bytes,6,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state                   protoimpl.MessageState   `protogen:"open.v1"`
+	Roster                  []*CharacterState        `protobuf:"bytes,1,rep,name=roster,proto3" json:"roster,omitempty"`
+	LogicalSessions         []*LogicalSessionState   `protobuf:"bytes,2,rep,name=logical_sessions,json=logicalSessions,proto3" json:"logical_sessions,omitempty"`
+	Broadcast               *BroadcastState          `protobuf:"bytes,3,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
+	PendingTerminalSwitch   *PendingTerminalSwitch   `protobuf:"bytes,4,opt,name=pending_terminal_switch,json=pendingTerminalSwitch,proto3" json:"pending_terminal_switch,omitempty"`
+	Revision                uint64                   `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	PlayerConfig            *PlayerConfigMetadata    `protobuf:"bytes,6,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
+	PendingCommandExecution *PendingCommandExecution `protobuf:"bytes,7,opt,name=pending_command_execution,json=pendingCommandExecution,proto3,oneof" json:"pending_command_execution,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *CoordinationState) Reset() {
 	*x = CoordinationState{}
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +670,7 @@ func (x *CoordinationState) String() string {
 func (*CoordinationState) ProtoMessage() {}
 
 func (x *CoordinationState) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[5]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +683,7 @@ func (x *CoordinationState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CoordinationState.ProtoReflect.Descriptor instead.
 func (*CoordinationState) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{5}
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CoordinationState) GetRoster() []*CharacterState {
@@ -594,6 +728,13 @@ func (x *CoordinationState) GetPlayerConfig() *PlayerConfigMetadata {
 	return nil
 }
 
+func (x *CoordinationState) GetPendingCommandExecution() *PendingCommandExecution {
+	if x != nil {
+		return x.PendingCommandExecution
+	}
+	return nil
+}
+
 var File_fallout_terminal_private_v1_coordination_proto protoreflect.FileDescriptor
 
 const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
@@ -633,14 +774,26 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1b\n" +
 	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x05R\aversion\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\"\xe0\x03\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"\xeb\x01\n" +
+	"\x17PendingCommandExecution\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
+	"\fbroadcast_id\x18\x02 \x01(\tR\vbroadcastId\x12\x1f\n" +
+	"\vterminal_id\x18\x03 \x01(\tR\n" +
+	"terminalId\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x04 \x01(\tR\tcommandId\x12!\n" +
+	"\fcommand_name\x18\x05 \x01(\tR\vcommandName\x12+\n" +
+	"\x11confirmation_text\x18\x06 \x01(\tR\x10confirmationText\"\xf5\x04\n" +
 	"\x11CoordinationState\x12C\n" +
 	"\x06roster\x18\x01 \x03(\v2+.fallout.terminal.private.v1.CharacterStateR\x06roster\x12[\n" +
 	"\x10logical_sessions\x18\x02 \x03(\v20.fallout.terminal.private.v1.LogicalSessionStateR\x0flogicalSessions\x12I\n" +
 	"\tbroadcast\x18\x03 \x01(\v2+.fallout.terminal.private.v1.BroadcastStateR\tbroadcast\x12j\n" +
 	"\x17pending_terminal_switch\x18\x04 \x01(\v22.fallout.terminal.private.v1.PendingTerminalSwitchR\x15pendingTerminalSwitch\x12\x1a\n" +
 	"\brevision\x18\x05 \x01(\x04R\brevision\x12V\n" +
-	"\rplayer_config\x18\x06 \x01(\v21.fallout.terminal.private.v1.PlayerConfigMetadataR\fplayerConfig*\xcb\x02\n" +
+	"\rplayer_config\x18\x06 \x01(\v21.fallout.terminal.private.v1.PlayerConfigMetadataR\fplayerConfig\x12u\n" +
+	"\x19pending_command_execution\x18\a \x01(\v24.fallout.terminal.private.v1.PendingCommandExecutionH\x00R\x17pendingCommandExecution\x88\x01\x01B\x1c\n" +
+	"\x1a_pending_command_execution*\xcb\x02\n" +
 	"\x14TerminalSwitchStatus\x12&\n" +
 	"\"TERMINAL_SWITCH_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" TERMINAL_SWITCH_STATUS_ACTIVATED\x10\x01\x12\"\n" +
@@ -654,7 +807,11 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\"TERMINAL_SWITCH_CHOICE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fTERMINAL_SWITCH_CHOICE_PRESERVE\x10\x01\x12\"\n" +
 	"\x1eTERMINAL_SWITCH_CHOICE_DISCARD\x10\x02\x12!\n" +
-	"\x1dTERMINAL_SWITCH_CHOICE_CANCEL\x10\x03B[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
+	"\x1dTERMINAL_SWITCH_CHOICE_CANCEL\x10\x03*\x95\x01\n" +
+	"\x18CommandExecutionDecision\x12*\n" +
+	"&COMMAND_EXECUTION_DECISION_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"COMMAND_EXECUTION_DECISION_APPROVE\x10\x01\x12%\n" +
+	"!COMMAND_EXECUTION_DECISION_REJECT\x10\x02B[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
 
 var (
 	file_fallout_terminal_private_v1_coordination_proto_rawDescOnce sync.Once
@@ -668,33 +825,36 @@ func file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_private_v1_coordination_proto_rawDescData
 }
 
-var file_fallout_terminal_private_v1_coordination_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_fallout_terminal_private_v1_coordination_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_fallout_terminal_private_v1_coordination_proto_goTypes = []any{
-	(TerminalSwitchStatus)(0),     // 0: fallout.terminal.private.v1.TerminalSwitchStatus
-	(TerminalSwitchChoice)(0),     // 1: fallout.terminal.private.v1.TerminalSwitchChoice
-	(*CharacterState)(nil),        // 2: fallout.terminal.private.v1.CharacterState
-	(*LogicalSessionState)(nil),   // 3: fallout.terminal.private.v1.LogicalSessionState
-	(*BroadcastState)(nil),        // 4: fallout.terminal.private.v1.BroadcastState
-	(*PendingTerminalSwitch)(nil), // 5: fallout.terminal.private.v1.PendingTerminalSwitch
-	(*PlayerConfigMetadata)(nil),  // 6: fallout.terminal.private.v1.PlayerConfigMetadata
-	(*CoordinationState)(nil),     // 7: fallout.terminal.private.v1.CoordinationState
-	(v1.PlayerRole)(0),            // 8: fallout.terminal.player.v1.PlayerRole
-	(*v1.LiveTerminal)(nil),       // 9: fallout.terminal.player.v1.LiveTerminal
+	(TerminalSwitchStatus)(0),       // 0: fallout.terminal.private.v1.TerminalSwitchStatus
+	(TerminalSwitchChoice)(0),       // 1: fallout.terminal.private.v1.TerminalSwitchChoice
+	(CommandExecutionDecision)(0),   // 2: fallout.terminal.private.v1.CommandExecutionDecision
+	(*CharacterState)(nil),          // 3: fallout.terminal.private.v1.CharacterState
+	(*LogicalSessionState)(nil),     // 4: fallout.terminal.private.v1.LogicalSessionState
+	(*BroadcastState)(nil),          // 5: fallout.terminal.private.v1.BroadcastState
+	(*PendingTerminalSwitch)(nil),   // 6: fallout.terminal.private.v1.PendingTerminalSwitch
+	(*PlayerConfigMetadata)(nil),    // 7: fallout.terminal.private.v1.PlayerConfigMetadata
+	(*PendingCommandExecution)(nil), // 8: fallout.terminal.private.v1.PendingCommandExecution
+	(*CoordinationState)(nil),       // 9: fallout.terminal.private.v1.CoordinationState
+	(v1.PlayerRole)(0),              // 10: fallout.terminal.player.v1.PlayerRole
+	(*v1.LiveTerminal)(nil),         // 11: fallout.terminal.player.v1.LiveTerminal
 }
 var file_fallout_terminal_private_v1_coordination_proto_depIdxs = []int32{
-	8, // 0: fallout.terminal.private.v1.LogicalSessionState.role:type_name -> fallout.terminal.player.v1.PlayerRole
-	9, // 1: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
-	2, // 2: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
-	3, // 3: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
-	4, // 4: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
-	5, // 5: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
-	6, // 6: fallout.terminal.private.v1.CoordinationState.player_config:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	10, // 0: fallout.terminal.private.v1.LogicalSessionState.role:type_name -> fallout.terminal.player.v1.PlayerRole
+	11, // 1: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
+	3,  // 2: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
+	4,  // 3: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
+	5,  // 4: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
+	6,  // 5: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
+	7,  // 6: fallout.terminal.private.v1.CoordinationState.player_config:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
+	8,  // 7: fallout.terminal.private.v1.CoordinationState.pending_command_execution:type_name -> fallout.terminal.private.v1.PendingCommandExecution
+	8,  // [8:8] is the sub-list for method output_type
+	8,  // [8:8] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_private_v1_coordination_proto_init() }
@@ -706,13 +866,14 @@ func file_fallout_terminal_private_v1_coordination_proto_init() {
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[1].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[2].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[3].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_coordination_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_private_v1_coordination_proto_rawDesc), len(file_fallout_terminal_private_v1_coordination_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   6,
+			NumEnums:      3,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

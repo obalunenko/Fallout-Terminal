@@ -3,10 +3,12 @@ import { createConnectTransport } from '@connectrpc/connect-web';
 import {
   ActionReason,
   PlayerPhase,
+  PlayerNoticeKind,
   PlayerRole,
   PlayerService,
   RosterAvailability,
 } from './gen/fallout/terminal/player/v1/player_pb.js';
+import { CommandExecutionPhase } from './gen/fallout/terminal/player/v1/terminal_pb.js';
 import {
   playCharScroll,
   playEnter,
@@ -45,6 +47,7 @@ let mode          = MODE.LIST;
 let viewEntryId   = null;
 let commandOutput = null;
 let currentCommandNodeId = null;
+let commandExecution = null;
 
 // Typewriter reveal: only replay when the shown content actually changed.
 let lastRenderedFolderKey  = null;
@@ -84,6 +87,7 @@ let playerState = null;
 let pendingSelection = null;
 let pendingSharedAction = null;
 let appliedSharedRevision = 0;
+let transientPlayerNotice = '';
 
 // ── DOM refs ──────────────────────────────────────────────
 const normalHeader = document.getElementById('normalHeader');
@@ -417,6 +421,13 @@ function applySubscriptionMessage(message, first) {
 }
 
 function applyGeneratedSnapshot(snapshot) {
+  // The first value of a new physical stream is a complete authoritative
+  // baseline. Never let revision or transient command UI retained from the
+  // previous stream suppress pending/rejected/completed recovery.
+  appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
+  terminalLiveBaselinePending = true;
+  commandExecution = null;
   applyRecognitionSnapshot(snapshot.recognitionHandle, generatedPlayerState(snapshot.playerState, snapshot.revision));
   applyGeneratedTerminal(snapshot.terminalPresentation, snapshot.revision);
 }
@@ -451,6 +462,7 @@ function applyGeneratedTerminal(presentation, revision) {
     introText: live.introText,
     nav: generatedNavigation(live.navigation),
     hack: generatedHack(live.hacking),
+    commandExecution: generatedCommandExecution(live.commandExecution),
   });
 }
 
@@ -478,12 +490,25 @@ function generatedPlayerState(state, revision) {
     })[state.phase] || 'no-broadcast',
     broadcastId: state.broadcastId || null,
     activeTerminalId: state.activeTerminalId || null,
+    notice: state.notice?.kind === PlayerNoticeKind.COMMAND_PERSISTENCE_FAILED
+      ? 'command-persistence-failed'
+      : null,
     roster: (state.roster || []).map(entry => ({
       id: entry.characterId,
       name: entry.displayName,
       status: entry.availability === RosterAvailability.AVAILABLE ? 'available' : 'claimed',
     })),
   };
+}
+
+function generatedCommandExecution(presentation) {
+  if (!presentation) return null;
+  const phase = ({
+    [CommandExecutionPhase.PENDING]: 'pending',
+    [CommandExecutionPhase.REJECTED]: 'rejected',
+  })[presentation.phase];
+  if (!phase || !presentation.commandNodeId) return null;
+  return { phase, commandNodeId: presentation.commandNodeId };
 }
 
 function generatedContentNode(node) {
@@ -608,6 +633,7 @@ function acceptSharedSnapshot(message) {
   if (Number.isFinite(playerRevision) && revision < playerRevision) return false;
   if (revision < appliedSharedRevision) return false;
   appliedSharedRevision = revision;
+  screen.dataset.runtimeRevision = String(revision);
   completeAcceptedSharedAction();
   return true;
 }
@@ -656,6 +682,7 @@ function clearBroadcastMirrors() {
   viewEntryId = null;
   commandOutput = null;
   currentCommandNodeId = null;
+  commandExecution = null;
   lastRenderedFolderKey = null;
   lastRenderedEntryId = null;
   lastRenderedCommandKey = null;
@@ -671,6 +698,7 @@ function clearBroadcastMirrors() {
   lastAttemptsLeft = null;
   terminalLiveBaselinePending = true;
   appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
   consumedRevealKey = null;
 
   clearTimeout(hackSolvedTimer);
@@ -749,6 +777,7 @@ function applyLiveTerminal(msg) {
     tree          = msg.tree;
     hackLevel     = msg.hackLevel || 0;
     hack          = msg.hack || null;
+    commandExecution = msg.commandExecution || null;
     serverNum     = 1 + Math.floor(Math.random() * 9);
     if (!isContinuousTerminalUpdate) {
       hackTyped     = '';
@@ -818,6 +847,7 @@ function applyNoLiveTerminal(revision) {
     terminalBroadcastID = '';
     tree = null;
     hack = null;
+    commandExecution = null;
     clearTimeout(hackSolvedTimer);
     hackSolvedTimer = null;
     setAmbientActive(false);
@@ -869,9 +899,13 @@ function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
     phase: String(nextState.phase || 'no-broadcast'),
     broadcastId: nextState.broadcastId == null ? null : String(nextState.broadcastId),
     activeTerminalId: nextState.activeTerminalId == null ? null : String(nextState.activeTerminalId),
+    notice: nextState.notice === 'command-persistence-failed'
+      ? 'command-persistence-failed'
+      : null,
     roster,
   };
   playerState = nextPlayerState;
+  if (nextPlayerState.notice !== null) transientPlayerNotice = '';
 
   const broadcastChanged = previousState !== null &&
     previousState.broadcastId !== nextPlayerState.broadcastId;
@@ -954,14 +988,21 @@ function createRequestID() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function canControlSharedTerminal() {
+function canControlSharedTerminalAction(action) {
+  const executionAllowsAction = commandExecution === null ||
+    (commandExecution.phase === 'rejected' && action === 'back');
   return sessionReady && playerState !== null && hasCurrentTerminalMirror() &&
+    executionAllowsAction &&
     playerState.role === 'active' &&
     playerState.phase === 'controlling' &&
     playerState.broadcastId !== null &&
     playerState.activeTerminalId !== null &&
     playerState.activeTerminalId === terminalID &&
     pendingSharedAction === null;
+}
+
+function canControlSharedTerminal() {
+  return canControlSharedTerminalAction('');
 }
 
 function beginSharedMutation(procedure, invoke) {
@@ -975,9 +1016,24 @@ function beginSharedMutation(procedure, invoke) {
   return true;
 }
 
+function beginSharedMutationForAction(procedure, invoke, action) {
+  if (!canControlSharedTerminalAction(action)) return false;
+
+  const requestId = createRequestID();
+  pendingSharedAction = { requestId, procedure, acceptedRevision: null };
+  showPlayerNotice('');
+  renderPlayerContext();
+  void invoke(requestId, playerState.broadcastId, playerState.activeTerminalId);
+  return true;
+}
+
 function beginNavigation(action, nodeId = '') {
-  return beginSharedMutation('navigate', (requestId, broadcastId, terminalId) =>
-    navigateRPC(requestId, broadcastId, terminalId, action, nodeId));
+  const invoke = (requestId, broadcastId, terminalId) =>
+    navigateRPC(requestId, broadcastId, terminalId, action, nodeId);
+  if (action === 'back' && commandExecution?.phase === 'rejected') {
+    return beginSharedMutationForAction('navigate', invoke, action);
+  }
+  return beginSharedMutation('navigate', invoke);
 }
 
 function beginGuess(targetId) {
@@ -1007,8 +1063,19 @@ function selectCharacter(characterID) {
 }
 
 function showPlayerNotice(message) {
+  transientPlayerNotice = message;
+  renderPlayerNotice();
+}
+
+function renderPlayerNotice() {
+  const authoritativeMessage = playerState?.role === 'active' &&
+    playerState.notice === 'command-persistence-failed'
+    ? 'НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ КОМАНДЫ. СОСТОЯНИЕ КОМАНДЫ НЕ ИЗМЕНЕНО.'
+    : '';
+  const message = authoritativeMessage || transientPlayerNotice;
   playerNotice.textContent = message;
   playerNotice.hidden = !message;
+  playerNotice.dataset.kind = authoritativeMessage ? 'error' : '';
 }
 
 function renderRoster() {
@@ -1034,10 +1101,14 @@ function renderPlayerContext() {
   assignedWaiting.hidden = !hasState || playerState.phase !== 'waiting';
 
   const observerReadOnly = hasState && playerState.role === 'observer';
+  const commandRequestPending = commandExecution?.phase === 'pending';
+  const commandRequestRejected = commandExecution?.phase === 'rejected';
   roleBadge.dataset.role = hasState ? playerState.role : '';
   screen.classList.toggle('observer-read-only', observerReadOnly);
-  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null);
+  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null || commandRequestPending);
+  screen.classList.toggle('shared-command-rejected', commandRequestRejected);
   screen.setAttribute('aria-readonly', String(observerReadOnly));
+  renderPlayerNotice();
 
   if (!hasState) return false;
 
@@ -1076,6 +1147,7 @@ function hideTerminalSurface() {
   hackBoard.hidden = true;
   hackBlocked.hidden = true;
   termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden = true;
   backBtn.hidden = true;
   pageNav.hidden = true;
@@ -1289,6 +1361,11 @@ function consumeKeyboardEvent(event) {
 }
 
 function consumeRevealKeydown(event) {
+  const acknowledgesCommandScreen = commandExecution?.phase === 'rejected' || commandOutput !== null;
+  if (acknowledgesCommandScreen &&
+      (event.key === 'Enter' || event.key === 'Escape' || event.key === 'Backspace')) {
+    return;
+  }
   const key = revealPhysicalKey(event);
   if (consumedRevealKey !== null && event.repeat && key === consumedRevealKey) {
     consumeKeyboardEvent(event);
@@ -1328,6 +1405,20 @@ document.addEventListener('keydown', (e) => {
       renderHackInputPreview();
       e.preventDefault();
     }
+    return;
+  }
+
+  if (commandExecution?.phase === 'pending') {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if ((commandExecution?.phase === 'rejected' || commandOutput !== null) &&
+      (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace')) {
+    goBack();
+    e.preventDefault();
     return;
   }
 
@@ -1794,14 +1885,66 @@ function render() {
 
   termIdle.hidden = true;
 
-  if (mode === MODE.HACK) {
+  if (commandExecution !== null) {
+    renderCommandExecutionScreen();
+  } else if (mode === MODE.HACK) {
     renderHackScreen();
   } else {
     renderNormalScreen();
   }
 }
 
+function renderCommandExecutionScreen() {
+  hackHeader.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  normalHeader.hidden = false;
+  serverLine.textContent = `-Server ${serverNum}-`;
+  introTextEl.textContent = introText;
+  const commandID = commandExecution.commandNodeId;
+  const command = findNodeById(tree, commandID);
+  const phase = commandExecution.phase;
+  const text = phase === 'pending'
+    ? 'Выполняется запрос'
+    : 'Ошибка доступа';
+  renderCommandRecordSurface({
+    kind: `command-${phase}`,
+    key: `${phase}:${commandID}`,
+    title: command ? command.name : '',
+    text,
+    showBack: phase === 'rejected' &&
+      playerState?.role === 'active' && playerState?.phase === 'controlling',
+  });
+}
+
+function renderCommandRecordSurface({ kind, key, title, text, showBack }) {
+  cancelReveal(termList);
+  cancelReveal(termOutput);
+  termList.hidden = true;
+  termEntry.hidden = false;
+  termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  termPrompt.hidden = false;
+  backBtn.hidden = false;
+  backBtn.classList.toggle('layout-placeholder', !showBack);
+  backBtn.disabled = !showBack;
+  backBtn.setAttribute('aria-hidden', String(!showBack));
+  entryTitle.textContent = title;
+  lastRenderedEntryId = null;
+  lastRenderedFolderKey = null;
+  lastMenuHoverIdx = null;
+
+  const commandKey = revealContentIdentity(kind, key, text);
+  const isNewCommand = commandKey !== lastRenderedCommandKey;
+  lastRenderedCommandKey = commandKey;
+  activatePagination(kind, key, text, entryBody, isNewCommand);
+}
+
 function renderNormalScreen() {
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  backBtn.classList.remove('layout-placeholder');
+  backBtn.disabled = false;
+  backBtn.removeAttribute('aria-hidden');
   cancelReveal(hackColumns);
   hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
@@ -1833,6 +1976,18 @@ function renderNormalScreen() {
     lastRenderedCommandKey = null;
 
     activatePagination('entry', viewEntryId, entryText, entryBody, isNewEntry);
+    return;
+  }
+
+  if (commandOutput !== null) {
+    const command = findNodeById(tree, currentCommandNodeId);
+    renderCommandRecordSurface({
+      kind: 'command',
+      key: currentCommandNodeId,
+      title: command ? command.name : '',
+      text: commandOutput,
+      showBack: playerState?.role === 'active' && playerState?.phase === 'controlling',
+    });
     return;
   }
 
@@ -1874,17 +2029,9 @@ function renderNormalScreen() {
   }
   revealInto(termList, rows, isNewFolder, `${folderKey}:selection:${selIndex}`);
 
-  if (commandOutput !== null) {
-    termOutput.hidden = false;
-    const commandKey = revealContentIdentity('command', currentCommandNodeId, commandOutput);
-    const isNewCommand = commandKey !== lastRenderedCommandKey;
-    lastRenderedCommandKey = commandKey;
-    activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
-  } else {
-    termOutput.hidden = true;
-    lastRenderedCommandKey = null;
-    deactivatePagination();
-  }
+  termOutput.hidden = true;
+  lastRenderedCommandKey = null;
+  deactivatePagination();
 }
 
 // ── Hacking screen ─────────────────────────────────────────
@@ -1909,6 +2056,7 @@ function renderHackScreen() {
   termList.hidden     = true;
   termEntry.hidden    = true;
   termOutput.hidden   = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden   = true;
   backBtn.hidden      = true;
   hackHeader.hidden   = false;

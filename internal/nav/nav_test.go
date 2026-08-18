@@ -1,19 +1,17 @@
 package nav
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefault(t *testing.T) {
 	t.Parallel()
 
 	want := domain.NavState{Path: []string{"root"}, Mode: "list"}
-	if got := Default(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("Default() = %#v, want %#v", got, want)
-	}
+	assert.Equal(t, want, Default())
 }
 
 func TestApplyAction(t *testing.T) {
@@ -95,6 +93,12 @@ func TestApplyAction(t *testing.T) {
 			want:   Default(),
 		},
 		{
+			name:   "back at root closes command result",
+			state:  navState([]string{"root"}, "list", "", "root-command"),
+			action: "back",
+			want:   Default(),
+		},
+		{
 			name:   "unknown action is a no-op",
 			state:  Default(),
 			action: "launch",
@@ -107,9 +111,7 @@ func TestApplyAction(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ApplyAction(test.state, tree, test.action, test.nodeID); !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("ApplyAction() = %#v, want %#v", got, test.want)
-			}
+			assert.Equal(t, test.want, ApplyAction(test.state, tree, test.action, test.nodeID))
 		})
 	}
 }
@@ -171,9 +173,7 @@ func TestRevalidate(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := Revalidate(test.state, test.tree); !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("Revalidate() = %#v, want %#v", got, test.want)
-			}
+			assert.Equal(t, test.want, Revalidate(test.state, test.tree))
 		})
 	}
 }

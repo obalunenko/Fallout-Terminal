@@ -50,6 +50,7 @@ const btnResetFailedHack = document.getElementById('btnResetFailedHack');
 const hackLevelSelect   = document.getElementById('hackLevelSelect');
 const introTextArea     = document.getElementById('introTextArea');
 const btnApplySettings  = document.getElementById('btnApplySettings');
+const termSettings      = document.getElementById('termSettings');
 const broadcastSummary = document.getElementById('broadcastSummary');
 const coordinationPanel = document.getElementById('coordinationPanel');
 const playerConfigStatus = document.getElementById('playerConfigStatus');
@@ -111,6 +112,92 @@ let pendingTerminalSwitch = null;
 let startupStatus = null;
 let publicAccessSnapshot = null;
 let publicAccessCommandPending = false;
+let sessionStateCommandPending = false;
+let commandExecutionDialogRequestID = null;
+let commandExecutionDecisionRequestID = null;
+let commandExecutionDialogEpoch = 0;
+const resolvedCommandExecutionRequestIDs = new Set();
+
+const commandStateActions = document.createElement('div');
+commandStateActions.className = 'settings-row command-state-terminal-actions';
+commandStateActions.hidden = true;
+commandStateActions.innerHTML = `
+  <button class="btn btn-mini btn-danger" id="btnResetTerminalCommandStates" type="button">
+    СБРОСИТЬ ВСЕ СОСТОЯНИЯ
+  </button>`;
+termSettings.appendChild(commandStateActions);
+const btnResetTerminalCommandStates = document.getElementById('btnResetTerminalCommandStates');
+
+const commandExecutionDialog = document.createElement('dialog');
+commandExecutionDialog.className = 'terminal-switch-dialog command-execution-dialog';
+commandExecutionDialog.id = 'commandExecutionDialog';
+commandExecutionDialog.hidden = true;
+commandExecutionDialog.setAttribute('aria-modal', 'true');
+commandExecutionDialog.setAttribute('aria-labelledby', 'commandExecutionDialogTitle');
+commandExecutionDialog.setAttribute('aria-describedby', 'commandExecutionDialogDescription commandExecutionDialogStatus commandExecutionDialogError');
+commandExecutionDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="commandExecutionDialogTitle">ПОДТВЕРЖДЕНИЕ КОМАНДЫ</h2>
+    <p class="terminal-switch-dialog-description" id="commandExecutionDialogDescription"></p>
+    <div class="terminal-switch-actions" role="group" aria-label="Решение мастера по выполнению команды" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-primary" id="btnApproveCommandExecution" type="button">ОДОБРИТЬ</button>
+      <button class="btn btn-danger" id="btnRejectCommandExecution" type="button">ОТКЛОНИТЬ</button>
+    </div>
+    <div class="terminal-switch-status" id="commandExecutionDialogStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="terminal-switch-error" id="commandExecutionDialogError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+  </div>`;
+document.body.appendChild(commandExecutionDialog);
+const commandExecutionDialogDescription = document.getElementById('commandExecutionDialogDescription');
+const commandExecutionDialogStatus = document.getElementById('commandExecutionDialogStatus');
+const commandExecutionDialogError = document.getElementById('commandExecutionDialogError');
+const btnApproveCommandExecution = document.getElementById('btnApproveCommandExecution');
+const btnRejectCommandExecution = document.getElementById('btnRejectCommandExecution');
+
+let resetConfirmationResolve = null;
+const resetConfirmationDialog = document.createElement('dialog');
+resetConfirmationDialog.className = 'terminal-switch-dialog command-state-reset-dialog';
+resetConfirmationDialog.id = 'resetConfirmationDialog';
+resetConfirmationDialog.hidden = true;
+resetConfirmationDialog.setAttribute('aria-modal', 'true');
+resetConfirmationDialog.setAttribute('aria-labelledby', 'resetConfirmationDialogTitle');
+resetConfirmationDialog.setAttribute('aria-describedby', 'resetConfirmationDialogDescription');
+resetConfirmationDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="resetConfirmationDialogTitle">ПОДТВЕРЖДЕНИЕ СБРОСА</h2>
+    <p class="terminal-switch-dialog-description" id="resetConfirmationDialogDescription"></p>
+    <div class="terminal-switch-actions" role="group" aria-label="Подтверждение сброса состояния команды" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-danger" id="btnConfirmCommandStateReset" type="button">ПОДТВЕРДИТЬ</button>
+      <button class="btn" id="btnCancelCommandStateReset" type="button">ОТМЕНИТЬ</button>
+    </div>
+  </div>`;
+document.body.appendChild(resetConfirmationDialog);
+const resetConfirmationDialogDescription = document.getElementById('resetConfirmationDialogDescription');
+const btnConfirmCommandStateReset = document.getElementById('btnConfirmCommandStateReset');
+const btnCancelCommandStateReset = document.getElementById('btnCancelCommandStateReset');
+
+function finishResetConfirmation(confirmed) {
+  const resolve = resetConfirmationResolve;
+  resetConfirmationResolve = null;
+  if (resetConfirmationDialog.open) resetConfirmationDialog.close();
+  resetConfirmationDialog.hidden = true;
+  if (resolve) resolve(confirmed);
+}
+
+function confirmCommandStateReset(message) {
+  if (resetConfirmationResolve) return Promise.resolve(false);
+  resetConfirmationDialogDescription.textContent = message;
+  resetConfirmationDialog.hidden = false;
+  resetConfirmationDialog.showModal();
+  btnCancelCommandStateReset.focus();
+  return new Promise(resolve => { resetConfirmationResolve = resolve; });
+}
+
+btnConfirmCommandStateReset.addEventListener('click', () => finishResetConfirmation(true));
+btnCancelCommandStateReset.addEventListener('click', () => finishResetConfirmation(false));
+resetConfirmationDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  finishResetConfirmation(false);
+});
 
 function renderStartupPresentation(status) {
   startupStatus = status && typeof status === 'object' ? status : {};
@@ -190,6 +277,21 @@ desktopAPI.onCoordinationState((coordination) => {
     renderHackStatus();
   }
 });
+if (typeof desktopAPI.onSessionState === 'function') {
+  desktopAPI.onSessionState((event) => {
+    const revision = Number(event?.revision);
+    if (!event?.session || !Number.isSafeInteger(revision)) return;
+    saveStatus.dataset.sessionStateRevision = String(revision);
+    updateSessionStateEvidenceDescription();
+    if (!state.session || revision <= newestDurableRevision) return;
+    state.session = event.session;
+    newestDurableRevision = revision;
+    saveStatus.textContent = `СОСТОЯНИЕ СЕССИИ ОБНОВЛЕНО · ревизия ${revision}`;
+    saveStatus.dataset.savedRevision = String(revision);
+    saveStatus.classList.remove('err');
+    renderAll();
+  });
+}
 void desktopAPI.getRuntimeStatus().then(renderStartupPresentation);
 serverUrlEl.addEventListener('click', async () => {
   const requestedUrl = serverUrl;
@@ -503,6 +605,80 @@ function locateNode(root, id) {
   return walk(root, null);
 }
 
+function commandExecutionState(term, commandID) {
+  const commandStates = term?.commandStates;
+  if (!commandStates || typeof commandStates !== 'object') return null;
+  const snapshot = commandStates[commandID];
+  return snapshot && typeof snapshot === 'object' ? snapshot : null;
+}
+
+function effectiveNodeName(term, node) {
+  if (node?.type !== 'command') return node?.name || '';
+  const completedName = commandExecutionState(term, node.id)?.completedName;
+  return typeof completedName === 'string' && completedName ? completedName : node.name;
+}
+
+function renderSessionStateResult(result, successMessage, acceptsCanonicalResult = null) {
+  if (!result?.ok || !result.session) {
+    saveStatus.textContent = 'Ошибка изменения состояния: ' + (result?.error || 'сессия не обновлена');
+    saveStatus.classList.add('err');
+    return false;
+  }
+  if (typeof acceptsCanonicalResult === 'function' && !acceptsCanonicalResult(result)) {
+    saveStatus.textContent = 'Ошибка изменения состояния: backend не подтвердил канонический сброс';
+    saveStatus.classList.add('err');
+    return false;
+  }
+
+  state.session = result.session;
+  const revision = Number(result.revision || result.savedRevision || 0);
+  newestDurableRevision = Math.max(newestDurableRevision, revision);
+  saveStatus.textContent = successMessage + (revision > 0 ? ` · ревизия ${revision}` : '');
+  saveStatus.dataset.savedRevision = String(newestDurableRevision);
+  saveStatus.classList.remove('err');
+  renderAll();
+  return true;
+}
+
+function updateSessionStateEvidenceDescription() {
+  const evidence = [];
+  if (saveStatus.dataset.wailsCommand) {
+    evidence.push(`Wails command ${saveStatus.dataset.wailsCommand} ${saveStatus.dataset.wailsResult || 'unknown'}`);
+  }
+  if (saveStatus.dataset.wailsTerminalId) evidence.push(`terminal ${saveStatus.dataset.wailsTerminalId}`);
+  if (saveStatus.dataset.wailsRevision) evidence.push(`document revision ${saveStatus.dataset.wailsRevision}`);
+  if (saveStatus.dataset.sessionStateRevision) {
+    evidence.push(`session-state revision ${saveStatus.dataset.sessionStateRevision}`);
+  }
+  if (evidence.length) {
+    const accessibleEvidence = evidence.join('; ');
+    saveStatus.setAttribute('aria-label', accessibleEvidence);
+    saveStatus.setAttribute('aria-description', accessibleEvidence);
+  } else {
+    saveStatus.removeAttribute('aria-label');
+    saveStatus.removeAttribute('aria-description');
+  }
+}
+
+async function runSessionStateCommand(command, successMessage, acceptsCanonicalResult = null) {
+  if (sessionStateCommandPending) return;
+  sessionStateCommandPending = true;
+  renderSettingsPanel();
+  renderNodeForm();
+  try {
+    const result = await command();
+    renderSessionStateResult(result, successMessage, acceptsCanonicalResult);
+  } catch (error) {
+    saveStatus.textContent = 'Ошибка изменения состояния: '
+      + (error instanceof Error ? error.message : String(error));
+    saveStatus.classList.add('err');
+  } finally {
+    sessionStateCommandPending = false;
+    renderSettingsPanel();
+    renderNodeForm();
+  }
+}
+
 function currentAddTarget() {
   const term = getEditTerminal();
   if (!term) return null;
@@ -744,10 +920,145 @@ btnNewPlayerConfig.addEventListener('click', () => runPlayerConfigCommand(
   'КОНФИГУРАЦИЯ ИГРОКОВ СОЗДАНА'
 ));
 
+function coordinationRevision(coordination) {
+  const revision = Number(coordination?.revision || 0);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
+}
+
+function rememberResolvedCommandExecution(requestID) {
+  resolvedCommandExecutionRequestIDs.add(requestID);
+  if (resolvedCommandExecutionRequestIDs.size <= 128) return;
+  const oldest = resolvedCommandExecutionRequestIDs.values().next().value;
+  resolvedCommandExecutionRequestIDs.delete(oldest);
+}
+
+function hideCommandExecutionDialog() {
+  // Any authoritative close invalidates the promise currently resolving this
+  // dialog. Its eventual callback must not overwrite a newer lifecycle state
+  // or dismiss a different request shown in the meantime.
+  commandExecutionDialogEpoch += 1;
+  commandExecutionDecisionRequestID = null;
+  commandExecutionDialogRequestID = null;
+  commandExecutionDialog.hidden = true;
+  if (typeof commandExecutionDialog.close === 'function' && commandExecutionDialog.open) {
+    commandExecutionDialog.close();
+  } else {
+    commandExecutionDialog.removeAttribute('open');
+  }
+  btnApproveCommandExecution.disabled = false;
+  btnRejectCommandExecution.disabled = false;
+  commandExecutionDialogStatus.textContent = '';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+}
+
+function showCommandExecutionDialog(pending) {
+  commandExecutionDialogEpoch += 1;
+  commandExecutionDecisionRequestID = null;
+  commandExecutionDialogRequestID = pending.requestId;
+  commandExecutionDialogDescription.textContent = pending.confirmationText;
+  commandExecutionDialogStatus.textContent = pending.commandName
+    ? `КОМАНДА: ${pending.commandName}`
+    : 'КОМАНДА ОЖИДАЕТ РЕШЕНИЯ';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+  btnApproveCommandExecution.disabled = false;
+  btnRejectCommandExecution.disabled = false;
+  commandExecutionDialog.hidden = false;
+  if (typeof commandExecutionDialog.showModal === 'function' && !commandExecutionDialog.open) {
+    commandExecutionDialog.showModal();
+  } else {
+    commandExecutionDialog.setAttribute('open', '');
+  }
+  btnApproveCommandExecution.focus();
+}
+
+function syncCommandExecutionDialog(coordination) {
+  const pending = coordination?.pendingCommandExecution;
+  const requestID = typeof pending?.requestId === 'string' ? pending.requestId : '';
+  if (!requestID) {
+    if (commandExecutionDialogRequestID) hideCommandExecutionDialog();
+    return;
+  }
+  if (requestID === commandExecutionDecisionRequestID || resolvedCommandExecutionRequestIDs.has(requestID)) {
+    return;
+  }
+  if (requestID === commandExecutionDialogRequestID) return;
+  if (commandExecutionDialogRequestID) hideCommandExecutionDialog();
+  showCommandExecutionDialog(pending);
+}
+
 function applyCoordinationState(coordination) {
+  if (coordination && state.coordination &&
+      coordinationRevision(coordination) <= coordinationRevision(state.coordination)) {
+    return false;
+  }
   state.coordination = coordination || null;
   state.liveTerminalId = coordination?.broadcast?.activeTerminalId || null;
+  syncCommandExecutionDialog(coordination);
+  return true;
 }
+
+async function resolveCommandExecution(decision) {
+  const requestID = commandExecutionDialogRequestID;
+  if (!requestID || commandExecutionDecisionRequestID) return null;
+
+  commandExecutionDecisionRequestID = requestID;
+  const epoch = commandExecutionDialogEpoch;
+  const startingRevision = coordinationRevision(state.coordination);
+  btnApproveCommandExecution.disabled = true;
+  btnRejectCommandExecution.disabled = true;
+  commandExecutionDialogStatus.textContent = decision === 'approve'
+    ? 'СОХРАНЕНИЕ И ВЫПОЛНЕНИЕ...'
+    : 'ОТКЛОНЕНИЕ ЗАПРОСА...';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+
+  let result;
+  try {
+    result = await desktopAPI.resolveCommandExecution({ requestId: requestID, decision });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  if (epoch !== commandExecutionDialogEpoch || commandExecutionDecisionRequestID !== requestID) {
+    return result;
+  }
+  commandExecutionDecisionRequestID = null;
+  const resultRevision = coordinationRevision(result?.state);
+  if (resultRevision > 0 && resultRevision < coordinationRevision(state.coordination)) {
+    return result;
+  }
+  if (!result?.state && coordinationRevision(state.coordination) > startingRevision &&
+      state.coordination?.pendingCommandExecution?.requestId !== requestID) {
+    return result;
+  }
+
+  rememberResolvedCommandExecution(requestID);
+  if (result?.state) applyCoordinationState(result.state);
+  if (commandExecutionDialogRequestID === requestID) hideCommandExecutionDialog();
+
+  if (!result?.ok) {
+    setCoordinationStatus(result?.error || 'СОСТОЯНИЕ КОМАНДЫ НЕ УДАЛОСЬ СОХРАНИТЬ', true);
+  } else if (decision === 'approve') {
+    setCoordinationStatus('КОМАНДА ВЫПОЛНЕНА И СОХРАНЕНА');
+  } else {
+    setCoordinationStatus('ЗАПРОС ОТКЛОНЁН');
+  }
+  renderCoordination();
+  return result;
+}
+
+btnApproveCommandExecution.addEventListener('click', () => {
+  void resolveCommandExecution('approve');
+});
+btnRejectCommandExecution.addEventListener('click', () => {
+  void resolveCommandExecution('reject');
+});
+commandExecutionDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  void resolveCommandExecution('reject');
+});
 
 function setCoordinationStatus(message, isError = false) {
   coordinationStatus.textContent = isError ? '' : (message || '');
@@ -980,7 +1291,37 @@ function renderSettingsPanel() {
   btnApplySettings.disabled = !term;
   hackLevelSelect.value = term ? String(term.hackLevel || 0) : '0';
   introTextArea.value   = term ? (term.introText || '') : '';
+  const completedCount = term?.commandStates && typeof term.commandStates === 'object'
+    ? Object.keys(term.commandStates).length
+    : 0;
+  commandStateActions.hidden = !term;
+  btnResetTerminalCommandStates.disabled = !term || completedCount === 0 || sessionStateCommandPending;
 }
+
+btnResetTerminalCommandStates.addEventListener('click', async () => {
+  const term = getEditTerminal();
+  if (!term || sessionStateCommandPending) return;
+  if (!await confirmCommandStateReset(`Сбросить все выполненные состояния команд терминала "${term.name}"?`)) return;
+  const revisionBeforeReset = newestDurableRevision;
+  runSessionStateCommand(
+    async () => {
+      const result = await desktopAPI.resetTerminalCommandStates({ terminalId: term.id });
+      saveStatus.dataset.wailsCommand = 'ResetTerminalCommandStates';
+      saveStatus.dataset.wailsResult = result?.ok ? 'ok' : 'error';
+      saveStatus.dataset.wailsTerminalId = term.id;
+      saveStatus.dataset.wailsRevision = String(Number(result?.revision || 0));
+      updateSessionStateEvidenceDescription();
+      return result;
+    },
+    'СОСТОЯНИЯ КОМАНД ТЕРМИНАЛА СБРОШЕНЫ',
+    (result) => {
+      const revision = Number(result?.revision || 0);
+      const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+      return revision > revisionBeforeReset && canonicalTerminal &&
+        Object.keys(canonicalTerminal.commandStates ?? {}).length === 0;
+    }
+  );
+});
 
 // ── Render: live hack status (term panel footer) ──────────────
 function renderHackStatus() {
@@ -1034,11 +1375,15 @@ function renderTree() {
 }
 
 function renderNode(node, isRoot) {
+  const term = getEditTerminal();
   const wrap = document.createElement('div');
   wrap.className = 'tree-node';
 
   const row = document.createElement('div');
-  row.className = 'tree-row' + (state.selectedNodeId === node.id ? ' selected' : '');
+  const completed = commandExecutionState(term, node.id);
+  row.className = 'tree-row'
+    + (state.selectedNodeId === node.id ? ' selected' : '')
+    + (completed ? ' command-completed' : '');
 
   const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
   const isExpanded   = state.expanded.has(node.id);
@@ -1063,7 +1408,7 @@ function renderNode(node, isRoot) {
 
   const label = document.createElement('span');
   label.className = 'tree-label';
-  label.textContent = isRoot ? 'ROOT' : node.name;
+  label.textContent = isRoot ? 'ROOT' : effectiveNodeName(term, node);
   row.appendChild(label);
 
   row.addEventListener('click', () => {
@@ -1115,40 +1460,137 @@ function renderNodeForm() {
   }
 
   const typeLabel = node.type === 'folder' ? 'ПАПКА' : node.type === 'command' ? 'КОМАНДА' : 'ЗАПИСЬ';
+  const snapshot = commandExecutionState(term, node.id);
   let html = `<div class="node-type-label">${typeLabel}</div>
-    <div class="field-label">НАЗВАНИЕ</div>
+    <label class="field-label" for="fldName">${node.type === 'command' ? 'ИСХОДНОЕ НАЗВАНИЕ' : 'НАЗВАНИЕ'}</label>
     <input class="field-input" id="fldName" value="${escAttr(node.name)}">`;
 
   if (node.type === 'command') {
-    html += `<div class="field-label">ТЕКСТ КОМАНДЫ (появится у игрока внизу экрана)</div>
+    html += `
+      <label class="state-change-toggle" for="fldStateChangeEnabled">
+        <input id="fldStateChangeEnabled" type="checkbox"${node.stateChange ? ' checked' : ''}${snapshot ? ' disabled' : ''}>
+        <span>ИЗМЕНЯЕТ СОСТОЯНИЕ</span>
+      </label>
+      ${snapshot ? '<div class="state-change-toggle-hint">Сначала сбросьте выполненное состояние, чтобы отключить настройку.</div>' : ''}
+      <div class="state-change-fields" id="stateChangeFields"${node.stateChange ? '' : ' hidden'}>
+        <label class="field-label" for="fldCompletedName">НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ</label>
+        <input class="field-input" id="fldCompletedName" value="${escAttr(node.stateChange?.completedName || '')}">
+        <label class="field-label" for="fldConfirmationText">ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ</label>
+        <textarea class="field-textarea state-change-textarea" id="fldConfirmationText">${escHtml(node.stateChange?.confirmationText || '')}</textarea>
+      </div>
+      <label class="field-label" for="fldText">ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.text || '')}</textarea>`;
+    if (snapshot) {
+      html += `
+        <div class="command-execution-snapshot" role="status" aria-label="СОХРАНЁННОЕ СОСТОЯНИЕ КОМАНДЫ">
+          <div class="command-execution-heading">ВЫПОЛНЕНО</div>
+          <div class="command-execution-label">ЗАФИКСИРОВАННОЕ НАЗВАНИЕ</div>
+          <div class="command-execution-value">${escHtml(snapshot.completedName || '')}</div>
+          <div class="command-execution-label">ЗАФИКСИРОВАННЫЙ РЕЗУЛЬТАТ</div>
+          <div class="command-execution-value command-execution-result">${escHtml(snapshot.resultText || '')}</div>
+        </div>`;
+    }
   } else if (node.type === 'entry') {
-    html += `<div class="field-label">ОПИСАНИЕ ЗАПИСИ</div>
+    html += `<label class="field-label" for="fldText">ОПИСАНИЕ ЗАПИСИ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.description || '')}</textarea>`;
   } else if (node.type === 'folder') {
     const count = node.children ? node.children.length : 0;
     html += `<div class="field-label">СОДЕРЖИМОЕ</div><div class="node-empty">${count} элемент(ов)</div>`;
   }
 
+  html += '<div class="node-validation-error" id="nodeValidationError" role="alert" hidden></div>';
   html += `<div class="node-actions">
       <button class="btn btn-primary" id="btnApplyNode">ПРИМЕНИТЬ</button>
+      ${snapshot ? '<button class="btn btn-secondary" id="btnResetCommandState" type="button">СБРОСИТЬ СОСТОЯНИЕ</button>' : ''}
       <button class="btn btn-danger" id="btnDeleteNode">УДАЛИТЬ</button>
     </div>`;
 
   nodeForm.innerHTML = html;
 
+  const validationError = document.getElementById('nodeValidationError');
+  const showValidationError = (message, field) => {
+    validationError.textContent = message;
+    validationError.hidden = false;
+    field?.focus();
+  };
+
+  if (node.type === 'command') {
+    const enabled = document.getElementById('fldStateChangeEnabled');
+    const fields = document.getElementById('stateChangeFields');
+    enabled.addEventListener('change', () => {
+      fields.hidden = !enabled.checked;
+      validationError.hidden = true;
+      validationError.textContent = '';
+    });
+  }
+
   document.getElementById('btnApplyNode').addEventListener('click', () => {
     const nameEl = document.getElementById('fldName');
     const name = nameEl.value.trim();
-    if (!name) { nameEl.focus(); return; }
+    if (!name) {
+      showValidationError(
+        node.type === 'command' ? 'УКАЖИТЕ ИСХОДНОЕ НАЗВАНИЕ КОМАНДЫ' : 'УКАЖИТЕ НАЗВАНИЕ',
+        nameEl
+      );
+      return;
+    }
+
+    if (node.type === 'command') {
+      const stateChangeEnabled = document.getElementById('fldStateChangeEnabled').checked;
+      const textEl = document.getElementById('fldText');
+      if (stateChangeEnabled) {
+        const completedNameEl = document.getElementById('fldCompletedName');
+        const confirmationTextEl = document.getElementById('fldConfirmationText');
+        if (!completedNameEl.value.trim()) {
+          showValidationError('УКАЖИТЕ НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ', completedNameEl);
+          return;
+        }
+        if (!confirmationTextEl.value.trim()) {
+          showValidationError('УКАЖИТЕ ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ', confirmationTextEl);
+          return;
+        }
+        if (!textEl.value.trim()) {
+          showValidationError('УКАЖИТЕ ТЕКСТ УСПЕШНОГО РЕЗУЛЬТАТА', textEl);
+          return;
+        }
+        node.stateChange = {
+          completedName: completedNameEl.value,
+          confirmationText: confirmationTextEl.value,
+        };
+      } else {
+        delete node.stateChange;
+      }
+      node.text = textEl.value;
+    }
+
     node.name = name;
-    if (node.type === 'command') node.text = document.getElementById('fldText').value;
     if (node.type === 'entry')   node.description = document.getElementById('fldText').value;
     autosave();
     renderTree();
     renderNodeForm();
     renderToolbarHint();
   });
+
+  const btnResetCommandState = document.getElementById('btnResetCommandState');
+  if (btnResetCommandState) {
+    btnResetCommandState.disabled = sessionStateCommandPending;
+    btnResetCommandState.addEventListener('click', async () => {
+      if (sessionStateCommandPending) return;
+      const displayedName = snapshot?.completedName || node.name;
+      if (!await confirmCommandStateReset(`Сбросить выполненное состояние команды "${displayedName}"?`)) return;
+      const revisionBeforeReset = newestDurableRevision;
+      runSessionStateCommand(
+        () => desktopAPI.resetCommandState({ terminalId: term.id, commandId: node.id }),
+        'СОСТОЯНИЕ КОМАНДЫ СБРОШЕНО',
+        (result) => {
+          const revision = Number(result?.revision || 0);
+          const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+          return revision > revisionBeforeReset && canonicalTerminal &&
+            !Object.hasOwn(canonicalTerminal.commandStates ?? {}, node.id);
+        }
+      );
+    });
+  }
 
   document.getElementById('btnDeleteNode').addEventListener('click', () => {
     const childCount = (node.type === 'folder' && node.children) ? node.children.length : 0;

@@ -9,8 +9,8 @@ import (
 
 var (
 	sessionFields  = fieldSet("version", "name", "playerConfig", "terminals")
-	terminalFields = fieldSet("id", "name", "hackLevel", "introText", "root")
-	nodeFields     = fieldSet("id", "type", "name", "children", "text", "description")
+	terminalFields = fieldSet("id", "name", "hackLevel", "introText", "root", "commandStates")
+	nodeFields     = fieldSet("id", "type", "name", "children", "text", "description", "stateChange")
 )
 
 // DecodePlayerConfig strictly decodes one standalone version-1 authored roster.

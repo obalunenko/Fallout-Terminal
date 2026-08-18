@@ -24,9 +24,19 @@ func SessionToProto(value domain.Session) (*persistencev1.Session, error) {
 		if err != nil {
 			return nil, err
 		}
-		result.Terminals = append(result.Terminals, &persistencev1.Terminal{
+		mapped := &persistencev1.Terminal{
 			Id: terminal.ID, Name: terminal.Name, HackLevel: int32(terminal.HackLevel), IntroText: terminal.IntroText, Root: root,
-		})
+		}
+		if len(terminal.CommandStates) != 0 {
+			mapped.CommandStates = make(map[string]*persistencev1.CommandExecutionState, len(terminal.CommandStates))
+			for commandID, state := range terminal.CommandStates {
+				mapped.CommandStates[commandID] = &persistencev1.CommandExecutionState{
+					CompletedName: state.CompletedName,
+					ResultText:    state.ResultText,
+				}
+			}
+		}
+		result.Terminals = append(result.Terminals, mapped)
 	}
 	return result, nil
 }
@@ -48,9 +58,19 @@ func SessionFromProto(value *persistencev1.Session, template domain.Session) (do
 		if err != nil {
 			return domain.Session{}, err
 		}
-		result.Terminals = append(result.Terminals, domain.Terminal{
+		mapped := domain.Terminal{
 			ID: terminal.GetId(), Name: terminal.GetName(), HackLevel: int(terminal.GetHackLevel()), IntroText: terminal.GetIntroText(), Root: root, Extra: terminalTemplate.Extra,
-		})
+		}
+		if len(terminal.GetCommandStates()) != 0 {
+			mapped.CommandStates = make(map[string]domain.CommandExecutionState, len(terminal.GetCommandStates()))
+			for commandID, state := range terminal.GetCommandStates() {
+				mapped.CommandStates[commandID] = domain.CommandExecutionState{
+					CompletedName: state.GetCompletedName(),
+					ResultText:    state.GetResultText(),
+				}
+			}
+		}
+		result.Terminals = append(result.Terminals, mapped)
 	}
 	if err := domain.ValidateSession(result); err != nil {
 		return domain.Session{}, err
@@ -81,7 +101,14 @@ func contentNodeToProto(node domain.ContentNode) (*persistencev1.ContentNode, er
 		}
 		result.Content = &persistencev1.ContentNode_Folder{Folder: folder}
 	case domain.NodeCommand:
-		result.Content = &persistencev1.ContentNode_Command{Command: &persistencev1.CommandContent{Text: node.Text}}
+		command := &persistencev1.CommandContent{Text: node.Text}
+		if node.StateChange != nil {
+			command.StateChange = &persistencev1.StateChangeConfig{
+				CompletedName:    node.StateChange.CompletedName,
+				ConfirmationText: node.StateChange.ConfirmationText,
+			}
+		}
+		result.Content = &persistencev1.ContentNode_Command{Command: command}
 	case domain.NodeEntry:
 		result.Content = &persistencev1.ContentNode_Entry{Entry: &persistencev1.EntryContent{Description: node.Description}}
 	default:
@@ -112,6 +139,12 @@ func contentNodeFromProto(node *persistencev1.ContentNode, template domain.Conte
 		}
 	case *persistencev1.ContentNode_Command:
 		result.Type, result.Text = domain.NodeCommand, content.Command.GetText()
+		if content.Command.GetStateChange() != nil {
+			result.StateChange = &domain.StateChangeConfig{
+				CompletedName:    content.Command.GetStateChange().GetCompletedName(),
+				ConfirmationText: content.Command.GetStateChange().GetConfirmationText(),
+			}
+		}
 	case *persistencev1.ContentNode_Entry:
 		result.Type, result.Description = domain.NodeEntry, content.Entry.GetDescription()
 	default:

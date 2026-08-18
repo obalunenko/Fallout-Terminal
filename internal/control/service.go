@@ -64,6 +64,24 @@ type RosterStore interface {
 	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) error
 }
 
+// CommandStateMutation is the detached durable document result returned by a
+// trusted command-state store. The coordinator owns publication and never
+// supplies a callback to the store.
+type CommandStateMutation struct {
+	Changed  bool
+	Revision uint64
+	Session  domain.Session
+}
+
+// CommandStateStore is the narrow synchronous durability boundary for
+// server-owned command execution snapshots. Coordinator transitions call it
+// in the one-way control-to-session lock order and commit only after success.
+type CommandStateStore interface {
+	ExecuteCommandState(terminalID, commandID string) (CommandStateMutation, error)
+	ResetCommandState(terminalID, commandID string) (CommandStateMutation, error)
+	ResetTerminalCommandStates(terminalID string) (CommandStateMutation, error)
+}
+
 // Config supplies deterministic seams for identifiers and ordered effects.
 // Enqueue must only place the detached effect onto another owner; it must not
 // call back into Service while the coordinator transaction is still locked.
@@ -74,6 +92,7 @@ type Config struct {
 	Terminals          TerminalRuntimeLifecycle
 	TrustedHack        TrustedHackRuntime
 	RosterStore        RosterStore
+	CommandStateStore  CommandStateStore
 	RequestResultLimit int
 }
 
@@ -123,6 +142,7 @@ type Service struct {
 	terminals           TerminalRuntimeLifecycle
 	trustedHack         TrustedHackRuntime
 	rosterStore         RosterStore
+	commandStateStore   CommandStateStore
 	requirePlayerConfig bool
 	requestResultLimit  int
 }
@@ -173,6 +193,7 @@ func New(config Config) *Service {
 		terminals:           config.Terminals,
 		trustedHack:         config.TrustedHack,
 		rosterStore:         config.RosterStore,
+		commandStateStore:   config.CommandStateStore,
 		requirePlayerConfig: config.RosterStore != nil,
 		requestResultLimit:  requestResultLimit,
 	}
@@ -688,6 +709,7 @@ func (service *Service) RequestTerminalActivation(target domain.TerminalTarget) 
 			activationErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
 			return transition{}
 		}
+		clearCommandExecutionRuntime(runtime)
 		if source := activeTerminalRuntime(broadcast); unfinishedTerminalRuntime(source) && source.TerminalID != target.TerminalID {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -754,6 +776,7 @@ func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState,
 			return transition{}
 		}
 		source := activeTerminalRuntime(broadcast)
+		clearCommandExecutionRuntime(runtime)
 		if unfinishedTerminalRuntime(source) {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -861,6 +884,106 @@ func (service *Service) ResolveTerminalSwitch(switchID domain.SwitchID, choice d
 	return domain.CloneMasterCoordinationState(state), resolveErr
 }
 
+// ResolveCommandExecution applies one exact private decision to the single
+// pending state-changing command. Approve holds the coordinator transaction
+// across the one-way durable store call and publishes completed state only
+// after that call succeeds.
+func (service *Service) ResolveCommandExecution(requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return service.Snapshot(), nil, fmt.Errorf("command execution request ID must not be blank")
+	}
+	if decision != domain.CommandExecutionApprove && decision != domain.CommandExecutionReject {
+		return service.Snapshot(), nil, fmt.Errorf("command execution decision must be approve or reject")
+	}
+
+	var state *domain.MasterCoordinationState
+	var mutation *CommandStateMutation
+	var resolveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		pending := runtime.PendingCommandExecution
+		broadcast := runtime.Broadcast
+		terminal := activeTerminalRuntime(broadcast)
+		if !currentPendingCommandExecution(pending, broadcast, terminal, requestID) {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("command execution decision is stale")
+			return transition{}
+		}
+		authored := contentNodeByStableID(&terminal.Tree, pending.CommandID)
+		if authored == nil || authored.Type != domain.NodeCommand || authored.StateChange == nil ||
+			authored.Name != pending.CommandName || authored.StateChange.ConfirmationText != pending.ConfirmationText {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("command execution decision is stale")
+			return transition{}
+		}
+
+		if decision == domain.CommandExecutionReject {
+			runtime.PendingCommandExecution = nil
+			terminal.CommandExecution = &domain.CommandExecutionPresentation{
+				Phase: domain.CommandExecutionPhaseRejected, CommandID: pending.CommandID,
+			}
+			state = masterSnapshot(runtime)
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+
+		if service.commandStateStore == nil {
+			resolveErr = fmt.Errorf("command execution could not be persisted")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		durable, err := service.commandStateStore.ExecuteCommandState(pending.TerminalID, pending.CommandID)
+		if err != nil {
+			resolveErr = fmt.Errorf("command execution could not be persisted")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		durableTerminal := terminalByStableID(&durable.Session, pending.TerminalID)
+		if durableTerminal == nil {
+			resolveErr = fmt.Errorf("command execution returned an invalid durable state")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		if _, completed := durableTerminal.CommandStates[pending.CommandID]; !completed {
+			resolveErr = fmt.Errorf("command execution returned an invalid durable state")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+
+		terminal.CommandStates = cloneCommandStates(durableTerminal.CommandStates)
+		terminal.CommandExecution = nil
+		commandID := pending.CommandID
+		terminal.Nav.CommandNodeID = &commandID
+		runtime.PendingCommandExecution = nil
+		value := durable
+		mutation = &value
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		if projection := service.projectActiveTerminal(runtime); projection != nil {
+			effects = append(effects, Effect{Live: projection})
+		}
+		return transition{accepted: true, effects: effects}
+	})
+	if state == nil {
+		state = service.Snapshot()
+	}
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), mutation, resolveErr
+}
+
+func (service *Service) failPendingCommandExecution(runtime *domain.ProcessRuntime, terminal *domain.TerminalRuntime, pending *domain.PendingCommandExecution, state **domain.MasterCoordinationState) transition {
+	runtime.PendingCommandExecution = nil
+	terminal.CommandExecution = nil
+	if session := runtime.SessionsByID[pending.ControllerSessionID]; session != nil {
+		session.Notice = &domain.PlayerNotice{Kind: domain.PlayerNoticeCommandPersistenceFailed}
+	}
+	*state = masterSnapshot(runtime)
+	effects := stateEffects(runtime)
+	if projection := service.projectActiveTerminal(runtime); projection != nil {
+		effects = append(effects, Effect{Live: projection})
+	}
+	return transition{accepted: true, effects: effects}
+}
+
 // CanDeleteTerminal prevents durable deletion while a process-local runtime
 // still owns active or preserved state for that authored terminal.
 func (service *Service) CanDeleteTerminal(terminalID string) error {
@@ -900,7 +1023,8 @@ func (service *Service) UpdateLiveTerminal(tree domain.ContentNode, introText *s
 		}
 		projection := service.terminals.UpdateRuntime(active, domain.TerminalTarget{
 			TerminalID: active.TerminalID, TerminalName: active.TerminalName,
-			Tree: tree, HackLevel: active.HackLevel, IntroText: intro,
+			Tree: tree, CommandStates: cloneCommandStates(active.CommandStates),
+			HackLevel: active.HackLevel, IntroText: intro,
 		})
 		if projection == nil {
 			state = masterSnapshot(runtime)
@@ -914,6 +1038,58 @@ func (service *Service) UpdateLiveTerminal(tree domain.ContentNode, introText *s
 	})
 	state.Revision = result.revision
 	return domain.CloneMasterCoordinationState(state), updateErr
+}
+
+// RefreshActiveTerminal installs one complete trusted backend target. Unlike
+// authored live updates, this path intentionally replaces CommandStates and is
+// used after a durable reset so the active projection cannot retain stale
+// frontend or runtime snapshots.
+func (service *Service) RefreshActiveTerminal(target domain.TerminalTarget) (*domain.MasterCoordinationState, error) {
+	target.TerminalID = strings.TrimSpace(target.TerminalID)
+	if target.TerminalID == "" {
+		return service.Snapshot(), fmt.Errorf("terminal ID must not be blank")
+	}
+	var state *domain.MasterCoordinationState
+	var refreshErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		active := activeTerminalRuntime(broadcast)
+		if broadcast == nil || active == nil || broadcast.ActiveTerminalID == nil ||
+			active.TerminalID != target.TerminalID {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("target terminal is not active")
+			return transition{}
+		}
+		if service.terminals == nil {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
+			return transition{}
+		}
+		// A durable reset removes the frozen snapshot that made the current
+		// command result view valid. Clear only that stale completed view before
+		// applying the canonical target; ordinary command results and completed
+		// commands whose snapshots remain are preserved.
+		if active.Nav.CommandNodeID != nil {
+			commandID := *active.Nav.CommandNodeID
+			_, wasCompleted := active.CommandStates[commandID]
+			_, remainsCompleted := target.CommandStates[commandID]
+			if wasCompleted && !remainsCompleted {
+				active.Nav.CommandNodeID = nil
+			}
+		}
+		projection := service.terminals.UpdateRuntime(active, target)
+		if projection == nil {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("active terminal could not be refreshed")
+			return transition{}
+		}
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{Live: projection})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), refreshErr
 }
 
 // ResetFailedHack atomically replaces only the failed puzzle checkpoint of
@@ -1018,6 +1194,7 @@ func (service *Service) EndBroadcast() (*domain.MasterCoordinationState, error) 
 		}
 		runtime.Broadcast = nil
 		runtime.PendingSwitch = nil
+		runtime.PendingCommandExecution = nil
 		clearRequestResults(runtime)
 		state = masterSnapshot(runtime)
 		effects := stateEffects(runtime)
@@ -1346,6 +1523,35 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
+		if runtime.PendingCommandExecution != nil {
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonConflict, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
+		}
+		if authored, initial := initialStateChangingCommand(terminal, command); initial {
+			runtime.PendingCommandExecution = &domain.PendingCommandExecution{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID,
+				TerminalID: terminal.TerminalID, CommandID: authored.ID,
+				CommandName: authored.Name, ConfirmationText: authored.StateChange.ConfirmationText,
+				ControllerSessionID: sessionID,
+			}
+			terminal.CommandExecution = &domain.CommandExecutionPresentation{
+				Phase: domain.CommandExecutionPhasePending, CommandID: authored.ID,
+			}
+			session.Notice = nil
+			outcome = domain.ActionResult{
+				RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted,
+				Revision: runtime.Revision + 1,
+			}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{
+				Fingerprint: fingerprint, Result: outcome,
+			})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
+		}
 		if service.actions == nil {
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
@@ -1368,6 +1574,7 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			Fingerprint: fingerprint,
 			Result:      outcome,
 		})
+		session.Notice = nil
 		return transition{
 			accepted: true,
 			effects: []Effect{
@@ -1570,6 +1777,114 @@ func activeTerminalRuntime(broadcast *domain.LiveBroadcast) *domain.TerminalRunt
 		return nil
 	}
 	return broadcast.TerminalRuntimes[*broadcast.ActiveTerminalID]
+}
+
+func clearCommandExecutionRuntime(runtime *domain.ProcessRuntime) {
+	if runtime == nil {
+		return
+	}
+	runtime.PendingCommandExecution = nil
+	if runtime.Broadcast == nil {
+		return
+	}
+	for _, terminal := range runtime.Broadcast.TerminalRuntimes {
+		if terminal != nil {
+			terminal.CommandExecution = nil
+		}
+	}
+}
+
+func initialStateChangingCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
+	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
+		return nil, false
+	}
+	folder := &runtime.Tree
+	if len(runtime.Nav.Path) == 0 || runtime.Nav.Path[0] != runtime.Tree.ID {
+		return nil, false
+	}
+	for _, folderID := range runtime.Nav.Path[1:] {
+		var next *domain.ContentNode
+		for index := range folder.Children {
+			child := &folder.Children[index]
+			if child.ID == folderID && child.Type == domain.NodeFolder {
+				next = child
+				break
+			}
+		}
+		if next == nil {
+			return nil, false
+		}
+		folder = next
+	}
+	for index := range folder.Children {
+		candidate := &folder.Children[index]
+		if candidate.ID != command.NodeID || candidate.Type != domain.NodeCommand || candidate.StateChange == nil {
+			continue
+		}
+		if _, completed := runtime.CommandStates[candidate.ID]; completed {
+			return nil, false
+		}
+		return candidate, true
+	}
+	return nil, false
+}
+
+func currentPendingCommandExecution(pending *domain.PendingCommandExecution, broadcast *domain.LiveBroadcast, terminal *domain.TerminalRuntime, requestID string) bool {
+	return pending != nil && pending.RequestID == requestID &&
+		broadcast != nil && pending.BroadcastID == broadcast.ID &&
+		broadcast.ActiveTerminalID != nil && *broadcast.ActiveTerminalID == pending.TerminalID &&
+		terminal != nil && terminal.TerminalID == pending.TerminalID && terminal.Lifecycle == domain.TerminalLifecycleActive &&
+		terminal.CommandExecution != nil && terminal.CommandExecution.Phase == domain.CommandExecutionPhasePending &&
+		terminal.CommandExecution.CommandID == pending.CommandID
+}
+
+func contentNodeByStableID(root *domain.ContentNode, nodeID string) *domain.ContentNode {
+	if root == nil {
+		return nil
+	}
+	if root.ID == nodeID {
+		return root
+	}
+	for index := range root.Children {
+		if found := contentNodeByStableID(&root.Children[index], nodeID); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func terminalByStableID(session *domain.Session, terminalID string) *domain.Terminal {
+	if session == nil {
+		return nil
+	}
+	for index := range session.Terminals {
+		if session.Terminals[index].ID == terminalID {
+			return &session.Terminals[index]
+		}
+	}
+	return nil
+}
+
+func cloneCommandStates(states map[string]domain.CommandExecutionState) map[string]domain.CommandExecutionState {
+	if states == nil {
+		return nil
+	}
+	clone := make(map[string]domain.CommandExecutionState, len(states))
+	for commandID, state := range states {
+		clone[commandID] = state
+	}
+	return clone
+}
+
+func (service *Service) projectActiveTerminal(runtime *domain.ProcessRuntime) *domain.PublicLiveState {
+	if service == nil || service.terminals == nil || runtime == nil || runtime.Broadcast == nil {
+		return nil
+	}
+	terminal := activeTerminalRuntime(runtime.Broadcast)
+	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+		return nil
+	}
+	return service.terminals.ProjectRuntime(terminal)
 }
 
 func unfinishedTerminalRuntime(runtime *domain.TerminalRuntime) bool {
@@ -1896,6 +2211,13 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 			state.PendingSwitch.TargetTerminalID = &targetID
 		}
 	}
+	if pending := runtime.PendingCommandExecution; pending != nil {
+		state.PendingCommandExecution = &domain.MasterPendingCommandExecution{
+			RequestID: pending.RequestID, BroadcastID: pending.BroadcastID,
+			TerminalID: pending.TerminalID, CommandID: pending.CommandID,
+			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
+		}
+	}
 	return state
 }
 
@@ -1909,6 +2231,10 @@ func playerSnapshot(runtime *domain.ProcessRuntime, sessionID domain.LogicalSess
 		SessionID:    session.ID,
 		FallbackName: session.FallbackName,
 		Role:         roleForSession(runtime.Broadcast, session.ID),
+	}
+	if session.Notice != nil {
+		notice := *session.Notice
+		state.Notice = &notice
 	}
 	if runtime.Broadcast == nil {
 		state.Phase = domain.PlayerPhaseNoBroadcast
@@ -2084,6 +2410,10 @@ func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime 
 	}
 	clone.Broadcast = cloneBroadcast(runtime.Broadcast)
 	clone.PendingSwitch = clonePendingSwitch(runtime.PendingSwitch)
+	if runtime.PendingCommandExecution != nil {
+		pending := *runtime.PendingCommandExecution
+		clone.PendingCommandExecution = &pending
+	}
 	return &clone
 }
 
@@ -2099,6 +2429,10 @@ func cloneLogicalSession(session *domain.LogicalSession) *domain.LogicalSession 
 	clone.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord, len(session.RequestResults))
 	for requestID, result := range session.RequestResults {
 		clone.RequestResults[requestID] = result
+	}
+	if session.Notice != nil {
+		notice := *session.Notice
+		clone.Notice = &notice
 	}
 	return &clone
 }
@@ -2131,9 +2465,7 @@ func clonePendingSwitch(pending *domain.TerminalSwitchDecision) *domain.Terminal
 	}
 	clone := *pending
 	if pending.Target != nil {
-		target := *pending.Target
-		target.Tree = cloneContentNode(pending.Target.Tree)
-		clone.Target = &target
+		clone.Target = cloneTerminalTarget(pending.Target)
 	}
 	return &clone
 }
@@ -2144,6 +2476,7 @@ func cloneTerminalTarget(target *domain.TerminalTarget) *domain.TerminalTarget {
 	}
 	clone := *target
 	clone.Tree = cloneContentNode(target.Tree)
+	clone.CommandStates = cloneCommandStates(target.CommandStates)
 	return &clone
 }
 
@@ -2153,6 +2486,11 @@ func cloneTerminalRuntime(runtime *domain.TerminalRuntime) *domain.TerminalRunti
 	}
 	clone := *runtime
 	clone.Tree = cloneContentNode(runtime.Tree)
+	clone.CommandStates = cloneCommandStates(runtime.CommandStates)
+	if runtime.CommandExecution != nil {
+		execution := *runtime.CommandExecution
+		clone.CommandExecution = &execution
+	}
 	clone.Nav = cloneNavState(runtime.Nav)
 	clone.Hack = cloneHackState(runtime.Hack)
 	return &clone
@@ -2166,6 +2504,10 @@ func clonePublicLiveState(state *domain.PublicLiveState) *domain.PublicLiveState
 	clone.Tree = cloneContentNode(state.Tree)
 	clone.Nav = cloneNavState(state.Nav)
 	clone.Hack = clonePublicHackState(state.Hack)
+	if state.CommandExecution != nil {
+		execution := *state.CommandExecution
+		clone.CommandExecution = &execution
+	}
 	return &clone
 }
 

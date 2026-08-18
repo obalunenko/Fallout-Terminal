@@ -251,10 +251,11 @@ test.describe('CRT visual shell', () => {
       const command = page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' });
       await expect(command).toBeVisible();
       await command.click();
-      await expect(page.locator('#termOutput')).toBeVisible();
+      await expect(page.locator('#termEntry')).toBeVisible();
+      await expect(page.locator('#termOutput')).toBeHidden();
       await page.keyboard.press('Shift');
-      await expectStateContained(page, '#termOutput');
-      await expect(page.locator('#termOutput')).toContainText('DIAGNOSTIC OUTPUT');
+      await expectStateContained(page, '#termEntry');
+      await expect(page.locator('#entryBody')).toContainText('DIAGNOSTIC OUTPUT');
       await expectControlReachable(page, '#pageNext');
 
       await activateCRTFixture(request, 'hacking');
@@ -777,11 +778,13 @@ test.describe('CRT reveal skip', () => {
     await expect(page.locator('#termList')).toBeVisible();
 
     await page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' }).click();
-    await expect.poll(() => page.locator('#termOutput > div').count()).toBeGreaterThan(1);
+    await expect(page.locator('#termEntry')).toBeVisible();
+    await expect(page.locator('#termOutput')).toBeHidden();
+    await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(1);
     const indicatorBefore = await page.locator('#pageIndicator').textContent();
     await page.keyboard.press('PageDown');
     await expect(page.locator('#pageIndicator')).toHaveText(indicatorBefore);
-    await expect.poll(() => page.locator('#termOutput > div').count()).toBeGreaterThan(2);
+    await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(2);
     await page.keyboard.press('PageDown');
     await expect(page.locator('#pageIndicator')).not.toHaveText(indicatorBefore);
 
