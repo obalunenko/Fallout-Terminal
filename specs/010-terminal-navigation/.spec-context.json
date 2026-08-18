@@ -1,0 +1,410 @@
+{
+  "workflow": "companion",
+  "specName": "terminal navigation",
+  "branch": "develop",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:18:42.136Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:23:15.119Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:26:27.218Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:36:46.843Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:43:57.072Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:44:33.345Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:48:06.921Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:52:33.374Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:52:46.796Z"
+    }
+  ],
+  "last_action": "living specs evaluated — skipped (not configured)",
+  "coverage": {
+    "FR-001": {
+      "title": "Мастер MUST иметь возможность настроить обычную команду как команду перехода и выбрать для неё другой терминал из текущей сессии.",
+      "tasks": [
+        "T001",
+        "T005",
+        "T006",
+        "T008",
+        "T009",
+        "T013",
+        "T015"
+      ]
+    },
+    "FR-002": {
+      "title": "Настройка команды перехода MUST сохраняться вместе с содержимым сессии и восстанавливаться после повторного открытия файла.",
+      "tasks": [
+        "T001",
+        "T004",
+        "T006",
+        "T009",
+        "T013",
+        "T015"
+      ]
+    },
+    "FR-003": {
+      "title": "Система MUST отклонять сохранение или выполнение команды перехода без существующего целевого терминала либо с целью, совпадающей с исходным терминалом.",
+      "tasks": [
+        "T005",
+        "T006",
+        "T008",
+        "T009",
+        "T012",
+        "T014",
+        "T015"
+      ]
+    },
+    "FR-004": {
+      "title": "Выбор команды перехода контролирующим игроком MUST создавать ровно один ожидающий запрос решения мастера без немедленной смены активного терминала.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-005": {
+      "title": "Пока решение мастера ожидается, система MUST блокировать остальные действия общей навигации и не создавать конкурирующий запрос перехода.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T016"
+      ]
+    },
+    "FR-006": {
+      "title": "Запрос решения мастеру MUST однозначно показывать направление перехода, исходный терминал, название выбранной команды и целевой терминал.",
+      "tasks": [
+        "T003",
+        "T011",
+        "T013",
+        "T015",
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-007": {
+      "title": "Одобрение команды перехода MUST сделать её целевой терминал единственным активным терминалом текущей трансляции.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T017"
+      ]
+    },
+    "FR-008": {
+      "title": "Одобрение команды перехода MUST сохранить текущее состояние исходного терминала для возможного возврата.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T019",
+        "T021"
+      ]
+    },
+    "FR-009": {
+      "title": "Одобрение команды перехода MUST завершать смену терминала без второго диалога решения о переключении.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T019",
+        "T021"
+      ]
+    },
+    "FR-010": {
+      "title": "Отклонение команды перехода или закрытие окна решения MUST оставить активный терминал и историю переходов без изменений.",
+      "tasks": [
+        "T012",
+        "T013",
+        "T014",
+        "T015",
+        "T017"
+      ]
+    },
+    "FR-011": {
+      "title": "Первый вход в защищённый терминал MUST применять существующие правила показа и прохождения взлома.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ]
+    },
+    "FR-012": {
+      "title": "Повторный вход в терминал с успешно завершённым в текущей трансляции взломом MUST сразу открывать его начальный экран без повторного взлома.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ]
+    },
+    "FR-013": {
+      "title": "Повторный вход в терминал с незавершённым или заблокированным взломом MUST восстанавливать его сохранённое состояние, если мастер явно не сбросил или не отбросил его.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ]
+    },
+    "FR-014": {
+      "title": "Перед одобренным прямым переходом система MUST сохранить исходный терминал, уровень меню с выбранной командой и идентичность этой команды как одну точку возврата.",
+      "tasks": [
+        "T008",
+        "T010",
+        "T012",
+        "T014"
+      ]
+    },
+    "FR-015": {
+      "title": "Начальный экран терминала MUST предлагать межтерминальный возврат только при наличии точки возврата в текущем маршруте.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T023",
+        "T025"
+      ]
+    },
+    "FR-016": {
+      "title": "Выбор межтерминального возврата контролирующим игроком MUST создавать ровно один ожидающий запрос решения мастера без немедленной смены активного терминала.",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-017": {
+      "title": "Одобрение возврата MUST активировать терминал из последней точки возврата и удалить только эту точку из маршрута.",
+      "tasks": [
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-018": {
+      "title": "Одобрённый возврат MUST открыть список сохранённого уровня меню исходного терминала, если этот уровень всё ещё существует.",
+      "tasks": [
+        "T007",
+        "T010",
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-019": {
+      "title": "Если сохранённый уровень больше не существует, одобрённый возврат MUST открыть ближайший существующий родительский уровень либо корень исходного терминала.",
+      "tasks": [
+        "T007",
+        "T010",
+        "T022",
+        "T024"
+      ]
+    },
+    "FR-020": {
+      "title": "Отклонение возврата или закрытие окна решения MUST оставить текущий терминал и маршрут без изменений.",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-021": {
+      "title": "Последовательные переходы MUST образовывать маршрут последнего-вошёл-первого-вышел, чтобы каждый возврат вёл только к непосредственному предыдущему терминалу.",
+      "tasks": [
+        "T008",
+        "T022",
+        "T023",
+        "T024"
+      ]
+    },
+    "FR-022": {
+      "title": "Только текущий контролирующий игрок MUST иметь право инициировать переход или возврат; действия остальных игроков MUST быть отклонены без изменения общего состояния.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T026",
+        "T028"
+      ]
+    },
+    "FR-023": {
+      "title": "Все подключённые игроки MUST получать одно и то же активное состояние терминала, ожидания решения, маршрута и результата перехода.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-024": {
+      "title": "Переподключившийся игрок MUST получать актуальный активный терминал и актуальное состояние ожидающего решения без восстановления устаревшего экрана.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-025": {
+      "title": "Удалённая, устаревшая или изменившая цель команда MUST завершаться безопасным отказом без смены активного терминала и без изменения маршрута.",
+      "tasks": [
+        "T006",
+        "T009",
+        "T012",
+        "T014",
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-026": {
+      "title": "Завершение трансляции, ручная смена активного терминала или закрытие приложения MUST отменять ожидающий межтерминальный переход.",
+      "tasks": [
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-027": {
+      "title": "Завершение трансляции, ручная смена активного терминала или закрытие приложения MUST очищать маршрут межтерминальных переходов этой трансляции.",
+      "tasks": [
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-028": {
+      "title": "Обычные папки, записи, команды и изменяющие состояние команды MUST сохранять существующее поведение, если для них не настроен межтерминальный переход.",
+      "tasks": [
+        "T005",
+        "T012",
+        "T014",
+        "T019",
+        "T021",
+        "T022",
+        "T024",
+        "T025"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 16,
+    "projectedTasks": 22,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: terminal content authoring and durable session content",
+    "area: broadcast coordination, shared navigation, and terminal runtime lifecycle",
+    "constraint: one game-master approval per forward or back transition",
+    "constraint: retain solved hacking state within the current broadcast"
+  ],
+  "intent": "Allow player-requested, game-master-approved movement between linked terminals with reversible navigation and preserved solved hacking state.",
+  "expectations": [
+    "No cross-session or external-terminal links.",
+    "No persisted route history across application restarts or new broadcasts.",
+    "No redesign of hacking-game rules.",
+    "No terminal-graph visualization."
+  ],
+  "approach": "Persist only an optional same-session terminal target on authored commands while keeping route, pending decisions, and hacking checkpoints in the coordinator's broadcast-scoped runtime. Reuse PlayerService.Navigate for forward and root-return requests, resolve every target again from the current validated session at approval, and publish the resulting active terminal and route in one revisioned stream update.",
+  "decisions": [
+    {
+      "decision": "Store an optional terminalTransition.targetTerminalId on command nodes in session JSON version 1",
+      "why": "Stable IDs survive renames and an additive optional field preserves legacy documents and unknown-field round trips",
+      "rejected": "A session-level link table, target names, or a new JSON version"
+    },
+    {
+      "decision": "Make terminalTransition mutually exclusive with stateChange and validate references in two passes",
+      "why": "The modes require different approval semantics and valid forward references must not depend on terminal array order",
+      "rejected": "Implicit precedence between configs or single-pass validation"
+    },
+    {
+      "decision": "Use a dedicated PendingTerminalNavigation approve/reject lifecycle",
+      "why": "Player transitions must block shared actions and preserve the source checkpoint with one master decision",
+      "rejected": "Reusing PendingTerminalSwitch or PendingCommandExecution"
+    },
+    {
+      "decision": "Reuse NavigateCommand for forward transitions and NavigateBack at root for returns",
+      "why": "Existing unary authorization, replay, revision, and acknowledgement semantics already cover both requests without trusting a browser-supplied target",
+      "rejected": "A new public RPC or target ID in player requests"
+    },
+    {
+      "decision": "Store a broadcast-scoped LIFO route with stable folder IDs and ancestor IDs",
+      "why": "Stable identity supports rename and move while saved ancestors provide deterministic nearest-parent fallback after deletion",
+      "rejected": "A raw old path, command ID alone, or a static terminal graph"
+    },
+    {
+      "decision": "Resolve source and target again through a trusted current-session catalog at approval",
+      "why": "Deleted or retargeted commands must fail safely instead of activating a frozen stale payload",
+      "rejected": "Trusting frontend payloads or retaining an unvalidated target snapshot"
+    },
+    {
+      "decision": "Reuse per-terminal runtime checkpoints but place navigation explicitly on activation",
+      "why": "Existing checkpoints already retain solved, unfinished, and failed hacking state while the feature requires destination root and restored return-folder semantics",
+      "rejected": "Persisting hack state or recreating terminal runtimes on every visit"
+    },
+    {
+      "decision": "Expose only route depth, top return target, and secret-free pending state publicly",
+      "why": "Players can render and reconnect consistently without receiving decision authority or the full private route",
+      "rejected": "Client-local route state or publishing master request metadata"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned additive session-v1 links and an atomic coordinator-owned forward/return lifecycle with retained hacking checkpoints",
+      "key_finding": "Existing per-terminal runtimes solve checkpoint retention, but manual PendingTerminalSwitch cannot satisfy one-decision navigation and moved-folder restoration needs stable-ID path reconstruction"
+    },
+    "tasks": {
+      "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
+    }
+  }
+}
