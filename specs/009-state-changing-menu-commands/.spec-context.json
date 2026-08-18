@@ -866,6 +866,351 @@
       "by": "ai",
       "at": "2026-08-17T20:40:49.809Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T21:28:19.140Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T21:32:41.825Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T21:32:42.077Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T21:32:42.320Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:12:10.925Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:12:11.180Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:12:11.423Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:12:11.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:14:59.596Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:14:59.864Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:15:00.110Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:15:00.357Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:15:00.602Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:15:00.847Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T22:30:11.844Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T23:15:21.130Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:17:07.228Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:17:37.848Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:19:04.667Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:22:37.015Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:22:50.194Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:22:57.513Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:05.897Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:06.169Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:06.413Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:06.658Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:06.902Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T23:25:19.691Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:04:33.236Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T00:45:08.365Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:08:04.736Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T11:52:05.920Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:53:43.286Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:53:43.394Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:55:39.740Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:55:39.837Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:55:39.948Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T11:58:54.717Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T12:00:23.976Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T12:13:20.386Z",
+      "reopened": true
     }
   ],
   "coverage": {
@@ -917,7 +1262,7 @@
         "T037"
       ],
       "tests": [
-        "internal/control/service_test.go::ordinary command regression;internal/live/service_test.go::ordinary command"
+        "tests/browser/state-changing-command-authoring.spec.mjs::bundled read-only demo exposes state-changing examples only in their initial state"
       ]
     },
     "FR-005": {
@@ -931,21 +1276,26 @@
         "T026"
       ],
       "tests": [
-        "internal/control/service_test.go::single server-owned pending;tests/browser/state-changing-command-approval.spec.mjs"
+        "tests/browser/state-changing-command-approval.spec.mjs::canonical approval input has explicit folder",
+        "entry",
+        "and only initial state-changing commands",
+        "tests/browser/state-changing-command-approval.spec.mjs::one pending request opens exactly one master dialog and approve publishes a full-screen durable result"
       ]
     },
     "FR-006": {
-      "title": "Отмена подтверждения MUST оставлять состояние команды, её отображаемое название и представление остальных игроков без изменений.",
+      "title": "Pending and resolved command text uses the same selected-record presentation semantics.",
       "tasks": [
-        "T002",
-        "T016",
-        "T017",
-        "T020",
-        "T021",
-        "T025"
+        "T019",
+        "T025",
+        "T063",
+        "T065",
+        "T066",
+        "T067"
       ],
       "tests": [
-        "internal/live/service_test.go::pending blocks actions;tests/browser/state-changing-command-approval.spec.mjs"
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/crt-rendering.spec.mjs"
       ]
     },
     "FR-007": {
@@ -962,16 +1312,19 @@
       ]
     },
     "FR-008": {
-      "title": "После успешного долговечного сохранения выполненного состояния терминал MUST показывать всем подключённым игрокам настроенный текст успешного выполнения.",
+      "title": "Pending blocks player actions and rejected state remains controller-acknowledgeable without visual divergence.",
       "tasks": [
-        "T002",
-        "T017",
-        "T021",
-        "T022",
-        "T025"
+        "T019",
+        "T025",
+        "T043",
+        "T063",
+        "T065",
+        "T066",
+        "T067"
       ],
       "tests": [
-        "tests/browser/state-changing-command-approval.spec.mjs::approve publishes durable result"
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     },
     "FR-009": {
@@ -1046,15 +1399,19 @@
       ]
     },
     "FR-015": {
-      "title": "Повторный выбор выполненной команды MUST без подтверждения показывать сохранённый успешный результат и MUST NOT выполнять действие или сохранение повторно.",
+      "title": "Completed command title and frozen result converge across controller and observers.",
       "tasks": [
-        "T017",
-        "T021",
-        "T035",
-        "T037"
+        "T025",
+        "T044",
+        "T062",
+        "T063",
+        "T064",
+        "T066",
+        "T067"
       ],
       "tests": [
-        "internal/live/service_test.go::completed command repeats frozen result;internal/control/service_test.go"
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     },
     "FR-016": {
@@ -1161,8 +1518,8 @@
         "T061"
       ],
       "tests": [
-        "app_test.go::TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTerminal",
-        "tests/browser/state-changing-command-sync.spec.mjs"
+        "scripts/state-changing-reset-native-smoke.sh",
+        "scripts/state-changing-reset-native-player-smoke.mjs"
       ]
     },
     "FR-024": {
@@ -1245,19 +1602,18 @@
     },
     "FR-030": {
       "tasks": [
-        "T002",
-        "T003",
-        "T016",
-        "T017",
-        "T020",
-        "T021",
-        "T023",
-        "T024",
-        "T025"
+        "T062",
+        "T064",
+        "T065",
+        "T066",
+        "T067"
       ],
       "tests": [
-        "tests/browser/state-changing-command-approval.spec.mjs::reject and close;internal/live/service_test.go"
-      ]
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/crt-rendering.spec.mjs"
+      ],
+      "title": "Command renderer preserves reveal, pagination, and responsive repagination semantics."
     },
     "FR-031": {
       "tasks": [
@@ -1355,9 +1711,33 @@
         "T040"
       ],
       "tests": [
-        "app_test.go::TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTerminal",
-        "tests/browser/state-changing-command-sync.spec.mjs::controller and two observers converge on completed result and title within one second",
-        "tests/browser/state-changing-command-authoring.spec.mjs::terminal reset canonical backend checks"
+        "scripts/state-changing-reset-native-smoke.sh",
+        "scripts/state-changing-reset-native-player-smoke.mjs"
+      ]
+    },
+    "FR-033": {
+      "title": "All command lifecycle states match the ordinary selected-record renderer.",
+      "tasks": [
+        "T065",
+        "T066",
+        "T067"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "SC-017": {
+      "title": "PENDING REJECTED COMPLETED by Back Enter matrix including reconnect and observers.",
+      "tasks": [
+        "T062",
+        "T063",
+        "T064"
+      ],
+      "tests": [
+        "internal/live/service_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     }
   },
@@ -1507,6 +1887,30 @@
       "decision": "Клик подтверждения native smoke вычисляется относительно геометрии окна.",
       "why": "WebKit показывает HTML dialog визуально, но скрывает дочерние кнопки modal из macOS Accessibility tree; относительная координата выполняет реальный UI-клик без вызова backend напрямую.",
       "rejected": "Искать скрытую кнопку через AX entire contents или считать клавиатурный focus стабильным."
+    },
+    {
+      "decision": "Нормализовать Back и Enter после REJECTED/COMPLETED в один server-authoritative Navigate back; в PENDING оба ввода блокируются до master decision.",
+      "why": "Один принятый runtime revision одновременно возвращает controller и observers без optimistic или browser-owned состояния.",
+      "rejected": "Локально закрывать экран у каждого player client."
+    },
+    {
+      "decision": "Render pending, rejected, ordinary-command, and completed-command text through the existing #termEntry/#entryBody record presentation primitive.",
+      "why": "The selected record renderer is the visual and behavioral reference for title, divider, reveal, pagination, and resize semantics.",
+      "rejected": "Maintaining a separately styled #termOutput command surface."
+    },
+    {
+      "decision": "Keep the Back control in layout as an invisible disabled placeholder when command state is not acknowledgeable.",
+      "why": "This preserves exact record geometry for observers and pending state while retaining controller-only Back/acknowledgement semantics."
+    },
+    {
+      "decision": "Expose accepted player runtime revision and master Wails/session-event evidence as non-authoritative DOM accessibility metadata consumed by the native smoke",
+      "why": "The gate can observe the real packaged UI and public player clients without adding a test-only backend mutation or bypassing generated bindings",
+      "rejected": "Fixture-only reset, direct App invocation, or optimistic browser-owned state"
+    },
+    {
+      "decision": "Use the Go approval-session endpoint as the executable canonical fixture and validate demo JSON against the same structural contract",
+      "why": "It removes the duplicated JavaScript session while preserving the demo and authoring fixtures for their distinct purposes",
+      "rejected": "Keep manually synchronized Go and JavaScript copies"
     }
   ],
   "approach": "Выбор initial stateful-команды через существующий player Navigate создаёт один временный общий pending-запрос и приватный prompt мастеру. Новый allowlisted desktop resolve переводит его в rejected без записи либо, после approve и атомарного session save, в долговечный frozen result; player/master получают только свои авторитетные ревизионные проекции.",
@@ -1519,9 +1923,9 @@
       "summary": "40 задач в 7 фазах: 4 setup, 6 foundational, 5 US1, 11 US2 MVP, 7 US3, 5 US4 и 2 polish/validation; каждая фаза разбита на явные test-first waves и joins."
     },
     "implement": {
-      "summary": "Все 61 task реализованы и проверены; native reset-all восстановлен заменой неподдерживаемого window.confirm на in-app modal.",
-      "key_finding": "Фактический Wails WebView не показывал window.confirm, хотя Playwright перехватывал его и давал ложноположительное покрытие.",
-      "risks": "Standalone AppleScript native smoke требует Accessibility permission; deterministic self-test и фактический Computer Use gate прошли."
+      "summary": "BUG-006 shipped with a canonical approval session source, explicit folder/entry/command contract, exact master command identity, distinct prompts, and a repeatable diagnostic native reset gate.",
+      "key_finding": "A shared #termEntry/#entryBody primitive plus a hidden Back layout placeholder provides renderer parity without changing server/protobuf contracts or acknowledgement authority.",
+      "risks": "No known open regression; two opt-in live-ngrok Playwright scenarios remain intentionally skipped by project configuration."
     }
   },
   "currentTask": "T040",
@@ -1655,15 +2059,14 @@
     },
     "T017": {
       "status": "DONE",
-      "did": "Added RED live/navigation contract tests for effective durable command projection, pending action blocking, rejected Back, and frozen repeat results",
+      "did": "Расширены live/nav регрессии для блокировки pending-ввода, rejected acknowledgement и completed Back без мутации состояния.",
       "files": [
-        "internal/live/service_test.go",
-        "internal/nav/nav_test.go"
+        "internal/live/service_test.go"
       ]
     },
     "T019": {
       "status": "DONE",
-      "did": "Added Playwright RED journeys for single master command confirmation, approve, reject, dialog-close rejection, and safe persistence failure behavior",
+      "did": "Добавлен падающий approval journey для отдельного точного имени команды и отличающегося confirmation prompt",
       "files": [
         "tests/browser/state-changing-command-approval.spec.mjs"
       ]
@@ -1685,12 +2088,9 @@
     },
     "T021": {
       "status": "DONE",
-      "did": "Implemented effective frozen command projection, pending/rejected runtime action rules, shared Back behavior, and repeat completed navigation",
+      "did": "Подтверждена серверная effective projection: pending блокирует runtime actions, rejected/completed принимают shared Back без мутации durable snapshot.",
       "files": [
-        "internal/live/service.go",
-        "internal/live/service_test.go",
-        "internal/nav/nav.go",
-        "internal/nav/nav_test.go"
+        "internal/live/service_test.go"
       ]
     },
     "T024": {
@@ -1720,10 +2120,11 @@
     },
     "T025": {
       "status": "DONE",
-      "did": "Implemented authoritative pending/rejected player screens, action blocking, controller Back, and enum-only persistence notice",
+      "did": "Player pending, access-denied, and command result screens now reuse the record entry surface while preserving blocked pending actions and controller-only acknowledgement; approval suite passes 6/6.",
       "files": [
         "client/client.js",
-        "client/client.css"
+        "client/client.css",
+        "tests/browser/state-changing-command-approval.spec.mjs"
       ]
     },
     "T023": {
@@ -1739,21 +2140,16 @@
     },
     "T026": {
       "status": "DONE",
-      "did": "Integrated canonical session-backed command-state hydration, private master resolution, generated Wails surface, and end-to-end approval fixtures",
+      "did": "Master и player approval journeys используют один Go session endpoint без дублирующего JavaScript fixture",
       "files": [
-        "app.go",
-        "internal/control/service.go",
-        "client/client.js",
-        "frontend/src/desktop-api.js",
-        "frontend/bindings",
-        "scripts/wails-bindings-check.sh",
         "tests/browser/fixture-server/main.go",
-        "tests/browser/fixtures/desktop-bindings.js"
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/state-changing-command-approval.spec.mjs"
       ]
     },
     "T029": {
       "status": "DONE",
-      "did": "Added RED multi-client lifecycle browser contracts for disconnect, convergence, durable reopen, and transient cancellation",
+      "did": "Three-client browser journey passes for controller plus two observers across disconnect/reconnect, navigation, terminal switch, and broadcast restart, with record-surface parity assertions.",
       "files": [
         "tests/browser/state-changing-command-sync.spec.mjs"
       ]
@@ -1782,9 +2178,10 @@
     },
     "T032": {
       "status": "DONE",
-      "did": "Made every new public stream snapshot an authoritative command-state recovery baseline while retaining full backend snapshot and monotonic overflow behavior",
+      "did": "Public snapshots restore pending and completed record surfaces after controller reconnect and shared lifecycle transitions without browser-side persistence; the three-client suite passes.",
       "files": [
-        "client/client.js"
+        "client/client.js",
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     },
     "T031": {
@@ -1798,10 +2195,10 @@
     },
     "T033": {
       "status": "DONE",
-      "did": "Added deterministic multi-player lifecycle fixtures for disconnect/reconnect, terminal switches, broadcast restart, durable session reopen, and transient cancellation audits",
+      "did": "Integration fixture расширен длинным frozen result и lifecycle сценариями approve/reject/dialog close/reconnect.",
       "files": [
         "tests/browser/fixture-server/main.go",
-        "tests/browser/fixtures/desktop-bindings.js"
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     },
     "T035": {
@@ -1850,20 +2247,23 @@
     },
     "T039": {
       "status": "DONE",
-      "did": "Added an uncompleted state-changing command to the bundled demo and documented authoring, approval, durable completion, reset, and version-1 compatibility workflows",
+      "did": "Demo JSON закреплён как initial approval input с folder/entry/state-changing commands и README описывает отдельные имя и prompt",
       "files": [
         "sessions/demo.json",
-        "README.md"
+        "README.md",
+        "tests/browser/state-changing-command-authoring.spec.mjs"
       ]
     },
     "T040": {
       "status": "DONE",
-      "did": "Выполнена полная Success Criteria validation: форматирование и vet, Go unit/race, protobuf generation/breaking/drift, Wails binding allowlist, frontend/client builds, Playwright 76 passed/2 opt-in skipped, native master-click reset подтверждён через Computer Use; autonomous smoke self-test passed, shell UI automation требует Accessibility permission.",
+      "did": "Single-owner SC gate passed formatting, vet, unit/race, protobuf/bindings/drift, builds, full Playwright and fresh packaged native reset/reopen",
       "files": [
+        "Makefile",
+        "scripts/proto-drift-test.sh",
         "scripts/state-changing-reset-native-smoke.sh",
-        "tests/browser/state-changing-command-authoring.spec.mjs",
-        "frontend/src/master.js",
-        "internal/testutil/testdata/session-v1-state-changing.json"
+        "frontend/package.json",
+        "client/package.json",
+        "tests/browser/package.json"
       ]
     },
     "T041": {
@@ -1884,14 +2284,15 @@
     },
     "T043": {
       "status": "DONE",
-      "did": "Expanded explicit reject, dialog-close rejection, and disconnect/approve exactly-once matrices to 100 trials",
+      "did": "Browser lifecycle matrix passes explicit rejection, dialog close, pending cancellation, and controller disconnect/approve with one pending request and no duplicate execute writes.",
       "files": [
-        "internal/control/service_test.go"
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
       ]
     },
     "T044": {
       "status": "DONE",
-      "did": "Added measured controller-plus-two-observer result/title convergence with an explicit one-second budget",
+      "did": "Controller and two observers converge on the completed command name and long result within one second, retain matching record-renderer geometry, and acknowledge from the controller only.",
       "files": [
         "tests/browser/state-changing-command-sync.spec.mjs"
       ]
@@ -2052,6 +2453,108 @@
         "internal/testutil/testdata/session-v1-state-changing.json",
         "internal/domain/model_test.go",
         "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Reopened lifecycle matrix now requires controller and observers to use the record entry surface; focused three-player test fails while command states still render through termOutput.",
+      "files": [
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Unified record-style presentation without changing runtime/navigation contracts; internal live and nav suites pass with pending blocking and shared acknowledgement intact.",
+      "files": [
+        "client/client.js",
+        "client/client.css",
+        "internal/live/service.go",
+        "internal/nav/nav.go"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Controller plus two observer browser lifecycle validation passes with matching record surfaces and accepted-revision convergence; internal player and control suites pass for snapshots, reconnect, pending deduplication, and decisions.",
+      "files": [
+        "internal/player/public_stream_test.go",
+        "internal/player/stream_test.go",
+        "internal/control/service_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Added a golden ordinary-record fixture and a failing browser parity regression spanning pending, rejected, first/repeated completed, long pagination, and resize repagination.",
+      "files": [
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Replaced termOutput command branches with a shared record-description primitive, including identical prompt/footer geometry, reveal, pagination, resize repagination, and invisible noninteractive Back placeholders.",
+      "files": [
+        "client/client.js",
+        "client/client.css"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Record-renderer parity now covers controller plus two observers for pending, completed, rejected, dialog close, reconnect, long pagination, Enter/Back, and synchronized narrow-viewport repagination; sync suite passes 3/3.",
+      "files": [
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Расширил native reset gate реальным master-кликом, Wails/session evidence, controller+observer DOM/revision convergence и полным reopen",
+      "files": [
+        "scripts/state-changing-reset-native-smoke.sh",
+        "scripts/state-changing-reset-native-player-smoke.mjs",
+        "client/client.js",
+        "frontend/src/master.js"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Воспроизведён BUG-006 структурными demo/approval проверками и browser assertion перехода INITIAL в единственный PENDING",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/state-changing-command-approval.spec.mjs"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Go/JavaScript/JSON approval inputs выровнены общим структурным контрактом, exact command label и distinct prompt",
+      "files": [
+        "sessions/demo.json",
+        "README.md",
+        "specs/009-state-changing-menu-commands/contracts/session-v1.md",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Native reset gate синхронизирован с process/accessibility lifecycle, сохраняет диагностику и дважды подряд прошёл полный reset/reopen",
+      "files": [
+        "scripts/state-changing-reset-native-smoke.sh"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Approval command пройдена через approve/reject/close с exact name/distinct prompt; ordinary и sync journeys сохранены; frontend и Playwright suites проходят",
+      "files": [
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/fixtures/desktop-bindings.js"
       ]
     }
   },
@@ -2299,9 +2802,150 @@
       "result": "passed: selected t_security commandStates 2->0; t_power commandStates preserved 1",
       "command": "./scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
       "warnings": "An immediate stability rerun was NOT RUN after an intermittent macOS Accessibility traversal stall; deterministic self-test and the successful actual-click run remain green."
+    },
+    {
+      "what": "BUG-004 focused command-screen matrix",
+      "command": "go test ./internal/live ./internal/nav ./internal/control ./internal/player; Playwright approval+sync",
+      "result": "passed: pending/rejected/completed, Back/Enter, controller plus two observers, reconnect, pagination and lifecycle transitions"
+    },
+    {
+      "what": "BUG-004 full Go quality gate",
+      "command": "make fmt-check; go vet ./...; go test ./...; go test -race ./...",
+      "result": "passed",
+      "warnings": [
+        "macOS linker emitted benign deployment-target warnings"
+      ]
+    },
+    {
+      "what": "BUG-004 contracts bindings builds and browser gate",
+      "command": "proto-check; proto-breaking; proto-drift; wails-bindings-check; client/frontend build; make build; make package; full Playwright",
+      "result": "passed: deterministic protobuf, 33 Wails methods, production builds, 77 browser tests passed and 2 opt-in ngrok tests skipped"
+    },
+    {
+      "what": "BUG-004 native master reset gate",
+      "command": "scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
+      "result": "passed: selected t_security commandStates 2 to 0, other terminals preserved 1"
+    },
+    {
+      "what": "BUG-004 immediate post-decision acknowledgement",
+      "command": "focused approval sync and CRT Playwright; full Playwright rerun; rebuilt package and native smoke",
+      "result": "passed: first Enter or Backspace returns from a revealing completed result without an extra reveal-skip key; 77 passed and 2 opt-in skipped; native reset passed"
+    },
+    {
+      "what": "Full browser suite",
+      "result": "78 passed, 2 opt-in external ngrok tests skipped",
+      "command": "npm test --prefix tests/browser"
+    },
+    {
+      "what": "BUG-005 renderer parity journeys",
+      "result": "approval 6/6 and three-client sync 3/3 passed",
+      "command": "npx playwright test state-changing-command-approval.spec.mjs state-changing-command-sync.spec.mjs"
+    },
+    {
+      "what": "Contract, generation, and build gates",
+      "result": "fmt, vet, protobuf deterministic/breaking/drift, Wails allowlist, client/frontend/package builds, and diff check passed",
+      "command": "make fmt-check; go vet ./...; make proto-check; make proto-breaking; scripts/proto-drift-test.sh; scripts/wails-bindings-check.sh; npm builds; make package; git diff --check"
+    },
+    {
+      "what": "Native master-click reset gate",
+      "result": "passed; selected commandStates 2->0 and other terminal preserved 1",
+      "command": "scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app"
+    },
+    {
+      "what": "Native master-click reset integration",
+      "command": "scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
+      "result": "PASS; runtime 10->11, controller+observer INITIAL in 58ms, other terminal preserved, full reopen INITIAL",
+      "warnings": []
+    },
+    {
+      "what": "Full Playwright regression suite",
+      "command": "npm test --prefix tests/browser",
+      "result": "78 passed, 2 skipped",
+      "warnings": [
+        "Two authenticated ngrok journeys remain opt-in and were skipped",
+        "NO_COLOR/FORCE_COLOR notice"
+      ]
+    },
+    {
+      "what": "Packaged native build",
+      "command": "make package",
+      "result": "PASS; ad-hoc signed build/bin/Fallout Terminal.app produced",
+      "warnings": []
+    },
+    {
+      "what": "Go regression suite",
+      "command": "go test ./...",
+      "result": "PASS",
+      "warnings": [
+        "Linker reported existing macOS deployment-version warnings"
+      ]
+    },
+    {
+      "what": "Binding and native-probe static gates",
+      "command": "scripts/wails-bindings-check.sh; scripts/state-changing-reset-native-smoke.sh --self-test; bash -n; node --check",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Native packaged-app reset/reopen stability run 1",
+      "command": "scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
+      "result": "PASS runtime 10->11 in 5ms; selected states 2->0; other terminal 1; reopen INITIAL",
+      "warnings": []
+    },
+    {
+      "what": "Native packaged-app reset/reopen stability run 2",
+      "command": "scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
+      "result": "PASS runtime 10->11 in 58ms; selected states 2->0; other terminal 1; reopen INITIAL",
+      "warnings": []
+    },
+    {
+      "what": "Frontend focused state-changing and desktop facade suite",
+      "command": "npm test --prefix frontend",
+      "result": "PASS 18/18",
+      "warnings": [
+        "First sandboxed attempt could not bind fixture port; rerun outside sandbox passed"
+      ]
+    },
+    {
+      "what": "Repository quality gate",
+      "command": "make check",
+      "result": "PASS fmt, vet, go test -race, protobuf deterministic/compatibility, Wails bindings",
+      "warnings": []
+    },
+    {
+      "what": "Go unit suite",
+      "command": "go test ./...",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker reported existing deployment-target object warnings; tests passed"
+      ]
+    },
+    {
+      "what": "Generated contract drift rejection",
+      "command": "scripts/proto-drift-test.sh",
+      "result": "PASS: intentional clean-generation drift was rejected",
+      "warnings": []
+    },
+    {
+      "what": "Production frontend builds",
+      "command": "npm run build --prefix frontend; npm run build --prefix client",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Fresh package and native reset gate",
+      "command": "make package; scripts/state-changing-reset-native-smoke.sh build/bin/Fallout Terminal.app",
+      "result": "PASS package; native runtime 10->11 in 58ms, selected states 2->0, other terminal preserved, reopen INITIAL",
+      "warnings": []
+    },
+    {
+      "what": "Working tree whitespace validation",
+      "command": "git diff --check",
+      "result": "PASS",
+      "warnings": []
     }
   ],
-  "last_action": "Accessibility enabled; autonomous native reset smoke passed with selected states 2->0 and other terminal preserved.",
+  "last_action": "all 72 tasks complete; make check, 79 Playwright tests, package, and native reset/reopen passed",
   "concerns": [
     {
       "note": "The separately opted-in real ngrok integration returned provider-dependent HTTP 404 instead of the expected unauthenticated 401; unrelated to T055 and excluded from the deterministic race gate per the project conditional-external-test policy.",
@@ -2318,5 +2962,6 @@
       "step": "implement",
       "kind": "environment"
     }
-  ]
+  ],
+  "lastAction": "BUG-004 implementation, full verification, and artifact reconciliation complete"
 }

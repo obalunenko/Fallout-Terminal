@@ -381,16 +381,6 @@ html, body {
   overflow-wrap: anywhere;
   overflow: hidden;
 }
-.term-output.command-execution-status {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  margin-bottom: clamp(4px, 1vh, 10px);
-  text-align: center;
-}
-
 /* ── Decorative bottom input line (normal screens) ────── */
 .term-prompt {
   flex: 0 0 auto;
@@ -420,6 +410,7 @@ html, body {
 }
 .back-btn:hover, .page-btn:hover { background: rgba(87, 255, 110, .12); }
 .back-btn:active, .page-btn:active { background: #57ff6e; color: #021002; }
+.back-btn.layout-placeholder { visibility: hidden; pointer-events: none; }
 .back-btn:focus-visible, .page-btn:focus-visible {
   outline: 2px solid #d8ffb8;
   outline-offset: 2px;

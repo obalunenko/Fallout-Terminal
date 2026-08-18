@@ -425,6 +425,7 @@ function applyGeneratedSnapshot(snapshot) {
   // baseline. Never let revision or transient command UI retained from the
   // previous stream suppress pending/rejected/completed recovery.
   appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
   terminalLiveBaselinePending = true;
   commandExecution = null;
   applyRecognitionSnapshot(snapshot.recognitionHandle, generatedPlayerState(snapshot.playerState, snapshot.revision));
@@ -632,6 +633,7 @@ function acceptSharedSnapshot(message) {
   if (Number.isFinite(playerRevision) && revision < playerRevision) return false;
   if (revision < appliedSharedRevision) return false;
   appliedSharedRevision = revision;
+  screen.dataset.runtimeRevision = String(revision);
   completeAcceptedSharedAction();
   return true;
 }
@@ -696,6 +698,7 @@ function clearBroadcastMirrors() {
   lastAttemptsLeft = null;
   terminalLiveBaselinePending = true;
   appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
   consumedRevealKey = null;
 
   clearTimeout(hackSolvedTimer);
@@ -1144,6 +1147,7 @@ function hideTerminalSurface() {
   hackBoard.hidden = true;
   hackBlocked.hidden = true;
   termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden = true;
   backBtn.hidden = true;
   pageNav.hidden = true;
@@ -1357,6 +1361,11 @@ function consumeKeyboardEvent(event) {
 }
 
 function consumeRevealKeydown(event) {
+  const acknowledgesCommandScreen = commandExecution?.phase === 'rejected' || commandOutput !== null;
+  if (acknowledgesCommandScreen &&
+      (event.key === 'Enter' || event.key === 'Escape' || event.key === 'Backspace')) {
+    return;
+  }
   const key = revealPhysicalKey(event);
   if (consumedRevealKey !== null && event.repeat && key === consumedRevealKey) {
     consumeKeyboardEvent(event);
@@ -1396,6 +1405,20 @@ document.addEventListener('keydown', (e) => {
       renderHackInputPreview();
       e.preventDefault();
     }
+    return;
+  }
+
+  if (commandExecution?.phase === 'pending') {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if ((commandExecution?.phase === 'rejected' || commandOutput !== null) &&
+      (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace')) {
+    goBack();
+    e.preventDefault();
     return;
   }
 
@@ -1872,30 +1895,56 @@ function render() {
 }
 
 function renderCommandExecutionScreen() {
-  deactivatePagination();
-  cancelReveal(termList);
-  cancelReveal(entryBody);
-  cancelReveal(termOutput);
   hackHeader.hidden = true;
   hackBoard.hidden = true;
   hackBlocked.hidden = true;
   normalHeader.hidden = false;
   serverLine.textContent = `-Server ${serverNum}-`;
   introTextEl.textContent = introText;
-  termList.hidden = true;
-  termEntry.hidden = true;
-  termPrompt.hidden = true;
-  termOutput.classList.add('command-execution-status');
-  termOutput.textContent = commandExecution.phase === 'pending'
+  const commandID = commandExecution.commandNodeId;
+  const command = findNodeById(tree, commandID);
+  const phase = commandExecution.phase;
+  const text = phase === 'pending'
     ? 'Выполняется запрос'
-    : 'Запрос отклонён';
-  termOutput.hidden = false;
-  backBtn.hidden = commandExecution.phase !== 'rejected' ||
-    playerState?.role !== 'active' || playerState?.phase !== 'controlling';
+    : 'Ошибка доступа';
+  renderCommandRecordSurface({
+    kind: `command-${phase}`,
+    key: `${phase}:${commandID}`,
+    title: command ? command.name : '',
+    text,
+    showBack: phase === 'rejected' &&
+      playerState?.role === 'active' && playerState?.phase === 'controlling',
+  });
+}
+
+function renderCommandRecordSurface({ kind, key, title, text, showBack }) {
+  cancelReveal(termList);
+  cancelReveal(termOutput);
+  termList.hidden = true;
+  termEntry.hidden = false;
+  termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  termPrompt.hidden = false;
+  backBtn.hidden = false;
+  backBtn.classList.toggle('layout-placeholder', !showBack);
+  backBtn.disabled = !showBack;
+  backBtn.setAttribute('aria-hidden', String(!showBack));
+  entryTitle.textContent = title;
+  lastRenderedEntryId = null;
+  lastRenderedFolderKey = null;
+  lastMenuHoverIdx = null;
+
+  const commandKey = revealContentIdentity(kind, key, text);
+  const isNewCommand = commandKey !== lastRenderedCommandKey;
+  lastRenderedCommandKey = commandKey;
+  activatePagination(kind, key, text, entryBody, isNewCommand);
 }
 
 function renderNormalScreen() {
-  termOutput.classList.remove('command-execution-status');
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  backBtn.classList.remove('layout-placeholder');
+  backBtn.disabled = false;
+  backBtn.removeAttribute('aria-hidden');
   cancelReveal(hackColumns);
   hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
@@ -1930,11 +1979,23 @@ function renderNormalScreen() {
     return;
   }
 
+  if (commandOutput !== null) {
+    const command = findNodeById(tree, currentCommandNodeId);
+    renderCommandRecordSurface({
+      kind: 'command',
+      key: currentCommandNodeId,
+      title: command ? command.name : '',
+      text: commandOutput,
+      showBack: playerState?.role === 'active' && playerState?.phase === 'controlling',
+    });
+    return;
+  }
+
   // MODE.LIST
   cancelReveal(entryBody);
   termEntry.hidden = true;
   termList.hidden  = false;
-  backBtn.hidden   = navStack.length <= 1 && commandOutput === null;
+  backBtn.hidden   = navStack.length <= 1;
   lastRenderedEntryId = null;
   lastMenuHoverIdx = null;
 
@@ -1968,17 +2029,9 @@ function renderNormalScreen() {
   }
   revealInto(termList, rows, isNewFolder, `${folderKey}:selection:${selIndex}`);
 
-  if (commandOutput !== null) {
-    termOutput.hidden = false;
-    const commandKey = revealContentIdentity('command', currentCommandNodeId, commandOutput);
-    const isNewCommand = commandKey !== lastRenderedCommandKey;
-    lastRenderedCommandKey = commandKey;
-    activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
-  } else {
-    termOutput.hidden = true;
-    lastRenderedCommandKey = null;
-    deactivatePagination();
-  }
+  termOutput.hidden = true;
+  lastRenderedCommandKey = null;
+  deactivatePagination();
 }
 
 // ── Hacking screen ─────────────────────────────────────────
@@ -2003,6 +2056,7 @@ function renderHackScreen() {
   termList.hidden     = true;
   termEntry.hidden    = true;
   termOutput.hidden   = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden   = true;
   backBtn.hidden      = true;
   hackHeader.hidden   = false;

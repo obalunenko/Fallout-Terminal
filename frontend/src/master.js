@@ -280,8 +280,10 @@ desktopAPI.onCoordinationState((coordination) => {
 if (typeof desktopAPI.onSessionState === 'function') {
   desktopAPI.onSessionState((event) => {
     const revision = Number(event?.revision);
-    if (!state.session || !event?.session || !Number.isSafeInteger(revision) ||
-        revision <= newestDurableRevision) return;
+    if (!event?.session || !Number.isSafeInteger(revision)) return;
+    saveStatus.dataset.sessionStateRevision = String(revision);
+    updateSessionStateEvidenceDescription();
+    if (!state.session || revision <= newestDurableRevision) return;
     state.session = event.session;
     newestDurableRevision = revision;
     saveStatus.textContent = `СОСТОЯНИЕ СЕССИИ ОБНОВЛЕНО · ревизия ${revision}`;
@@ -636,6 +638,26 @@ function renderSessionStateResult(result, successMessage, acceptsCanonicalResult
   saveStatus.classList.remove('err');
   renderAll();
   return true;
+}
+
+function updateSessionStateEvidenceDescription() {
+  const evidence = [];
+  if (saveStatus.dataset.wailsCommand) {
+    evidence.push(`Wails command ${saveStatus.dataset.wailsCommand} ${saveStatus.dataset.wailsResult || 'unknown'}`);
+  }
+  if (saveStatus.dataset.wailsTerminalId) evidence.push(`terminal ${saveStatus.dataset.wailsTerminalId}`);
+  if (saveStatus.dataset.wailsRevision) evidence.push(`document revision ${saveStatus.dataset.wailsRevision}`);
+  if (saveStatus.dataset.sessionStateRevision) {
+    evidence.push(`session-state revision ${saveStatus.dataset.sessionStateRevision}`);
+  }
+  if (evidence.length) {
+    const accessibleEvidence = evidence.join('; ');
+    saveStatus.setAttribute('aria-label', accessibleEvidence);
+    saveStatus.setAttribute('aria-description', accessibleEvidence);
+  } else {
+    saveStatus.removeAttribute('aria-label');
+    saveStatus.removeAttribute('aria-description');
+  }
 }
 
 async function runSessionStateCommand(command, successMessage, acceptsCanonicalResult = null) {
@@ -1282,7 +1304,15 @@ btnResetTerminalCommandStates.addEventListener('click', async () => {
   if (!await confirmCommandStateReset(`Сбросить все выполненные состояния команд терминала "${term.name}"?`)) return;
   const revisionBeforeReset = newestDurableRevision;
   runSessionStateCommand(
-    () => desktopAPI.resetTerminalCommandStates({ terminalId: term.id }),
+    async () => {
+      const result = await desktopAPI.resetTerminalCommandStates({ terminalId: term.id });
+      saveStatus.dataset.wailsCommand = 'ResetTerminalCommandStates';
+      saveStatus.dataset.wailsResult = result?.ok ? 'ok' : 'error';
+      saveStatus.dataset.wailsTerminalId = term.id;
+      saveStatus.dataset.wailsRevision = String(Number(result?.revision || 0));
+      updateSessionStateEvidenceDescription();
+      return result;
+    },
     'СОСТОЯНИЯ КОМАНД ТЕРМИНАЛА СБРОШЕНЫ',
     (result) => {
       const revision = Number(result?.revision || 0);

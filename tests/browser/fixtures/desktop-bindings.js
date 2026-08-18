@@ -395,30 +395,12 @@ export async function OpenSession(...args) {
     }));
   }
   if (approvalFixtureActive()) {
-    return Promise.resolve({
-      ok: true,
+    return fetch('/__fixture/state-changing-command-approval/session').then(async response => ({
+      ok: response.ok,
+      error: response.ok ? '' : 'approval session fixture is unavailable',
       filePath: '/private/tmp/fallout-state-changing-approval.json',
-      session: {
-        version: 1,
-        name: 'State-changing approval fixture',
-        terminals: [{
-          id: 'terminal-stateful',
-          name: 'Терминал охраны',
-          hackLevel: 0,
-          introText: '',
-          root: {
-            id: 'root', type: 'folder', name: 'ROOT', children: [{
-              id: 'doors', type: 'command', name: 'Открыть двери',
-              text: 'Доступ в сектор разрешён.',
-              stateChange: {
-                completedName: 'Двери открыты',
-                confirmationText: 'Открыть двери? Это действие нельзя повторить.',
-              },
-            }],
-          },
-        }],
-      },
-    });
+      session: response.ok ? await response.json() : null,
+    }));
   }
   const result = await authoringFixtureCommand('session');
   return {

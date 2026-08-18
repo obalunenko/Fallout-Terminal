@@ -658,6 +658,7 @@ func TestPendingCommandBlocksEverySharedRuntimeAction(t *testing.T) {
 
 	commands := []domain.RuntimeCommand{
 		{Kind: domain.RuntimeCommandNavigate, Action: "back"},
+		{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "doors"},
 		{Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors"},
 		{Kind: domain.RuntimeCommandGuess, TargetID: "guess"},
 		{Kind: domain.RuntimeCommandActivatePattern, PatternID: "pattern"},
@@ -679,14 +680,17 @@ func TestRejectedCommandAcceptsOnlyBackAndClearsPresentation(t *testing.T) {
 		CommandID: "doors",
 	}
 
-	projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
-		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors",
-	})
-	assert.False(t, accepted)
-	assert.Nil(t, projection)
-	require.NotNil(t, runtime.CommandExecution)
+	for _, command := range []domain.RuntimeCommand{
+		{Kind: domain.RuntimeCommandNavigate, Action: "enter", NodeID: "doors"},
+		{Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors"},
+	} {
+		projection, accepted := service.Apply(runtime, command)
+		assert.False(t, accepted)
+		assert.Nil(t, projection)
+		require.NotNil(t, runtime.CommandExecution)
+	}
 
-	projection, accepted = service.Apply(runtime, domain.RuntimeCommand{
+	projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
 		Kind: domain.RuntimeCommandNavigate, Action: "back",
 	})
 	require.True(t, accepted)
@@ -719,6 +723,32 @@ func TestCompletedCommandRepeatsFrozenResultWithoutChangingSnapshot(t *testing.T
 		assert.Equal(t, "Проход разблокирован.", command.Text, "completed repeat %d", attempt)
 		assert.Equal(t, target.CommandStates, runtime.CommandStates, "completed repeat %d", attempt)
 	}
+}
+
+func TestCompletedCommandResultAcceptsBackWithoutChangingSnapshot(t *testing.T) {
+	service := New(&constantRandom{}, fixedWords{})
+	target := stateChangingTarget()
+	target.CommandStates = map[string]domain.CommandExecutionState{
+		"doors": {CompletedName: "Двери открыты", ResultText: "Проход разблокирован."},
+	}
+	runtime, _ := service.CreateRuntime(target)
+	require.NotNil(t, runtime)
+
+	projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "doors",
+	})
+	require.True(t, accepted)
+	require.NotNil(t, projection)
+	require.NotNil(t, projection.Nav.CommandNodeID)
+
+	projection, accepted = service.Apply(runtime, domain.RuntimeCommand{
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.True(t, accepted)
+	require.NotNil(t, projection)
+	assert.Nil(t, projection.Nav.CommandNodeID)
+	assert.Equal(t, nav.Default(), projection.Nav)
+	assert.Equal(t, target.CommandStates, runtime.CommandStates)
 }
 
 func TestOrdinaryCommandKeepsLegacyResultPathWithoutExecutionPresentation(t *testing.T) {

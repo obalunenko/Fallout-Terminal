@@ -48,6 +48,12 @@ type fixtureCommandStateStore struct {
 	failNext      bool
 }
 
+var fixtureCommandResult = "Доступ в сектор разрешён.\n" +
+	"ПРОТОКОЛ ДОСТУПА:\n" +
+	strings.Repeat("Состояние гермозатвора подтверждено. Контрольные цепи переведены в штатный режим. "+
+		"Маршрут эвакуации свободен. Аварийные блокировки сняты. Диагностический журнал сохранён.\n", 80) +
+	"Конец отчёта."
+
 type fixtureAuthoringStore struct {
 	mu       sync.Mutex
 	session  domain.Session
@@ -184,7 +190,7 @@ func (store *fixtureCommandStateStore) ExecuteCommandState(terminalID, commandID
 		}
 		store.states[commandID] = domain.CommandExecutionState{
 			CompletedName: "Двери открыты",
-			ResultText:    "Доступ в сектор разрешён.",
+			ResultText:    fixtureCommandResult,
 		}
 		store.revision++
 		store.executeWrites++
@@ -604,6 +610,10 @@ func run() error {
 		response.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(response).Encode(state)
 	})
+	mux.HandleFunc("GET /__fixture/state-changing-command-approval/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(stateChangingApprovalSession(nil))
+	})
 	mux.HandleFunc("POST /__fixture/state-changing-command-approval/reset", func(response http.ResponseWriter, _ *http.Request) {
 		approvalStore.reset()
 		if _, err := service.EndBroadcast(); err != nil {
@@ -957,14 +967,27 @@ func stateChangingApprovalTarget() domain.TerminalTarget {
 		TerminalID: "terminal-stateful", TerminalName: "Терминал охраны", HackLevel: 0,
 		Tree: domain.ContentNode{
 			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
-			Children: []domain.ContentNode{{
-				ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
-				Text: "Доступ в сектор разрешён.",
-				StateChange: &domain.StateChangeConfig{
-					CompletedName:    "Двери открыты",
-					ConfirmationText: "Открыть двери? Это действие нельзя повторить.",
+			Children: []domain.ContentNode{
+				{
+					ID: "approval-guide", Type: domain.NodeFolder, Name: "СПРАВКА",
+					Children: []domain.ContentNode{{
+						ID: "archive-note", Type: domain.NodeEntry, Name: "ПАМЯТКА",
+						Description: "Команды требуют разрешения смотрителя.",
+					}},
 				},
-			}},
+				{
+					ID: "renderer-reference", Type: domain.NodeEntry, Name: "ЭТАЛОН РЕНДЕРА",
+					Description: fixtureCommandResult,
+				},
+				{
+					ID: "doors", Type: domain.NodeCommand, Name: "Открыть двери",
+					Text: "Доступ в сектор разрешён.",
+					StateChange: &domain.StateChangeConfig{
+						CompletedName:    "Двери открыты",
+						ConfirmationText: "Разрешить доступ в защищённый сектор?",
+					},
+				},
+			},
 		},
 	}
 }
@@ -1087,7 +1110,7 @@ func crtFixtureTerminal() domain.TerminalTarget {
 		},
 		domain.ContentNode{
 			ID: "crt-command", Type: domain.NodeCommand, Name: "RUN DIAGNOSTIC",
-			Text: strings.Repeat("DIAGNOSTIC OUTPUT\n", 36) + "DIAGNOSTIC COMPLETE",
+			Text: strings.Repeat("DIAGNOSTIC OUTPUT\n", 96) + "DIAGNOSTIC COMPLETE",
 		},
 		domain.ContentNode{
 			ID: "crt-literal", Type: domain.NodeEntry, Name: `<img data-crt-injected src=x onerror="window.__crtInjected=true">`,

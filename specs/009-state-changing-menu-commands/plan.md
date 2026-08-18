@@ -3,12 +3,15 @@
 **Bugfix**: 2026-08-17 — BUG-001 Updated from bugfix patch
 **Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
 **Bugfix**: 2026-08-17 — BUG-003 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-004 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-005 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-006 Updated from bugfix patch
 
 **Feature**: `009-state-changing-menu-commands` | **Date**: 2026-08-17 | **Spec**: [spec.md](./spec.md)
 
 ## Summary
 
-Функция добавляет однонаправленные команды: выбор активного игрока создаёт общий заблокированный запрос, а выполнение начинается только после решения мастера в приватном диалоге. Pending/rejected состояния принадлежат текущему broadcast и публикуются всем игрокам, тогда как только одобренные и успешно записанные frozen name/result становятся долговечным миром по стабильным ID терминала и команды в session JSON version 1. Существующий player `Navigate` создаёт запрос, новый private desktop command разрешает его, а approve проходит общий session pipeline до публикации успеха.
+Функция добавляет однонаправленные команды: выбор активного игрока создаёт общий заблокированный запрос, а выполнение начинается только после решения мастера в приватном диалоге. Pending/rejected состояния принадлежат текущему broadcast и публикуются всем игрокам, тогда как только одобренные и успешно записанные frozen name/result становятся долговечным миром по стабильным ID терминала и команды в session JSON version 1. Существующий player `Navigate` создаёт запрос, новый private desktop command разрешает его, а approve проходит общий session pipeline до публикации успеха. По BUG-004 весь lifecycle выбранной команды отображается как единый полноэкранный экран записи: pending не принимает `Back`/`Enter`, а rejected/completed сохраняются до равнозначного общего acknowledgement этими действиями контроллера. По BUG-005 `PENDING`, `REJECTED`, первый и повторный `COMPLETED` переиспользуют record-description presentation primitive обычной записи с одинаковыми типографикой, переносами, reveal, pagination/page controls и repagination при resize. По BUG-006 канонический approval fixture содержит явные folder/entry/command, каждая его команда начинается initial и проходит через master decision, а dialog отдельно показывает `commandName` и отличный авторский `confirmationText` без изменения ordinary-command semantics вне fixture.
 
 ## Project Structure
 
@@ -137,9 +140,10 @@ scripts/wails-bindings-check.sh
 ### Public ConnectRPC
 
 - Обычный `NavigateCommand{node_id}` для initial stateful-команды создаёт ровно один server-owned pending request; player не получает поля approve/confirm.
-- `LiveTerminal.command_execution` с phase pending/rejected обеспечивает одинаковый общий экран и reconnect snapshot без раскрытия приватного prompt.
-- Пока pending, UI и сервер блокируют shared navigation/commands. Disconnect инициатора не отменяет запрос.
-- Approve success очищает pending и публикует effective frozen tree/result одной следующей revision; reject показывает общий rejection screen до возврата контроллера.
+- `LiveTerminal.command_execution` с phase pending/rejected и существующий `Nav.CommandNodeID` для completed result обеспечивают одинаковое server-authoritative полноэкранное представление записи и reconnect snapshot без раскрытия приватного prompt; BUG-004 не требует нового protobuf phase. По BUG-005 эти разные server-authoritative проекции сходятся в одном клиентском record-description presentation primitive; отдельная command-output поверхность не используется.
+- Пока pending, UI и сервер блокируют shared navigation/commands, включая `Back` и `Enter`. Disconnect инициатора не отменяет запрос.
+- ~~Approve success очищает pending и публикует effective frozen tree/result одной следующей revision; reject показывает общий rejection screen до возврата контроллера.~~ По BUG-004 approve success очищает pending и публикует effective frozen tree/result как полноэкранный completed screen, reject публикует полноэкранную «Ошибка доступа», а оба результата сохраняются до `Back` или `Enter` контроллера.
+- После решения player client нормализует `Back` и `Enter` в один shared acknowledgement (`Navigate back`); observers не могут очистить экран локально и возвращаются в прежнее меню только по следующей авторитетной revision.
 - Storage failure возвращает терминал в прежнее menu state, отправляет безопасную персональную ошибку контроллеру и не публикует completed name/result.
 - Уже выполненная команда остаётся selectable; повтор показывает frozen result без dialog и записи.
 
@@ -147,7 +151,7 @@ scripts/wails-bindings-check.sh
 
 ### Private Wails Bridge
 
-- `CoordinationState.pending_command_execution` переносит master-only request ID, terminal/command identity и авторский prompt как в bootstrap, так и в existing `coordination-state` event.
+- `CoordinationState.pending_command_execution` переносит master-only request ID, terminal/command identity и авторский prompt как в bootstrap, так и в existing `coordination-state` event; master dialog отображает точное `commandName` отдельно от `confirmationText`, даже если авторский prompt не повторяет имя.
 - `ResolveCommandExecution` принимает только exact current request ID и enum approve/reject; закрытие/cancel диалога отправляет reject, stale callback является no-op/error.
 - `ResetCommandState` и `ResetTerminalCommandStates` являются отдельными allowlisted desktop methods; frontend выполняет confirm, backend повторно валидирует ID.
 - `session-state` несёт канонический session document и document revision только master frontend после durable mutation.
@@ -160,9 +164,9 @@ scripts/wails-bindings-check.sh
 1. При открытии session service загружает optional configs/states; отсутствие означает исходное состояние.
 2. Активация терминала гидратирует runtime из backend session и строит effective tree, не доверяя server-owned полям frontend payload.
 3. Initial player selection создаёт runtime pending, публикует ожидание players и private coordination request мастеру без session write.
-4. Reject/close очищает pending и публикует rejection; Back возвращает прежний menu path. Disconnect инициатора pending сохраняет.
-5. Approve проходит exact request validation и durable store gate; после save одна coordinator revision доставляет всем одинаковые effective name/result/navigation.
-6. Reconnect player получает pending/rejected/completed в первом snapshot; reload master получает pending в coordination bootstrap.
+4. ~~Reject/close очищает pending и публикует rejection; Back возвращает прежний menu path.~~ Reject/close очищает pending и публикует полноэкранную «Ошибка доступа»; `Back` или `Enter` контроллера очищает presentation и возвращает всем прежний menu path. Disconnect инициатора pending сохраняет.
+5. Approve проходит exact request validation и durable store gate; после save одна coordinator revision доставляет всем одинаковые effective name/result/navigation и удерживает полноэкранный completed screen до `Back` или `Enter` контроллера.
+6. Reconnect player получает pending/rejected/completed screen в первом snapshot; reload master получает pending в coordination bootstrap. Observer остаётся read-only и не может выполнить локальное acknowledgement.
 7. End broadcast, terminal switch и shutdown отменяют pending/rejected без сохранения; durable `commandStates` остаются и восстанавливаются при активации.
 8. Reset изменяет durable state тем же save-before-publication порядком; shutdown дренирует уже достигшие store boundary writes.
 
@@ -208,7 +212,7 @@ scripts/wails-bindings-check.sh
 1. Внедрить в coordinator узкий `CommandStateStore` с односторонним lock order `control → session` и без callback в coordinator.
 2. Распознавать ordinary, initial-stateful и completed команды; для initial создавать один pending request без persistence.
 3. Добавить private resolve: reject/close публикует rejection, approve сохраняет snapshot до completed publication.
-4. Строить effective public tree и отдельную pending/rejected presentation без утечки master prompt.
+4. Строить effective public tree и pending/rejected presentation без утечки master prompt; отображать pending/rejected и completed `Nav.CommandNodeID` как единый полноэкранный экран записи, сохраняя существующий protobuf-контракт.
 5. Обрабатывать повторные/concurrent selections, controller disconnect и stale master decisions без второго dialog/write.
 6. Гидратировать activation/reconnect из backend session/runtime и типизировать persistence failure для master/controller.
 
@@ -217,16 +221,16 @@ scripts/wails-bindings-check.sh
 ### Phase 4: Master and Player Interfaces
 
 1. Добавить в master property editor state-change config, четыре обязательных текста, frozen state и field errors.
-2. Показывать один approval dialog на pending request ID; approve/reject/close вызывать private resolve и игнорировать stale callback после lifecycle cancel.
+2. Показывать один approval dialog на pending request ID; отдельно отображать точное имя запрошенной команды и авторский `confirmationText`, approve/reject/close вызывать private resolve и игнорировать stale callback после lifecycle cancel.
 3. Добавить reset-one/reset-terminal, bindings и revision-aware `session-state` subscription.
-4. Добавить в player client общие «Выполняется запрос»/«Запрос отклонён», action blocking, Back и безопасную controller-only persistence error.
+4. ~~Добавить в player client общие «Выполняется запрос»/«Запрос отклонён», action blocking, Back и безопасную controller-only persistence error.~~ По BUG-004 добавить единый полноэкранный экран записи для «Выполняется запрос», «Ошибка доступа» и completed result; блокировать `Back`/`Enter` в pending, принимать оба как общий acknowledgement после решения и сохранить безопасную controller-only persistence error. По BUG-005 переиспользовать для ordinary command result и всех состояний state-changing lifecycle общий record-description renderer с одинаковыми layout/reveal/pagination/resize semantics, сохраняя controller-only acknowledgement и read-only observers.
 5. Не сохранять pending/command state в browser storage и не делать optimistic completed transition.
 
 Независимый срез: player выбирает, все ожидают, master approve/reject/close разрешает запрос, а все интерфейсы сходятся только по авторитетным ревизиям.
 
 ### Phase 5: Integration, Compatibility and Regression Gates
 
-1. Расширить fixture server и Playwright journeys для controller + минимум двух observers, master approve/reject/close, repeat, disconnect/reconnect, navigation, broadcast stop/switch/start.
+1. Расширить fixture server и Playwright journeys для controller + минимум двух observers, master approve/reject/close, repeat, disconnect/reconnect, navigation, broadcast stop/switch/start и полной BUG-004 матрицы `PENDING|REJECTED|COMPLETED × Back|Enter` с отсутствием списка меню; по BUG-005 сравнивать каждый command lifecycle screen с выбранной обычной записью по DOM surface, computed typography/layout, reveal, переносам, pagination/page controls и repagination при resize; по BUG-006/SC-018 использовать канонический approval input с явными folder/entry/command, валидным initial `stateChange` у каждой команды и parity между Go/JavaScript/JSON представлениями, проходя каждую команду до dialog с раздельными `commandName` и отличающимся `confirmationText`.
 2. Проверить полный app reopen на том же session file и frozen-config edit/reset/re-execute.
 3. Проверить 100 конкурентных/повторных запросов и 100 persistence failures детерминированными fakes/race tests.
 4. Выполнить protobuf compatibility/drift, Wails binding allowlist, Go race/vet/test и оба frontend build/test контура.
@@ -237,12 +241,12 @@ scripts/wails-bindings-check.sh
 |---|---|---|
 | Domain/JSON | `go test ./internal/domain ./internal/session` | Legacy v1 defaults; config/state round-trip; unknown fields; invalid orphan state; frozen snapshots |
 | Atomic persistence | Focused session tests with storage fakes | Ошибка write/sync/rename оставляет старый файл/revision; stale Save не стирает состояние; delete prune атомарен |
-| Coordinator concurrency | `go test -race ./internal/control ./internal/live ./internal/player` | Один pending/dialog; disconnect сохраняет его; approve пишет один раз; reject/lifecycle cancel не пишут; ordinary path прежний |
+| Coordinator concurrency | `go test -race ./internal/control ./internal/live ./internal/player` | Один pending/dialog; disconnect сохраняет его; approve пишет один раз; reject/lifecycle cancel не пишут; pending отклоняет `Back`/`Enter`, а после решения оба действия дают один общий возврат; ordinary path прежний |
 | Protobuf governance | `scripts/proto-generate.sh --sync-revision`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh --all-fixtures`, `scripts/proto-drift-test.sh` | Добавления совместимы, generated artifacts детерминированы и не редактировались вручную |
 | Wails boundary | `scripts/wails-bindings-check.sh` и app/contract tests | Только два reset-метода и одно private event добавлены; public descriptor не содержит desktop capability |
 | Go repository | `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...` | Формат, статическая проверка и все регрессии проходят |
-| Master frontend | `npm ci --prefix frontend`, `npm test --prefix frontend`, `npm run build --prefix frontend` | Валидация полей, один dialog/request ID, approve/reject/close, stale callback, reset и revision ordering |
-| Player/browser | `npm ci --prefix tests/browser`, `npm test --prefix tests/browser` | Controller + 2 observers видят pending/rejected/result ≤1 s; actions блокируются; disconnect/reconnect/lifecycle корректны |
+| Master frontend | `npm ci --prefix frontend`, `npm test --prefix frontend`, `npm run build --prefix frontend` | Валидация полей, один dialog/request ID, отдельные видимые `commandName` и отличный `confirmationText`, approve/reject/close, stale callback, reset и revision ordering |
+| Player/browser | `npm ci --prefix tests/browser`, `npm test --prefix tests/browser` | SC-018: канонический approval input содержит явные folder/entry/command, каждая команда имеет initial `stateChange` и создаёт pending с точным master command name; golden ordinary-record fixture доказывает renderer parity для `PENDING`, `REJECTED`, первого/повторного `COMPLETED`, controller + 2 observers, reconnect и узкого viewport по DOM surface, типографике/layout, reveal, переносам, pagination/page controls и repagination; `Back`/`Enter` блокируются до решения и синхронно возвращают всех после него, отдельный legacy fixture сохраняет ordinary path |
 | Desktop lifecycle | Целевой app integration test и ручной smoke того же файла | End broadcast, terminal switch, app close/open сохраняют выполненное имя; reset активного терминала синхронен |
 | Native reset integration | Production-faithful App/session/coordinator integration test с writable session и реальным `ResetTerminalCommandStates` path; browser binding не мутирует fixture state самостоятельно | Общий reset активного терминала возвращает каноническую новую document revision без прежних `commandStates`, обновляет master/controller/observer и переживает reopen того же файла |
 | Native master click regression | Автоматизируемый smoke собранного desktop-приложения с реальным кликом и подтверждением «Сбросить все состояния», writable session file и подключёнными controller/observer | Доказана непрерывная цепочка `master control → generated Wails binding → private backend → canonical session-state/runtime revisions → master/player initial`; отсутствие вызова, backend error/no-op или completed-состояние в любом представлении проваливает gate |
@@ -264,4 +268,6 @@ scripts/wails-bindings-check.sh
 | Состояние теряется при activation/reconnect | Runtime гидратируется из backend session; snapshot строится из effective tree |
 | Публичная схема раскрывает private state | Public contract содержит только effective value/prompt; descriptor separation test расширяется |
 | Fixture подтверждает reset, обходя production desktop/backend path | Reset-all regression gate проходит через реальный App, session worker и coordinator refresh; browser fixture только транспортирует вызов и проверяет канонический ответ/event |
+| Go, JavaScript и JSON approval fixtures расходятся по составу узлов или state-change настройкам | Один канонический fixture contract либо автоматическая parity-проверка требует явные folder/entry/command, initial `stateChange` каждой команды и сохраняет reset-specific completed fixture отдельно |
 | App/backend integration проходит, но реальная native-кнопка не вызывает тот же путь | Отдельный native master-click gate запускает собранное приложение, нажимает и подтверждает reset-all и проверяет Wails-вызов, terminal ID, backend result, document/runtime revisions и master/player rendering |
+| Локальный `Enter` или `Back` очищает экран только у одного player client | Оба ввода нормализуются в один server-authoritative shared acknowledgement; observers остаются read-only, а controller/observers меняют экран только по принятой runtime revision |

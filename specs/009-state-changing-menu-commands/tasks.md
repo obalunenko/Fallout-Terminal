@@ -3,10 +3,13 @@
 **Bugfix**: 2026-08-17 — BUG-001 Updated from bugfix patch
 **Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
 **Bugfix**: 2026-08-17 — BUG-003 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-004 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-005 Updated from bugfix patch
+**Bugfix**: 2026-08-18 — BUG-006 Updated from bugfix patch
 
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/)
 
-**Tests**: Конституция и критерии SC-001–SC-016 требуют автоматических domain, persistence, concurrency, contract, production-faithful desktop integration и multi-client browser проверок. В каждой user-story фазе тестовые задачи выполняются до реализации и должны сначала зафиксировать ожидаемое падение.
+**Tests**: Конституция и критерии SC-001–SC-018 требуют автоматических domain, persistence, concurrency, contract, production-faithful desktop integration и multi-client browser проверок. В каждой user-story фазе тестовые задачи выполняются до реализации и должны сначала зафиксировать ожидаемое падение.
 
 ## Phase 1: Setup — контрактные источники и генерация
 
@@ -101,16 +104,16 @@
 
 **Goal**: Выбор initial stateful-команды создаёт один общий pending-запрос, мастер approve/reject/close разрешает его, а только durable approve показывает completed result.
 
-**Independent Test**: Контроллер выбирает команду, все игроки видят «Выполняется запрос», master dialog появляется один раз; approve выполняет и сохраняет один раз, reject/close показывает «Запрос отклонён», persistence failure не публикует успех.
+**Independent Test**: Контроллер выбирает команду, все игроки вместо меню видят полноэкранное «Выполняется запрос», master dialog появляется один раз; approve выполняет и сохраняет один раз и показывает полноэкранный frozen result, ~~reject/close показывает «Запрос отклонён»~~ reject/close показывает полноэкранную «Ошибка доступа», `Back`/`Enter` заблокированы до решения и возвращают всех после него, persistence failure не публикует успех (уточнено BUG-004).
 
 ### Tests
 
 **Wave 1 — independent (different files):**
 
 - [x] **T016** [P] [US2] Написать падающие coordinator-тесты для single pending, exact request resolution, approve persist-before-success, reject/close, duplicate/stale decisions и 100 concurrent selections · `internal/control/service_test.go`
-- [x] **T017** [P] [US2] Написать падающие live-тесты для effective initial/completed tree, pending action blocking, rejected Back и frozen repeat result без второго write · `internal/live/service_test.go`, `internal/nav/nav_test.go`
+- [x] **T017** [P] [US2] ⚠️ Reopened — Написать падающие live-тесты для effective initial/completed tree, pending action blocking, rejected Back и frozen repeat result без второго write (reopened — BUG-004) · `internal/live/service_test.go`, `internal/nav/nav_test.go`
 - [x] **T018** [P] [US2] Написать падающие public adapter/handler тесты для pending/rejected projection, controller-only failure notice, ordinary path и отсутствия private prompt/resolve symbols · `internal/player/adapter_test.go`, `internal/player/handler_test.go`
-- [x] **T019** [P] [US2] Написать падающий browser journey для player request, единственного master dialog, approve, reject, close и persistence failure · `tests/browser/state-changing-command-approval.spec.mjs`
+- [x] **T019** [P] [US2] ⚠️ Reopened — Написать падающий browser journey для player request, единственного master dialog с раздельными точным command name и отличающимся confirmation text, approve, reject, close и persistence failure (reopened — BUG-004; reopened — BUG-005; reopened — BUG-006) · `tests/browser/state-changing-command-approval.spec.mjs`
 
 ### Implementation
 
@@ -119,17 +122,17 @@
 **Wave 2 — independent (different files):**
 
 - [x] **T020** [P] [US2] Реализовать coordinator single-pending state machine, server request ID, private resolve validation и approve/reject revisions · `internal/control/service.go`
-- [x] **T021** [P] [US2] Реализовать effective command projection, pending/rejected runtime presentation, shared-action conflict и completed repeat navigation · `internal/live/service.go`, `internal/nav/nav.go`
+- [x] **T021** [P] [US2] ⚠️ Reopened — Реализовать effective command projection, pending/rejected runtime presentation, shared-action conflict и completed repeat navigation (reopened — BUG-004) · `internal/live/service.go`, `internal/nav/nav.go`
 - [x] **T022** [P] [US2] Реализовать public protobuf adapters/handler mapping для command execution presentation и персонального безопасного persistence notice · `internal/player/adapter.go`, `internal/player/handler.go`
 - [x] **T023** [P] [US2] Реализовать private resolve method, coordination projection, session-state emission и безопасные master errors · `app.go`, `app_contract.go`, `desktop_service.go`, `wails_host.go`
 - [x] **T024** [P] [US2] Реализовать master approval dialog с дедупликацией по request ID и отображением approve/reject/persistence outcomes · `frontend/src/master.js`
-- [x] **T025** [P] [US2] Реализовать player screens «Выполняется запрос»/«Запрос отклонён», блокировку действий, Back и controller notice без optimistic completion · `client/client.js`, `client/client.css`
+- [x] **T025** [P] [US2] ⚠️ Reopened — ~~Реализовать player screens «Выполняется запрос»/«Запрос отклонён», блокировку действий, Back и controller notice без optimistic completion~~ Реализовать единый полноэкранный player screen для «Выполняется запрос»/«Ошибка доступа»/completed result, блокировку `Back`/`Enter` до решения, оба acknowledgement после решения и controller notice без optimistic completion (reopened — BUG-004; reopened — BUG-005) · `client/client.js`, `client/client.css`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — end-to-end integration join:**
 
-- [x] **T026** [US2] Связать session store, coordinator effects, private desktop API и browser fixtures в полный player-request/master-decision flow · `main.go`, `frontend/src/desktop-api.js`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
+- [x] **T026** [US2] ⚠️ Reopened — Связать session store, coordinator effects, private desktop API и parity канонического Go/JavaScript approval fixture в полный player-request/master-decision flow (reopened — BUG-004; reopened — BUG-006) · `main.go`, `frontend/src/desktop-api.js`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
 
 **Checkpoint**: User Story 2 независимо работает от player click до master decision; reject не пишет session, approve публикуется только после durability, repeat не выполняется снова.
 
@@ -147,7 +150,7 @@
 
 - [x] **T027** [P] [US3] Написать падающие coordinator race/lifecycle тесты для controller disconnect retention, end broadcast/switch/shutdown cancellation и stale dialog callback · `internal/control/service_test.go`
 - [x] **T028** [P] [US3] Написать падающие snapshot/stream тесты для первого pending/rejected/completed состояния, monotonic revisions и reconnect после overflow · `internal/player/public_stream_test.go`, `internal/player/stream_test.go`
-- [x] **T029** [P] [US3] Написать падающий multi-client browser journey с controller + двумя observers, disconnect/reconnect, navigation, terminal switch и broadcast restart · `tests/browser/state-changing-command-sync.spec.mjs`
+- [x] **T029** [P] [US3] ⚠️ Reopened — Написать падающий multi-client browser journey с controller + двумя observers, disconnect/reconnect, navigation, terminal switch и broadcast restart (reopened — BUG-004; reopened — BUG-005) · `tests/browser/state-changing-command-sync.spec.mjs`
 
 ### Implementation
 
@@ -157,13 +160,13 @@
 
 - [x] **T030** [P] [US3] Реализовать сохранение pending при controller disconnect и атомарную отмену transient request/rejection на end broadcast, terminal switch и shutdown · `internal/control/service.go`
 - [x] **T031** [P] [US3] Добавить pending в private coordination bootstrap/event, защитить master dialog от пропущенных событий и поздних callback, применить document revision ordering · `app.go`, `frontend/src/master.js`, `frontend/src/desktop-api.js`
-- [x] **T032** [P] [US3] Обеспечить полные public snapshots и восстановление pending/rejected/completed UI без browser persistence · `internal/player/adapter.go`, `internal/player/stream.go`, `client/client.js`
+- [x] **T032** [P] [US3] ⚠️ Reopened — Обеспечить полные public snapshots и восстановление pending/rejected/completed UI без browser persistence (reopened — BUG-004; reopened — BUG-005) · `internal/player/adapter.go`, `internal/player/stream.go`, `client/client.js`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
 **Wave 3 — lifecycle fixture join:**
 
-- [x] **T033** [US3] Расширить integration fixture для управляемых disconnect, master resolution, lifecycle transitions и reopen одного session file · `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
+- [x] **T033** [US3] ⚠️ Reopened — Расширить integration fixture для управляемых disconnect, master resolution, lifecycle transitions и reopen одного session file (reopened — BUG-004) · `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
 
 **Checkpoint**: User Story 3 независимо доказывает единый server-authoritative экран и корректное разделение transient pending от durable completed state на всех lifecycle-границах.
 
@@ -205,15 +208,15 @@
 
 **Wave 1 — independent (different files):**
 
-- [x] **T039** [P] Добавить понятный state-changing пример без выполненного snapshot и обновить пользовательское описание настройки/мастерского одобрения · `sessions/demo.json`, `README.md`
+- [x] **T039** [P] ⚠️ Reopened — Добавить понятный state-changing пример без выполненного snapshot и обновить пользовательское описание настройки/мастерского одобрения; закрепить в каноническом approval input явные folder/entry/command и валидный initial `stateChange` у каждой его команды (reopened — BUG-006) · `sessions/demo.json`, `README.md`
 
 **⟶ Wait for Wave 1 and all story checkpoints to finish, then:**
 
 **Wave 2 — single-owner validation:**
 
-- [x] **T040** ⚠️ Reopened — Выполнить single-owner Success Criteria validation: форматирование, vet, unit/race, protobuf format/generation/breaking/drift, Wails binding allowlist, frontend/client builds, полный Playwright suite и обязательный native master-click reset gate; задокументировать только реально выполненные результаты (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003) · `Makefile`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh`, `scripts/proto-drift-test.sh`, `scripts/wails-bindings-check.sh`, `scripts/state-changing-reset-native-smoke.sh`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
+- [x] **T040** ⚠️ Reopened — Выполнить single-owner Success Criteria validation: форматирование, vet, unit/race, protobuf format/generation/breaking/drift, Wails binding allowlist, frontend/client builds, полный Playwright suite и обязательный native master-click reset gate; задокументировать только реально выполненные результаты (reopened — BUG-001; reopened — BUG-002; reopened — BUG-003; reopened — BUG-004; reopened — BUG-005; reopened — BUG-006) · `Makefile`, `scripts/proto-check.sh`, `scripts/proto-breaking.sh`, `scripts/proto-drift-test.sh`, `scripts/wails-bindings-check.sh`, `scripts/state-changing-reset-native-smoke.sh`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
 
-**Checkpoint**: SC-001–SC-016 подтверждены автоматическими проверками либо явно отмечены как недоступные; generated drift отсутствует, public/private capability boundary сохранена.
+**Checkpoint**: SC-001–SC-018 подтверждены автоматическими проверками либо явно отмечены как недоступные; generated drift отсутствует, public/private capability boundary сохранена.
 
 ---
 
@@ -248,6 +251,25 @@ BUG-003 overlay
     → reopened T014/T015/T050/T057 + T060 correction
         → reopened T051 + T061 native focused verification
             → reopened T040 full-suite validation
+
+BUG-004 overlay
+  reopened T017/T019 + T062 full-screen regression reproduction
+    → reopened T021/T025/T026 + T063 presentation correction
+        → reopened T029/T032/T033/T043/T044 + T064 multi-client verification
+            → reopened T040 full-suite validation
+
+BUG-005 overlay
+  reopened T019/T062 + T065 record-renderer parity reproduction
+    → reopened T025/T063 + T066 presentation correction
+        → reopened T029/T032/T043/T044/T064 + T067 multi-client verification
+            → reopened T040 full-suite validation
+
+BUG-006 overlay
+  reopened T019/T039 + T070 canonical-input/master-identity reproduction
+    → reopened T026 + T071 fixture parity correction
+        → T072 every-command focused verification
+            → T072 + independent T069 native-gate stabilization
+                → reopened T040 full-suite validation
 ```
 
 - Phase 1: T001/T002/T003 parallel → T004 generation join.
@@ -260,6 +282,9 @@ BUG-003 overlay
 - Phase 10 (BUG-001 overlay): audit T009/T011 and complete reopened T012 → T049 → reopened T013/T014/T015 with T050 → T051 → reopened T040.
 - Phase 13 (BUG-002 overlay): audit T009 and complete reopened T011/T012/T049/T054 with T056 → reopened T014/T015/T050 with T057 → reopened T051 with T058 → reopened T040.
 - Phase 14 (BUG-003 overlay): audit T009 and complete reopened T011/T012/T049/T054/T056/T058 with T059 → reopened T014/T015/T050/T057 with T060 → reopened T051 with T061 → reopened T040.
+- Phase 15 (BUG-004 overlay): complete reopened T017/T019 with T062 → reopened T021/T025/T026 with T063 → reopened T029/T032/T033/T043/T044 with T064 → reopened T040.
+- Phase 16 (BUG-005 overlay): complete reopened T019/T062 with T065 → reopened T025/T063 with T066 → reopened T029/T032/T043/T044/T064 with T067 → reopened T040.
+- Phase 19 (BUG-006 overlay): complete reopened T019/T039 with T070 → reopened T026 with T071 → T072; complete independent T069 and T072 before reopened T040.
 
 ### Parallel opportunities
 
@@ -267,6 +292,9 @@ BUG-003 overlay
 - Test waves intentionally touch separate files from one another and can be authored concurrently before implementation.
 - Within US2 and US3, coordinator, live, transport, master UI and player UI tasks use frozen contracts and can proceed independently, but integration waits for the full wave.
 - Tasks that revisit `internal/control/service.go`, `app.go`, `master.js`, `client.js` or shared browser fixtures are placed in later phases/waves and must not overlap earlier owners.
+- BUG-004 сохраняет существующую protobuf-модель: T063 использует `command_execution` для pending/rejected и `Nav.CommandNodeID` для completed, поэтому T002/T004/T018/T020/T022/T028 не переоткрываются; T064 повторно проверяет их границы через snapshots и browser journeys.
+- BUG-005 не меняет protobuf или server-authoritative state machine: T065–T067 локализованы в player rendering/browser verification, а T017/T021/T026/T033 требуют только аудита при обнаружении transport/runtime расхождения.
+- BUG-006 не меняет глобальную семантику ordinary-команд и не переиспользует completed reset fixture как approval input: T070–T072 закрепляют fixture-scoped contract и command identity на browser/master границе, а T024/T033/T038 остаются закрытыми до конкретного focused-test расхождения.
 
 ### MVP boundary
 
@@ -276,8 +304,8 @@ Phase 4 завершает минимальный вертикальный пр�
 
 - [x] T041 Расширить автоматические coordinator/live проверки до 100 последовательных pending-проверок и 100 повторных/конкурентных обращений к completed-команде, доказывая ровно одно выполнение и одну durable write · `internal/control/service_test.go`, `internal/live/service_test.go` per SC-002, SC-004, SC-011 (partial)
 - [x] T042 Добавить 100 детерминированных persistence-failure прогонов выполнения state-changing команды с проверкой неизменности durable/runtime state, revision/effects и восстановления прежнего состояния после reopen · `internal/control/service_test.go`, `internal/session/service_test.go`, `internal/session/storage_test.go` per SC-008 (partial)
-- [x] T043 Довести матрицу explicit reject, dialog close и controller disconnect/approve до 100 случаев с единственным pending, точным resolution и отсутствием лишних store writes · `internal/control/service_test.go`, `tests/browser/state-changing-command-approval.spec.mjs` per SC-013, SC-015 (partial)
-- [x] T044 Добавить явную проверку сходимости completed name/result у контроллера и минимум двух наблюдателей не позднее одной секунды после durable master decision · `tests/browser/state-changing-command-sync.spec.mjs` per SC-003 (partial)
+- [x] **T043** ⚠️ Reopened — Довести матрицу explicit reject, dialog close и controller disconnect/approve до 100 случаев с единственным pending, точным resolution и отсутствием лишних store writes (reopened — BUG-004; reopened — BUG-005) · `internal/control/service_test.go`, `tests/browser/state-changing-command-approval.spec.mjs` per SC-013, SC-015, SC-017 (partial)
+- [x] **T044** ⚠️ Reopened — Добавить явную проверку сходимости completed name/result у контроллера и минимум двух наблюдателей не позднее одной секунды после durable master decision (reopened — BUG-004; reopened — BUG-005) · `tests/browser/state-changing-command-sync.spec.mjs` per SC-003, SC-017 (partial)
 - [x] T045 Добавить endurance-сценарий минимум из 20 переходов меню и проверку восстановления durable command state после остановки/старта broadcast, переключения терминалов и полного перезапуска desktop process с повторным открытием того же session file · `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go` per SC-005 (partial)
 - [x] T046 Добавить выборку из 100 completed-команд для проверки сохранения snapshots при rename/move внутри терминала, удаления без наследования новым ID, frozen authored edits и reset/re-execute с новыми значениями · `internal/domain/model_test.go`, `internal/session/service_test.go` per SC-010, SC-012 (partial)
 
@@ -355,3 +383,71 @@ Phase 4 завершает минимальный вертикальный пр�
 **Wave 3 — native focused verification:**
 
 - [x] **T061** [US1] Повторить native master-click gate для нескольких completed-команд выбранного терминала и отдельного нетронутого терминала; доказать одну новую durable revision, master/controller/observer `INITIAL` ≤1 s без reload, сохранение другого terminal scope, отсутствие stale result после navigation и сохранение результата после полного закрытия приложения и reopen того же JSON, затем передать доказательство в T040 · `scripts/state-changing-reset-native-smoke.sh`, `app_test.go`, `tests/browser/state-changing-command-sync.spec.mjs` per SC-009, SC-016
+
+## Phase 15: Bugfix BUG-004 — полноэкранный lifecycle выбранной команды
+
+**Goal**: После выбора state-changing команды controller и observers видят единый полноэкранный экран записи; pending не принимает `Back`/`Enter`, а rejected/completed сохраняются до равнозначного server-authoritative acknowledgement этими действиями контроллера.
+
+**Wave 1 — regression reproduction:**
+
+- [x] **T062** [US2] ⚠️ Reopened — Добавить падающее воспроизведение BUG-004 для полной матрицы `PENDING|REJECTED|COMPLETED × Back|Enter`: экран занимает представление записи без списка меню, pending не меняет nav/revision, reject показывает «Ошибка доступа», approve показывает frozen result, а после решения оба действия возвращают controller и observers в прежнее меню (reopened — BUG-005) · `internal/live/service_test.go`, `internal/nav/nav_test.go`, `tests/browser/state-changing-command-approval.spec.mjs` per FR-006, FR-008, FR-030, FR-033, SC-002, SC-003, SC-013, SC-017
+
+**⟶ T062 and reopened T017/T019 must reproduce the incomplete presentation before Wave 2:**
+
+**Wave 2 — correction:**
+
+- [x] **T063** [US2] ⚠️ Reopened — По падающему T062 реализовать единое полноэкранное представление записи для pending, «Ошибка доступа» и completed result; скрывать список меню, сохранять pagination/reveal длинного результата, блокировать `Back`/`Enter` в pending и нормализовать оба ввода после решения в один accepted shared `Navigate back` без browser-owned или optimistic state (reopened — BUG-005) · `client/client.js`, `client/client.css`, `internal/live/service.go`, `internal/nav/nav.go` per FR-006, FR-008, FR-030, FR-033
+
+**⟶ T063 and reopened T021/T025/T026 must finish before Wave 3:**
+
+**Wave 3 — focused verification:**
+
+- [x] **T064** [US2] [US3] ⚠️ Reopened — Проверить controller + минимум двух observers для approve/reject/close, `Back`/`Enter`, длинного paginated результата, reconnect до acknowledgement, controller disconnect, terminal switch и broadcast restart; доказать одинаковый экран ≤1 s, read-only observers, отсутствие локального расхождения и возврат всех представлений только по принятой runtime revision, затем передать доказательство в переоткрытую T040 (reopened — BUG-005) · `internal/player/public_stream_test.go`, `internal/player/stream_test.go`, `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go` per SC-003, SC-013, SC-015, SC-017
+
+## Phase 16: Bugfix BUG-005 — паритет с рендером описания записи
+
+**Goal**: `PENDING`, `REJECTED`, первый и повторный `COMPLETED` используют тот же presentation contract, что описание обычной записи, выбранной в меню, при сохранении server-authoritative lifecycle и общей навигации.
+
+**Wave 1 — renderer-parity regression reproduction:**
+
+- [x] **T065** [US2] Добавить падающее browser-воспроизведение BUG-005: выбрать обычную запись как эталон и сравнить с `PENDING`, `REJECTED`, первым `COMPLETED` и повторным просмотром completed-команды область контента, типографику, переносы, reveal, pagination/page controls и repagination при resize для короткого, многострочного и длинного текста; существующий отдельный `#termOutput.command-screen` MUST провалить проверку · `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go` per FR-006, FR-008, FR-015, FR-030, FR-033/BUG-005, SC-002, SC-003, SC-013, SC-017/BUG-005
+
+**⟶ T065 and reopened T019/T062 must fail on the separate command-output renderer before Wave 2:**
+
+**Wave 2 — shared record renderer correction:**
+
+- [x] **T066** [US2] По падающему T065 заменить отдельные pending/rejected/completed command-output branches общим record-description presentation primitive либо доказуемо эквивалентным компонентом с одинаковыми layout/reveal/pagination/resize semantics; сохранить pending action blocking, controller-only acknowledgement, observer read-only и текущие server/protobuf contracts · `client/client.js`, `client/client.css` per FR-006, FR-008, FR-015, FR-030, FR-033/BUG-005
+
+**⟶ T066 and reopened T025/T063 must finish before Wave 3:**
+
+**Wave 3 — multi-client renderer verification:**
+
+- [x] **T067** [US2] [US3] Проверить record-renderer parity для controller + минимум двух observers во всех исходах approve/reject/close, при reconnect до acknowledgement, повторном выборе completed-команды, `Back`/`Enter` и resize на каждой странице длинного текста; доказать одинаковый экран ≤1 s и возврат всех клиентов только по принятой runtime revision, затем передать результат в переоткрытую T040 · `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go` per SC-002, SC-003, SC-013, SC-017/BUG-005
+
+## Phase 17: Convergence
+
+- [x] T068 HIGH: Расширить обязательный native master-click reset gate до непрерывной проверки собранного приложения с writable session, controller и observer: зафиксировать generated Wails result/error, совпадающий terminal ID, одну новую document revision, канонически пустые `commandStates`, `session-state` event, новую runtime revision и `INITIAL` в master/controller/observer DOM не позднее одной секунды без reload; сохранить completed-состояния другого терминала, исключить stale result после navigation, полностью закрыть приложение и доказать тот же результат после reopen исходного JSON · `scripts/state-changing-reset-native-smoke.sh` per FR-023/BUG-003, SC-016, plan: Native master click regression, T059/T061 (partial)
+
+## Phase 18: Convergence
+
+- [x] T069 HIGH: Стабилизировать обязательный native master-click reset gate для повторных запусков на актуальном packaged app: надёжно синхронизировать lifecycle native process и появление master Wails/session-state accessibility evidence, сохранять диагностические данные при каждом раннем выходе и доказать последовательными успешными прогонами полный reset/reopen сценарий с controller и observer без ослабления ограничений по revision, terminal scope, `INITIAL` ≤1 s и отсутствию stale result · `scripts/state-changing-reset-native-smoke.sh`, `scripts/state-changing-reset-native-player-smoke.mjs`, `frontend/src/master.js` per FR-023/BUG-003, SC-016, plan: Native master click regression (partial)
+
+## Phase 19: Bugfix BUG-006 — канонический approval input и имя команды у мастера
+
+**Goal**: Канонический approval input содержит минимум одну явную папку, запись и команду, каждая его команда начинает в `INITIAL` с валидным `stateChange`, а master dialog отдельно показывает точное имя выбранной команды и отличный авторский prompt без изменения ordinary-command compatibility вне fixture.
+
+**Wave 1 — fixture/master regression reproduction:**
+
+- [x] **T070** [US2] Добавить падающую структурную и browser-проверку BUG-006: канонический approval input имеет явные folder/entry/command, пустые initial `commandStates`, непустые `name`/`text`/`completedName`/`confirmationText` у каждой команды; выбрать каждую команду и доказать `INITIAL → PENDING`, отдельные видимые `КОМАНДА: <точное имя>` и намеренно отличный `confirmationText`, а также отсутствие ordinary bypass (reopened T019/T039) · `sessions/demo.json`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js` per FR-001–FR-006/BUG-006, SC-001, SC-002, SC-018
+
+**⟶ T070 and reopened T019/T039 must fail on the incomplete or divergent approval input before Wave 2:**
+
+**Wave 2 — canonical fixture parity correction:**
+
+- [x] **T071** [US2] По падающему T070 определить один канонический approval fixture contract либо точную автоматическую parity-проекцию и выровнять его Go/JavaScript/JSON представления: добавить явные folder/entry/command, обеспечить initial `stateChange` каждой команды и раздельный `commandName`/`confirmationText` в master dialog; не менять ordinary semantics, legacy fixture и отдельный completed fixture для reset/reopen (reopened T026; T024/T033/T038 только audit) · `sessions/demo.json`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`, `frontend/src/master.js`, `README.md` per FR-004, FR-005/BUG-006, FR-017, FR-028, SC-007, SC-018
+
+**⟶ T071 and reopened T026 must finish before Wave 3:**
+
+**Wave 3 — every-command focused verification:**
+
+- [x] **T072** [US2] [US4] Пройти каждую команду канонического approval input через approve, reject и close, проверяя точное имя и отличный prompt, единственный pending/request ID, отсутствие initial completed snapshot и ordinary bypass; отдельно подтвердить неизменный ordinary flow legacy fixture, parity fixture sources и полный frontend/Playwright suite, затем передать результат в переоткрытую T040 · `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js` per SC-002, SC-007, SC-013, SC-018/BUG-006
