@@ -12,6 +12,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Distinguished same-generation dud removal from puzzle replacement so the hacking board is reconciled without a full rerender.
 
+**Bugfix**: 2026-08-19 — BUG-003 Required a complete-board font fit before hacking reveal and stable code-row typography throughout ordinary row insertion.
+
 ## Clarifications
 
 ### Session 2026-08-16
@@ -52,6 +54,8 @@ As a player, I see restrained flicker, cursor activity, and progressive content 
 
 **BUG-002 extension**: Activate a delimiter pattern that removes a dud within the current puzzle generation and verify that only the affected board content changes while existing rows and reveal progress remain in place.
 
+**BUG-003 extension**: Enter a newly generated hacking puzzle and verify that the code-row font is fitted from the complete board before the first row appears and does not zoom out as later rows reveal.
+
 **Acceptance Scenarios**:
 
 1. **Given** the player screen is active, **When** each six-second flicker cycle runs, **Then** opacity remains 1 through 96%, changes to .92 at 97%, returns to 1 at 98%, changes to .96 at 99%, and returns to 1 at 100%.
@@ -64,6 +68,7 @@ As a player, I see restrained flicker, cursor activity, and progressive content 
 8. **Given** a hacking-puzzle reveal is active, **When** attempts, activity-log content, hover state, viewport size, or font metrics change without replacing the puzzle generation and board text, **Then** the visible rows remain stable and the reveal neither restarts nor duplicates code.
 9. **Given** a hacking-puzzle reveal is active, **When** a different puzzle generation replaces it, **Then** the obsolete reveal is cancelled before the new puzzle begins and no stale code row is appended.
 10. **Given** a delimiter pattern removes a dud without changing the hacking generation, **When** the authoritative board update arrives, **Then** the affected candidate changes to its removed presentation without clearing, replacing, or replaying the rest of the hacking board.
+11. **Given** a new hacking-puzzle generation and unchanged viewport, orientation, and active font metrics, **When** its code rows progressively reveal, **Then** the first visible row already uses the complete board's fitted font size and every later row append preserves exactly that size instead of producing a grow, shrink, or zoom effect.
 
 ---
 
@@ -102,6 +107,7 @@ As a player who wants to read the current content immediately or uses a compact 
 - Replacing a hacking generation during its reveal cancels the old generation before any new row is inserted.
 - Dud removal in an already revealed row updates that row in place while every unaffected revealed row retains its DOM identity and interaction state.
 - Dud removal in a not-yet-revealed row updates the pending row content without revealing it early or restarting the active sequence.
+- Hacking row insertion alone never triggers a partial-board refit; a genuine viewport, orientation, or active-font change may refit during reveal only from the complete generation, including queued rows.
 
 ## Requirements
 
@@ -129,6 +135,7 @@ As a player who wants to read the current content immediately or uses a compact 
 - **FR-020**: While hacking code rows are progressively revealing, pressing any keyboard key MUST render every remaining row within 100 milliseconds and consume that physical press and its repeats without submitting a guess, pattern, typed character, back action, or other hacking action; normal hacking input MUST resume with a later physical key press.
 - **FR-021**: An unrevealed hacking code row and all of its targets MUST be absent from the interaction surface until the complete row is revealed, and reveal bookkeeping MUST remain browser-local presentation state that never mutates authoritative hacking state.
 - **FR-022**: Within an unchanged hacking generation, authoritative dud removal MUST reconcile only the affected board content and related pattern/log presentation without clearing or rebuilding the hacking board, replacing unaffected revealed row nodes, or restarting active reveal timing. If the affected row is unrevealed, its updated content MUST appear at its existing reveal position and MUST remain outside the interaction surface until then.
+- **FR-023**: Before the first code row of a new hacking generation becomes visible, the player experience MUST calculate one shared hacking-row font size from the complete generation, including every queued row, under the current viewport, layout orientation, activity-log allocation, and active font metrics. Ordinary reveal appends, reveal completion, skip completion, reconnect, hover, attempts, log updates, and same-generation reconciliation MUST reuse that size without visible grow, shrink, or zoom. A genuine viewport, orientation, or active-font change MAY recalculate the size, but the recalculation MUST still use the complete generation and preserve the responsive single-screen font floor, containment, and maximal-fit rules.
 
 ### Impacted Application Surfaces
 
@@ -162,7 +169,7 @@ As a player who wants to read the current content immediately or uses a compact 
 
 - **Go tests**: Extend focused embedded-player asset checks to protect the required CRT layer, interaction, and keyboard reveal-skip contracts.
 - **Race testing**: Not required specifically for browser-only presentation behavior; the normal repository race gate remains unchanged.
-- **Browser tests**: Add a focused player journey covering representative states, folder/record/command and BUG-001 hacking-code reveal, replay/cancellation, key-driven reveal completion, BUG-002 same-generation dud reconciliation, hit testing, and supported viewport checks.
+- **Browser tests**: Add a focused player journey covering representative states, folder/record/command and BUG-001 hacking-code reveal, replay/cancellation, key-driven reveal completion, BUG-002 same-generation dud reconciliation, BUG-003 complete-board pre-fit and reveal-time font stability, hit testing, and supported viewport checks.
 - **Interactive verification**: Run the current development entrypoint and inspect reveal and reveal-skip journeys with list, record, command, pagination, and first-entry/replacement hacking states.
 - **Packaging/release verification**: Run the normal player build and unsigned application build gates because embedded player assets change; signing and public-provider checks are not feature-specific.
 
@@ -181,6 +188,7 @@ As a player who wants to read the current content immediately or uses a compact 
 - **SC-009**: A controlled new hacking puzzle shows fewer than all code rows on its first render, reveals complete rows in deterministic DOM source order at the 40-millisecond cadence, and displays all remaining rows within 100 milliseconds after a key press while producing zero actions from that consumed press and its repeats.
 - **SC-010**: Attempts, log, hover, reconnect, viewport, font-readiness, and fit updates preserving the hacking generation and board text produce zero additional row-reveal sequences, while replacing the generation mid-reveal produces zero stale appended rows and exactly one reveal for the replacement puzzle.
 - **SC-011**: A controlled same-generation dud-removal update removes zero hacking rows, starts zero additional reveal sequences, preserves the exact DOM identity of every unaffected revealed row, updates the affected candidate presentation, and leaves an affected unrevealed row unavailable until its original reveal turn.
+- **SC-012**: At every supported normal and compact/stacked viewport, the 200%-zoom case, and bundled- and fallback-font rendering, a controlled new hacking generation uses one computed row font size from its first visible row through uninterrupted or skipped completion, with zero append-driven size changes; after a genuine viewport, orientation, or font change, any new size is calculated from all rows and still satisfies the inherited complete-board font-floor, containment, and maximal-fit tolerance.
 
 ## Assumptions
 

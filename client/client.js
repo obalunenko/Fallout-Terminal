@@ -56,6 +56,7 @@ let lastRenderedEntryId    = null;
 let lastRenderedCommandKey = null;
 let lastRenderedHackKey    = null;
 let lastRenderedHackRows = new Map();
+let hackBoardFit = null;
 const activeRevealControllers = new Set();
 let consumedRevealKey = null;
 
@@ -708,6 +709,7 @@ function clearBroadcastMirrors() {
   lastRenderedCommandKey = null;
   lastRenderedHackKey = null;
   lastRenderedHackRows = new Map();
+  hackBoardFit = null;
   hackLevel = 0;
   hack = null;
   hackTyped = '';
@@ -734,6 +736,8 @@ function clearBroadcastMirrors() {
   cancelReveal(hackColumns);
   hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
+  hackBoard.style.removeProperty('--hack-row-font');
+  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
   hackLog.replaceChildren();
   introTextEl.textContent = '';
   entryTitle.textContent = '';
@@ -1790,30 +1794,39 @@ function regionContains(parent, child) {
     childBounds.bottom <= parentBounds.bottom + tolerance;
 }
 
-function hackContentOverflows() {
-  const columns = Array.from(hackColumns.children);
-  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
-  const logLines = Array.from(hackLog.children);
-  const regions = [hackBoard, hackColumns, hackLogPanel, hackLog, hackInputLine, ...columns, ...rows, ...logLines];
+function hackLayoutParts(board = hackBoard) {
+  const columnsContainer = board.querySelector('.hack-columns');
+  const log = board.querySelector('.hack-log');
+  const logPanel = board.querySelector('.hack-log-panel');
+  const inputLine = board.querySelector('.hack-input-line');
+  return { columnsContainer, log, logPanel, inputLine };
+}
+
+function hackContentOverflows(board = hackBoard) {
+  const { columnsContainer, log, logPanel, inputLine } = hackLayoutParts(board);
+  const columns = Array.from(columnsContainer.children);
+  const rows = Array.from(columnsContainer.querySelectorAll('.hack-row'));
+  const logLines = Array.from(log.children);
+  const regions = [board, columnsContainer, logPanel, log, inputLine, ...columns, ...rows, ...logLines];
   if (regions.some(regionOverflows)) return true;
 
   const containedRegions = [
-    [screen, hackHeader],
-    [screen, hackBoard],
-    [hackBoard, hackColumns],
-    [hackBoard, hackLogPanel],
-    [hackLogPanel, hackLog],
-    [hackLogPanel, hackInputLine],
-    ...columns.map(column => [hackColumns, column]),
-    ...rows.map(row => [hackColumns, row]),
-    ...logLines.map(line => [hackLog, line]),
+    [board, columnsContainer],
+    [board, logPanel],
+    [logPanel, log],
+    [logPanel, inputLine],
+    ...columns.map(column => [columnsContainer, column]),
+    ...rows.map(row => [columnsContainer, row]),
+    ...logLines.map(line => [log, line]),
   ];
+  if (board === hackBoard) containedRegions.push([screen, hackHeader], [screen, hackBoard]);
   return containedRegions.some(([parent, child]) => !regionContains(parent, child));
 }
 
-function hackRowsFitColumns() {
+function hackRowsFitColumns(board = hackBoard) {
+  const { columnsContainer } = hackLayoutParts(board);
   const tolerance = 0.5;
-  return Array.from(hackColumns.children).every(column => {
+  return Array.from(columnsContainer.children).every(column => {
     const columnBounds = column.getBoundingClientRect();
     return Array.from(column.querySelectorAll('.hack-row')).every(row => {
       const addressBounds = row.querySelector('.hack-addr').getBoundingClientRect();
@@ -1830,24 +1843,25 @@ function hackRowsFitColumns() {
   });
 }
 
-function fitHackRowFont() {
-  hackBoard.style.removeProperty('--hack-row-font');
-  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
-  const columns = Array.from(hackColumns.children);
-  if (!rows.length || !columns.length) return;
+function fitHackRowFont(board = hackBoard) {
+  board.style.removeProperty('--hack-row-font');
+  const { columnsContainer } = hackLayoutParts(board);
+  const rows = Array.from(columnsContainer.querySelectorAll('.hack-row'));
+  const columns = Array.from(columnsContainer.children);
+  if (!rows.length || !columns.length) return null;
 
-  const baseSize = Number.parseFloat(getComputedStyle(hackBoard).fontSize);
-  if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+  const baseSize = Number.parseFloat(getComputedStyle(board).fontSize);
+  if (!Number.isFinite(baseSize) || baseSize <= 0) return null;
 
-  const applySize = size => hackBoard.style.setProperty('--hack-row-font', `${size}px`);
+  const applySize = size => board.style.setProperty('--hack-row-font', `${size}px`);
   const fitsAt = size => {
     applySize(size);
-    return hackRowsFitColumns() && !hackContentOverflows();
+    return hackRowsFitColumns(board) && !hackContentOverflows(board);
   };
 
   if (!fitsAt(baseSize)) {
     applySize(baseSize);
-    return;
+    return baseSize;
   }
 
   let low = baseSize;
@@ -1864,29 +1878,103 @@ function fitHackRowFont() {
     else high = candidate;
   }
   applySize(low);
+  return low;
+}
+
+function applyHackLayout(board) {
+  board.style.removeProperty('--hack-row-font');
+  board.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+  const preferStacked = board.clientWidth <= 700 || board.clientHeight <= 300;
+  board.classList.toggle('hack-stacked', preferStacked);
+  board.classList.toggle('hack-compact', preferStacked || hackContentOverflows(board));
+
+  if (!preferStacked && hackContentOverflows(board)) {
+    board.classList.add('hack-compact', 'hack-stacked');
+  }
+  if (hackContentOverflows(board)) {
+    board.classList.add('hack-tight');
+  }
+  const fontSize = fitHackRowFont(board);
+  return {
+    fontSize,
+    compact: board.classList.contains('hack-compact'),
+    stacked: board.classList.contains('hack-stacked'),
+    tight: board.classList.contains('hack-tight'),
+  };
+}
+
+function applyHackFit(fit) {
+  hackBoard.classList.toggle('hack-compact', Boolean(fit?.compact));
+  hackBoard.classList.toggle('hack-stacked', Boolean(fit?.stacked));
+  hackBoard.classList.toggle('hack-tight', Boolean(fit?.tight));
+  if (Number.isFinite(fit?.fontSize)) {
+    hackBoard.style.setProperty('--hack-row-font', `${fit.fontSize}px`);
+  } else {
+    hackBoard.style.removeProperty('--hack-row-font');
+  }
+}
+
+function createHackFitProbe() {
+  if (lastRenderedHackRows.size === 0) return null;
+  const bounds = hackBoard.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) return null;
+
+  const probe = hackBoard.cloneNode(true);
+  probe.hidden = false;
+  probe.inert = true;
+  probe.setAttribute('aria-hidden', 'true');
+  probe.removeAttribute('id');
+  probe.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+  const probeColumns = probe.querySelector('.hack-columns');
+  probeColumns.replaceChildren();
+
+  const clonedColumns = new Map();
+  for (const descriptor of lastRenderedHackRows.values()) {
+    let probeColumn = clonedColumns.get(descriptor.parent);
+    if (!probeColumn) {
+      probeColumn = descriptor.parent.cloneNode(false);
+      clonedColumns.set(descriptor.parent, probeColumn);
+      probeColumns.appendChild(probeColumn);
+    }
+    probeColumn.appendChild(descriptor.row.cloneNode(true));
+  }
+
+  Object.assign(probe.style, {
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+    margin: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    zIndex: '-1',
+  });
+  document.body.appendChild(probe);
+  return probe;
+}
+
+function fitCompleteHackBoard() {
+  const probe = createHackFitProbe();
+  if (!probe) return null;
+  try {
+    const fit = applyHackLayout(probe);
+    hackBoardFit = fit;
+    applyHackFit(hackBoardFit);
+    return fit;
+  } finally {
+    probe.remove();
+  }
 }
 
 function fitHackLayout() {
   hackFitFrame = null;
   if (mode !== MODE.HACK || hackBoard.hidden) {
-    hackBoard.style.removeProperty('--hack-row-font');
-    hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+    hackBoardFit = null;
+    applyHackFit(null);
     return;
   }
-
-  hackBoard.style.removeProperty('--hack-row-font');
-  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
-  const preferStacked = hackBoard.clientWidth <= 700 || hackBoard.clientHeight <= 300;
-  hackBoard.classList.toggle('hack-stacked', preferStacked);
-  hackBoard.classList.toggle('hack-compact', preferStacked || hackContentOverflows());
-
-  if (!preferStacked && hackContentOverflows()) {
-    hackBoard.classList.add('hack-compact', 'hack-stacked');
-  }
-  if (hackContentOverflows()) {
-    hackBoard.classList.add('hack-tight');
-  }
-  fitHackRowFont();
+  fitCompleteHackBoard();
 }
 
 function scheduleHackFit() {
@@ -2129,6 +2217,8 @@ function renderHackScreen() {
     cancelReveal(hackColumns);
     lastRenderedHackKey = null;
     lastRenderedHackRows = new Map();
+    hackBoardFit = null;
+    applyHackFit(null);
     hackBoard.hidden   = true;
     hackBlocked.hidden = true;
     return;
@@ -2138,6 +2228,8 @@ function renderHackScreen() {
 
   if (hack.failed) {
     cancelReveal(hackColumns);
+    hackBoardFit = null;
+    applyHackFit(null);
     hackBoard.hidden   = true;
     hackBlocked.hidden = false;
     return;
@@ -2147,11 +2239,11 @@ function renderHackScreen() {
   hackBoard.hidden   = false;
   const hackKey = hackRevealIdentity(hack);
   const isNewHack = hackKey !== lastRenderedHackKey;
+  if (isNewHack) hackBoardFit = null;
   lastRenderedHackKey = hackKey;
-  renderHackColumns(isNewHack, hackKey);
   renderHackLog();
   renderHackInputPreview();
-  scheduleHackFit();
+  renderHackColumns(isNewHack, hackKey);
 }
 
 function hackRevealIdentity(hackState) {
@@ -2272,7 +2364,6 @@ function reconcileHackColumns(hackState) {
       current.signature = replacement.signature;
     }
   }
-  scheduleHackFit();
 }
 
 function renderHackColumns(animate, hackKey) {
@@ -2281,12 +2372,14 @@ function renderHackColumns(animate, hackKey) {
   } else {
     const built = hackBoardSnapshot(hack);
     lastRenderedHackRows = new Map(built.rows.map(descriptor => [descriptor.key, descriptor]));
+    fitCompleteHackBoard();
     revealInto(hackColumns, built.rows, animate, hackKey, {
       prepareContainer: container => built.columns.forEach(column => container.appendChild(column)),
       appendElement: descriptor => descriptor.parent.appendChild(descriptor.row),
-      afterAppend: scheduleHackFit,
     });
   }
+
+  if (!hackBoardFit) fitCompleteHackBoard();
 
   if (hackHoverKey === null) return;
   const hoveredPattern = (hack.patterns || []).find(pattern =>

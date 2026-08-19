@@ -54,7 +54,7 @@ test.beforeEach(async ({ page }) => {
   await openAuthoringFixture(page);
 });
 
-test('bundled read-only demo exposes every configurable command mode in its initial state', async () => {
+test('bundled read-only demo exposes every configurable command mode and a completed example', async () => {
   const demo = JSON.parse(await readFile(BUNDLED_DEMO_URL, 'utf8'));
   const terminalIDs = new Set(demo.terminals.map(terminal => terminal.id));
   expect([...terminalIDs]).toEqual(['t_demo1', 't_demo2']);
@@ -76,7 +76,8 @@ test('bundled read-only demo exposes every configurable command mode in its init
   const ordinaryCommands = commands.filter(command => !command.stateChange && !command.terminalTransition);
   const stateChangingCommands = commands.filter(command => command.stateChange);
   const terminalTransitionCommands = commands.filter(command => command.terminalTransition);
-  const completed = demo.terminals.flatMap(terminal => Object.keys(terminal.commandStates ?? {}));
+  const completed = demo.terminals.flatMap(terminal =>
+    Object.entries(terminal.commandStates ?? {}).map(([commandId, state]) => ({ commandId, state })));
 
   expect(nodes.some(node => node.type === 'folder')).toBe(true);
   expect(nodes.some(node => node.type === 'entry')).toBe(true);
@@ -101,7 +102,13 @@ test('bundled read-only demo exposes every configurable command mode in its init
     expect(command.terminalTransition.targetTerminalId.trim()).not.toBe('');
     expect(terminalIDs.has(command.terminalTransition.targetTerminalId)).toBe(true);
   }
-  expect(completed).toEqual([]);
+  const stateChangingCommandIDs = new Set(stateChangingCommands.map(command => command.id));
+  expect(completed.length).toBeGreaterThan(0);
+  for (const snapshot of completed) {
+    expect(stateChangingCommandIDs.has(snapshot.commandId)).toBe(true);
+    expect(snapshot.state.completedName.trim()).not.toBe('');
+    expect(snapshot.state.resultText.trim()).not.toBe('');
+  }
 });
 
 test('state-change mode requires all four authored texts and persists one config', async ({ page }) => {

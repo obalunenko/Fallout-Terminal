@@ -4,6 +4,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Separated puzzle-generation identity from same-generation dud-removal reconciliation.
 
+**Bugfix**: 2026-08-19 — BUG-003 Added complete-board pre-fit and reveal-time hacking typography stability.
+
 ## Decision 1: Retain the historical DOM/CSS composition
 
 **Decision**: Keep the existing HTML/CSS screen composition and protect the exact historical palette, glow, scanlines, vignette, six-second flicker checkpoints, and hard-step blink/pulse behavior.
@@ -114,3 +116,15 @@
 - Use rendered board text as reveal identity: rejected because it conflates same-generation gameplay with puzzle replacement.
 - Rebuild every row immediately without animation: rejected because it still destroys node identity, focus, hover, and active reveal progress.
 - Defer every dud update until the initial reveal completes: rejected because already revealed content would temporarily disagree with authoritative state.
+
+## Decision 10: Fit the complete hacking board before progressive painting
+
+**Decision**: Calculate the shared hacking-row font from the complete generation-local board snapshot before the reveal controller paints its first row. Retain that fit through ordinary row appends and uninterrupted or skipped completion. Recalculate only when a genuine viewport, layout-orientation, or active-font input changes, and always measure the complete snapshot, including queued rows.
+
+**Rationale**: The responsive fitter's height constraint is meaningful only for the complete fixed-row board. Measuring the interaction DOM during progressive reveal sees only the rows already appended, temporarily permits an oversized font, and then shrinks it as more rows arrive. A generation-local pre-fit preserves stable typography while retaining the responsive base-size floor, one-size rule, complete-board containment, and maximal-fit tolerance. The snapshot can participate in measurement without placing unrevealed targets in the interaction surface.
+
+**Alternatives considered**:
+
+- Refit after every appended row: rejected by BUG-003 because partial-board measurements produce the visible zoom-out effect.
+- Render every row invisibly in the interactive columns before reveal: rejected because unrevealed targets must remain absent from pointer, focus, and keyboard interaction and hidden live DOM complicates that guarantee.
+- Hold the base hacking role until reveal completes and enlarge once: rejected because it creates a second size jump and fails to use the required maximal complete-board fit from the first visible row.

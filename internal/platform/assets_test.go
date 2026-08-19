@@ -884,7 +884,7 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"hackBoard.classList.toggle('hack-stacked'",
 		"hackBoard.classList.toggle('hack-compact'",
 		"function renderHackScreen() {\n  deactivatePagination();",
-		"renderHackInputPreview();\n  scheduleHackFit();",
+		"renderHackInputPreview();\n  renderHackColumns(isNewHack, hackKey);",
 	} {
 		assert.Falsef(t, !strings.Contains(js, fragment),
 			"player script is missing pagination contract %q", fragment)
@@ -958,11 +958,11 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	for _, fragment := range []string{
 		"function regionContains(parent, child)",
-		"hackColumns.querySelectorAll('.hack-row')",
-		"Array.from(hackLog.children)",
+		"columnsContainer.querySelectorAll('.hack-row')",
+		"Array.from(log.children)",
 		"regions.some(regionOverflows)",
 		"containedRegions.some(([parent, child]) => !regionContains(parent, child))",
-		"hackBoard.classList.add('hack-tight')",
+		"board.classList.add('hack-tight')",
 	} {
 		assert.Falsef(t, !strings.Contains(js, fragment),
 			"player script is missing rendered hacking geometry contract %q", fragment)
@@ -1488,18 +1488,18 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 
 	js := read("client/client.js")
 	for _, fragment := range []string{
-		"function hackRowsFitColumns()",
+		"function hackRowsFitColumns(board = hackBoard)",
 		"const tolerance = 0.5",
 		"finalBounds.right <= columnBounds.right + tolerance",
 		"rowBounds.bottom <= columnBounds.bottom + tolerance",
-		"function fitHackRowFont()",
-		"hackBoard.style.removeProperty('--hack-row-font')",
+		"function fitHackRowFont(board = hackBoard)",
+		"board.style.removeProperty('--hack-row-font')",
 		"let low = baseSize",
 		"Math.min(...columns.map(column => column.getBoundingClientRect().width))",
-		"hackRowsFitColumns() && !hackContentOverflows()",
+		"hackRowsFitColumns(board) && !hackContentOverflows(board)",
 		"while (high - low > 0.25)",
-		"hackBoard.style.setProperty('--hack-row-font', `${size}px`)",
-		"fitHackRowFont();",
+		"board.style.setProperty('--hack-row-font', `${size}px`)",
+		"const fontSize = fitHackRowFont(board)",
 		"window.addEventListener('resize', scheduleHackFit)",
 		"hackFitObserver.observe(termBody)",
 		"document.fonts.ready.then(scheduleHackFit)",
@@ -1631,6 +1631,35 @@ func TestPlayerCRTHackingRevealAssetContract(t *testing.T) {
 
 	assert.NotContains(t, js, "hackColumns.innerHTML")
 	assert.NotContains(t, js, "function buildColumnHtml")
+}
+
+func TestPlayerCRTHackingRevealFontStabilityAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let hackBoardFit = null",
+		"function createHackFitProbe()",
+		"probe.inert = true",
+		"probe.setAttribute('aria-hidden', 'true')",
+		"descriptor.row.cloneNode(true)",
+		"function fitCompleteHackBoard()",
+		"const fit = applyHackLayout(probe)",
+		"hackBoardFit = fit",
+		"applyHackFit(hackBoardFit)",
+		"window.addEventListener('resize', scheduleHackFit)",
+		"document.fonts.ready.then(scheduleHackFit)",
+	} {
+		assert.Contains(t, js, fragment,
+			"player script is missing stable complete-board hacking fit contract %q", fragment)
+	}
+
+	assert.NotContains(t, js, "afterAppend: scheduleHackFit",
+		"progressive row insertion must not refit against the partial interaction DOM")
 }
 
 func TestPlayerCRTDudReconciliationAssetContract(t *testing.T) {

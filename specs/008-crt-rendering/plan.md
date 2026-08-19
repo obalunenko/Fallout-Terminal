@@ -8,6 +8,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
 
+**Bugfix**: 2026-08-19 — BUG-003 Updated from bugfix patch
+
 ## Summary
 
 Preserve the historical Fallout-style CRT shell, palette, scanlines, vignette, six-second flicker, hard-step indicators, and 40ms ordered row/line reveal in the current player client. Add a browser-local reveal controller so any key pressed during an active reveal completes the visible page within 100ms and is consumed before navigation, activation, paging, back, or hacking handling; a later physical key press behaves normally. Persistent CRT effects remain always on, with no player-facing or operating-system-driven reduced-motion branch, and the feature changes no RPC, authoritative state, persistence, Wails bridge, or dependency.
@@ -15,6 +17,8 @@ Preserve the historical Fallout-style CRT shell, palette, scanlines, vignette, s
 BUG-001 extends the same browser-local lifecycle to the first presentation of a hacking generation: complete code rows reveal at the 40ms cadence in deterministic DOM source order, unchanged hacking updates and fit work do not replay them, replacement generations cancel stale work, and a skip key completes the board without also becoming hacking input.
 
 BUG-002 separates stable puzzle-generation identity from mutable board content. An authoritative dud-removal update reconciles only the affected row content and used-pattern/log presentation, preserves unaffected row nodes and active reveal progress, and never starts a second whole-board reveal; only a different generation replaces the board.
+
+BUG-003 establishes the hacking row font from the complete generation before the first row is painted and retains that generation-local fit through ordinary row appends and reveal completion. Genuine viewport, orientation, or active-font changes may request a refit, but measurement continues to include every revealed and queued row so progressive insertion never appears as a zoom-out effect and the inherited responsive font-floor, containment, and maximal-fit contracts remain intact.
 
 ## Project Structure
 
@@ -67,9 +71,9 @@ The gate passes before research and remains passed after the Phase 1 design.
 
 **Existing dependencies**: Vite 8.1.5 for the player build, Playwright 1.62.1 for browser verification, and generated ConnectRPC/Protobuf player clients. No dependency or version change is required.
 
-**State ownership**: Existing authoritative projections choose the visible player state and puzzle generation. Reveal timers, active reveal controllers, generation-local board snapshots, and consumed-key repeat suppression are ephemeral per browser tab and are cleared on completion, generation replacement, key release, or terminal teardown. Same-generation board mutations reconcile against the local snapshot without becoming a new reveal identity.
+**State ownership**: Existing authoritative projections choose the visible player state and puzzle generation. Reveal timers and active reveal controllers are cleared on completion or replacement; generation-local board snapshots and complete-board font fits remain browser-local until generation replacement or terminal teardown; consumed-key repeat suppression clears on key release or teardown. Same-generation board mutations reconcile against the local snapshot without becoming a new reveal identity or an append-driven partial-board refit.
 
-**Performance and viewport targets**: Keep the 40ms row/line cadence; complete 25 uninterrupted rows within 1.2 seconds; reveal hacking rows at the same cadence; complete all remaining visible rows or lines, including hacking code rows, within 100ms of a skip key; remain operable without page scrolling at 360×640, 768×720, and 1440×900.
+**Performance and viewport targets**: Keep the 40ms row/line cadence; complete 25 uninterrupted rows within 1.2 seconds; reveal hacking rows at the same cadence and with one complete-board font size from the first visible row through completion; complete all remaining visible rows or lines, including hacking code rows, within 100ms of a skip key; remain operable without page scrolling at 360×640, 768×720, and 1440×900.
 
 **Security constraints**: Continue constructing authored rows and lines with `textContent` or the existing escaping boundary, preserve the restrictive CSP and same-origin resource policy, and keep optional sound failures isolated from rendering and input.
 
@@ -89,6 +93,8 @@ Content identity continues to decide whether a reveal is new. Unchanged authorit
 
 The client retains a generation-local board snapshot and reconciles changed rows by stable column/row coordinates. For a revealed row, reconciliation updates the existing row's affected cell content and target metadata without replacing the row or any unaffected row. For a pending row, it updates the controller's queued row descriptor so the authoritative content appears at the original reveal position and remains noninteractive until appended. Used-pattern state and the activity log update normally, stale hover is cleared, and no new controller is registered.
 
+Under BUG-003, the client fits a new hacking generation against its complete board snapshot before the reveal controller paints the first row. The chosen size is stored as generation-local presentation state and ordinary append callbacks reuse it rather than calling the fitter against the partial interaction DOM. A genuine viewport, orientation, or active-font change invalidates and recomputes that value from the same complete snapshot, including queued rows; skip completion, reconnect, hover, attempts, log changes, and same-generation reconciliation do not independently invalidate it. This preserves the responsive feature's common-size, base-role floor, complete-board containment, and maximal-fit tolerance without exposing unrevealed targets.
+
 ### Consumed-key guard
 
 A capture-phase key guard runs before the existing normal terminal keyboard handler. If the visible page has an active reveal, any key completes all reveal controllers belonging to that page, calls `preventDefault`, stops further handling for that event, and records the consumed physical key until key release so auto-repeat from the same press cannot navigate or activate content. Another physical key press after completion follows existing keyboard behavior; there is no stored skip mode.
@@ -107,6 +113,8 @@ BUG-001 browser checks observe the first hacking frame, row-by-row DOM order and
 
 BUG-002 browser checks force a deterministic dud-removal outcome and observe child-list mutations, row-node identity, reveal timings, pending-row interaction, affected candidate text, used-pattern hover/focus state, and later hacking input. They prove zero full-board teardown and zero second reveal for both revealed-row and pending-row dud removal.
 
+BUG-003 browser checks sample the computed hacking-row font from the first painted row through uninterrupted and skipped completion at normal, compact/stacked, 200%-zoom, bundled-font, and fallback-font layouts. They prove zero append-driven font changes and reuse the responsive-layout geometry assertions to show that the precomputed value includes the complete board. Separate viewport, orientation, and font-readiness transitions prove that a legitimate refit still uses all revealed and queued rows without restarting reveal.
+
 ## Implementation Phases
 
 ### Phase 0: Research and decisions
@@ -115,12 +123,13 @@ BUG-002 browser checks force a deterministic dud-removal outcome and observe chi
 - Model reveal completion as an explicit, idempotent controller operation.
 - Consume a skip key before normal player input and suppress repeats from the same physical press until key release.
 - Keep pagination and layout recalculation immediate for already-opened content while new content identities reveal independently.
+- Fit a hacking generation from its complete queued board before progressive painting and treat row insertion as reveal state rather than a layout-input change.
 - Separate deterministic animation-contract checks from stable historical-color screenshots.
 
 ### Phase 1: Presentation contract and state design
 
 - Define the observable shell, effect, reveal, keyboard, responsive, safety, and visual-snapshot contracts in `contracts/crt-presentation.md`.
-- Model transient presentation mode, reveal sequence, active-page registry, and consumed-key guard in `data-model.md`.
+- Model transient presentation mode, reveal sequence, generation-local complete-board fit, active-page registry, and consumed-key guard in `data-model.md`.
 - Confirm no RPC, generated binding, persistent JSON, Wails bridge, public access, or capability change.
 - Re-check the Constitution Check against the final design; all seven principles remain PASS.
 
@@ -130,6 +139,7 @@ BUG-002 browser checks force a deterministic dud-removal outcome and observe chi
 - Refactor row/line reveal around an idempotent controller with generation-safe cancellation and immediate completion.
 - Extend that controller to a hacking-generation identity and complete code-row units without exposing partial or unrevealed targets.
 - Reconcile same-generation dud-removal deltas into existing revealed or queued hacking rows without replacing unaffected nodes or restarting the controller.
+- Precompute and retain one complete-board hacking-row fit before the first row is painted; remove append-driven partial-DOM fitting while retaining complete-board refits for genuine viewport, orientation, and active-font changes.
 - Install the reveal-skip guard before normal keyboard actions and isolate one consumed physical key from auto-repeat.
 - Preserve current identity suppression, pagination, resize/font recalculation, same-generation hacking updates/fitting, authored-text safety, CSP, and optional-audio degradation.
 - Do not add `prefers-reduced-motion`, a setting, persistence, or any path that disables persistent CRT effects.
@@ -141,6 +151,7 @@ BUG-002 browser checks force a deterministic dud-removal outcome and observe chi
 - Add focused Playwright coverage and approved visual snapshot baselines.
 - Add BUG-001 asset and Playwright coverage for initial hacking-row reveal, interaction gating, skip consumption, identity stability, and replacement cancellation.
 - Add BUG-002 fixture, asset, and Playwright coverage for deterministic dud removal, revealed/pending row reconciliation, zero unrelated row removals, and zero reveal replay.
+- Add BUG-003 asset and Playwright coverage for complete-board pre-fit, zero reveal-append font changes, skipped completion, compact/stacked and zoom layouts, fallback-font rendering, and legitimate complete-board refits.
 - Run focused checks while developing, then the full browser suite as the required browser regression gate.
 - Run repository Go checks, the player production build, the current runtime journey, and the unsigned application build.
 
@@ -153,6 +164,7 @@ BUG-002 browser checks force a deterministic dud-removal outcome and observe chi
 | Focused browser journey | `npm test --prefix tests/browser -- crt-rendering.spec.mjs` | Fast feedback for CRT geometry, exact animation configuration, reveal lifecycle, consumed keys, snapshots, audio failure, safety, and viewports. |
 | BUG-001 hacking reveal | Focused cases in `crt-rendering.spec.mjs` | A new puzzle reveals complete code rows at 40ms in deterministic order; same-identity updates do not replay; replacement cancels stale rows; a key completes within 100ms without a hacking action. |
 | BUG-002 dud reconciliation | Focused cases in `crt-rendering.spec.mjs` | Dud removal within one generation updates only affected content, preserves unaffected row nodes and reveal progress, exposes no pending target early, and starts no new reveal. |
+| BUG-003 stable hacking typography | Focused cases in `crt-rendering.spec.mjs` plus responsive hacking geometry assertions | The first visible row uses the complete-board fit; uninterrupted and skipped row insertion changes the computed size zero times; legitimate viewport/orientation/font refits include queued rows and preserve the complete-board fit constraints. |
 | Full browser regression gate | `npm ci --prefix tests/browser` then `npm test --prefix tests/browser` | Every browser journey passes, not only the new focused specification. |
 | Repository Go checks | `gofmt -l .`, `go vet ./...`, `go test ./...` | No Go formatting paths; vet and all Go tests succeed. |
 | Generated bindings | `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` | No unexplained generated-file drift; no generated contract was edited manually. |
