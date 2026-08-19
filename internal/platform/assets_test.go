@@ -174,7 +174,7 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
-func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testing.T) {
+func TestBundledDemoShowcasesEveryCommandBehavior(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -183,14 +183,25 @@ func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testi
 	demo, err := domain.DecodeSession(raw)
 	require.NoError(t, err)
 
+	ordinaryCommands := 0
 	stateChangingCommands := 0
+	completedCommandStates := 0
+	terminalTransitions := 0
 	for _, terminal := range demo.Terminals {
-		require.Empty(t, terminal.CommandStates,
-			"read-only bundled demo must not expose reset controls for snapshots it cannot mutate")
 		var visit func(domain.ContentNode)
 		visit = func(node domain.ContentNode) {
-			if node.Type == domain.NodeCommand && node.StateChange != nil {
-				stateChangingCommands++
+			if node.Type == domain.NodeCommand {
+				switch {
+				case node.StateChange != nil:
+					stateChangingCommands++
+					if _, completed := terminal.CommandStates[node.ID]; completed {
+						completedCommandStates++
+					}
+				case node.TerminalTransition != nil:
+					terminalTransitions++
+				default:
+					ordinaryCommands++
+				}
 			}
 			for _, child := range node.Children {
 				visit(child)
@@ -198,8 +209,14 @@ func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testi
 		}
 		visit(terminal.Root)
 	}
+	require.GreaterOrEqual(t, ordinaryCommands, 1,
+		"bundled demo must showcase an ordinary command")
 	require.GreaterOrEqual(t, stateChangingCommands, 1,
-		"bundled demo must retain an initial-state example of the feature")
+		"bundled demo must showcase a state-changing command")
+	require.GreaterOrEqual(t, completedCommandStates, 1,
+		"bundled demo must showcase a completed command that can be reset in its writable copy")
+	require.GreaterOrEqual(t, terminalTransitions, 1,
+		"bundled demo must showcase cross-terminal navigation")
 }
 
 func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {

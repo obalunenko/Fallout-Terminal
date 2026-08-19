@@ -322,8 +322,13 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	t.Parallel()
 
 	fileSystem := testutil.NewFakeFileSystem()
-	demo := validSession("demo")
+	demo := stateChangingSession("demo")
 	demo.PlayerConfig = "demo-players.json"
+	completedState := domain.CommandExecutionState{
+		CompletedName: "Двери открыты",
+		ResultText:    "Доступ в сектор разрешён.",
+	}
+	demo.Terminals[0].CommandStates = map[string]domain.CommandExecutionState{"doors": completedState}
 	demoData, err := domain.EncodeSession(demo)
 	require.NoError(t, err)
 	playerConfigData, err := domain.EncodePlayerConfig(domain.PlayerConfig{
@@ -349,6 +354,7 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	assert.Empty(t, result.Error)
 	assert.Equal(t, destination, result.FilePath)
 	require.NotNil(t, result.Session)
+	assert.Equal(t, completedState, result.Session.Terminals[0].CommandStates["doors"])
 	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, testLocations.BundledDemo))
 	assert.Equal(t, playerConfigData, fileSystemFileData(t, fileSystem, bundledPlayerConfig))
 	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, destination))
@@ -357,6 +363,18 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	snapshot := service.Snapshot()
 	assert.Equal(t, destination, snapshot.Path)
 	assert.NotNil(t, snapshot.Session)
+
+	reset := service.ResetCommandState(t.Context(), "t1", "doors")
+	require.True(t, reset.OK, "ResetCommandState() in writable demo copy = %#v", reset)
+	assert.True(t, reset.Changed)
+	assert.Equal(t, uint64(1), reset.Revision)
+	require.NotNil(t, reset.Session)
+	assert.NotContains(t, reset.Session.Terminals[0].CommandStates, "doors")
+	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, testLocations.BundledDemo),
+		"resetting the writable copy mutated the bundled demo")
+	writtenCopy, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, destination))
+	require.NoError(t, err)
+	assert.NotContains(t, writtenCopy.Terminals[0].CommandStates, "doors")
 }
 
 func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
