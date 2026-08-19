@@ -1093,8 +1093,8 @@ function showPlayerNotice(message) {
   renderPlayerNotice();
 }
 
-function isDirectTerminalNavigationPending() {
-  return terminalNavigation?.pending?.direction === 'forward';
+function isTerminalNavigationPending() {
+  return terminalNavigation?.pending != null;
 }
 
 function renderPlayerNotice() {
@@ -1102,10 +1102,9 @@ function renderPlayerNotice() {
     playerState.notice === 'command-persistence-failed'
     ? 'НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ КОМАНДЫ. СОСТОЯНИЕ КОМАНДЫ НЕ ИЗМЕНЕНО.'
     : '';
-  const navigationMessage = terminalNavigation?.pending && !isDirectTerminalNavigationPending()
-    ? `${terminalNavigation.pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД'} В ${terminalNavigation.pending.targetTerminalName || terminalNavigation.pending.targetTerminalId} ОЖИДАЕТ РЕШЕНИЯ МАСТЕРА`
-    : '';
-  const message = authoritativeMessage || navigationMessage || transientPlayerNotice;
+  const message = isTerminalNavigationPending()
+    ? ''
+    : authoritativeMessage || transientPlayerNotice;
   playerNotice.textContent = message;
   playerNotice.hidden = !message;
   playerNotice.dataset.kind = authoritativeMessage ? 'error' : '';
@@ -1442,7 +1441,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (commandExecution?.phase === 'pending' || isDirectTerminalNavigationPending()) {
+  if (commandExecution?.phase === 'pending' || isTerminalNavigationPending()) {
     if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
       e.preventDefault();
     }
@@ -1921,7 +1920,7 @@ function render() {
 
   if (commandExecution !== null) {
     renderCommandExecutionScreen();
-  } else if (isDirectTerminalNavigationPending()) {
+  } else if (isTerminalNavigationPending()) {
     renderTerminalNavigationPendingScreen();
   } else if (mode === MODE.HACK) {
     renderHackScreen();
@@ -1965,7 +1964,7 @@ function renderTerminalNavigationPendingScreen() {
   renderCommandRecordSurface({
     kind: 'terminal-navigation-pending',
     key: `${pending.direction}:${pending.targetTerminalId}`,
-    title: `ПЕРЕХОД В ${target}`,
+    title: `${pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД'} В ${target}`,
     text: 'Выполняется запрос',
     showBack: false,
   });

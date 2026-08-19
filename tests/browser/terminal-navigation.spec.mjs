@@ -212,6 +212,80 @@ test('direct pending replaces every player menu with the inert record surface ac
   await runDecision('close');
 });
 
+test('return pending replaces every player menu with the inert record surface across reconnect and decisions', async ({ browser, request }) => {
+  const runDecision = async decision => {
+    const masterContext = await browser.newContext();
+    const master = await masterContext.newPage();
+    await openMaster(master);
+    const controller = await openParticipant(browser);
+    const firstObserver = await openParticipant(browser);
+    let secondObserver = await openParticipant(browser);
+    try {
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+      await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+
+      await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
+      await decideNavigation(master, 'approve');
+      await expect(controller.page.locator('#hackHeader')).toBeVisible();
+      await finishHack(request, controller.page);
+      await Promise.all([firstObserver, secondObserver].map(participant =>
+        expect(participant.page.locator('#termList')).toBeVisible({ timeout: 2000 })));
+
+      const currentMenu = await controller.page.locator('#termList').textContent();
+      const returnButton = controller.page.getByRole('button', { name: /НАЗАД В Жилой терминал/i });
+      await expect(returnButton).toBeVisible();
+      await returnButton.click();
+      await Promise.all([controller, firstObserver, secondObserver].map(participant =>
+        expectPendingTransitionSurface(participant.page)));
+
+      const retainedToken = await secondObserver.page.evaluate(() =>
+        localStorage.getItem('fallout-terminal.player-token'));
+      await secondObserver.context.close();
+      secondObserver = await openParticipant(browser, retainedToken);
+      await expectPendingTransitionSurface(secondObserver.page);
+
+      for (const participant of [controller, firstObserver, secondObserver]) {
+        await participant.page.keyboard.press('Enter');
+        await participant.page.keyboard.press('Backspace');
+        await expectPendingTransitionSurface(participant.page);
+      }
+
+      const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+      await expect(dialog).toBeVisible();
+      if (decision === 'close') await dialog.press('Escape');
+      else await dialog.getByRole('button', { name: decision === 'approve' ? 'ОДОБРИТЬ' : 'ОТКЛОНИТЬ' }).click();
+      await expect(dialog).toBeHidden();
+
+      if (decision === 'approve') {
+        await Promise.all([controller, firstObserver, secondObserver].map(async participant => {
+          await expect(participant.page.locator('#termList')).toBeVisible({ timeout: 2000 });
+          await expect(participant.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first()).toBeVisible();
+          await expect(participant.page.getByRole('button', { name: /НАЗАД В/i })).toHaveCount(0);
+        }));
+      } else {
+        await Promise.all([controller, firstObserver, secondObserver].map(async participant => {
+          await expect(participant.page.locator('#termList')).toBeVisible({ timeout: 2000 });
+          await expect(participant.page.locator('#termList')).toHaveText(currentMenu);
+          await expect(participant.page.locator('#termEntry')).toBeHidden();
+          await expect(participant.page.getByRole('button', { name: /НАЗАД В Жилой терминал/i })).toBeVisible();
+        }));
+      }
+    } finally {
+      await controller.context.close();
+      await firstObserver.context.close();
+      await secondObserver.context.close();
+      await masterContext.close();
+    }
+  };
+
+  await runDecision('approve');
+  expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+  await runDecision('reject');
+  expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+  await runDecision('close');
+});
+
 test('an unfinished destination hack resumes with the exact retained progress', async ({ browser, request }) => {
   const masterContext = await browser.newContext();
   const master = await masterContext.newPage();
@@ -255,10 +329,13 @@ test('root return stays pending on reject, then restores the nested source menu 
     const returnButton = player.page.getByRole('button', { name: /НАЗАД В Жилой терминал/i });
     await expect(returnButton).toBeVisible();
     await returnButton.click();
-    await expect(returnButton).toBeDisabled();
+    await expectPendingTransitionSurface(player.page);
     await decideNavigation(master, 'reject');
+    await expect(player.page.locator('#termList')).toBeVisible();
+    await expect(returnButton).toBeVisible();
     await expect(returnButton).toBeEnabled();
     await returnButton.click();
+    await expectPendingTransitionSurface(player.page);
     await decideNavigation(master, 'approve');
 
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ' })).toBeVisible();

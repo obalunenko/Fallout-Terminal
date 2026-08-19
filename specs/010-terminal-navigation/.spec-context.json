@@ -490,6 +490,76 @@
       "by": "ai",
       "at": "2026-08-19T00:39:32.009Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T01:03:40.119Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:05:02.763Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:05:48.932Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:06:30.047Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:06:30.147Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:08:18.053Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T08:53:08.707Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T08:53:08.975Z",
+      "reopened": true
     }
   ],
   "last_action": "BUG-002 implemented; 37/37 tasks complete; automated gates and accepted packaged presentation smoke pass",
@@ -929,8 +999,57 @@
     },
     "FR-029": {
       "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::direct pending replaces every player menu with the inert record surface across reconnect and decisions"
+      ],
+      "title": "Direct pending uses one inert full-screen request surface for every connected or reconnecting player",
+      "tasks": [
+        "T016",
+        "T027",
+        "T030",
+        "T031",
+        "T036",
+        "T037"
+      ]
+    },
+    "FR-030": {
+      "title": "Return pending uses one inert full-screen request surface and preserves the current route until resolution",
+      "tasks": [
+        "T016",
+        "T023",
+        "T027",
+        "T030",
+        "T031",
+        "T036",
+        "T038"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::return pending replaces every player menu with the inert record surface across reconnect and decisions"
+      ]
+    },
+    "SC-010": {
+      "title": "Forward pending presentation converges for controller, observers, and reconnect",
+      "tasks": [
+        "T030",
+        "T031",
+        "T036",
+        "T037"
+      ],
+      "tests": [
         "tests/browser/terminal-navigation.spec.mjs::direct pending replaces every player menu with the inert record surface across reconnect and decisions",
-        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+        "native packaged controller plus two observers and reconnect smoke"
+      ]
+    },
+    "SC-011": {
+      "title": "Return pending presentation converges and close or reject restores the unchanged current root",
+      "tasks": [
+        "T030",
+        "T031",
+        "T036",
+        "T038"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::return pending replaces every player menu with the inert record surface across reconnect and decisions",
+        "native packaged controller plus two observers and reconnect smoke"
       ]
     }
   },
@@ -1025,6 +1144,16 @@
       "decision": "Render only direct terminal-navigation pending through the existing record-description surface while keeping TerminalNavigationPresentation separate from CommandExecutionPresentation",
       "why": "Meets FR-029/SC-010 without merging independent protocol lifecycles or introducing an optimistic terminal switch",
       "rejected": "Reuse command-execution state or keep the transition-specific notice overlay"
+    },
+    {
+      "decision": "Render every terminal-navigation pending direction through one full-screen record-description surface and suppress notices until the master resolves it",
+      "why": "Forward and return requests share the same authoritative waiting contract and input lock while retaining separate navigation and command-execution protocols",
+      "rejected": "Keep a return-specific overlay over the current terminal screen"
+    },
+    {
+      "decision": "Normalize Wails file filter globs to bare extensions on Darwin while preserving documented glob syntax on other platforms",
+      "why": "Wails v3 beta passes Darwin patterns to UTType as filename extensions, so '*.json' disables the native Open action while 'json' works",
+      "rejected": "Relax the session chooser filter or special-case only one dialog"
     }
   ],
   "step_summaries": {
@@ -1036,9 +1165,9 @@
       "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
     },
     "implement": {
-      "summary": "Direct terminal transitions now use the shared full-screen pending record across controller, observers, and reconnect; all 37 tasks and automated/native gates are complete.",
-      "key_finding": "The native boundary had two synthetic one-terminal projections that rejected valid cross-terminal references during activation and protobuf routing; both now operate with the correct validation context",
-      "risks": "No open implementation tasks; the historical manual-gate concern is superseded by the accepted T036 verification record"
+      "summary": "Return and forward terminal-navigation requests now share the inert full-screen record surface across controller, observers, and reconnect; all 38 tasks, automated gates, and the packaged native BUG-003 delta are complete.",
+      "key_finding": "The UI defect was direction-specific gating in client rendering; packaged acceptance also exposed that Wails Darwin file filters require bare extensions rather than '*.json' globs.",
+      "risks": "The real demo's automatic playerConfig roster load can remain on its loading state, while explicit selection of the same roster succeeds."
     }
   },
   "currentTask": "T036",
@@ -1166,7 +1295,7 @@
     },
     "T016": {
       "status": "DONE",
-      "did": "Routed direct terminal-navigation pending through the shared full-screen record renderer, suppressed its old overlay, and blocked acknowledgement keys",
+      "did": "Generalized the full-screen terminal-navigation request renderer and input lock to return pending while suppressing notice overlays",
       "files": [
         "client/client.js"
       ]
@@ -1226,10 +1355,9 @@
     },
     "T023": {
       "status": "DONE",
-      "did": "Added browser return journeys covering pending lock, reject and approve, nested restore, A-B-C unwind and no-route absence",
+      "did": "Updated the root-return journey to assert the full-screen request surface and unchanged return control after rejection before nested restore approval",
       "files": [
-        "tests/browser/terminal-navigation.spec.mjs",
-        "tests/browser/fixture-server/main.go"
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T024": {
@@ -1261,7 +1389,7 @@
     },
     "T027": {
       "status": "DONE",
-      "did": "Extended the multiplayer/reconnect journey to require the shared full-screen pending record, hidden menu, and inert Enter/Back; all 11 focused tests pass",
+      "did": "Proved the return-pending surface and input lock converge for the controller, two observers, and a reconnecting observer across all decisions",
       "files": [
         "tests/browser/terminal-navigation.spec.mjs"
       ]
@@ -1292,21 +1420,20 @@
     },
     "T030": {
       "status": "DONE",
-      "did": "Passed targeted, race, full Go suites, frontend/client builds, 11 focused navigation journeys, and make check; removed an invalid durable runtime snapshot from the bundled demo",
+      "did": "Passed targeted Go and race suites, both web builds, all Go tests, 12 focused navigation browser tests, and make check",
       "files": [
         "client/client.js",
-        "tests/browser/terminal-navigation.spec.mjs",
-        "sessions/demo.json"
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T031": {
       "status": "DONE",
-      "did": "Packaged Wails smoke passed native reject/approve, controller plus two observers and reconnect full-screen pending, ten solved-terminal revisits, A-B-C LIFO unwind, shutdown, and real demo save/reopen",
+      "did": "Revalidated the accepted packaged Wails runtime with a controller, two observers, pending reconnect, forward and return approval, return close restoration, inert inputs, real demo selection, and the prior accepted durability and journey evidence",
       "files": [
+        "internal/platform/desktop.go",
+        "internal/platform/desktop_test.go",
         "build/bin/Fallout Terminal.app",
-        "sessions/demo.json",
-        "client/client.js",
-        "tests/browser/terminal-navigation.spec.mjs"
+        "sessions/demo.json"
       ]
     },
     "T032": {
@@ -1348,16 +1475,23 @@
     },
     "T036": {
       "status": "DONE",
-      "did": "Revalidated SC-010 on the accepted packaged runtime across controller, two observers, and reconnect; combined with the prior accepted native lifecycle pass, the complete gate remains green",
+      "did": "Passed the packaged native acceptance delta for SC-010 and SC-011 across controller, two observers, reconnect, approve and close decisions while retaining the previously accepted full navigation journey and shutdown coverage",
       "files": [
         "build/bin/Fallout Terminal.app",
-        "sessions/demo.json",
-        "specs/010-terminal-navigation/.spec-context.json"
+        "client/client.js",
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T037": {
       "status": "DONE",
       "did": "Added controller, two-observer, reconnect, input-lock, approve/reject/close regression; confirmed it fails because the record surface stays hidden",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added a controller, two-observer, reconnect, approve/reject/close regression that reproduces the return-pending overlay defect",
       "files": [
         "tests/browser/terminal-navigation.spec.mjs"
       ]
@@ -1519,6 +1653,42 @@
       "command": "open sessions/demo.json in packaged app, Apply t_demo1 to t_demo2, inspect file, restart, reopen",
       "result": "passed with both terminal IDs retained and t_demo2 selected after reopen",
       "warnings": []
+    },
+    {
+      "what": "BUG-003 fail-first and focused navigation regression",
+      "command": "npm test --prefix tests/browser -- --grep return-pending; npm test --prefix tests/browser -- terminal-navigation.spec.mjs",
+      "result": "new regression failed with hidden #termEntry before the fix, then 12/12 focused navigation tests passed",
+      "warnings": []
+    },
+    {
+      "what": "BUG-003 complete automated gate",
+      "command": "targeted Go and race suites; go test ./...; frontend/client builds; make check; git diff --check",
+      "result": "passed after the final Darwin file-filter fix",
+      "warnings": [
+        "macOS linker warned that some objects were built for macOS 26 while the test link target was 11; tests passed"
+      ]
+    },
+    {
+      "what": "BUG-003 accepted packaged Wails delta",
+      "command": "signed production bundle with native master, controller, two observers, and observer reconnect",
+      "result": "passed forward and return full-screen pending, exact request text, hidden menu/output/back/notice, inert Enter/Backspace, forward approval, return close restore, and return approval",
+      "warnings": [
+        "The unchanged full 10-revisit, A-B-C, reject, new-broadcast, and shutdown paths retain the prior accepted T036 evidence and current automated coverage"
+      ]
+    },
+    {
+      "what": "Final packaged macOS verification",
+      "command": "make package; scripts/verify-macos-app.sh \"build/bin/Fallout Terminal.app\"",
+      "result": "valid signed arm64 bundle; canonical manifest 74a9239a307db6cc5fc49a56a15cd9c244c0f07155b9256af29ca2bb53ab54a0",
+      "warnings": []
+    },
+    {
+      "what": "Darwin native JSON chooser regression",
+      "command": "go test ./internal/platform; open sessions/demo.json in the packaged app",
+      "result": "bare Darwin extension filter keeps Open enabled and the real demo session opens successfully",
+      "warnings": [
+        "The demo session's automatic player-roster reference remained on its loading state; the acceptance journey loaded the same real demo-players.json explicitly into an equivalent two-terminal session"
+      ]
     }
   ],
   "concerns": [
@@ -1530,6 +1700,11 @@
     {
       "note": "The packaged end-broadcast confirmation button was not exposed to Computer Use coordinate/AX activation; current shutdown cleanup and automated new-broadcast coverage passed, while the prior accepted packaged T036 run remains the evidence for the unchanged end/new-broadcast dialog path.",
       "step": "implement"
+    },
+    {
+      "note": "The packaged app can open sessions/demo.json after the Darwin filter fix, but automatic loading of its playerConfig reference remained stuck on the roster-loading state; explicit selection of the same sessions/demo-players.json succeeds. This is separate from BUG-003 terminal-navigation presentation.",
+      "step": "implement",
+      "kind": "follow-up"
     }
   ]
 }
