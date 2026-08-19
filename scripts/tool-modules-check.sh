@@ -34,8 +34,8 @@ check_tool_module() {
     fail "tools/$directory/go.mod does not own $command_package"
     return 1
   }
-  grep -Eq "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}$" "$module_file" || {
-    fail "tools/$directory/go.mod does not directly pin $parent_module $version"
+  grep -Eq "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}([[:space:]]+// indirect)?$" "$module_file" || {
+    fail "tools/$directory/go.mod does not pin $parent_module $version"
     return 1
   }
 }
@@ -101,7 +101,7 @@ check_active_commands() {
 check_tree() {
   local scan_root="$1"
 
-  check_tool_module "$scan_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.8 || return
+  check_tool_module "$scan_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.10 || return
   check_tool_module "$scan_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0 || return
   check_tool_module "$scan_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11 || return
   check_tool_module "$scan_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0 || return
@@ -130,7 +130,7 @@ self_test() {
   printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
   mkdir -p "$fixture_root/docs"
   printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
-  write_fixture_module "$fixture_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.8
+  write_fixture_module "$fixture_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.10
   write_fixture_module "$fixture_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0
   write_fixture_module "$fixture_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11
   write_fixture_module "$fixture_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0
