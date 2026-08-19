@@ -1620,33 +1620,35 @@ function renderNodeForm() {
     <input class="field-input" id="fldName" value="${escAttr(node.name)}">`;
 
   if (node.type === 'command') {
-  const transitionOptions = state.session.terminals
-    .filter(candidate => candidate.id !== term.id)
-    .map(candidate => `<option value="${escAttr(candidate.id)}"${node.terminalTransition?.targetTerminalId === candidate.id ? ' selected' : ''}>${escHtml(candidate.name)}</option>`)
-    .join('');
+    const commandMode = node.stateChange
+      ? 'state-change'
+      : node.terminalTransition
+        ? 'terminal-transition'
+        : 'ordinary';
+    const transitionOptions = state.session.terminals
+      .filter(candidate => candidate.id !== term.id)
+      .map(candidate => `<option value="${escAttr(candidate.id)}"${node.terminalTransition?.targetTerminalId === candidate.id ? ' selected' : ''}>${escHtml(candidate.name)}</option>`)
+      .join('');
     html += `
-      <label class="state-change-toggle" for="fldStateChangeEnabled">
-        <input id="fldStateChangeEnabled" type="checkbox"${node.stateChange ? ' checked' : ''}${snapshot ? ' disabled' : ''}>
-        <span>ИЗМЕНЯЕТ СОСТОЯНИЕ</span>
-      </label>
-      ${snapshot ? '<div class="state-change-toggle-hint">Сначала сбросьте выполненное состояние, чтобы отключить настройку.</div>' : ''}
-      <div class="state-change-fields" id="stateChangeFields"${node.stateChange ? '' : ' hidden'}>
+      <label class="field-label" for="fldCommandMode">РЕЖИМ КОМАНДЫ</label>
+      <select class="field-input command-mode-select" id="fldCommandMode"${snapshot ? ' disabled' : ''}>
+        <option value="ordinary"${commandMode === 'ordinary' ? ' selected' : ''}>ОБЫЧНАЯ КОМАНДА</option>
+        <option value="state-change"${commandMode === 'state-change' ? ' selected' : ''}>ИЗМЕНЯЕТ СОСТОЯНИЕ</option>
+        <option value="terminal-transition"${commandMode === 'terminal-transition' ? ' selected' : ''}>ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ</option>
+      </select>
+      ${snapshot ? '<div class="command-mode-hint">Сначала сбросьте выполненное состояние команды, чтобы изменить режим.</div>' : ''}
+      <div class="state-change-fields" id="stateChangeFields"${commandMode === 'state-change' ? '' : ' hidden'}>
         <label class="field-label" for="fldCompletedName">НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ</label>
         <input class="field-input" id="fldCompletedName" value="${escAttr(node.stateChange?.completedName || '')}">
         <label class="field-label" for="fldConfirmationText">ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ</label>
         <textarea class="field-textarea state-change-textarea" id="fldConfirmationText">${escHtml(node.stateChange?.confirmationText || '')}</textarea>
       </div>
-    <label class="state-change-toggle" for="fldTerminalTransitionEnabled">
-    <input id="fldTerminalTransitionEnabled" type="checkbox"${node.terminalTransition ? ' checked' : ''}${snapshot ? ' disabled' : ''}>
-    <span>ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ</span>
-    </label>
-    ${snapshot ? '<div class="state-change-toggle-hint">Сначала сбросьте выполненное состояние команды, чтобы настроить переход.</div>' : ''}
-    <div class="state-change-fields terminal-transition-fields" id="terminalTransitionFields"${node.terminalTransition ? '' : ' hidden'}>
-    <label class="field-label" for="fldTerminalTransitionTarget">ЦЕЛЕВОЙ ТЕРМИНАЛ</label>
-    <select class="field-input" id="fldTerminalTransitionTarget">
-      <option value="">ВЫБЕРИТЕ ТЕРМИНАЛ</option>${transitionOptions}
-    </select>
-    </div>
+      <div class="state-change-fields terminal-transition-fields" id="terminalTransitionFields"${commandMode === 'terminal-transition' ? '' : ' hidden'}>
+        <label class="field-label" for="fldTerminalTransitionTarget">ЦЕЛЕВОЙ ТЕРМИНАЛ</label>
+        <select class="field-input" id="fldTerminalTransitionTarget">
+          <option value="">ВЫБЕРИТЕ ТЕРМИНАЛ</option>${transitionOptions}
+        </select>
+      </div>
       <label class="field-label" for="fldText">ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.text || '')}</textarea>`;
     if (snapshot) {
@@ -1684,28 +1686,15 @@ function renderNodeForm() {
   };
 
   if (node.type === 'command') {
-    const enabled = document.getElementById('fldStateChangeEnabled');
+    const mode = document.getElementById('fldCommandMode');
     const fields = document.getElementById('stateChangeFields');
-  const transitionEnabled = document.getElementById('fldTerminalTransitionEnabled');
-  const transitionFields = document.getElementById('terminalTransitionFields');
-    enabled.addEventListener('change', () => {
-      fields.hidden = !enabled.checked;
-    if (enabled.checked) {
-    transitionEnabled.checked = false;
-    transitionFields.hidden = true;
-    }
+    const transitionFields = document.getElementById('terminalTransitionFields');
+    mode.addEventListener('change', () => {
+      fields.hidden = mode.value !== 'state-change';
+      transitionFields.hidden = mode.value !== 'terminal-transition';
       validationError.hidden = true;
       validationError.textContent = '';
     });
-  transitionEnabled.addEventListener('change', () => {
-    transitionFields.hidden = !transitionEnabled.checked;
-    if (transitionEnabled.checked) {
-      enabled.checked = false;
-      fields.hidden = true;
-    }
-    validationError.hidden = true;
-    validationError.textContent = '';
-  });
   }
 
   document.getElementById('btnApplyNode').addEventListener('click', () => {
@@ -1720,16 +1709,11 @@ function renderNodeForm() {
     }
 
     if (node.type === 'command') {
-      const stateChangeEnabled = document.getElementById('fldStateChangeEnabled').checked;
-    const transitionEnabled = document.getElementById('fldTerminalTransitionEnabled').checked;
+      const commandMode = document.getElementById('fldCommandMode').value;
       const textEl = document.getElementById('fldText');
-    let nextStateChange = null;
-    let nextTerminalTransition = null;
-    if (stateChangeEnabled && transitionEnabled) {
-    showValidationError('КОМАНДА НЕ МОЖЕТ ОДНОВРЕМЕННО ИЗМЕНЯТЬ СОСТОЯНИЕ И ПЕРЕКЛЮЧАТЬ ТЕРМИНАЛ', document.getElementById('fldTerminalTransitionEnabled'));
-    return;
-    }
-      if (stateChangeEnabled) {
+      let nextStateChange = null;
+      let nextTerminalTransition = null;
+      if (commandMode === 'state-change') {
         const completedNameEl = document.getElementById('fldCompletedName');
         const confirmationTextEl = document.getElementById('fldConfirmationText');
         if (!completedNameEl.value.trim()) {
@@ -1744,24 +1728,24 @@ function renderNodeForm() {
           showValidationError('УКАЖИТЕ ТЕКСТ УСПЕШНОГО РЕЗУЛЬТАТА', textEl);
           return;
         }
-    nextStateChange = {
+        nextStateChange = {
           completedName: completedNameEl.value,
           confirmationText: confirmationTextEl.value,
         };
       }
-    if (transitionEnabled) {
-    const targetEl = document.getElementById('fldTerminalTransitionTarget');
-    const targetID = targetEl.value;
-    if (!targetID || targetID === term.id || !state.session.terminals.some(candidate => candidate.id === targetID)) {
-      showValidationError('ВЫБЕРИТЕ ДРУГОЙ СУЩЕСТВУЮЩИЙ ТЕРМИНАЛ', targetEl);
-      return;
-    }
-    nextTerminalTransition = { targetTerminalId: targetID };
-    }
-    if (nextStateChange) node.stateChange = nextStateChange;
-    else delete node.stateChange;
-    if (nextTerminalTransition) node.terminalTransition = nextTerminalTransition;
-    else delete node.terminalTransition;
+      if (commandMode === 'terminal-transition') {
+        const targetEl = document.getElementById('fldTerminalTransitionTarget');
+        const targetID = targetEl.value;
+        if (!targetID || targetID === term.id || !state.session.terminals.some(candidate => candidate.id === targetID)) {
+          showValidationError('ВЫБЕРИТЕ ДРУГОЙ СУЩЕСТВУЮЩИЙ ТЕРМИНАЛ', targetEl);
+          return;
+        }
+        nextTerminalTransition = { targetTerminalId: targetID };
+      }
+      if (nextStateChange) node.stateChange = nextStateChange;
+      else delete node.stateChange;
+      if (nextTerminalTransition) node.terminalTransition = nextTerminalTransition;
+      else delete node.terminalTransition;
       node.text = textEl.value;
     }
 

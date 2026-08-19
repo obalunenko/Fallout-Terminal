@@ -24,8 +24,10 @@ message TerminalTransitionConfig {
 
 message CommandContent {
   string text = 1;
-  optional StateChangeConfig state_change = 2;
-  optional TerminalTransitionConfig terminal_transition = 3;
+  oneof behavior {
+    StateChangeConfig state_change = 2;
+    TerminalTransitionConfig terminal_transition = 3;
+  }
 }
 
 message EntryContent {

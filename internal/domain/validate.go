@@ -300,7 +300,10 @@ func validateTree(path string, root ContentNode) (map[string]ContentNode, []tree
 			if len([]byte(node.Text)) > maxBodyBytes {
 				return fmt.Errorf("%s.text exceeds %d bytes", nodePath, maxBodyBytes)
 			}
-			if node.StateChange != nil {
+			switch node.Behavior() {
+			case CommandBehaviorInvalid:
+				return fmt.Errorf("%s command cannot contain both stateChange and terminalTransition", nodePath)
+			case CommandBehaviorStateChange:
 				if err := validateRequiredString(nodePath+".text", node.Text, maxBodyBytes); err != nil {
 					return err
 				}
@@ -310,17 +313,17 @@ func validateTree(path string, root ContentNode) (map[string]ContentNode, []tree
 				if err := validateRequiredString(nodePath+".stateChange.confirmationText", node.StateChange.ConfirmationText, maxBodyBytes); err != nil {
 					return err
 				}
-			}
-			if node.TerminalTransition != nil {
-				if node.StateChange != nil {
-					return fmt.Errorf("%s command cannot contain both stateChange and terminalTransition", nodePath)
-				}
+			case CommandBehaviorTerminalTransition:
 				if err := validateRequiredString(nodePath+".terminalTransition.targetTerminalId", node.TerminalTransition.TargetTerminalID, MaxTerminalIDBytes); err != nil {
 					return err
 				}
 				transitionReferences = append(transitionReferences, treeTransitionReference{
 					path: nodePath + ".terminalTransition", targetTerminalID: node.TerminalTransition.TargetTerminalID,
 				})
+			case CommandBehaviorOrdinary:
+				// No optional command behavior is configured.
+			default:
+				return fmt.Errorf("%s command has unsupported behavior %q", nodePath, node.Behavior())
 			}
 		case NodeEntry:
 			if node.StateChange != nil || node.TerminalTransition != nil {

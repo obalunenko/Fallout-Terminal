@@ -125,6 +125,46 @@ func TestTerminalTransitionRoundTripTreatsConfigAsKnownAndDetachesClone(t *testi
 	assert.Equal(t, "b", session.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID)
 }
 
+func TestCommandBehaviorDiscriminatesOrdinaryStateChangeTransitionAndInvalid(t *testing.T) {
+	t.Parallel()
+
+	stateChange := &StateChangeConfig{CompletedName: "Done", ConfirmationText: "Proceed?"}
+	transition := &TerminalTransitionConfig{TargetTerminalID: "b"}
+	tests := []struct {
+		name string
+		node ContentNode
+		want CommandBehavior
+	}{
+		{name: "ordinary", node: ContentNode{Type: NodeCommand}, want: CommandBehaviorOrdinary},
+		{name: "state change", node: ContentNode{Type: NodeCommand, StateChange: stateChange}, want: CommandBehaviorStateChange},
+		{name: "terminal transition", node: ContentNode{Type: NodeCommand, TerminalTransition: transition}, want: CommandBehaviorTerminalTransition},
+		{name: "invalid dual config", node: ContentNode{Type: NodeCommand, StateChange: stateChange, TerminalTransition: transition}, want: CommandBehaviorInvalid},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.want, test.node.Behavior())
+		})
+	}
+}
+
+func TestDecodeSessionRejectsMalformedDualCommandBehavior(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Invalid behavior",
+  "terminals": [
+    {"id":"a","name":"A","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[{"id":"go","type":"command","name":"GO","text":"Done","stateChange":{"completedName":"Done","confirmationText":"Proceed?"},"terminalTransition":{"targetTerminalId":"b"}}]}},
+    {"id":"b","name":"B","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[]}}
+  ]
+}`)
+
+	_, err := DecodeSession(raw)
+	require.ErrorContains(t, err, "cannot contain both stateChange and terminalTransition")
+}
+
 func TestStateChangingCommandRoundTripPreservesFrozenSnapshotAndUnknownFields(t *testing.T) {
 	t.Parallel()
 

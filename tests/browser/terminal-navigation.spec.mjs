@@ -86,18 +86,61 @@ test.beforeEach(async ({ request }) => {
   expect(response.ok()).toBe(true);
 });
 
+test('command authoring exposes one exclusive behavior selector', async ({ page }) => {
+  await openMaster(page);
+  await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
+
+  const form = page.locator('#nodeForm');
+  const mode = form.getByLabel('РЕЖИМ КОМАНДЫ');
+  await expect(mode).toHaveValue('terminal-transition');
+  await expect(mode.locator('option')).toHaveText([
+    'ОБЫЧНАЯ КОМАНДА',
+    'ИЗМЕНЯЕТ СОСТОЯНИЕ',
+    'ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ',
+  ]);
+
+  await mode.selectOption('state-change');
+  await expect(form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ')).toBeVisible();
+  await expect(form.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ')).toBeHidden();
+
+  await mode.selectOption('terminal-transition');
+  await expect(form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ')).toBeHidden();
+  await expect(form.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ')).toBeVisible();
+
+  await mode.selectOption('ordinary');
+  await expect(form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ')).toBeHidden();
+  await expect(form.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ')).toBeHidden();
+});
+
 test('transition authoring is mutually exclusive, validates locally, and survives reopen', async ({ page }) => {
   await openMaster(page);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
   const form = page.locator('#nodeForm');
-  const transition = form.getByLabel('ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ');
-  const stateChange = form.getByLabel('ИЗМЕНЯЕТ СОСТОЯНИЕ');
-  await transition.check();
-  await expect(stateChange).not.toBeChecked();
+  const mode = form.getByLabel('РЕЖИМ КОМАНДЫ');
+  await expect(mode).toHaveValue('terminal-transition');
+
+  await mode.selectOption('state-change');
+  await form.getByLabel('ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ').fill('Переход подготовлен.');
+  await form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ').fill('ПЕРЕХОД ПОДГОТОВЛЕН');
+  await form.getByLabel('ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ').fill('Подготовить переход?');
+  await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
+  const stateChangeSave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
+    ?.terminals?.[0]?.root?.children?.[0]);
+  expect(stateChangeSave).toHaveProperty('stateChange');
+  expect(stateChangeSave).not.toHaveProperty('terminalTransition');
+
+  await page.reload();
+  await openMaster(page);
+  await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
+  await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('state-change');
+
+  await page.getByLabel('РЕЖИМ КОМАНДЫ').selectOption('terminal-transition');
   await form.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ').selectOption('security');
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
-  await expect.poll(() => page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
-    ?.terminals?.[0]?.root?.children?.[0]?.terminalTransition?.targetTerminalId)).toBe('security');
+  const transitionSave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
+    ?.terminals?.[0]?.root?.children?.[0]);
+  expect(transitionSave).toHaveProperty('terminalTransition.targetTerminalId', 'security');
+  expect(transitionSave).not.toHaveProperty('stateChange');
   await expect.poll(() => page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
     ?.terminals?.map(terminal => terminal.id))).toEqual(['residential', 'security', 'vault']);
 
@@ -105,11 +148,23 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   await openMaster(page);
   await expect(page.locator('.term-row')).toHaveCount(3);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
-  await expect(page.getByLabel('ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ')).toBeChecked();
+  await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('terminal-transition');
   await expect(page.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ')).toHaveValue('security');
 
+  await page.getByLabel('РЕЖИМ КОМАНДЫ').selectOption('ordinary');
+  await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
+  const ordinarySave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
+    ?.terminals?.[0]?.root?.children?.[0]);
+  expect(ordinarySave).not.toHaveProperty('stateChange');
+  expect(ordinarySave).not.toHaveProperty('terminalTransition');
+
+  await page.reload();
+  await openMaster(page);
+  await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
+  await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('ordinary');
+
   await selectCommand(page, 'ЗАВЕРШЁННАЯ КОМАНДА');
-  await expect(page.getByLabel('ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ')).toBeDisabled();
+  await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toBeDisabled();
 });
 
 test('deleting a referenced terminal is blocked before local mutation', async ({ page }) => {

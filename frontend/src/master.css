@@ -402,17 +402,9 @@ button {
 .field-textarea { resize: vertical; min-height: 100px; }
 .node-type-label { color: #ffe08a; font-size: 12px; margin-bottom: 4px; }
 .node-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-.state-change-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 12px;
-  color: #b9ffb0;
-  font-size: 11px;
-  letter-spacing: .5px;
-}
-.state-change-toggle input { accent-color: #6fae55; }
-.state-change-toggle-hint {
+.command-mode-select { cursor: pointer; }
+.command-mode-select:disabled { cursor: not-allowed; opacity: .65; }
+.command-mode-hint {
   margin-top: 5px;
   color: #6f9a5f;
   font-size: 9px;

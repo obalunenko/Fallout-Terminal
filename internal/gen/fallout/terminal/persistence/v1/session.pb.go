@@ -214,12 +214,15 @@ func (x *TerminalTransitionConfig) GetTargetTerminalId() string {
 }
 
 type CommandContent struct {
-	state              protoimpl.MessageState    `protogen:"open.v1"`
-	Text               string                    `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	StateChange        *StateChangeConfig        `protobuf:"bytes,2,opt,name=state_change,json=stateChange,proto3,oneof" json:"state_change,omitempty"`
-	TerminalTransition *TerminalTransitionConfig `protobuf:"bytes,3,opt,name=terminal_transition,json=terminalTransition,proto3,oneof" json:"terminal_transition,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// Types that are valid to be assigned to Behavior:
+	//
+	//	*CommandContent_StateChange
+	//	*CommandContent_TerminalTransition
+	Behavior      isCommandContent_Behavior `protobuf_oneof:"behavior"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CommandContent) Reset() {
@@ -259,19 +262,46 @@ func (x *CommandContent) GetText() string {
 	return ""
 }
 
+func (x *CommandContent) GetBehavior() isCommandContent_Behavior {
+	if x != nil {
+		return x.Behavior
+	}
+	return nil
+}
+
 func (x *CommandContent) GetStateChange() *StateChangeConfig {
 	if x != nil {
-		return x.StateChange
+		if x, ok := x.Behavior.(*CommandContent_StateChange); ok {
+			return x.StateChange
+		}
 	}
 	return nil
 }
 
 func (x *CommandContent) GetTerminalTransition() *TerminalTransitionConfig {
 	if x != nil {
-		return x.TerminalTransition
+		if x, ok := x.Behavior.(*CommandContent_TerminalTransition); ok {
+			return x.TerminalTransition
+		}
 	}
 	return nil
 }
+
+type isCommandContent_Behavior interface {
+	isCommandContent_Behavior()
+}
+
+type CommandContent_StateChange struct {
+	StateChange *StateChangeConfig `protobuf:"bytes,2,opt,name=state_change,json=stateChange,proto3,oneof"`
+}
+
+type CommandContent_TerminalTransition struct {
+	TerminalTransition *TerminalTransitionConfig `protobuf:"bytes,3,opt,name=terminal_transition,json=terminalTransition,proto3,oneof"`
+}
+
+func (*CommandContent_StateChange) isCommandContent_Behavior() {}
+
+func (*CommandContent_TerminalTransition) isCommandContent_Behavior() {}
 
 type EntryContent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -598,13 +628,13 @@ const file_fallout_terminal_persistence_v1_session_proto_rawDesc = "" +
 	"\vresult_text\x18\x02 \x01(\tR\n" +
 	"resultText\"H\n" +
 	"\x18TerminalTransitionConfig\x12,\n" +
-	"\x12target_terminal_id\x18\x01 \x01(\tR\x10targetTerminalId\"\x9a\x02\n" +
+	"\x12target_terminal_id\x18\x01 \x01(\tR\x10targetTerminalId\"\xf7\x01\n" +
 	"\x0eCommandContent\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\x12Z\n" +
-	"\fstate_change\x18\x02 \x01(\v22.fallout.terminal.persistence.v1.StateChangeConfigH\x00R\vstateChange\x88\x01\x01\x12o\n" +
-	"\x13terminal_transition\x18\x03 \x01(\v29.fallout.terminal.persistence.v1.TerminalTransitionConfigH\x01R\x12terminalTransition\x88\x01\x01B\x0f\n" +
-	"\r_state_changeB\x16\n" +
-	"\x14_terminal_transition\"0\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12W\n" +
+	"\fstate_change\x18\x02 \x01(\v22.fallout.terminal.persistence.v1.StateChangeConfigH\x00R\vstateChange\x12l\n" +
+	"\x13terminal_transition\x18\x03 \x01(\v29.fallout.terminal.persistence.v1.TerminalTransitionConfigH\x00R\x12terminalTransitionB\n" +
+	"\n" +
+	"\bbehavior\"0\n" +
 	"\fEntryContent\x12 \n" +
 	"\vdescription\x18\x01 \x01(\tR\vdescription\"\x9a\x02\n" +
 	"\vContentNode\x12\x0e\n" +
@@ -681,7 +711,10 @@ func file_fallout_terminal_persistence_v1_session_proto_init() {
 	if File_fallout_terminal_persistence_v1_session_proto != nil {
 		return
 	}
-	file_fallout_terminal_persistence_v1_session_proto_msgTypes[4].OneofWrappers = []any{}
+	file_fallout_terminal_persistence_v1_session_proto_msgTypes[4].OneofWrappers = []any{
+		(*CommandContent_StateChange)(nil),
+		(*CommandContent_TerminalTransition)(nil),
+	}
 	file_fallout_terminal_persistence_v1_session_proto_msgTypes[6].OneofWrappers = []any{
 		(*ContentNode_Folder)(nil),
 		(*ContentNode_Command)(nil),

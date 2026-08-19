@@ -1,5 +1,7 @@
 # Модель данных: переходы между терминалами
 
+**Bugfix**: 2026-08-19 — BUG-004 Уточнён дискриминированный режим содержимого команды.
+
 ## Границы жизненного цикла
 
 | Состояние | Владелец | Жизненный цикл | Persistence |
@@ -19,16 +21,16 @@
 |---|---|---|
 | `TargetTerminalID` | `string` | Обязательный stable ID другого терминала в той же session. |
 
-`ContentNode` получает `TerminalTransition *TerminalTransitionConfig`. Конфигурация разрешена только при `Type == NodeCommand`, не может сосуществовать с `StateChange` и не позволяет target, равный содержащему terminal ID.
+~~`ContentNode` получает независимый `TerminalTransition *TerminalTransitionConfig` рядом с `StateChange`, а их взаимоисключение выражается только validation.~~ По BUG-004 command content имеет один дискриминированный режим: ordinary/unset, `StateChange` или `TerminalTransition`. Persistence protobuf выражает два configured-варианта общим `oneof behavior`; JSON v1 сохраняет прежние `stateChange`/`terminalTransition` names и допускает не более одного из них. Transition разрешён только при `Type == NodeCommand` и не позволяет target, равный содержащему terminal ID.
 
 ### Session reference validation
 
 1. Проверить version, session fields, лимит терминалов, все terminal ID/name и уникальность IDs.
 2. Построить множество всех terminal IDs.
-3. Проверить каждое дерево, node variants, command states и optional transition config.
-4. Отклонить blank, missing, self-target и `stateChange` + `terminalTransition`.
+3. Проверить каждое дерево, node variants, command states и единственный command behavior variant.
+4. Отклонить blank, missing, self-target и malformed JSON/import input с `stateChange` + `terminalTransition`, даже если protobuf producer уже ограничен общим oneof.
 
-Отсутствие `terminalTransition` — legacy default «обычная команда». Неизвестные JSON-поля на session, terminal и node продолжают round-trip через `Extra`.
+Отсутствие обоих `stateChange` и `terminalTransition` — legacy default «обычная команда». Неизвестные JSON-поля на session, terminal и node продолжают round-trip через `Extra`.
 
 ## Broadcast runtime entities
 

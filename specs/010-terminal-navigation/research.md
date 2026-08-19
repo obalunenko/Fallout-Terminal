@@ -1,16 +1,18 @@
 # Исследование: переходы между терминалами
 
+**Bugfix**: 2026-08-19 — BUG-004 Уточнены общий persistence `oneof` и единый authoring mode selector.
+
 ## 1. Авторская ссылка в session JSON version 1
 
-**Decision**: Добавить к command-узлу optional `TerminalTransitionConfig` с единственным `targetTerminalId`; в JSON использовать `terminalTransition`, не меняя `version: 1`.
+**Decision**: ~~Добавить к protobuf `CommandContent` независимый optional `TerminalTransitionConfig` рядом с optional `state_change`.~~ По BUG-004 сохранить optional JSON-семантику `terminalTransition` и `version: 1`, но объединить protobuf `state_change = 2` и `terminal_transition = 3` в один реальный `oneof behavior`; unset oneof означает обычную команду.
 
-**Rationale**: Связь — это авторское свойство команды, а стабильный terminal ID переживает переименование. Optional field сохраняет прежнее поведение всех существующих v1-файлов; прямое domain↔protobuf отображение и `nodeFields` оставляют unknown-field preservation без изменения storage pipeline.
+**Rationale**: Связь — это авторское свойство команды, а стабильный terminal ID переживает переименование. Необязательный oneof сохраняет прежнее поведение всех существующих v1-файлов; те же field numbers/JSON names сохраняют wire/JSON shape валидных документов, а прямое domain↔protobuf отображение и `nodeFields` оставляют unknown-field preservation без изменения storage pipeline.
 
-**Alternatives considered**: Отдельная таблица связей на уровне session дублирует identity команды; хранение имени цели ломает rename; новая JSON-версия не нужна для совместимого optional-расширения.
+**Alternatives considered**: Отдельная таблица связей на уровне session дублирует identity команды; хранение имени цели ломает rename; новая JSON-версия не нужна для совместимого optional-расширения; два независимых optional config оставляют взаимоисключающий инвариант вне generated type и отклонены BUG-004.
 
 ## 2. Двухпроходная валидация и взаимоисключающие режимы команды
 
-**Decision**: `ValidateSession` сначала собирает все terminal IDs, затем валидирует деревья и cross-terminal references. `terminalTransition` разрешён только у command, должен ссылаться на существующий другой терминал и взаимоисключающ с `stateChange`.
+**Decision**: `ValidateSession` сначала собирает все terminal IDs, затем валидирует деревья и cross-terminal references. `terminalTransition` разрешён только у command, должен ссылаться на существующий другой терминал и взаимоисключающ с `stateChange`. По BUG-004 persistence protobuf выражает это одним oneof; validation остаётся защитой для session JSON/import boundary и malformed legacy input.
 
 **Rationale**: Два прохода разрешают ссылки на терминал, идущий позже в массиве, и не делают валидность зависимой от порядка. Взаимоисключение убирает неопределённость между durable execution approval и terminal-navigation approval; completed state-changing command сначала надо сбросить.
 

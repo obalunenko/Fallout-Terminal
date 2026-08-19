@@ -59,6 +59,18 @@ type TerminalTransitionConfig struct {
 	TargetTerminalID string `json:"targetTerminalId"`
 }
 
+// CommandBehavior is the single semantic variant selected for a command.
+// The durable JSON-v1 fields remain pointers so malformed documents containing
+// both known fields can be decoded and rejected instead of silently losing data.
+type CommandBehavior string
+
+const (
+	CommandBehaviorOrdinary           CommandBehavior = "ordinary"
+	CommandBehaviorStateChange        CommandBehavior = "state-change"
+	CommandBehaviorTerminalTransition CommandBehavior = "terminal-transition"
+	CommandBehaviorInvalid            CommandBehavior = "invalid"
+)
+
 // CommandExecutionState is the immutable durable snapshot captured from a
 // state-changing command's first successfully persisted execution.
 type CommandExecutionState struct {
@@ -88,6 +100,21 @@ type ContentNode struct {
 	StateChange        *StateChangeConfig         `json:"stateChange,omitempty"`
 	TerminalTransition *TerminalTransitionConfig  `json:"terminalTransition,omitempty"`
 	Extra              map[string]json.RawMessage `json:"-"`
+}
+
+// Behavior returns the command's discriminated behavior without mutating its
+// JSON-v1 representation. Invalid identifies a defensive dual-config state.
+func (n ContentNode) Behavior() CommandBehavior {
+	switch {
+	case n.StateChange != nil && n.TerminalTransition != nil:
+		return CommandBehaviorInvalid
+	case n.StateChange != nil:
+		return CommandBehaviorStateChange
+	case n.TerminalTransition != nil:
+		return CommandBehaviorTerminalTransition
+	default:
+		return CommandBehaviorOrdinary
+	}
 }
 
 // NavState is the shared server-authoritative player position.

@@ -3,6 +3,7 @@
 **Bugfix**: 2026-08-19 — BUG-001 Updated from bugfix patch
 **Bugfix**: 2026-08-19 — BUG-002 Updated from bugfix patch
 **Bugfix**: 2026-08-19 — BUG-003 Updated from bugfix patch
+**Bugfix**: 2026-08-19 — BUG-004 Updated from bugfix patch
 
 **Input**: design artifacts from `specs/010-terminal-navigation/`
 
@@ -18,13 +19,13 @@
 
 **Wave 1 — independent (different files):**
 
-- [x] **T001** [P] Добавить optional `TerminalTransitionConfig` в persistence v1, сохранив номера существующих полей и JSON version 1 · `proto/fallout/terminal/persistence/v1/session.proto`
+- [x] **T001** [P] ⚠️ Reopened — ~~добавить `terminal_transition` как independent optional field рядом со `state_change`~~; по BUG-004 объединить `CommandContent.state_change = 2` и `terminal_transition = 3` в один реальный `oneof behavior`, оставить unset ordinary mode и сохранить JSON version 1/known names `(reopened — BUG-004)` · `proto/fallout/terminal/persistence/v1/session.proto`
 - [x] **T002** [P] Добавить public direction/route/pending presentation и optional field 9 без новой player RPC · `proto/fallout/terminal/player/v1/terminal.proto`
 - [x] **T003** [P] Добавить private pending/notice/decision contracts и exact resolve request/result с `UNSPECIFIED = 0` · `proto/fallout/terminal/private/v1/coordination.proto`, `proto/fallout/terminal/private/v1/desktop.proto`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [x] **T004** Регенерировать pinned Go/ECMAScript protobuf outputs и reviewed schema revision штатным `make proto-generate` без ручного редактирования generated code · `internal/gen/fallout/terminal/persistence/v1/session.pb.go`, `internal/gen/fallout/terminal/player/v1/terminal.pb.go`, `internal/gen/fallout/terminal/private/v1/coordination.pb.go`, `internal/gen/fallout/terminal/private/v1/desktop.pb.go`, `client/gen/fallout/terminal/player/v1/terminal_pb.js`, `proto/schema-revision.txt`
+- [x] **T004** ⚠️ Reopened — регенерировать pinned Go/ECMAScript protobuf outputs и reviewed schema revision штатным `make proto-generate` без ручного редактирования generated code; по BUG-004 подтвердить shared `CommandContent` oneof generated API и сохранённые field numbers/JSON names `(reopened — BUG-004)` · `internal/gen/fallout/terminal/persistence/v1/session.pb.go`, `internal/gen/fallout/terminal/player/v1/terminal.pb.go`, `internal/gen/fallout/terminal/private/v1/coordination.pb.go`, `internal/gen/fallout/terminal/private/v1/desktop.pb.go`, `client/gen/fallout/terminal/player/v1/terminal_pb.js`, `proto/schema-revision.txt`
 
 ---
 
@@ -36,19 +37,19 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [x] **T005** [P] Покрыть deep clone, known/unknown JSON fields, two-pass validation, forward references, missing/self target и конфликт со `stateChange` · `internal/domain/model_test.go`, `internal/domain/validate_test.go`
-- [x] **T006** [P] Покрыть legacy/new v1 round-trip, terminal-order independence, atomic invalid-save rejection и detached trusted catalog lookup · `internal/session/contract_test.go`, `internal/session/service_test.go`
+- [x] **T005** [P] ⚠️ Reopened — покрыть deep clone, known/unknown JSON fields, two-pass validation, forward references, missing/self target и конфликт со `stateChange`; по BUG-004 проверить ordinary/state-change/transition discriminated behavior и malformed dual-config JSON rejection `(reopened — BUG-004)` · `internal/domain/model_test.go`, `internal/domain/validate_test.go`
+- [x] **T006** [P] ⚠️ Reopened — покрыть legacy/new v1 round-trip, terminal-order independence, atomic invalid-save rejection и detached trusted catalog lookup; по BUG-004 проверить shared-oneof adapter round-trip каждого варианта и сохранение field numbers/JSON names `(reopened — BUG-004)` · `internal/session/contract_test.go`, `internal/session/service_test.go`
 - [x] **T007** [P] Покрыть поиск folder по stable ID, восстановление новой ancestry и nearest-ancestor/root fallback после move/delete · `internal/nav/nav_test.go`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [x] **T008** Добавить durable transition config, broadcast route/pending/notice/presentation aggregates, deep clones, JSON known fields и two-pass cross-terminal validation · `internal/domain/model.go`, `internal/domain/json.go`, `internal/domain/validate.go`
+- [x] **T008** ⚠️ Reopened — добавить durable transition config, broadcast route/pending/notice/presentation aggregates, deep clones, JSON known fields и two-pass cross-terminal validation; по BUG-004 выразить command behavior как один discriminated ordinary/state-change/transition variant и сохранить defensive dual-config JSON/import rejection `(reopened — BUG-004)` · `internal/domain/model.go`, `internal/domain/json.go`, `internal/domain/validate.go`
 
 **⟶ Wait for T008 to finish, then Wave 3 — independent (different files):**
 
-- [x] **T009** [P] Реализовать explicit protobuf mapping и current-session `TerminalCatalog`, возвращающий detached target/command snapshot без изменения storage/revision pipeline · `internal/session/contract.go`, `internal/session/service.go`
+- [x] **T009** [P] ⚠️ Reopened — реализовать explicit protobuf mapping и current-session `TerminalCatalog`, возвращающий detached target/command snapshot без изменения storage/revision pipeline; по BUG-004 map ровно один generated `CommandContent.behavior` variant либо unset ordinary и отклонять невозможное/невалидное состояние на boundary `(reopened — BUG-004)` · `internal/session/contract.go`, `internal/session/service.go`
 - [x] **T010** [P] Реализовать pure stable-folder lookup и детерминированное восстановление current ancestry с parent/root fallback · `internal/nav/nav.go`
 
 **⟶ Wait for Wave 3 to finish, then:**
@@ -70,14 +71,14 @@
 **Wave 1 — independent (different files), write these tests to fail first:**
 
 - [x] **T012** [P] [US1] Добавить coordinator tests для controller-only linked command, exact-one pending, 20 replayed requests, competing-action conflict, approve/reject, stale/missing/self target и atomic route/active revision · `internal/control/service_test.go`
-- [x] **T013** [P] [US1] ⚠️ Reopened — добавить Playwright tests для mutually-exclusive authoring, completed-state guard, save/reopen, inbound-delete guard и master forward decision dialog; согласовать fixture round-trip с полной session, не теряющей второй terminal `(reopened — BUG-001)` · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixtures/desktop-bindings.js`
+- [x] **T013** [P] [US1] ⚠️ Reopened — добавить Playwright tests для mutually-exclusive authoring, completed-state guard, save/reopen, inbound-delete guard и master forward decision dialog; согласовать fixture round-trip с полной session, не теряющей второй terminal `(reopened — BUG-001)`; по BUG-004 заменить checkbox assertions на один ordinary/state-change/transition selector и проверить отсутствие inactive config после каждого switch/save/reopen `(reopened — BUG-004)` · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixtures/desktop-bindings.js`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then Wave 2 — independent (different files):**
 
 - [x] **T014** [P] [US1] Перехватывать linked `NavigateCommand` после authority/replay checks, создавать один `PendingTerminalNavigation`, блокировать gameplay и атомарно approve/reject со свежим catalog lookup · `internal/control/service.go`
-- [x] **T015** [P] [US1] Добавить command-editor toggle/select, mutual exclusion, local validation, inbound-reference delete guard и deduplicated master dialog с close-as-reject/stale callback guard · `frontend/src/master.js`, `frontend/src/master.css`, `frontend/src/desktop-api.js`
+- [x] **T015** [P] [US1] ⚠️ Reopened — ~~использовать два command-editor checkbox toggle с программным mutual exclusion~~; по BUG-004 добавить один ordinary/state-change/terminal-transition mode selector, очищать inactive config, сохранять target select, local validation, completed-state guard, inbound-reference delete guard и deduplicated master dialog `(reopened — BUG-004)` · `frontend/src/master.js`, `frontend/src/master.css`, `frontend/src/desktop-api.js`
 - [x] **T016** [P] [US1] [US3] ⚠️ Reopened — отображать authoritative pending status и делать shared controls inert без optimistic terminal switch; по BUG-002 для прямого pending скрывать меню и переиспользовать полноэкранный record-description renderer с точным текстом «Выполняется запрос», не объединяя отдельные protocol lifecycles; по BUG-003 применять тот же renderer к return pending, скрывать текущий экран и notice overlay и не выполнять преждевременный pop маршрута `(reopened — BUG-002)` `(reopened — BUG-003)` · `client/client.js`, `client/client.css`
 
 **⟶ Wait for Wave 2 to finish, then:**
@@ -168,15 +169,15 @@
 
 **Wave 1:**
 
-- [x] **T029** Проверить protobuf format/lint/generation/breaking и exact Wails allowlist командами `make proto-check proto-breaking bindings-check`; исправить только governed schema/adapters, если найден drift или public leakage · `proto/`, `internal/gen/`, `client/gen/`, `frontend/bindings/`, `app_contract.go`
+- [x] **T029** ⚠️ Reopened — проверить protobuf format/lint/generation/breaking и exact Wails allowlist командами `make proto-check proto-breaking bindings-check`; по BUG-004 проверить descriptor с одним real oneof, field numbers `2`/`3`, reviewed generated-API delta и отсутствие drift/public leakage `(reopened — BUG-004)` · `proto/`, `internal/gen/`, `client/gen/`, `frontend/bindings/`, `app_contract.go`
 
 **⟶ Wait for T029 to finish, then:**
 
-- [x] **T030** ⚠️ Reopened — выполнить единственную полную Success Criteria validation: `go test ./internal/domain ./internal/session ./internal/nav`, `go test -race ./internal/control ./internal/live ./internal/player`, `go test ./...`, frontend/client builds, focused `terminal-navigation.spec.mjs`, затем `make check`, включая SC-009 `(reopened — BUG-001)`, SC-010 `(reopened — BUG-002)` и SC-011 `(reopened — BUG-003)` · `specs/010-terminal-navigation/spec.md`, `Makefile`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
+- [x] **T030** ⚠️ Reopened — выполнить единственную полную Success Criteria validation: `go test ./internal/domain ./internal/session ./internal/nav`, `go test -race ./internal/control ./internal/live ./internal/player`, `go test ./...`, frontend/client builds, focused `terminal-navigation.spec.mjs`, затем `make check`, включая SC-009 `(reopened — BUG-001)`, SC-010 `(reopened — BUG-002)`, SC-011 `(reopened — BUG-003)` и SC-012 shared oneof/single-choice authoring `(reopened — BUG-004)` · `specs/010-terminal-navigation/spec.md`, `Makefile`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
 
 **⟶ Wait for T030 to finish, then:**
 
-- [x] **T031** ⚠️ Reopened — собрать accepted Wails runtime и пройти native master + controller + two observers smoke для approve/reject, 10 revisits, three-terminal unwind, reconnect and shutdown cleanup; дополнительно открыть реальный `sessions/demo.json`, применить `t_demo1` → `t_demo2`, дождаться durable revision и проверить цель после reopen; по BUG-002 доказать полноэкранный прямой pending «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать ту же полноэкранную поверхность для return pending и восстановление текущего root screen после reject/close; зафиксировать любой недоступный manual gate без ложного PASS `(reopened — BUG-001)` `(reopened — BUG-002)` `(reopened — BUG-003)` · `main.go`, `app.go`, `wails.json`, `sessions/demo.json`, `specs/010-terminal-navigation/spec.md`
+- [x] **T031** ⚠️ Reopened — собрать accepted Wails runtime и пройти native master + controller + two observers smoke для approve/reject, 10 revisits, three-terminal unwind, reconnect and shutdown cleanup; дополнительно открыть реальный `sessions/demo.json`, применить `t_demo1` → `t_demo2`, дождаться durable revision и проверить цель после reopen; по BUG-002 доказать полноэкранный прямой pending «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать ту же полноэкранную поверхность для return pending и восстановление текущего root screen после reject/close; по BUG-004 пройти native ordinary/state-change/transition selector, switch cleanup и save/reopen ровно одного config; зафиксировать любой недоступный manual gate без ложного PASS `(reopened — BUG-001)` `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-004)` · `main.go`, `app.go`, `wails.json`, `sessions/demo.json`, `specs/010-terminal-navigation/spec.md`
 
 ---
 
@@ -193,6 +194,7 @@
 - BUG-001 corrective DAG overrides the earlier completion state: `T034` failing regression → `T035` correction → reopened `T013` and `T033` → reopened `T030` → reopened `T031` → `T036` accepted packaged-runtime gate.
 - BUG-002 corrective DAG overrides the earlier completion state: `T037` failing presentation regression → reopened `T016` correction → reopened `T027` multi-player/reconnect proof → reopened `T030` full gate → reopened `T031` native smoke → reopened `T036` accepted packaged-runtime gate.
 - BUG-003 corrective DAG overrides the earlier completion state: `T038` failing return-presentation regression → reopened `T016` correction → reopened `T023` return journey and `T027` multi-player/reconnect proof → reopened `T030` full gate → reopened `T031` native smoke → reopened `T036` accepted packaged-runtime gate.
+- BUG-004 corrective DAG overrides phase ordering for its reopened tasks: schema branch `T039` failing regression → reopened `T001` → `T004` → reopened `T005` and `T006` fail/pass cycle → reopened `T008` → `T009`; authoring branch `T040` failing regression → reopened `T013` fail/pass cycle → reopened `T015`; both branches → reopened `T029` → `T030` → `T031`.
 
 ## Parallel Opportunities
 
@@ -252,3 +254,18 @@
 **⟶ Wait for T038 to fail for the reported return-overlay reason, then:** выполнить переоткрытую **T016**; после неё выполнить переоткрытые **T023** и **T027** → **T030** → **T031** → **T036**.
 
 **Checkpoint**: Forward и return pending используют общий полноэкранный renderer во всех player views, а active terminal, route mutation, resolve и lifecycle semantics остаются прежними.
+
+## Phase 12: BUG-004 — one exclusive command behavior
+
+**Purpose**: Выразить state-change и terminal-transition как один structural command behavior в persistence contract и один явный выбор режима в master UI, сохранив ordinary commands, JSON v1 и field numbers.
+
+### Tests
+
+- [x] **T039** [P] [US1] Добавить падающий descriptor/generated-API и adapter regression: `CommandContent.state_change = 2` и `terminal_transition = 3` принадлежат одному real `oneof behavior`, unset представляет ordinary command, каждый legacy valid variant сохраняет wire/JSON round-trip, а malformed dual-config JSON/import отклоняется · `internal/session/contract_test.go`, `internal/domain/model_test.go`, `internal/domain/validate_test.go`
+- [x] **T040** [P] [US1] Добавить падающий Playwright regression для одного command-mode selector: ordinary/state-change/terminal-transition взаимоисключающи, switch скрывает и удаляет inactive config, completed-state guard сохраняется, а save/reopen восстанавливает ровно один mode · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/fixtures/desktop-bindings.js`
+
+### Implementation and verification
+
+**⟶ After the regressions fail:** выполнить schema branch **T039** → **T001** → **T004** → **T005/T006** → **T008** → **T009** и authoring branch **T040** → **T013** → **T015**; после завершения обеих веток выполнить **T029** → **T030** → **T031**.
+
+**Checkpoint**: SC-012 доказана на descriptor, adapters, browser и packaged native paths; каждый command имеет ordinary/unset либо ровно один configured behavior, а существующие session v1 field numbers и JSON names не меняются.

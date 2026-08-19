@@ -93,20 +93,20 @@ test('bundled read-only demo exposes state-changing and terminal-transition exam
   expect(completed).toEqual([]);
 });
 
-test('state-change toggle requires all four authored texts and persists an optional config', async ({ page }) => {
+test('state-change mode requires all four authored texts and persists one config', async ({ page }) => {
   await selectCommand(page, 'Включить аварийный свет');
 
   const form = page.locator('#nodeForm');
-  const enabled = form.getByLabel('ИЗМЕНЯЕТ СОСТОЯНИЕ');
+  const mode = form.getByLabel('РЕЖИМ КОМАНДЫ');
   const initialName = form.getByLabel('ИСХОДНОЕ НАЗВАНИЕ');
   const completedName = form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ');
   const confirmationText = form.getByLabel('ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ');
   const successText = form.getByLabel('ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ');
 
-  await expect(enabled).not.toBeChecked();
+  await expect(mode).toHaveValue('ordinary');
   await expect(completedName).toBeHidden();
   await expect(confirmationText).toBeHidden();
-  await enabled.check();
+  await mode.selectOption('state-change');
   await expect(completedName).toBeVisible();
   await expect(confirmationText).toBeVisible();
 
@@ -140,7 +140,7 @@ test('state-change toggle requires all four authored texts and persists an optio
     },
   }));
 
-  await enabled.uncheck();
+  await mode.selectOption('ordinary');
   await expect(completedName).toBeHidden();
   await expect(confirmationText).toBeHidden();
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
@@ -157,7 +157,7 @@ test('completed command displays its frozen snapshot while authored fields remai
   await selectCommand(page, 'Двери открыты');
 
   const form = page.locator('#nodeForm');
-  await expect(form.getByLabel('ИЗМЕНЯЕТ СОСТОЯНИЕ')).toBeChecked();
+  await expect(form.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('state-change');
   await expect(form.getByLabel('ИСХОДНОЕ НАЗВАНИЕ')).toHaveValue('Открыть двери');
   await expect(form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ')).toHaveValue('Двери разблокированы');
   await expect(form.getByLabel('ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ')).toHaveValue('Новая редакция результата открытия.');

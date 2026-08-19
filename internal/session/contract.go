@@ -118,16 +118,22 @@ func contentNodeToProto(node domain.ContentNode) (*persistencev1.ContentNode, er
 		result.Content = &persistencev1.ContentNode_Folder{Folder: folder}
 	case domain.NodeCommand:
 		command := &persistencev1.CommandContent{Text: node.Text}
-		if node.StateChange != nil {
-			command.StateChange = &persistencev1.StateChangeConfig{
+		switch node.Behavior() {
+		case domain.CommandBehaviorOrdinary:
+			// An unset protobuf oneof is the ordinary-command variant.
+		case domain.CommandBehaviorStateChange:
+			command.Behavior = &persistencev1.CommandContent_StateChange{StateChange: &persistencev1.StateChangeConfig{
 				CompletedName:    node.StateChange.CompletedName,
 				ConfirmationText: node.StateChange.ConfirmationText,
-			}
-		}
-		if node.TerminalTransition != nil {
-			command.TerminalTransition = &persistencev1.TerminalTransitionConfig{
+			}}
+		case domain.CommandBehaviorTerminalTransition:
+			command.Behavior = &persistencev1.CommandContent_TerminalTransition{TerminalTransition: &persistencev1.TerminalTransitionConfig{
 				TargetTerminalId: node.TerminalTransition.TargetTerminalID,
-			}
+			}}
+		case domain.CommandBehaviorInvalid:
+			return nil, fmt.Errorf("command %q cannot contain both stateChange and terminalTransition", node.ID)
+		default:
+			return nil, fmt.Errorf("command %q has unsupported behavior %q", node.ID, node.Behavior())
 		}
 		result.Content = &persistencev1.ContentNode_Command{Command: command}
 	case domain.NodeEntry:
@@ -160,16 +166,20 @@ func contentNodeFromProto(node *persistencev1.ContentNode, template domain.Conte
 		}
 	case *persistencev1.ContentNode_Command:
 		result.Type, result.Text = domain.NodeCommand, content.Command.GetText()
-		if content.Command.GetStateChange() != nil {
+		switch behavior := content.Command.GetBehavior().(type) {
+		case nil:
+			// An unset protobuf oneof is the ordinary-command variant.
+		case *persistencev1.CommandContent_StateChange:
 			result.StateChange = &domain.StateChangeConfig{
-				CompletedName:    content.Command.GetStateChange().GetCompletedName(),
-				ConfirmationText: content.Command.GetStateChange().GetConfirmationText(),
+				CompletedName:    behavior.StateChange.GetCompletedName(),
+				ConfirmationText: behavior.StateChange.GetConfirmationText(),
 			}
-		}
-		if content.Command.GetTerminalTransition() != nil {
+		case *persistencev1.CommandContent_TerminalTransition:
 			result.TerminalTransition = &domain.TerminalTransitionConfig{
-				TargetTerminalID: content.Command.GetTerminalTransition().GetTargetTerminalId(),
+				TargetTerminalID: behavior.TerminalTransition.GetTargetTerminalId(),
 			}
+		default:
+			return domain.ContentNode{}, fmt.Errorf("command %q has unsupported protobuf behavior %T", node.GetId(), behavior)
 		}
 	case *persistencev1.ContentNode_Entry:
 		result.Type, result.Description = domain.NodeEntry, content.Entry.GetDescription()

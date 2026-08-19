@@ -560,9 +560,132 @@
       "by": "extension",
       "at": "2026-08-19T08:53:08.975Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T14:17:05.050Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:19:26.472Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:19:26.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:20:03.828Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:20:21.867Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:21:22.481Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:21:22.796Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:22:33.218Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:22:47.091Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:23:45.996Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:25:34.836Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:26:32.879Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:37:56.741Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:43:40.064Z",
+      "reopened": true
     }
   ],
-  "last_action": "BUG-002 implemented; 37/37 tasks complete; automated gates and accepted packaged presentation smoke pass",
+  "last_action": "BUG-004 implemented; 40/40 tasks complete; automated and accepted packaged native gates pass",
   "coverage": {
     "FR-001": {
       "title": "Мастер MUST иметь возможность настроить обычную команду как команду перехода и выбрать для неё другой терминал из текущей сессии.",
@@ -1051,6 +1174,57 @@
         "tests/browser/terminal-navigation.spec.mjs::return pending replaces every player menu with the inert record surface across reconnect and decisions",
         "native packaged controller plus two observers and reconnect smoke"
       ]
+    },
+    "FR-031": {
+      "title": "Persistence CommandContent uses one shared protobuf oneof with unset ordinary mode and stable fields 2/3 plus JSON-v1 names.",
+      "tasks": [
+        "T001",
+        "T004",
+        "T005",
+        "T006",
+        "T008",
+        "T009",
+        "T029",
+        "T030",
+        "T039"
+      ],
+      "tests": [
+        "internal/session/contract_test.go::TestCommandContentUsesOneRealBehaviorOneofWithStableFieldNumbers",
+        "internal/session/contract_test.go::TestSessionContractRoundTripsStateChangeConfigAndFrozenCommandStates",
+        "internal/session/contract_test.go::TestSessionContractRoundTripsTerminalTransitionAndKeepsLegacyAbsent"
+      ]
+    },
+    "FR-032": {
+      "title": "Master command editor exposes one ordinary/state-change/terminal-transition choice and persists exactly one active mode.",
+      "tasks": [
+        "T013",
+        "T015",
+        "T030",
+        "T031",
+        "T040"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::command authoring exposes one exclusive behavior selector",
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring is mutually exclusive validates locally and survives reopen",
+        "tests/browser/state-changing-command-authoring.spec.mjs::state-change mode requires all four authored texts and persists one config",
+        "native packaged command-mode save/reopen smoke"
+      ]
+    },
+    "SC-012": {
+      "title": "All descriptor adapter and master save/reopen checks preserve one behavior mode with stable schema identity.",
+      "tasks": [
+        "T029",
+        "T030",
+        "T031",
+        "T039",
+        "T040"
+      ],
+      "tests": [
+        "internal/session/contract_test.go::TestCommandContentUsesOneRealBehaviorOneofWithStableFieldNumbers",
+        "tests/browser/terminal-navigation.spec.mjs::command authoring exposes one exclusive behavior selector",
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring is mutually exclusive validates locally and survives reopen",
+        "native packaged command-mode save/reopen smoke"
+      ]
     }
   },
   "size": "oversized",
@@ -1154,6 +1328,21 @@
       "decision": "Normalize Wails file filter globs to bare extensions on Darwin while preserving documented glob syntax on other platforms",
       "why": "Wails v3 beta passes Darwin patterns to UTType as filename extensions, so '*.json' disables the native Open action while 'json' works",
       "rejected": "Relax the session chooser filter or special-case only one dialog"
+    },
+    {
+      "decision": "Name the shared protobuf oneof behavior and keep ordinary commands unset",
+      "why": "One generated discriminant makes state_change and terminal_transition structurally exclusive while preserving field numbers 2 and 3 and JSON names",
+      "rejected": "Two independent proto3 optional fields with validation-only mutual exclusion"
+    },
+    {
+      "decision": "Keep JSON-v1 command config pointers and expose a domain Behavior discriminant",
+      "why": "The decoder must retain malformed dual-config documents long enough to reject them defensively without changing the durable JSON version or known names",
+      "rejected": "An interface-only domain union that would silently discard or complicate legacy JSON input"
+    },
+    {
+      "decision": "Use one three-option master command mode selector and delete inactive configs on apply",
+      "why": "The UI can represent only ordinary, state-change, or terminal-transition and save/reopen restores exactly one choice",
+      "rejected": "Two checkboxes with JavaScript mutual exclusion"
     }
   ],
   "step_summaries": {
@@ -1165,16 +1354,16 @@
       "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
     },
     "implement": {
-      "summary": "Return and forward terminal-navigation requests now share the inert full-screen record surface across controller, observers, and reconnect; all 38 tasks, automated gates, and the packaged native BUG-003 delta are complete.",
-      "key_finding": "The UI defect was direction-specific gating in client rendering; packaged acceptance also exposed that Wails Darwin file filters require bare extensions rather than '*.json' globs.",
-      "risks": "The real demo's automatic playerConfig roster load can remain on its loading state, while explicit selection of the same roster succeeds."
+      "summary": "Implemented BUG-004 end to end: CommandContent now has one real behavior oneof, domain/session mappings enforce one variant, and master authoring uses one three-mode selector with durable inactive-config cleanup.",
+      "key_finding": "JSON-v1 compatibility is preserved by retaining the two known pointer fields at the JSON boundary while exposing and validating a single semantic behavior discriminant.",
+      "risks": "No open implementation risks; protobuf field numbers and JSON names are unchanged and full automated plus native packaged gates passed."
     }
   },
-  "currentTask": "T036",
+  "currentTask": "T031",
   "task_summaries": {
     "T001": {
       "status": "DONE",
-      "did": "Added optional persistence-v1 terminal transition config without changing existing field numbers or JSON version",
+      "did": "Changed CommandContent to one real behavior oneof with unset ordinary mode while preserving state_change field 2 and terminal_transition field 3; protobuf formatting passes.",
       "files": [
         "proto/fallout/terminal/persistence/v1/session.proto"
       ]
@@ -1196,19 +1385,15 @@
     },
     "T004": {
       "status": "DONE",
-      "did": "Regenerated pinned Go and ECMAScript protobuf outputs and synchronized the reviewed schema revision",
+      "did": "Regenerated pinned protobuf outputs with make proto-generate, updated reviewed schema revision, and confirmed generated CommandContent exposes Behavior with StateChange and TerminalTransition wrappers.",
       "files": [
         "internal/gen/fallout/terminal/persistence/v1/session.pb.go",
-        "internal/gen/fallout/terminal/player/v1/terminal.pb.go",
-        "internal/gen/fallout/terminal/private/v1/coordination.pb.go",
-        "internal/gen/fallout/terminal/private/v1/desktop.pb.go",
-        "client/gen/fallout/terminal/player/v1/terminal_pb.js",
         "proto/schema-revision.txt"
       ]
     },
     "T005": {
       "status": "DONE",
-      "did": "Added fail-first domain tests for transition JSON, deep cloning, two-pass references, missing/self targets, and state-change conflicts",
+      "did": "Added fail-first domain coverage for ordinary, state-change, transition, and invalid dual-config behavior discrimination plus malformed dual-config JSON rejection; existing clone/unknown-field/two-pass target tests remain in place.",
       "files": [
         "internal/domain/model_test.go",
         "internal/domain/validate_test.go"
@@ -1216,7 +1401,7 @@
     },
     "T006": {
       "status": "DONE",
-      "did": "Added fail-first session tests for legacy/new v1 round trips, atomic invalid saves, terminal-order independence, and detached current-catalog lookups",
+      "did": "Updated session contract regressions to assert unset ordinary behavior, exact generated StateChange/TerminalTransition oneof wrappers, stable descriptor fields, round trips, and boundary rejection of malformed dual config; confirmed the pre-adapter code no longer compiles against the oneof API.",
       "files": [
         "internal/session/contract_test.go",
         "internal/session/service_test.go"
@@ -1231,19 +1416,19 @@
     },
     "T008": {
       "status": "DONE",
-      "did": "Implemented durable transition config, broadcast route/pending/notice/public aggregates, deep session/projection clones, known JSON fields, and two-pass cross-terminal validation",
+      "did": "Introduced a CommandBehavior discriminant for ordinary, state-change, terminal-transition, and defensive invalid states while retaining JSON-v1 pointer fields for lossless malformed-input rejection; validation now branches on the discriminant and domain tests pass.",
       "files": [
         "internal/domain/model.go",
-        "internal/domain/json.go",
-        "internal/domain/validate.go"
+        "internal/domain/validate.go",
+        "internal/domain/model_test.go"
       ]
     },
     "T009": {
       "status": "DONE",
-      "did": "Mapped terminal links explicitly through persistence protobuf and added atomic detached current-session terminal/catalog lookups",
+      "did": "Mapped exactly one domain command behavior to the generated protobuf oneof wrappers, preserved unset ordinary commands, decoded by generated oneof type, and rejected invalid boundary states; full session package tests pass.",
       "files": [
         "internal/session/contract.go",
-        "internal/session/service.go"
+        "internal/session/contract_test.go"
       ]
     },
     "T010": {
@@ -1272,9 +1457,10 @@
     },
     "T013": {
       "status": "DONE",
-      "did": "Extended authoring save/reopen coverage to assert all three fixture terminal IDs survive the save boundary and reopen",
+      "did": "Reworked Playwright authoring coverage around one three-mode selector, including state-change→transition→ordinary switch/save/reopen cycles, inactive-config removal, full-session retention, and completed-state disabling; confirmed it fails before the UI change.",
       "files": [
-        "tests/browser/terminal-navigation.spec.mjs"
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixtures/desktop-bindings.js"
       ]
     },
     "T014": {
@@ -1286,11 +1472,12 @@
     },
     "T015": {
       "status": "DONE",
-      "did": "Added mutually exclusive link authoring with local validation and completed guards, inbound-reference deletion protection, and a deduplicated stale-safe master decision dialog",
+      "did": "Replaced the two command checkboxes with one ordinary/state-change/terminal-transition selector, preserved target and local validation, cleared inactive configs on apply, disabled mode changes for completed commands, and updated selector-dependent browser coverage; focused tests pass.",
       "files": [
         "frontend/src/master.js",
         "frontend/src/master.css",
-        "frontend/src/desktop-api.js"
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T016": {
@@ -1408,32 +1595,32 @@
     },
     "T029": {
       "status": "DONE",
-      "did": "Verified deterministic protobuf generation, all breaking-change fixtures, public/private schema isolation, and the exact 34-method Wails binding allowlist",
+      "did": "Passed make proto-check proto-breaking bindings-check: schema is formatted/linted/deterministic, generated oneof API is current, breaking fixtures are rejected, and the exact 34-method Wails allowlist remains unchanged.",
       "files": [
-        "proto/",
-        "internal/gen/",
-        "client/gen/",
-        "frontend/bindings/",
-        "app_contract.go",
-        "scripts/wails-bindings-check.sh"
+        "proto/fallout/terminal/persistence/v1/session.proto",
+        "internal/gen/fallout/terminal/persistence/v1/session.pb.go",
+        "proto/schema-revision.txt"
       ]
     },
     "T030": {
       "status": "DONE",
-      "did": "Passed targeted Go and race suites, both web builds, all Go tests, 12 focused navigation browser tests, and make check",
+      "did": "Passed the complete SC-012 validation: focused domain/session/nav tests, control/live/player race tests, go test ./..., frontend and client production builds, all 13 terminal-navigation Playwright tests, and aggregate make check including vet, full race, proto, breaking, and bindings gates.",
       "files": [
-        "client/client.js",
-        "tests/browser/terminal-navigation.spec.mjs"
+        "specs/010-terminal-navigation/spec.md",
+        "Makefile",
+        "frontend/package.json",
+        "client/package.json",
+        "tests/browser/package.json",
+        "internal/platform/assets_test.go"
       ]
     },
     "T031": {
       "status": "DONE",
-      "did": "Revalidated the accepted packaged Wails runtime with a controller, two observers, pending reconnect, forward and return approval, return close restoration, inert inputs, real demo selection, and the prior accepted durability and journey evidence",
+      "did": "Built and verified signed arm64 bundle (manifest 95ac50bb16b0371199293633a5a1df62eecd842410797931e2a12ac5b43e55f5), opened the real demo, then used an isolated copy for accepted native ordinary→state-change→terminal-transition save cycles. Durable JSON contained zero configs in ordinary, exactly stateChange in state-change, exactly terminalTransition targeting t_demo2 after the final switch, and restart/reopen restored the transition selector and target. Prior accepted native master/controller/two-observer navigation evidence remains unchanged; sessions/demo.json stayed untouched.",
       "files": [
-        "internal/platform/desktop.go",
-        "internal/platform/desktop_test.go",
         "build/bin/Fallout Terminal.app",
-        "sessions/demo.json"
+        "sessions/demo.json",
+        "specs/010-terminal-navigation/spec.md"
       ]
     },
     "T032": {
@@ -1492,6 +1679,20 @@
     "T038": {
       "status": "DONE",
       "did": "Added a controller, two-observer, reconnect, approve/reject/close regression that reproduces the return-pending overlay defect",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Added a fail-first descriptor regression proving CommandContent must expose one real behavior oneof while preserving field numbers 2 and 3; confirmed the test fails against the pre-fix generated schema.",
+      "files": [
+        "internal/session/contract_test.go"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Added a fail-first Playwright regression for one exclusive command behavior selector and all three modes; confirmed it fails because the selector is absent.",
       "files": [
         "tests/browser/terminal-navigation.spec.mjs"
       ]
@@ -1689,6 +1890,34 @@
       "warnings": [
         "The demo session's automatic player-roster reference remained on its loading state; the acceptance journey loaded the same real demo-players.json explicitly into an equivalent two-terminal session"
       ]
+    },
+    {
+      "what": "BUG-004 fail-first regressions",
+      "command": "focused Go descriptor test and Playwright command-mode test before implementation",
+      "result": "failed for missing real behavior oneof and missing РЕЖИМ КОМАНДЫ selector, then passed after implementation",
+      "warnings": []
+    },
+    {
+      "what": "BUG-004 protobuf and bindings gate",
+      "command": "make proto-check proto-breaking bindings-check",
+      "result": "passed deterministic generation, breaking fixtures, generated shared-oneof API, and exact 34-method Wails allowlist",
+      "warnings": []
+    },
+    {
+      "what": "BUG-004 complete automated gate",
+      "command": "targeted Go tests; race suites; go test ./...; frontend/client builds; 13-test terminal-navigation suite; make check",
+      "result": "passed",
+      "warnings": [
+        "macOS linker emitted benign newer-object-version warnings during Go tests"
+      ]
+    },
+    {
+      "what": "BUG-004 accepted packaged Wails delta",
+      "command": "signed bundle; native ordinary/state-change/terminal-transition save cycles; durable JSON inspection; restart and reopen",
+      "result": "passed zero/one-config cleanup and restored terminal-transition target t_demo2 after reopen; bundle manifest 95ac50bb16b0371199293633a5a1df62eecd842410797931e2a12ac5b43e55f5",
+      "warnings": [
+        "Used an isolated copy for mutations; the real sessions/demo.json was opened and remained unchanged"
+      ]
     }
   ],
   "concerns": [
@@ -1706,5 +1935,6 @@
       "step": "implement",
       "kind": "follow-up"
     }
-  ]
+  ],
+  "summary": "BUG-004 implemented and verified: shared protobuf behavior oneof, single master command-mode selector, full automated gates, and accepted packaged save/reopen smoke."
 }

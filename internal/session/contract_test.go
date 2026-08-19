@@ -6,9 +6,27 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	persistencev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/testing/protocmp"
 )
+
+func TestCommandContentUsesOneRealBehaviorOneofWithStableFieldNumbers(t *testing.T) {
+	descriptor := (&persistencev1.CommandContent{}).ProtoReflect().Descriptor()
+	behavior := descriptor.Oneofs().ByName("behavior")
+	require.NotNil(t, behavior)
+	require.False(t, behavior.IsSynthetic())
+
+	stateChange := descriptor.Fields().ByName("state_change")
+	require.NotNil(t, stateChange)
+	require.Equal(t, int32(2), int32(stateChange.Number()))
+	require.Equal(t, behavior, stateChange.ContainingOneof())
+
+	terminalTransition := descriptor.Fields().ByName("terminal_transition")
+	require.NotNil(t, terminalTransition)
+	require.Equal(t, int32(3), int32(terminalTransition.Number()))
+	require.Equal(t, behavior, terminalTransition.ContainingOneof())
+}
 
 func TestSessionContractMapsEveryKnownFieldAndPreservesRecursiveJSONExtras(t *testing.T) {
 	value := domain.Session{
@@ -75,7 +93,7 @@ func TestSessionContractKeepsLegacyOptionalFieldsAbsentAndOrdinaryContentUnchang
 	ordinary := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
 	require.NotNil(t, ordinary)
 	require.Equal(t, "All systems nominal.", ordinary.GetText())
-	require.Nil(t, ordinary.StateChange)
+	require.Nil(t, ordinary.GetBehavior())
 
 	roundTrip, err := SessionFromProto(semantic, value)
 	require.NoError(t, err)
@@ -99,6 +117,7 @@ func TestSessionContractRoundTripsStateChangeConfigAndFrozenCommandStates(t *tes
 	require.Equal(t, "Двери открыты", semantic.GetTerminals()[0].GetCommandStates()["doors"].GetCompletedName())
 	require.Equal(t, "Доступ в сектор разрешён.", semantic.GetTerminals()[0].GetCommandStates()["doors"].GetResultText())
 	command := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
+	require.IsType(t, &persistencev1.CommandContent_StateChange{}, command.GetBehavior())
 	require.Equal(t, "Двери открыты", command.GetStateChange().GetCompletedName())
 	require.Equal(t, "Открыть двери?", command.GetStateChange().GetConfirmationText())
 
@@ -117,6 +136,7 @@ func TestSessionContractRoundTripsTerminalTransitionAndKeepsLegacyAbsent(t *test
 	semantic, err := SessionToProto(value)
 	require.NoError(t, err)
 	command := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
+	require.IsType(t, &persistencev1.CommandContent_TerminalTransition{}, command.GetBehavior())
 	require.NotNil(t, command.GetTerminalTransition())
 	require.Equal(t, "b", command.GetTerminalTransition().GetTargetTerminalId())
 
@@ -131,7 +151,19 @@ func TestSessionContractRoundTripsTerminalTransitionAndKeepsLegacyAbsent(t *test
 	legacy.Terminals[0].Root.Children[0].TerminalTransition = nil
 	legacyProto, err := SessionToProto(legacy)
 	require.NoError(t, err)
-	require.Nil(t, legacyProto.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand().TerminalTransition)
+	require.Nil(t, legacyProto.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand().GetBehavior())
+}
+
+func TestSessionContractRejectsDualCommandBehaviorAtBoundary(t *testing.T) {
+	t.Parallel()
+
+	value := linkedSessionForTest()
+	command := &value.Terminals[0].Root.Children[0]
+	command.Text = "Done"
+	command.StateChange = &domain.StateChangeConfig{CompletedName: "Done", ConfirmationText: "Proceed?"}
+
+	_, err := SessionToProto(value)
+	require.ErrorContains(t, err, "cannot contain both stateChange and terminalTransition")
 }
 
 func linkedSessionForTest() domain.Session {
