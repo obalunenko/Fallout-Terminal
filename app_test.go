@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -250,6 +251,78 @@ func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision
 	status := app.GetRuntimeStatus()
 	require.Equal(t, uint64(3), status.RequestedRevision)
 	require.Equal(t, uint64(3), status.SavedRevision)
+}
+
+func TestDesktopSessionFacadeSavesRealDemoCrossTerminalLinkAndReopensIt(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Campaigns/demo-boundary.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Campaigns",
+			BundledDemo:      "/Applications/Fallout Terminal.app/Contents/Resources/sessions/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	app := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+
+	opened := app.OpenSession()
+	require.True(t, opened.OK, "OpenSession() = %#v", opened)
+	require.NotNil(t, opened.Session)
+	require.Equal(t, []string{"t_demo1", "t_demo2"}, []string{
+		opened.Session.Terminals[0].ID,
+		opened.Session.Terminals[1].ID,
+	})
+	require.Equal(t, "t_demo2", opened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+
+	saved := app.SaveSession(*opened.Session)
+	require.True(t, saved.OK, "SaveSession() = %#v", saved)
+	require.Equal(t, uint64(1), saved.SavedRevision)
+	reopened := app.OpenSession()
+	require.True(t, reopened.OK, "reopen = %#v", reopened)
+	require.Len(t, reopened.Session.Terminals, 2)
+	require.Equal(t, "t_demo2", reopened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+}
+
+func TestTerminalActivationValidatesRealDemoLinkAgainstCompleteActiveSession(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Campaigns/demo-activation.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{DocumentsDefault: "/Campaigns"},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision:  1,
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-demo-activation"},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{Sessions: sessions, Coordination: coordination})
+
+	opened := app.OpenSession()
+	require.True(t, opened.OK, "OpenSession() = %#v", opened)
+	require.Len(t, opened.Session.Terminals, 2)
+	source := opened.Session.Terminals[0]
+	result := app.RequestTerminalActivation(LiveTerminalPayload{
+		TerminalID: source.ID, TerminalName: source.Name, Tree: source.Root,
+		HackLevel: source.HackLevel, IntroText: source.IntroText,
+	})
+	require.True(t, result.OK, "RequestTerminalActivation() = %#v", result)
+	require.Len(t, coordination.targets, 1)
+	require.Equal(t, "t_demo2", coordination.targets[0].Tree.Children[4].TerminalTransition.TargetTerminalID)
 }
 
 func TestApplicationUnwindsPartialStartup(t *testing.T) {
@@ -1535,6 +1608,33 @@ func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 
 }
 
+func TestResolveTerminalNavigationUsesOnlyExactPrivateDecisionAndPublishesOneNewRevision(t *testing.T) {
+	controller := domain.LogicalSessionID("controller-1")
+	coordination := &recordingCoordinationService{state: &domain.MasterCoordinationState{
+		Revision:  8,
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &controller, ActiveTerminalID: appStringPointer("terminal-a")},
+		PendingTerminalNavigation: &domain.MasterPendingTerminalNavigation{
+			RequestID: "navigation-1", BroadcastID: "broadcast-1", Direction: domain.TerminalNavigationForward,
+			SourceTerminalID: "terminal-a", TargetTerminalID: "terminal-b",
+		},
+	}}
+	events := &recordingEventSink{recorder: &callRecorder{}}
+	app := NewAppWithDependencies(AppDependencies{Coordination: coordination, Events: events})
+
+	result := app.ResolveTerminalNavigation(TerminalNavigationDecisionPayload{RequestID: " navigation-1 ", Decision: domain.TerminalNavigationApprove})
+	require.True(t, result.OK)
+	require.Empty(t, result.Error)
+	require.Equal(t, uint64(9), result.State.Revision)
+	require.Nil(t, result.State.PendingTerminalNavigation)
+	require.Equal(t, []recordedTerminalNavigationDecision{{RequestID: "navigation-1", Decision: domain.TerminalNavigationApprove}}, coordination.navigationDecisions)
+	require.Len(t, events.Records(), 1)
+	require.Equal(t, coordinationStateEvent, events.Records()[0].Name)
+
+	invalid := app.ResolveTerminalNavigation(TerminalNavigationDecisionPayload{RequestID: "navigation-2", Decision: "discard"})
+	require.False(t, invalid.OK)
+	require.Len(t, coordination.navigationDecisions, 1, "invalid private enums must not reach the coordinator")
+}
+
 func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T) {
 	recorder := &callRecorder{}
 	events := &recordingEventSink{recorder: recorder}
@@ -1940,13 +2040,19 @@ type recordingLiveService struct {
 }
 
 type recordingCoordinationService struct {
-	state      *domain.MasterCoordinationState
-	addState   *domain.MasterCoordinationState
-	startState *domain.MasterCoordinationState
-	addErr     error
-	startErr   error
-	addNames   []string
-	startCalls int
+	state               *domain.MasterCoordinationState
+	addState            *domain.MasterCoordinationState
+	startState          *domain.MasterCoordinationState
+	addErr              error
+	startErr            error
+	addNames            []string
+	startCalls          int
+	navigationDecisions []recordedTerminalNavigationDecision
+}
+
+type recordedTerminalNavigationDecision struct {
+	RequestID string
+	Decision  domain.TerminalNavigationDecision
 }
 
 type recordingCoordinatedHackService struct {
@@ -2214,6 +2320,15 @@ func (service *recordingCoordinationService) StartBroadcast() (*domain.MasterCoo
 	}
 	service.state = domain.CloneMasterCoordinationState(service.startState)
 	return domain.CloneMasterCoordinationState(service.state), nil
+}
+
+func (service *recordingCoordinationService) ResolveTerminalNavigation(requestID string, decision domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error) {
+	service.navigationDecisions = append(service.navigationDecisions, recordedTerminalNavigationDecision{RequestID: requestID, Decision: decision})
+	state := domain.CloneMasterCoordinationState(service.state)
+	state.Revision++
+	state.PendingTerminalNavigation = nil
+	service.state = state
+	return domain.CloneMasterCoordinationState(state), nil
 }
 
 func (service *recordingLiveService) Set(string, string, domain.ContentNode, int, string) *domain.PublicLiveState {

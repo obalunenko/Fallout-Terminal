@@ -117,6 +117,10 @@ let commandExecutionDialogRequestID = null;
 let commandExecutionDecisionRequestID = null;
 let commandExecutionDialogEpoch = 0;
 const resolvedCommandExecutionRequestIDs = new Set();
+let terminalNavigationDialogRequestID = null;
+let terminalNavigationDecisionRequestID = null;
+let terminalNavigationDialogEpoch = 0;
+const resolvedTerminalNavigationRequestIDs = new Set();
 
 const commandStateActions = document.createElement('div');
 commandStateActions.className = 'settings-row command-state-terminal-actions';
@@ -152,6 +156,30 @@ const commandExecutionDialogStatus = document.getElementById('commandExecutionDi
 const commandExecutionDialogError = document.getElementById('commandExecutionDialogError');
 const btnApproveCommandExecution = document.getElementById('btnApproveCommandExecution');
 const btnRejectCommandExecution = document.getElementById('btnRejectCommandExecution');
+
+const terminalNavigationDialog = document.createElement('dialog');
+terminalNavigationDialog.className = 'terminal-switch-dialog terminal-navigation-dialog';
+terminalNavigationDialog.id = 'terminalNavigationDialog';
+terminalNavigationDialog.hidden = true;
+terminalNavigationDialog.setAttribute('aria-modal', 'true');
+terminalNavigationDialog.setAttribute('aria-labelledby', 'terminalNavigationDialogTitle');
+terminalNavigationDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="terminalNavigationDialogTitle">ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ</h2>
+    <div class="terminal-navigation-summary" id="terminalNavigationSummary"></div>
+    <div class="terminal-switch-actions" role="group" aria-label="Решение мастера по переходу" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-primary" id="btnApproveTerminalNavigation" type="button">ОДОБРИТЬ</button>
+      <button class="btn btn-danger" id="btnRejectTerminalNavigation" type="button">ОТКЛОНИТЬ</button>
+    </div>
+    <div class="terminal-switch-status" id="terminalNavigationStatus" role="status" aria-live="polite"></div>
+    <div class="terminal-switch-error" id="terminalNavigationError" role="alert" hidden></div>
+  </div>`;
+document.body.appendChild(terminalNavigationDialog);
+const terminalNavigationSummary = document.getElementById('terminalNavigationSummary');
+const terminalNavigationStatus = document.getElementById('terminalNavigationStatus');
+const terminalNavigationError = document.getElementById('terminalNavigationError');
+const btnApproveTerminalNavigation = document.getElementById('btnApproveTerminalNavigation');
+const btnRejectTerminalNavigation = document.getElementById('btnRejectTerminalNavigation');
 
 let resetConfirmationResolve = null;
 const resetConfirmationDialog = document.createElement('dialog');
@@ -988,6 +1016,56 @@ function syncCommandExecutionDialog(coordination) {
   showCommandExecutionDialog(pending);
 }
 
+function rememberResolvedTerminalNavigation(requestID) {
+  resolvedTerminalNavigationRequestIDs.add(requestID);
+  if (resolvedTerminalNavigationRequestIDs.size > 128) {
+    resolvedTerminalNavigationRequestIDs.delete(resolvedTerminalNavigationRequestIDs.values().next().value);
+  }
+}
+
+function hideTerminalNavigationDialog() {
+  terminalNavigationDialogEpoch += 1;
+  terminalNavigationDecisionRequestID = null;
+  terminalNavigationDialogRequestID = null;
+  terminalNavigationDialog.hidden = true;
+  if (terminalNavigationDialog.open) terminalNavigationDialog.close();
+  else terminalNavigationDialog.removeAttribute('open');
+  btnApproveTerminalNavigation.disabled = false;
+  btnRejectTerminalNavigation.disabled = false;
+  terminalNavigationStatus.textContent = '';
+  terminalNavigationError.hidden = true;
+}
+
+function showTerminalNavigationDialog(pending) {
+  terminalNavigationDialogEpoch += 1;
+  terminalNavigationDecisionRequestID = null;
+  terminalNavigationDialogRequestID = pending.requestId;
+  const direction = pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД';
+  terminalNavigationSummary.innerHTML = `
+    <div class="terminal-navigation-direction">${direction}</div>
+    <div>ИЗ: ${escHtml(pending.sourceTerminalName || pending.sourceTerminalId || '—')}</div>
+    <div>КОМАНДА: ${escHtml(pending.commandName || pending.commandId || '—')}</div>
+    <div>В: ${escHtml(pending.targetTerminalName || pending.targetTerminalId || '—')}</div>`;
+  terminalNavigationError.hidden = true;
+  terminalNavigationStatus.textContent = 'ИСХОДНЫЙ ТЕРМИНАЛ ОСТАЁТСЯ АКТИВНЫМ ДО РЕШЕНИЯ';
+  terminalNavigationDialog.hidden = false;
+  if (!terminalNavigationDialog.open) terminalNavigationDialog.showModal();
+  btnApproveTerminalNavigation.focus();
+}
+
+function syncTerminalNavigationDialog(coordination) {
+  const pending = coordination?.pendingTerminalNavigation;
+  const requestID = typeof pending?.requestId === 'string' ? pending.requestId : '';
+  if (!requestID) {
+    if (terminalNavigationDialogRequestID) hideTerminalNavigationDialog();
+    return;
+  }
+  if (requestID === terminalNavigationDecisionRequestID || resolvedTerminalNavigationRequestIDs.has(requestID)) return;
+  if (requestID === terminalNavigationDialogRequestID) return;
+  if (terminalNavigationDialogRequestID) hideTerminalNavigationDialog();
+  showTerminalNavigationDialog(pending);
+}
+
 function applyCoordinationState(coordination) {
   if (coordination && state.coordination &&
       coordinationRevision(coordination) <= coordinationRevision(state.coordination)) {
@@ -996,8 +1074,67 @@ function applyCoordinationState(coordination) {
   state.coordination = coordination || null;
   state.liveTerminalId = coordination?.broadcast?.activeTerminalId || null;
   syncCommandExecutionDialog(coordination);
+  syncTerminalNavigationDialog(coordination);
+  syncTerminalNavigationNotice(coordination);
   return true;
 }
+
+function syncTerminalNavigationNotice(coordination) {
+  const notice = coordination?.terminalNavigationNotice;
+  if (!notice) {
+    if (coordinationError.dataset.kind === 'terminal-navigation') {
+      coordinationError.dataset.kind = '';
+      setCoordinationStatus('');
+    }
+    return;
+  }
+  const labels = {
+    'target-missing': 'ЦЕЛЕВОЙ ТЕРМИНАЛ ПЕРЕХОДА БОЛЬШЕ НЕ СУЩЕСТВУЕТ',
+    'self-target': 'КОМАНДА ПЕРЕХОДА НЕ МОЖЕТ ССЫЛАТЬСЯ НА ТЕКУЩИЙ ТЕРМИНАЛ',
+    'command-stale': 'КОМАНДА ПЕРЕХОДА БЫЛА ИЗМЕНЕНА ИЛИ УДАЛЕНА',
+    'target-changed': 'ЦЕЛЬ КОМАНДЫ ПЕРЕХОДА ИЗМЕНИЛАСЬ',
+  };
+  const detail = [notice.sourceTerminalId, notice.commandId, notice.targetTerminalId].filter(Boolean).join(' · ');
+  coordinationError.dataset.kind = 'terminal-navigation';
+  setCoordinationStatus(`${labels[notice.reason] || 'ПЕРЕХОД БОЛЬШЕ НЕ ДЕЙСТВИТЕЛЕН'}${detail ? ` · ${detail}` : ''}`, true);
+}
+
+async function resolveTerminalNavigation(decision) {
+  const requestID = terminalNavigationDialogRequestID;
+  if (!requestID || terminalNavigationDecisionRequestID) return null;
+  terminalNavigationDecisionRequestID = requestID;
+  const epoch = terminalNavigationDialogEpoch;
+  btnApproveTerminalNavigation.disabled = true;
+  btnRejectTerminalNavigation.disabled = true;
+  terminalNavigationStatus.textContent = decision === 'approve' ? 'ВЫПОЛНЕНИЕ ПЕРЕХОДА...' : 'ОТКЛОНЕНИЕ ПЕРЕХОДА...';
+  let result;
+  try {
+    result = await desktopAPI.resolveTerminalNavigation({ requestId: requestID, decision });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  if (epoch !== terminalNavigationDialogEpoch || terminalNavigationDecisionRequestID !== requestID) return result;
+  terminalNavigationDecisionRequestID = null;
+  rememberResolvedTerminalNavigation(requestID);
+  if (result?.state) applyCoordinationState(result.state);
+  if (terminalNavigationDialogRequestID === requestID) hideTerminalNavigationDialog();
+  if (result?.ok) {
+    setCoordinationStatus(decision === 'approve' ? 'ПЕРЕХОД ВЫПОЛНЕН' : 'ПЕРЕХОД ОТКЛОНЁН');
+  } else if (result?.state?.terminalNavigationNotice) {
+    syncTerminalNavigationNotice(result.state);
+  } else {
+    setCoordinationStatus(result?.error || 'ПЕРЕХОД НЕ ВЫПОЛНЕН', true);
+  }
+  renderCoordination();
+  return result;
+}
+
+btnApproveTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('approve'); });
+btnRejectTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('reject'); });
+terminalNavigationDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  void resolveTerminalNavigation('reject');
+});
 
 async function resolveCommandExecution(decision) {
   const requestID = commandExecutionDialogRequestID;
@@ -1170,6 +1307,18 @@ async function runTerminalSwitchRequest(command, completedMessage, pendingMessag
 }
 
 // ── Render: terminal list ────────────────────────────────────
+function inboundTerminalTransitions(targetTerminalID) {
+  const inbound = [];
+  const visit = (source, node) => {
+    if (node?.terminalTransition?.targetTerminalId === targetTerminalID) {
+      inbound.push(`${source.name}: ${node.name}`);
+    }
+    for (const child of node?.children ?? []) visit(source, child);
+  };
+  for (const source of state.session?.terminals ?? []) visit(source, source.root);
+  return inbound;
+}
+
 function renderTermList() {
   termList.innerHTML = '';
   if (!state.session.terminals.length) {
@@ -1216,6 +1365,11 @@ function renderTermList() {
         setCoordinationStatus('АКТИВНЫЙ ИЛИ СОХРАНЁННЫЙ ТЕРМИНАЛ НЕЛЬЗЯ УДАЛИТЬ', true);
         return;
       }
+    const inbound = inboundTerminalTransitions(term.id);
+    if (inbound.length) {
+    setCoordinationStatus(`ТЕРМИНАЛ ИСПОЛЬЗУЕТСЯ КОМАНДАМИ ПЕРЕХОДА: ${inbound.join(', ')}`, true);
+    return;
+    }
       if (!window.confirm(`Удалить терминал "${term.name}" целиком?`)) return;
       const idx = state.session.terminals.findIndex(t => t.id === term.id);
       if (idx >= 0) state.session.terminals.splice(idx, 1);
@@ -1466,6 +1620,10 @@ function renderNodeForm() {
     <input class="field-input" id="fldName" value="${escAttr(node.name)}">`;
 
   if (node.type === 'command') {
+  const transitionOptions = state.session.terminals
+    .filter(candidate => candidate.id !== term.id)
+    .map(candidate => `<option value="${escAttr(candidate.id)}"${node.terminalTransition?.targetTerminalId === candidate.id ? ' selected' : ''}>${escHtml(candidate.name)}</option>`)
+    .join('');
     html += `
       <label class="state-change-toggle" for="fldStateChangeEnabled">
         <input id="fldStateChangeEnabled" type="checkbox"${node.stateChange ? ' checked' : ''}${snapshot ? ' disabled' : ''}>
@@ -1478,6 +1636,17 @@ function renderNodeForm() {
         <label class="field-label" for="fldConfirmationText">ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ</label>
         <textarea class="field-textarea state-change-textarea" id="fldConfirmationText">${escHtml(node.stateChange?.confirmationText || '')}</textarea>
       </div>
+    <label class="state-change-toggle" for="fldTerminalTransitionEnabled">
+    <input id="fldTerminalTransitionEnabled" type="checkbox"${node.terminalTransition ? ' checked' : ''}${snapshot ? ' disabled' : ''}>
+    <span>ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ</span>
+    </label>
+    ${snapshot ? '<div class="state-change-toggle-hint">Сначала сбросьте выполненное состояние команды, чтобы настроить переход.</div>' : ''}
+    <div class="state-change-fields terminal-transition-fields" id="terminalTransitionFields"${node.terminalTransition ? '' : ' hidden'}>
+    <label class="field-label" for="fldTerminalTransitionTarget">ЦЕЛЕВОЙ ТЕРМИНАЛ</label>
+    <select class="field-input" id="fldTerminalTransitionTarget">
+      <option value="">ВЫБЕРИТЕ ТЕРМИНАЛ</option>${transitionOptions}
+    </select>
+    </div>
       <label class="field-label" for="fldText">ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.text || '')}</textarea>`;
     if (snapshot) {
@@ -1517,11 +1686,26 @@ function renderNodeForm() {
   if (node.type === 'command') {
     const enabled = document.getElementById('fldStateChangeEnabled');
     const fields = document.getElementById('stateChangeFields');
+  const transitionEnabled = document.getElementById('fldTerminalTransitionEnabled');
+  const transitionFields = document.getElementById('terminalTransitionFields');
     enabled.addEventListener('change', () => {
       fields.hidden = !enabled.checked;
+    if (enabled.checked) {
+    transitionEnabled.checked = false;
+    transitionFields.hidden = true;
+    }
       validationError.hidden = true;
       validationError.textContent = '';
     });
+  transitionEnabled.addEventListener('change', () => {
+    transitionFields.hidden = !transitionEnabled.checked;
+    if (transitionEnabled.checked) {
+      enabled.checked = false;
+      fields.hidden = true;
+    }
+    validationError.hidden = true;
+    validationError.textContent = '';
+  });
   }
 
   document.getElementById('btnApplyNode').addEventListener('click', () => {
@@ -1537,7 +1721,14 @@ function renderNodeForm() {
 
     if (node.type === 'command') {
       const stateChangeEnabled = document.getElementById('fldStateChangeEnabled').checked;
+    const transitionEnabled = document.getElementById('fldTerminalTransitionEnabled').checked;
       const textEl = document.getElementById('fldText');
+    let nextStateChange = null;
+    let nextTerminalTransition = null;
+    if (stateChangeEnabled && transitionEnabled) {
+    showValidationError('КОМАНДА НЕ МОЖЕТ ОДНОВРЕМЕННО ИЗМЕНЯТЬ СОСТОЯНИЕ И ПЕРЕКЛЮЧАТЬ ТЕРМИНАЛ', document.getElementById('fldTerminalTransitionEnabled'));
+    return;
+    }
       if (stateChangeEnabled) {
         const completedNameEl = document.getElementById('fldCompletedName');
         const confirmationTextEl = document.getElementById('fldConfirmationText');
@@ -1553,13 +1744,24 @@ function renderNodeForm() {
           showValidationError('УКАЖИТЕ ТЕКСТ УСПЕШНОГО РЕЗУЛЬТАТА', textEl);
           return;
         }
-        node.stateChange = {
+    nextStateChange = {
           completedName: completedNameEl.value,
           confirmationText: confirmationTextEl.value,
         };
-      } else {
-        delete node.stateChange;
       }
+    if (transitionEnabled) {
+    const targetEl = document.getElementById('fldTerminalTransitionTarget');
+    const targetID = targetEl.value;
+    if (!targetID || targetID === term.id || !state.session.terminals.some(candidate => candidate.id === targetID)) {
+      showValidationError('ВЫБЕРИТЕ ДРУГОЙ СУЩЕСТВУЮЩИЙ ТЕРМИНАЛ', targetEl);
+      return;
+    }
+    nextTerminalTransition = { targetTerminalId: targetID };
+    }
+    if (nextStateChange) node.stateChange = nextStateChange;
+    else delete node.stateChange;
+    if (nextTerminalTransition) node.terminalTransition = nextTerminalTransition;
+    else delete node.terminalTransition;
       node.text = textEl.value;
     }
 

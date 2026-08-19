@@ -112,6 +112,10 @@ type coordinationCommandExecutionService interface {
 	ResolveCommandExecution(string, domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *controlservice.CommandStateMutation, error)
 }
 
+type coordinationTerminalNavigationService interface {
+	ResolveTerminalNavigation(string, domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error)
+}
+
 type coordinationBroadcastLifecycleService interface {
 	EndBroadcast() (*domain.MasterCoordinationState, error)
 }
@@ -310,6 +314,14 @@ type ResolveCommandExecutionResult struct {
 	State *domain.MasterCoordinationState `json:"state"`
 }
 
+// ResolveTerminalNavigationResult is the private response for one exact
+// forward/return decision and its resulting authoritative coordination state.
+type ResolveTerminalNavigationResult struct {
+	OK    bool                            `json:"ok"`
+	Error string                          `json:"error,omitempty"`
+	State *domain.MasterCoordinationState `json:"state"`
+}
+
 // PlayerConfigCommandResult combines durable metadata with authoritative roster state.
 type PlayerConfigCommandResult struct {
 	OK       bool                            `json:"ok"`
@@ -384,6 +396,11 @@ type TerminalSwitchDecisionPayload struct {
 type CommandExecutionDecisionPayload struct {
 	RequestID string                          `json:"requestId"`
 	Decision  domain.CommandExecutionDecision `json:"decision"`
+}
+
+type TerminalNavigationDecisionPayload struct {
+	RequestID string                            `json:"requestId"`
+	Decision  domain.TerminalNavigationDecision `json:"decision"`
 }
 
 // ResetCommandStatePayload addresses one authored state-changing command by
@@ -1366,7 +1383,7 @@ func (app *App) EndBroadcast() CoordinationCommandResult {
 func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalSwitchCommandResult {
 	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
 	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
-	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+	if err := app.validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.terminalSwitchFailure(err.Error(), nil)
 	}
 	payload, err := routeTerminalActivationRequest(payload, false)
@@ -1473,6 +1490,49 @@ func (app *App) ResolveCommandExecution(payload CommandExecutionDecisionPayload)
 	})
 }
 
+// ResolveTerminalNavigation validates and routes an exact private enum/request
+// pair, then accepts only a newer coordination revision from the coordinator.
+func (app *App) ResolveTerminalNavigation(payload TerminalNavigationDecisionPayload) ResolveTerminalNavigationResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
+	payload.RequestID = strings.TrimSpace(payload.RequestID)
+	if payload.RequestID == "" {
+		return app.terminalNavigationFailure("terminal navigation request ID must not be blank", nil)
+	}
+	if payload.Decision != domain.TerminalNavigationApprove && payload.Decision != domain.TerminalNavigationReject {
+		return app.terminalNavigationFailure("terminal navigation decision must be approve or reject", nil)
+	}
+	routed, err := routeTerminalNavigationDecisionRequest(payload)
+	if err != nil {
+		return app.terminalNavigationFailure("terminal navigation decision could not be represented by the private contract", nil)
+	}
+	coordination, ok := app.deps.Coordination.(coordinationTerminalNavigationService)
+	if !ok {
+		return app.terminalNavigationFailure("coordination service is unavailable", nil)
+	}
+	state, err := coordination.ResolveTerminalNavigation(routed.RequestID, routed.Decision)
+	if state != nil {
+		app.publishCoordinationStateIfNewer(state)
+	}
+	if err != nil {
+		return app.terminalNavigationFailure("terminal navigation request is no longer valid", state)
+	}
+	if state == nil {
+		return app.terminalNavigationFailure("terminal navigation could not be resolved", nil)
+	}
+	return routeResolveTerminalNavigationResult(ResolveTerminalNavigationResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
+}
+
+func (app *App) terminalNavigationFailure(message string, state *domain.MasterCoordinationState) ResolveTerminalNavigationResult {
+	if state == nil {
+		app.mu.RLock()
+		state = domain.CloneMasterCoordinationState(app.coordinationState)
+		app.mu.RUnlock()
+	}
+	return routeResolveTerminalNavigationResult(ResolveTerminalNavigationResult{Error: message, State: domain.CloneMasterCoordinationState(state)})
+}
+
 func (app *App) publishCoordinationStateIfNewer(state *domain.MasterCoordinationState) {
 	if state == nil {
 		return
@@ -1517,11 +1577,7 @@ func commandExecutionMasterError(err error) string {
 // puzzle through the ordered coordinator boundary. The legacy fallback keeps
 // older focused hosts compatible while production always provides coordination.
 func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationCommandResult {
-	intro := ""
-	if payload.IntroText != nil {
-		intro = *payload.IntroText
-	}
-	if err := validateLiveTerminal("live-terminal", "Live Terminal", payload.Tree, 0, intro); err != nil {
+	if err := app.validateLiveTerminalUpdate(payload.Tree, payload.IntroText); err != nil {
 		return app.coordinationFailure(err.Error())
 	}
 	payload, err := routeLiveTerminalUpdateRequest(payload)
@@ -1555,7 +1611,7 @@ func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationComman
 func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommandResult {
 	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
 	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
-	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+	if err := app.validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.coordinationFailure(err.Error())
 	}
 	payload, err := routeTerminalActivationRequest(payload, true)
@@ -2055,10 +2111,63 @@ func validatedCoordinationDisplayName(value string, label string) (string, error
 	return value, nil
 }
 
-func validateLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
+func (app *App) validateLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
 	validationTree := cloneTreeForBridgeValidation(tree)
+	if sessions, ok := app.deps.Sessions.(sessionCommands); ok {
+		active := sessions.Snapshot()
+		if active.Session != nil {
+			for index := range active.Session.Terminals {
+				if active.Session.Terminals[index].ID != id {
+					continue
+				}
+				terminal := active.Session.Terminals[index]
+				terminal.Name = name
+				terminal.HackLevel = hackLevel
+				terminal.IntroText = intro
+				terminal.Root = validationTree
+				active.Session.Terminals[index] = terminal
+				return domain.ValidateSession(*active.Session)
+			}
+			return fmt.Errorf("terminal %q is not part of the active session", id)
+		}
+	}
+	return validateIsolatedLiveTerminal(id, name, validationTree, hackLevel, intro)
+}
+
+func (app *App) validateLiveTerminalUpdate(tree domain.ContentNode, intro *string) error {
+	validationTree := cloneTreeForBridgeValidation(tree)
+	if sessions, ok := app.deps.Sessions.(sessionCommands); ok {
+		active := sessions.Snapshot()
+		var state *domain.MasterCoordinationState
+		if app.deps.Coordination != nil {
+			state = app.deps.Coordination.Snapshot()
+		}
+		if active.Session != nil && state != nil && state.Broadcast != nil && state.Broadcast.ActiveTerminalID != nil {
+			for index := range active.Session.Terminals {
+				if active.Session.Terminals[index].ID != *state.Broadcast.ActiveTerminalID {
+					continue
+				}
+				terminal := active.Session.Terminals[index]
+				terminal.Root = validationTree
+				if intro != nil {
+					terminal.IntroText = *intro
+				}
+				active.Session.Terminals[index] = terminal
+				return domain.ValidateSession(*active.Session)
+			}
+			return fmt.Errorf("terminal %q is not part of the active session", *state.Broadcast.ActiveTerminalID)
+		}
+	}
+	value := ""
+	if intro != nil {
+		value = *intro
+	}
+	return validateIsolatedLiveTerminal("live-terminal", "Live Terminal", validationTree, 0, value)
+}
+
+func validateIsolatedLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
 	terminal := domain.Terminal{
-		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: validationTree,
+		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: tree,
 	}
 	return domain.ValidateSession(domain.Session{
 		Version:   1,

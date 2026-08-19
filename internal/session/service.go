@@ -48,6 +48,13 @@ type Store interface {
 	CopyAtomic(source, destination string) error
 }
 
+// TerminalCatalog exposes detached, validated snapshots from the currently
+// active session without allowing callers to mutate persistence-owned state.
+type TerminalCatalog interface {
+	LookupTerminal(terminalID string) (domain.TerminalTarget, bool)
+	LookupTerminalTransition(sourceTerminalID, commandID string) (domain.TerminalTransitionTarget, bool)
+}
+
 // SessionResult is returned by create, open, and demo-copy commands.
 type SessionResult struct {
 	OK       bool            `json:"ok"`
@@ -140,6 +147,51 @@ func NewService(store Store, dialog Dialog, locations Locations) *Service {
 	}
 	go service.runSaveWorker()
 	return service
+}
+
+// LookupTerminal returns the latest detached target authored in the active session.
+func (service *Service) LookupTerminal(terminalID string) (domain.TerminalTarget, bool) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	terminal := terminalByID(service.active.Session, terminalID)
+	if terminal == nil {
+		return domain.TerminalTarget{}, false
+	}
+	return terminalTarget(*terminal), true
+}
+
+// LookupTerminalTransition resolves a command link and target from one locked
+// current-session snapshot, so source and destination cannot come from different revisions.
+func (service *Service) LookupTerminalTransition(sourceTerminalID, commandID string) (domain.TerminalTransitionTarget, bool) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	source := terminalByID(service.active.Session, sourceTerminalID)
+	if source == nil {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	command := contentNodeByID(&source.Root, commandID)
+	if command == nil || command.Type != domain.NodeCommand || command.TerminalTransition == nil {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	target := terminalByID(service.active.Session, command.TerminalTransition.TargetTerminalID)
+	if target == nil || target.ID == source.ID {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	return domain.TerminalTransitionTarget{
+		SourceTerminalID:   source.ID,
+		SourceTerminalName: source.Name,
+		CommandID:          command.ID,
+		CommandName:        command.Name,
+		Target:             terminalTarget(*target),
+	}, true
+}
+
+func terminalTarget(terminal domain.Terminal) domain.TerminalTarget {
+	cloned := domain.CloneSession(domain.Session{Version: 1, Name: "catalog", Terminals: []domain.Terminal{terminal}}).Terminals[0]
+	return domain.TerminalTarget{
+		TerminalID: cloned.ID, TerminalName: cloned.Name, Tree: cloned.Root,
+		CommandStates: cloned.CommandStates, HackLevel: cloned.HackLevel, IntroText: cloned.IntroText,
+	}
 }
 
 // Create asks for an explicit destination, writes a valid starter document,
@@ -871,6 +923,10 @@ func cloneNode(node domain.ContentNode) domain.ContentNode {
 	if node.StateChange != nil {
 		stateChange := *node.StateChange
 		copy.StateChange = &stateChange
+	}
+	if node.TerminalTransition != nil {
+		transition := *node.TerminalTransition
+		copy.TerminalTransition = &transition
 	}
 	if node.Children != nil {
 		copy.Children = make([]domain.ContentNode, len(node.Children))

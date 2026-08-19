@@ -60,6 +60,74 @@ type fixtureAuthoringStore struct {
 	revision uint64
 }
 
+type fixtureTerminalCatalog struct {
+	mu      sync.Mutex
+	session domain.Session
+}
+
+func (catalog *fixtureTerminalCatalog) replace(session domain.Session) {
+	catalog.mu.Lock()
+	catalog.session = domain.CloneSession(session)
+	catalog.mu.Unlock()
+}
+
+func (catalog *fixtureTerminalCatalog) snapshot() domain.Session {
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+	return domain.CloneSession(catalog.session)
+}
+
+func (catalog *fixtureTerminalCatalog) LookupTerminal(id string) (domain.TerminalTarget, bool) {
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+	terminal := fixtureTerminalByID(&catalog.session, id)
+	if terminal == nil {
+		return domain.TerminalTarget{}, false
+	}
+	return fixtureTarget(*terminal), true
+}
+
+func (catalog *fixtureTerminalCatalog) LookupTerminalTransition(sourceID, commandID string) (domain.TerminalTransitionTarget, bool) {
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+	source := fixtureTerminalByID(&catalog.session, sourceID)
+	if source == nil {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	command := fixtureNodeByID(&source.Root, commandID)
+	if command == nil || command.TerminalTransition == nil {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	target := fixtureTerminalByID(&catalog.session, command.TerminalTransition.TargetTerminalID)
+	if target == nil || target.ID == source.ID {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	return domain.TerminalTransitionTarget{
+		SourceTerminalID: source.ID, SourceTerminalName: source.Name,
+		CommandID: command.ID, CommandName: command.Name, Target: fixtureTarget(*target),
+	}, true
+}
+
+func fixtureTarget(terminal domain.Terminal) domain.TerminalTarget {
+	clone := domain.CloneSession(domain.Session{Version: 1, Name: "fixture", Terminals: []domain.Terminal{terminal}}).Terminals[0]
+	return domain.TerminalTarget{TerminalID: clone.ID, TerminalName: clone.Name, Tree: clone.Root, CommandStates: clone.CommandStates, HackLevel: clone.HackLevel, IntroText: clone.IntroText}
+}
+
+func fixtureNodeByID(node *domain.ContentNode, id string) *domain.ContentNode {
+	if node == nil {
+		return nil
+	}
+	if node.ID == id {
+		return node
+	}
+	for index := range node.Children {
+		if found := fixtureNodeByID(&node.Children[index], id); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
 type fixtureSessionStateResult struct {
 	OK       bool            `json:"ok"`
 	Error    string          `json:"error,omitempty"`
@@ -458,6 +526,18 @@ func activateLifecycleTerminal(service *control.Service, target domain.TerminalT
 	return err
 }
 
+func activatePreservingTerminal(service *control.Service, target domain.TerminalTarget) error {
+	state, err := service.RequestTerminalActivation(target)
+	if err != nil {
+		return err
+	}
+	if state.PendingSwitch == nil {
+		return nil
+	}
+	_, err = service.ResolveTerminalSwitch(state.PendingSwitch.SwitchID, domain.TerminalSwitchPreserve)
+	return err
+}
+
 func restartStateChangingBroadcast(service *control.Service, target domain.TerminalTarget) error {
 	if _, err := service.EndBroadcast(); err != nil {
 		return err
@@ -485,6 +565,9 @@ func run() error {
 	approvalStore.reset()
 	authoringStore := &fixtureAuthoringStore{}
 	authoringStore.reset()
+	navigationCatalog := &fixtureTerminalCatalog{session: terminalNavigationSession()}
+	var navigationPending atomic.Bool
+	var navigationProjectionRevision atomic.Uint64
 	liveService := live.New(fixtureHackRandom, nil)
 	var connectPlayer *player.ConnectService
 	service := control.New(control.Config{
@@ -493,6 +576,7 @@ func run() error {
 		Terminals:         liveService,
 		TrustedHack:       liveService,
 		CommandStateStore: approvalStore,
+		TerminalCatalog:   navigationCatalog,
 		Enqueue: func(effect control.Effect) {
 			if connectPlayer != nil {
 				connectPlayer.PublishEffect(effect)
@@ -587,6 +671,193 @@ func run() error {
 		}
 		response.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(response).Encode(authoringStore.resetTerminal(payload))
+	})
+	mux.HandleFunc("GET /__fixture/terminal-navigation/master", func(response http.ResponseWriter, _ *http.Request) {
+		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
+		if readErr != nil {
+			http.Error(response, "fixture master page is unavailable", http.StatusInternalServerError)
+			return
+		}
+		page := strings.Replace(string(raw), `<head>`, `<head>
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>`, 1)
+		page = strings.ReplaceAll(page, `./master.css`, `/__fixture/master.css`)
+		page = strings.ReplaceAll(page, `./master.js`, `/__fixture/master.js`)
+		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("GET /__fixture/terminal-navigation/session", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(navigationCatalog.snapshot())
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/save", func(response http.ResponseWriter, request *http.Request) {
+		var candidate domain.Session
+		if err := json.NewDecoder(request.Body).Decode(&candidate); err != nil || domain.ValidateSession(candidate) != nil {
+			http.Error(response, "invalid terminal navigation session", http.StatusBadRequest)
+			return
+		}
+		navigationCatalog.replace(candidate)
+		navigationProjectionRevision.Add(1)
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(map[string]any{"ok": true, "revision": navigationProjectionRevision.Load()})
+	})
+	mux.HandleFunc("GET /__fixture/terminal-navigation/state", func(response http.ResponseWriter, _ *http.Request) {
+		state := service.Snapshot()
+		state.Revision += navigationProjectionRevision.Load()
+		if navigationPending.Load() {
+			state.PendingTerminalNavigation = &domain.MasterPendingTerminalNavigation{
+				RequestID: "navigation-forward-1", BroadcastID: state.Broadcast.ID,
+				Direction:        domain.TerminalNavigationForward,
+				SourceTerminalID: "residential", SourceTerminalName: "Жилой терминал",
+				CommandID: "go-security", CommandName: "ПЕРЕЙТИ В ОХРАНУ",
+				TargetTerminalID: "security", TargetTerminalName: "Терминал охраны",
+			}
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(state)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/reset", func(response http.ResponseWriter, _ *http.Request) {
+		fixtureHackRandom.reset()
+		navigationCatalog.replace(terminalNavigationSession())
+		navigationPending.Store(false)
+		navigationProjectionRevision.Store(0)
+		if _, err := service.EndBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		if _, err := service.StartBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		source, _ := navigationCatalog.LookupTerminal("residential")
+		if _, err := service.RequestTerminalActivation(source); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/pending-forward", func(response http.ResponseWriter, _ *http.Request) {
+		navigationPending.Store(true)
+		navigationProjectionRevision.Add(1)
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/resolve", func(response http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			RequestID string `json:"requestId"`
+			Decision  string `json:"decision"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil || (payload.Decision != "approve" && payload.Decision != "reject") {
+			http.Error(response, "invalid terminal navigation decision", http.StatusBadRequest)
+			return
+		}
+		var state *domain.MasterCoordinationState
+		if navigationPending.Load() && payload.RequestID == "navigation-forward-1" {
+			navigationPending.Store(false)
+			navigationProjectionRevision.Add(1)
+			state = service.Snapshot()
+		} else {
+			decision := domain.TerminalNavigationReject
+			if payload.Decision == "approve" {
+				decision = domain.TerminalNavigationApprove
+			}
+			resolved, resolveErr := service.ResolveTerminalNavigation(payload.RequestID, decision)
+			if resolveErr != nil {
+				response.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(response).Encode(map[string]any{"ok": false, "error": resolveErr.Error(), "state": resolved})
+				return
+			}
+			state = resolved
+		}
+		state.Revision += navigationProjectionRevision.Load()
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(map[string]any{"ok": true, "state": state})
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/switch-source", func(response http.ResponseWriter, _ *http.Request) {
+		target, _ := navigationCatalog.LookupTerminal("residential")
+		if err := activatePreservingTerminal(service, target); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/switch-target", func(response http.ResponseWriter, _ *http.Request) {
+		target, _ := navigationCatalog.LookupTerminal("security")
+		if err := activatePreservingTerminal(service, target); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/force-hack", func(response http.ResponseWriter, _ *http.Request) {
+		if _, ok := service.ForceHackSuccess(); !ok {
+			http.Error(response, "active terminal has no unfinished hack", http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/move-source-folder", func(response http.ResponseWriter, _ *http.Request) {
+		session := navigationCatalog.snapshot()
+		source := fixtureTerminalByID(&session, "residential")
+		if source == nil {
+			http.Error(response, "source terminal is unavailable", http.StatusConflict)
+			return
+		}
+		var navigation domain.ContentNode
+		for index := range source.Root.Children {
+			if source.Root.Children[index].ID == "navigation" {
+				navigation = source.Root.Children[index]
+				source.Root.Children = append(source.Root.Children[:index], source.Root.Children[index+1:]...)
+				break
+			}
+		}
+		source.Root.Children = append(source.Root.Children, domain.ContentNode{
+			ID: "archive", Type: domain.NodeFolder, Name: "АРХИВ", Children: []domain.ContentNode{navigation},
+		})
+		navigationCatalog.replace(session)
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/delete-source-folder", func(response http.ResponseWriter, _ *http.Request) {
+		session := navigationCatalog.snapshot()
+		source := fixtureTerminalByID(&session, "residential")
+		if source == nil {
+			http.Error(response, "source terminal is unavailable", http.StatusConflict)
+			return
+		}
+		for index := range source.Root.Children {
+			if source.Root.Children[index].ID == "navigation" {
+				source.Root.Children = append(source.Root.Children[:index], source.Root.Children[index+1:]...)
+				break
+			}
+		}
+		navigationCatalog.replace(session)
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/remove-target", func(response http.ResponseWriter, _ *http.Request) {
+		session := navigationCatalog.snapshot()
+		for index := range session.Terminals {
+			if session.Terminals[index].ID == "security" {
+				session.Terminals = append(session.Terminals[:index], session.Terminals[index+1:]...)
+				break
+			}
+		}
+		navigationCatalog.replace(session)
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/terminal-navigation/new-broadcast", func(response http.ResponseWriter, _ *http.Request) {
+		if _, err := service.EndBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		if _, err := service.StartBroadcast(); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		source, _ := navigationCatalog.LookupTerminal("residential")
+		if _, err := service.RequestTerminalActivation(source); err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET /__fixture/state-changing-command-approval/master", func(response http.ResponseWriter, _ *http.Request) {
 		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
@@ -1039,6 +1310,35 @@ func stateChangingAuthoringSession() domain.Session {
 				"alarm": {CompletedName: "Тревога включена", ResultText: "Охрана сектора предупреждена."},
 			},
 		}},
+	}
+}
+
+func terminalNavigationSession() domain.Session {
+	return domain.Session{
+		Version: 1, Name: "Terminal navigation fixture",
+		Terminals: []domain.Terminal{
+			{
+				ID: "residential", Name: "Жилой терминал",
+				Root: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{
+					{ID: "go-security", Type: domain.NodeCommand, Name: "ПЕРЕЙТИ В ОХРАНУ", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "security"}},
+					{ID: "navigation", Type: domain.NodeFolder, Name: "НАВИГАЦИЯ", Children: []domain.ContentNode{
+						{ID: "go-security-nested", Type: domain.NodeCommand, Name: "ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "security"}},
+					}},
+					{ID: "completed", Type: domain.NodeCommand, Name: "ЗАВЕРШЁННАЯ КОМАНДА", Text: "Done", StateChange: &domain.StateChangeConfig{CompletedName: "ЗАВЕРШЁННАЯ КОМАНДА", ConfirmationText: "Run?"}},
+				}},
+				CommandStates: map[string]domain.CommandExecutionState{"completed": {CompletedName: "ЗАВЕРШЁННАЯ КОМАНДА", ResultText: "Done"}},
+			},
+			{
+				ID: "security", Name: "Терминал охраны", HackLevel: 1,
+				Root: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{
+					{ID: "go-vault", Type: domain.NodeCommand, Name: "ПЕРЕЙТИ В ХРАНИЛИЩЕ", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "vault"}},
+				}},
+			},
+			{
+				ID: "vault", Name: "Терминал хранилища",
+				Root: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT"},
+			},
+		},
 	}
 }
 

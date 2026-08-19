@@ -265,6 +265,16 @@ export function ResolveCommandExecution(payload) {
 }
 
 /**
+ * @param {$models.TerminalNavigationDecisionPayload} payload
+ * @returns {$CancellablePromise<$models.ResolveTerminalNavigationResult>}
+ */
+export function ResolveTerminalNavigation(payload) {
+    return $Call.ByID(2812243969, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType10($result);
+    }));
+}
+
+/**
  * @param {$models.TerminalSwitchDecisionPayload} payload
  * @returns {$CancellablePromise<$models.TerminalSwitchCommandResult>}
  */
@@ -280,7 +290,7 @@ export function ResolveTerminalSwitch(payload) {
  */
 export function SavePublicAccessSettings(payload) {
     return $Call.ByID(2107763802, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -290,7 +300,7 @@ export function SavePublicAccessSettings(payload) {
  */
 export function SaveSession(session) {
     return $Call.ByID(830349524, session).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType11($result);
+        return $$createType12($result);
     }));
 }
 
@@ -319,7 +329,7 @@ export function StartBroadcast() {
  */
 export function StartPublicAccess(payload) {
     return $Call.ByID(2229627868, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -329,7 +339,7 @@ export function StartPublicAccess(payload) {
  */
 export function StopPublicAccess(payload) {
     return $Call.ByID(887374898, payload).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType10($result);
+        return $$createType11($result);
     }));
 }
 
@@ -354,5 +364,6 @@ const $$createType6 = $models.PlayerConfigCommandResult.createFrom;
 const $$createType7 = $models.TerminalSwitchCommandResult.createFrom;
 const $$createType8 = $models.SessionStateResult.createFrom;
 const $$createType9 = $models.ResolveCommandExecutionResult.createFrom;
-const $$createType10 = $models.PublicAccessCommandResult.createFrom;
-const $$createType11 = session$0.SaveResult.createFrom;
+const $$createType10 = $models.ResolveTerminalNavigationResult.createFrom;
+const $$createType11 = $models.PublicAccessCommandResult.createFrom;
+const $$createType12 = session$0.SaveResult.createFrom;

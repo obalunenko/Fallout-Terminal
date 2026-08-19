@@ -49,16 +49,20 @@
             "id": "n_cmd_state_change_1",
             "type": "command",
             "name": "Разблокировать входную дверь",
-            "text": "Замки входной двери отключены. Дверь разблокирована.",
-            "stateChange": {
-              "completedName": "Входная дверь разблокирована",
-              "confirmationText": "Разрешить снятие блокировки входного шлюза?"
+            "terminalTransition": {
+              "targetTerminalId": "t_demo2"
             }
           }
         ],
         "id": "root",
         "name": "ROOT",
         "type": "folder"
+      },
+      "commandStates": {
+        "n_cmd_1": {
+          "completedName": "Освещение у входа включено",
+          "resultText": "Освещение у входа включено. Проход хорошо виден."
+        }
       }
     },
     {

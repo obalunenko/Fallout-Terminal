@@ -905,6 +905,56 @@ export class ResolveCommandExecutionResult {
 }
 
 /**
+ * ResolveTerminalNavigationResult is the private response for one exact
+ * forward/return decision and its resulting authoritative coordination state.
+ */
+export class ResolveTerminalNavigationResult {
+    /**
+     * Creates a new ResolveTerminalNavigationResult instance.
+     * @param {Partial<ResolveTerminalNavigationResult>} [$$source = {}] - The source object to create the ResolveTerminalNavigationResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (!("state" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.MasterCoordinationState | null}
+             */
+            this["state"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResolveTerminalNavigationResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResolveTerminalNavigationResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("state" in $$parsedSource) {
+            $$parsedSource["state"] = $$createField2_0($$parsedSource["state"]);
+        }
+        return new ResolveTerminalNavigationResult(/** @type {Partial<ResolveTerminalNavigationResult>} */($$parsedSource));
+    }
+}
+
+/**
  * RuntimeStatus is the synchronous startup/status snapshot used to avoid
  * losing events emitted before the frontend subscribes.
  */
@@ -1168,6 +1218,41 @@ export class SessionStateResult {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new SessionStateResult(/** @type {Partial<SessionStateResult>} */($$parsedSource));
+    }
+}
+
+export class TerminalNavigationDecisionPayload {
+    /**
+     * Creates a new TerminalNavigationDecisionPayload instance.
+     * @param {Partial<TerminalNavigationDecisionPayload>} [$$source = {}] - The source object to create the TerminalNavigationDecisionPayload.
+     */
+    constructor($$source = {}) {
+        if (!("requestId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["requestId"] = "";
+        }
+        if (!("decision" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.TerminalNavigationDecision}
+             */
+            this["decision"] = domain$0.TerminalNavigationDecision.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TerminalNavigationDecisionPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {TerminalNavigationDecisionPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TerminalNavigationDecisionPayload(/** @type {Partial<TerminalNavigationDecisionPayload>} */($$parsedSource));
     }
 }
 

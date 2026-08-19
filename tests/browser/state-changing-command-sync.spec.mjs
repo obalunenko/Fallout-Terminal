@@ -230,6 +230,7 @@ test('controller disconnect keeps one pending request and durable completion sur
       await reconnected.page.locator('.term-row', { hasText: 'АРХИВ' }).click();
       await Promise.all(journey.players.map(player =>
         expect(player.page.locator('.term-row', { hasText: 'ЖУРНАЛ' })).toBeVisible()));
+      await expect(reconnected.page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
       await reconnected.page.locator('#backBtn').click();
       await Promise.all(journey.players.map(player =>
         expect(player.page.locator('.term-row', { hasText: 'Двери открыты' })).toBeVisible()));

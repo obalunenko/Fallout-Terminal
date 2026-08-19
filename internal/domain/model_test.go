@@ -97,6 +97,34 @@ func TestUnknownFieldsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTerminalTransitionRoundTripTreatsConfigAsKnownAndDetachesClone(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Linked terminals",
+  "terminals": [
+    {"id":"a","name":"A","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[{"id":"go","type":"command","name":"GO","terminalTransition":{"targetTerminalId":"b"},"futureNode":true}]}},
+    {"id":"b","name":"B","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[]}}
+  ]
+}`)
+	session, err := DecodeSession(raw)
+	require.NoError(t, err)
+	transition := session.Terminals[0].Root.Children[0].TerminalTransition
+	require.NotNil(t, transition)
+	assert.Equal(t, "b", transition.TargetTerminalID)
+	assert.NotContains(t, session.Terminals[0].Root.Children[0].Extra, "terminalTransition")
+
+	encoded, err := EncodeSession(session)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"terminalTransition"`)
+	assert.Contains(t, string(encoded), `"futureNode"`)
+
+	clone := CloneSession(session)
+	clone.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID = "changed"
+	assert.Equal(t, "b", session.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID)
+}
+
 func TestStateChangingCommandRoundTripPreservesFrozenSnapshotAndUnknownFields(t *testing.T) {
 	t.Parallel()
 

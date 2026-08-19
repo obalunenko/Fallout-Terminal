@@ -178,6 +178,53 @@ func TestRevalidate(t *testing.T) {
 	}
 }
 
+func TestStableFolderLookupAndReturnRestoration(t *testing.T) {
+	t.Parallel()
+
+	tree := navigationTree()
+	path, ok := FindFolderPath(tree, "nested")
+	assert.True(t, ok)
+	assert.Equal(t, []string{"root", "docs", "nested"}, path)
+
+	// Stable-ID lookup follows the folder to its current location after an edit.
+	moved := tree
+	nested := moved.Children[0].Children[2]
+	moved.Children[0].Children = moved.Children[0].Children[:2]
+	moved.Children[1].Children = append(moved.Children[1].Children, nested)
+	assert.Equal(t, domain.NavState{Path: []string{"root", "archive", "nested"}, Mode: "list"}, RestoreFolder(moved, "nested", []string{"root", "docs"}))
+
+	// If the exact folder is gone, the nearest surviving authored ancestor wins.
+	withoutNested := treeWithout("nested")
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs"}, Mode: "list"}, RestoreFolder(withoutNested, "nested", []string{"root", "docs"}))
+	withoutDocs := treeWithout("docs")
+	assert.Equal(t, Default(), RestoreFolder(withoutDocs, "nested", []string{"root", "docs"}))
+	assert.Equal(t, Default(), RestoreFolder(tree, "missing", nil))
+}
+
+func TestRestoreFolderUsesStableIdentityThenNearestSurvivingAncestor(t *testing.T) {
+	t.Parallel()
+
+	tree := navigationTree()
+	// Rename does not change a stable folder identity.
+	tree.Children[0].Children[2].Name = "RENAMED"
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs", "nested"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+
+	// Moving the saved folder wins over its historical ancestry.
+	nested := tree.Children[0].Children[2]
+	tree.Children[0].Children = tree.Children[0].Children[:2]
+	tree.Children[1].Children = append(tree.Children[1].Children, nested)
+	assert.Equal(t, domain.NavState{Path: []string{"root", "archive", "nested"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+
+	// Deleting the saved folder falls back from the closest saved ancestor to root.
+	removeNode(&tree, "nested")
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+	removeNode(&tree, "docs")
+	assert.Equal(t, Default(), RestoreFolder(tree, "nested", []string{"root", "docs"}))
+}
+
 func navigationTree() domain.ContentNode {
 	return domain.ContentNode{
 		ID: "root", Type: domain.NodeFolder, Name: "ROOT",

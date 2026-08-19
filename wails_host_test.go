@@ -2,14 +2,18 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
+	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
 	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +42,44 @@ func TestWailsV3ApplicationOptionsServeOnlyMasterAssetsAndQuitWithLastWindow(t *
 	body, err := io.ReadAll(response.Result().Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "MASTER")
+	assert.NotContains(t, string(body), "characterSelect", "the private Wails asset host must not serve the public player application")
+}
+
+func TestWailsSaveSessionBindingRetainsBothRealDemoTerminals(t *testing.T) {
+	raw, err := os.ReadFile("sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Campaigns/wails-demo-transition.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Campaigns",
+			BundledDemo:      "/Applications/Fallout Terminal.app/Contents/Resources/sessions/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	core := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+	require.True(t, core.OpenSession().OK)
+
+	_ = application.New(application.Options{})
+	bindings := application.NewBindings(nil, nil)
+	require.NoError(t, bindings.Add(application.NewService(newDesktopService(core))))
+	method := bindings.Get(&application.CallOptions{
+		MethodName: "github.com/obalunenko/Fallout-Terminal.desktopService.SaveSession",
+	})
+	require.NotNil(t, method, "SaveSession binding must resolve")
+	result, err := method.Call(t.Context(), []json.RawMessage{json.RawMessage(raw)})
+	require.NoError(t, err)
+	saved, ok := result.(sessionservice.SaveResult)
+	require.True(t, ok, "SaveSession result type = %T", result)
+	require.True(t, saved.OK, "SaveSession binding result = %#v", saved)
+
+	reopened := core.OpenSession()
+	require.True(t, reopened.OK, "reopen = %#v", reopened)
+	require.Len(t, reopened.Session.Terminals, 2)
+	require.Equal(t, "t_demo2", reopened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
 }
 
 func TestMasterWindowOptionsPreserveAcceptedSingleWindowContract(t *testing.T) {

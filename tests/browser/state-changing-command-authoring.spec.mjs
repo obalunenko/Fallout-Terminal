@@ -54,8 +54,10 @@ test.beforeEach(async ({ page }) => {
   await openAuthoringFixture(page);
 });
 
-test('bundled read-only demo exposes state-changing examples only in their initial state', async () => {
+test('bundled read-only demo exposes state-changing and terminal-transition examples in their initial state', async () => {
   const demo = JSON.parse(await readFile(BUNDLED_DEMO_URL, 'utf8'));
+  const terminalIDs = new Set(demo.terminals.map(terminal => terminal.id));
+  expect([...terminalIDs]).toEqual(['t_demo1', 't_demo2']);
   const nodes = demo.terminals.flatMap((terminal) => {
     const collected = [];
     const visit = (node, isRoot = false) => {
@@ -66,17 +68,27 @@ test('bundled read-only demo exposes state-changing examples only in their initi
     return collected;
   });
   const commands = nodes.filter(node => node.type === 'command');
+  const stateChangingCommands = commands.filter(command => command.stateChange);
+  const terminalTransitionCommands = commands.filter(command => command.terminalTransition);
   const completed = demo.terminals.flatMap(terminal => Object.keys(terminal.commandStates ?? {}));
 
   expect(nodes.some(node => node.type === 'folder')).toBe(true);
   expect(nodes.some(node => node.type === 'entry')).toBe(true);
-  expect(commands.length).toBeGreaterThan(0);
-  for (const command of commands) {
+  expect(stateChangingCommands.length).toBeGreaterThan(0);
+  for (const command of stateChangingCommands) {
     expect(command.name.trim()).not.toBe('');
     expect(command.text.trim()).not.toBe('');
     expect(command.stateChange?.completedName?.trim()).not.toBe('');
     expect(command.stateChange?.confirmationText?.trim()).not.toBe('');
     expect(command.stateChange.confirmationText).not.toContain(command.name);
+    expect(command.terminalTransition).toBeUndefined();
+  }
+  expect(terminalTransitionCommands.length).toBeGreaterThan(0);
+  for (const command of terminalTransitionCommands) {
+    expect(command.name.trim()).not.toBe('');
+    expect(command.stateChange).toBeUndefined();
+    expect(command.terminalTransition.targetTerminalId.trim()).not.toBe('');
+    expect(terminalIDs.has(command.terminalTransition.targetTerminalId)).toBe(true);
   }
   expect(completed).toEqual([]);
 });

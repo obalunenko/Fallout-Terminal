@@ -109,3 +109,46 @@ func TestSessionContractRoundTripsStateChangeConfigAndFrozenCommandStates(t *tes
 	require.NoError(t, err)
 	require.Empty(t, cmp.Diff(semantic, roundTripSemantic, protocmp.Transform()))
 }
+
+func TestSessionContractRoundTripsTerminalTransitionAndKeepsLegacyAbsent(t *testing.T) {
+	t.Parallel()
+
+	value := linkedSessionForTest()
+	semantic, err := SessionToProto(value)
+	require.NoError(t, err)
+	command := semantic.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand()
+	require.NotNil(t, command.GetTerminalTransition())
+	require.Equal(t, "b", command.GetTerminalTransition().GetTargetTerminalId())
+
+	roundTrip, err := SessionFromProto(semantic, value)
+	require.NoError(t, err)
+	require.Equal(t, value, roundTrip)
+
+	legacy := value
+	legacy.Terminals = append([]domain.Terminal(nil), value.Terminals...)
+	legacy.Terminals[0].Root = value.Terminals[0].Root
+	legacy.Terminals[0].Root.Children = append([]domain.ContentNode(nil), value.Terminals[0].Root.Children...)
+	legacy.Terminals[0].Root.Children[0].TerminalTransition = nil
+	legacyProto, err := SessionToProto(legacy)
+	require.NoError(t, err)
+	require.Nil(t, legacyProto.GetTerminals()[0].GetRoot().GetFolder().GetChildren()[0].GetCommand().TerminalTransition)
+}
+
+func linkedSessionForTest() domain.Session {
+	return domain.Session{Version: 1, Name: "Links", Terminals: []domain.Terminal{
+		{
+			ID: "a", Name: "Alpha",
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{{
+					ID: "go", Type: domain.NodeCommand, Name: "GO",
+					TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "b"},
+				}},
+			},
+		},
+		{
+			ID: "b", Name: "Beta",
+			Root: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}},
+		},
+	}}
+}

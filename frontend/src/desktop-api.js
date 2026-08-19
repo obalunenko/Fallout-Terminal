@@ -16,6 +16,7 @@ const APP_METHODS = Object.freeze({
   requestTerminalClear: desktopService.RequestTerminalClear,
   resolveTerminalSwitch: desktopService.ResolveTerminalSwitch,
   resolveCommandExecution: desktopService.ResolveCommandExecution,
+  resolveTerminalNavigation: desktopService.ResolveTerminalNavigation,
   forceHackSuccess: desktopService.ForceHackSuccess,
   resetFailedHack: desktopService.ResetFailedHack,
   resetCommandState: desktopService.ResetCommandState,
@@ -64,6 +65,25 @@ function command(binding, ...args) {
   }));
 }
 
+function snapshotPortableSession(session) {
+  if (typeof globalThis.structuredClone === 'function') return globalThis.structuredClone(session);
+  return JSON.parse(JSON.stringify(session));
+}
+
+function saveSessionCommand(session) {
+  try {
+    // Wails may complete the native call asynchronously. Capture the complete
+    // portable document now so later UI/event mutations cannot change which
+    // terminals the backend validates for this revision.
+    return command(APP_METHODS.saveSession, snapshotPortableSession(session));
+  } catch (error) {
+    return Promise.resolve({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function writeClipboardText(value) {
   if (typeof value !== 'string' || value === '') return false;
   try {
@@ -99,6 +119,16 @@ function normalizeCommandExecutionResult(result) {
   const ok = value.ok === true;
   const state = value.state && typeof value.state === 'object' ? value.state : null;
   const error = ok ? '' : 'СОСТОЯНИЕ КОМАНДЫ НЕ УДАЛОСЬ СОХРАНИТЬ';
+  return Object.freeze({ ok, error, state });
+}
+
+function normalizeTerminalNavigationResult(result) {
+  const value = result && typeof result === 'object' ? result : {};
+  const ok = value.ok === true;
+  const state = value.state && typeof value.state === 'object' ? value.state : null;
+  const error = ok ? '' : (typeof value.error === 'string' && value.error
+    ? value.error
+    : 'ПЕРЕХОД БОЛЬШЕ НЕ ДЕЙСТВИТЕЛЕН');
   return Object.freeze({ ok, error, state });
 }
 
@@ -374,7 +404,7 @@ const desktopAPI = {
   writeClipboardText,
   openSession: () => command(APP_METHODS.openSession),
   newSession: () => command(APP_METHODS.newSession),
-  saveSession: (session) => command(APP_METHODS.saveSession, session),
+  saveSession: saveSessionCommand,
   loadReferencedPlayerConfig: () => playerConfigCommand(APP_METHODS.loadReferencedPlayerConfig),
   newPlayerConfig: () => playerConfigCommand(APP_METHODS.newPlayerConfig),
   openPlayerConfig: () => playerConfigCommand(APP_METHODS.openPlayerConfig),
@@ -388,6 +418,10 @@ const desktopAPI = {
       ? payload.decision
       : '',
   }).then(normalizeCommandExecutionResult),
+  resolveTerminalNavigation: (payload) => command(APP_METHODS.resolveTerminalNavigation, {
+    requestId: typeof payload?.requestId === 'string' ? payload.requestId : '',
+    decision: payload?.decision === 'approve' || payload?.decision === 'reject' ? payload.decision : '',
+  }).then(normalizeTerminalNavigationResult),
   forceHackSuccess: () => command(APP_METHODS.forceHackSuccess),
   resetFailedHack: (payload) => command(APP_METHODS.resetFailedHack, payload),
   resetCommandState: (payload) => sessionStateCommand(APP_METHODS.resetCommandState, {

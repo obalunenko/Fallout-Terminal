@@ -87,6 +87,22 @@ func verifySessionContract(value domain.Session) error {
 	return err
 }
 
+// ContentNodeToProto maps one already-validated authored tree without
+// inventing a partial session around it. Cross-terminal links are resolved by
+// the complete session validator at the application boundary, not by this
+// shape-preserving private-contract adapter.
+func ContentNodeToProto(node domain.ContentNode) (*persistencev1.ContentNode, error) {
+	return contentNodeToProto(node)
+}
+
+// ContentNodeFromProto maps one authored tree while preserving JSON-only
+// extension fields from its native template. It deliberately performs no
+// session-wide reference validation because the surrounding terminal catalog
+// is not part of this private bridge message.
+func ContentNodeFromProto(node *persistencev1.ContentNode, template domain.ContentNode) (domain.ContentNode, error) {
+	return contentNodeFromProto(node, template)
+}
+
 func contentNodeToProto(node domain.ContentNode) (*persistencev1.ContentNode, error) {
 	result := &persistencev1.ContentNode{Id: node.ID, Name: node.Name}
 	switch node.Type {
@@ -106,6 +122,11 @@ func contentNodeToProto(node domain.ContentNode) (*persistencev1.ContentNode, er
 			command.StateChange = &persistencev1.StateChangeConfig{
 				CompletedName:    node.StateChange.CompletedName,
 				ConfirmationText: node.StateChange.ConfirmationText,
+			}
+		}
+		if node.TerminalTransition != nil {
+			command.TerminalTransition = &persistencev1.TerminalTransitionConfig{
+				TargetTerminalId: node.TerminalTransition.TargetTerminalID,
 			}
 		}
 		result.Content = &persistencev1.ContentNode_Command{Command: command}
@@ -143,6 +164,11 @@ func contentNodeFromProto(node *persistencev1.ContentNode, template domain.Conte
 			result.StateChange = &domain.StateChangeConfig{
 				CompletedName:    content.Command.GetStateChange().GetCompletedName(),
 				ConfirmationText: content.Command.GetStateChange().GetConfirmationText(),
+			}
+		}
+		if content.Command.GetTerminalTransition() != nil {
+			result.TerminalTransition = &domain.TerminalTransitionConfig{
+				TargetTerminalID: content.Command.GetTerminalTransition().GetTargetTerminalId(),
 			}
 		}
 	case *persistencev1.ContentNode_Entry:

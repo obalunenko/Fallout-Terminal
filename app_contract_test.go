@@ -157,6 +157,8 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.TerminalSwitchDecisionRequest{}, []string{"switch_id", "choice"}},
 		{&privatev1.ResolveCommandExecutionRequest{}, []string{"request_id", "decision"}},
 		{&privatev1.ResolveCommandExecutionResult{}, []string{"ok", "error", "state"}},
+		{&privatev1.ResolveTerminalNavigationRequest{}, []string{"request_id", "decision"}},
+		{&privatev1.ResolveTerminalNavigationResult{}, []string{"ok", "error", "state"}},
 		{&privatev1.ResetCommandStateRequest{}, []string{"terminal_id", "command_id"}},
 		{&privatev1.ResetTerminalCommandStatesRequest{}, []string{"terminal_id"}},
 		{&privatev1.SessionStateResult{}, []string{"ok", "error", "revision", "session"}},
@@ -182,8 +184,10 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.BroadcastState{}, []string{"broadcast_id", "active_controller_session_id", "active_terminal_id", "revision"}},
 		{&privatev1.PendingTerminalSwitch{}, []string{"switch_id", "terminal_id", "terminal_name", "requested_terminal", "broadcast_id", "source_terminal_id", "target_terminal_id"}},
 		{&privatev1.PendingCommandExecution{}, []string{"request_id", "broadcast_id", "terminal_id", "command_id", "command_name", "confirmation_text"}},
+		{&privatev1.PendingTerminalNavigation{}, []string{"request_id", "broadcast_id", "direction", "source_terminal_id", "source_terminal_name", "command_id", "command_name", "target_terminal_id", "target_terminal_name", "route_depth"}},
+		{&privatev1.TerminalNavigationNotice{}, []string{"reason", "source_terminal_id", "command_id", "target_terminal_id"}},
 		{&privatev1.PlayerConfigMetadata{}, []string{"status", "file_path", "version", "name"}},
-		{&privatev1.CoordinationState{}, []string{"roster", "logical_sessions", "broadcast", "pending_terminal_switch", "revision", "player_config", "pending_command_execution"}},
+		{&privatev1.CoordinationState{}, []string{"roster", "logical_sessions", "broadcast", "pending_terminal_switch", "revision", "player_config", "pending_command_execution", "pending_terminal_navigation", "terminal_navigation_notice"}},
 	}
 	for _, test := range coverage {
 		descriptor := test.message.ProtoReflect().Descriptor()
@@ -204,6 +208,25 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		"COMMAND_EXECUTION_DECISION_APPROVE",
 		"COMMAND_EXECUTION_DECISION_REJECT",
 	}, descriptorEnumNames(decision))
+	navigationDecision := (&privatev1.ResolveTerminalNavigationRequest{}).ProtoReflect().Descriptor().Fields().ByName("decision").Enum()
+	require.Equal(t, []string{
+		"TERMINAL_NAVIGATION_DECISION_UNSPECIFIED",
+		"TERMINAL_NAVIGATION_DECISION_APPROVE",
+		"TERMINAL_NAVIGATION_DECISION_REJECT",
+	}, descriptorEnumNames(navigationDecision))
+}
+
+func TestPublicPlayerDescriptorsExcludePrivateTerminalNavigationCapabilities(t *testing.T) {
+	t.Parallel()
+	for _, fullName := range []protoreflect.FullName{
+		"fallout.terminal.player.v1.PendingTerminalNavigation",
+		"fallout.terminal.player.v1.TerminalNavigationDecision",
+		"fallout.terminal.player.v1.ResolveTerminalNavigationRequest",
+		"fallout.terminal.player.v1.TerminalNavigationNotice",
+	} {
+		_, err := protoregistry.GlobalTypes.FindMessageByName(fullName)
+		require.Error(t, err, "%s must remain private", fullName)
+	}
 }
 
 func descriptorEnumNames(descriptor protoreflect.EnumDescriptor) []string {
@@ -295,7 +318,7 @@ func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *test
 func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.T) {
 	requiredMethods := []string{
 		"GetRuntimeStatus", "NewSession", "OpenSession", "CopyDemo", "SaveSession", "LoadReferencedPlayerConfig", "NewPlayerConfig", "OpenPlayerConfig",
-		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ResolveCommandExecution", "ForceHackSuccess", "ResetFailedHack", "ResetCommandState", "ResetTerminalCommandStates",
+		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ResolveCommandExecution", "ResolveTerminalNavigation", "ForceHackSuccess", "ResetFailedHack", "ResetCommandState", "ResetTerminalCommandStates",
 		"AddCharacter", "RenameCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
 		"StartBroadcast", "EndBroadcast", "OpenURL", "GetPublicAccess", "SavePublicAccessSettings", "GeneratePlayerPassword", "StartPublicAccess", "StopPublicAccess",
 	}
@@ -304,7 +327,7 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 	for index := range serviceType.NumMethod() {
 		actualMethods = append(actualMethods, serviceType.Method(index).Name)
 	}
-	require.Len(t, actualMethods, 33)
+	require.Len(t, actualMethods, 34)
 	require.ElementsMatch(t, requiredMethods, actualMethods)
 
 	for _, forbidden := range []string{
@@ -348,7 +371,7 @@ func TestDesktopServiceMethodsAreTransparentCoreForwards(t *testing.T) {
 		forwarded[method.Name.Name] = selector.Sel.Name
 	}
 
-	require.Len(t, forwarded, 33)
+	require.Len(t, forwarded, 34)
 	for exposed, core := range forwarded {
 		require.Equal(t, exposed, core, "%s must not translate into an authored capability", exposed)
 	}

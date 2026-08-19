@@ -702,6 +702,21 @@ button {
   overflow-wrap: anywhere;
 }
 .terminal-switch-error[hidden] { display: none; }
+.terminal-navigation-summary {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 20px;
+  padding: 12px;
+  border: 1px solid rgba(159, 232, 154, .35);
+  background: rgba(12, 32, 15, .6);
+  color: #9fe89a;
+  line-height: 1.4;
+}
+.terminal-navigation-direction {
+  color: #ffe08a;
+  letter-spacing: 1.5px;
+}
+.terminal-transition-fields select { width: 100%; }
 
 @media (max-width: 1050px) {
   .term-panel { width: 230px; }

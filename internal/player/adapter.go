@@ -323,14 +323,46 @@ func LiveToProto(state *domain.PublicLiveState) *playerv1.LiveTerminal {
 		return nil
 	}
 	return &playerv1.LiveTerminal{
-		TerminalId:       state.TerminalID,
-		TerminalName:     state.TerminalName,
-		Tree:             ContentNodeToProto(state.Tree),
-		HackLevel:        int32(state.HackLevel),
-		IntroText:        state.IntroText,
-		Navigation:       NavigationToProto(&state.Nav),
-		Hacking:          HackToProto(state.Hack),
-		CommandExecution: commandExecutionToProto(state.CommandExecution),
+		TerminalId:         state.TerminalID,
+		TerminalName:       state.TerminalName,
+		Tree:               ContentNodeToProto(state.Tree),
+		HackLevel:          int32(state.HackLevel),
+		IntroText:          state.IntroText,
+		Navigation:         NavigationToProto(&state.Nav),
+		Hacking:            HackToProto(state.Hack),
+		CommandExecution:   commandExecutionToProto(state.CommandExecution),
+		TerminalNavigation: terminalNavigationToProto(state.TerminalNavigation),
+	}
+}
+
+func terminalNavigationToProto(presentation *domain.TerminalNavigationPresentation) *playerv1.TerminalNavigationPresentation {
+	if presentation == nil {
+		return nil
+	}
+	result := &playerv1.TerminalNavigationPresentation{RouteDepth: presentation.RouteDepth}
+	if presentation.ReturnTarget != nil {
+		result.ReturnTarget = &playerv1.TerminalReturnTarget{
+			TerminalId: presentation.ReturnTarget.TerminalID, TerminalName: presentation.ReturnTarget.TerminalName,
+		}
+	}
+	if presentation.Pending != nil {
+		result.Pending = &playerv1.PendingTerminalNavigationPresentation{
+			Direction:          terminalNavigationDirectionToProto(presentation.Pending.Direction),
+			TargetTerminalId:   presentation.Pending.TargetTerminalID,
+			TargetTerminalName: presentation.Pending.TargetTerminalName,
+		}
+	}
+	return result
+}
+
+func terminalNavigationDirectionToProto(direction domain.TerminalNavigationDirection) playerv1.TerminalNavigationDirection {
+	switch direction {
+	case domain.TerminalNavigationForward:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD
+	case domain.TerminalNavigationReturn:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN
+	default:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_UNSPECIFIED
 	}
 }
 

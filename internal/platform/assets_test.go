@@ -221,7 +221,7 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
 		"proto/fallout/terminal/private/v1/runtime.proto": "4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9",
-		"proto/schema-revision.txt":                       "e1ccd2d6b5669c4a431aae2c1cb7eece07df2ab177d1140b8c9983820b9006e1",
+		"proto/schema-revision.txt":                       "57b77f581b3518d0e16b5366c905fb39cf6b46cf614f8dd437dbaa9d4371e543",
 		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {

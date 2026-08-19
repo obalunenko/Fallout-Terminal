@@ -69,6 +69,10 @@ func (service *desktopService) ResolveCommandExecution(payload CommandExecutionD
 	return service.core.ResolveCommandExecution(payload)
 }
 
+func (service *desktopService) ResolveTerminalNavigation(payload TerminalNavigationDecisionPayload) ResolveTerminalNavigationResult {
+	return service.core.ResolveTerminalNavigation(payload)
+}
+
 func (service *desktopService) ForceHackSuccess() CommandResult {
 	return service.core.ForceHackSuccess()
 }

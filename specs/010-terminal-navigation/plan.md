@@ -2,6 +2,8 @@
 
 **Feature**: `010-terminal-navigation` | **Date**: 2026-08-18 | **Spec**: [spec.md](./spec.md)
 
+**Bugfix**: 2026-08-19 — BUG-001 Updated from bugfix patch
+
 ## Summary
 
 Функция добавляет к обычной авторской команде необязательную ссылку на другой терминал того же session JSON version 1. Выбор такой команды и возврат из корня создают один server-authoritative approve/reject request; только approve атомарно меняет активный терминал и LIFO-маршрут.
@@ -113,6 +115,7 @@ tests/browser/
 | Player stream | Controller-only mutation, observers read-only, monotonic complete update, pending snapshot/reconnect, active-terminal convergence, overflow resubscribe. |
 | Private desktop | Exact prompt fields, dialog dedup/close/stale callback, typed notice, one new allowlisted Wails method, no public decision capability. |
 | Browser | Master, controller and at least two observers; approve/reject/return, nested source folder, stale target, reconnect while pending, retained hacking. |
+| Master/native persistence | Реальный `sessions/demo.json`: полный terminal set до и после Wails `SaveSession`, успешная durable revision для `t_demo1` → `t_demo2`, reopen с сохранённой целью; missing/self target по-прежнему отклоняются. |
 
 Applicable commands:
 
