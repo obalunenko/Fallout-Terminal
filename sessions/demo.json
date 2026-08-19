@@ -57,12 +57,6 @@
         "id": "root",
         "name": "ROOT",
         "type": "folder"
-      },
-      "commandStates": {
-        "n_cmd_1": {
-          "completedName": "Освещение у входа включено",
-          "resultText": "Освещение у входа включено. Проход хорошо виден."
-        }
       }
     },
     {

@@ -1093,12 +1093,16 @@ function showPlayerNotice(message) {
   renderPlayerNotice();
 }
 
+function isDirectTerminalNavigationPending() {
+  return terminalNavigation?.pending?.direction === 'forward';
+}
+
 function renderPlayerNotice() {
   const authoritativeMessage = playerState?.role === 'active' &&
     playerState.notice === 'command-persistence-failed'
     ? 'НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ КОМАНДЫ. СОСТОЯНИЕ КОМАНДЫ НЕ ИЗМЕНЕНО.'
     : '';
-  const navigationMessage = terminalNavigation?.pending
+  const navigationMessage = terminalNavigation?.pending && !isDirectTerminalNavigationPending()
     ? `${terminalNavigation.pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД'} В ${terminalNavigation.pending.targetTerminalName || terminalNavigation.pending.targetTerminalId} ОЖИДАЕТ РЕШЕНИЯ МАСТЕРА`
     : '';
   const message = authoritativeMessage || navigationMessage || transientPlayerNotice;
@@ -1438,7 +1442,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (commandExecution?.phase === 'pending') {
+  if (commandExecution?.phase === 'pending' || isDirectTerminalNavigationPending()) {
     if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
       e.preventDefault();
     }
@@ -1917,6 +1921,8 @@ function render() {
 
   if (commandExecution !== null) {
     renderCommandExecutionScreen();
+  } else if (isDirectTerminalNavigationPending()) {
+    renderTerminalNavigationPendingScreen();
   } else if (mode === MODE.HACK) {
     renderHackScreen();
   } else {
@@ -1944,6 +1950,24 @@ function renderCommandExecutionScreen() {
     text,
     showBack: phase === 'rejected' &&
       playerState?.role === 'active' && playerState?.phase === 'controlling',
+  });
+}
+
+function renderTerminalNavigationPendingScreen() {
+  hackHeader.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  normalHeader.hidden = false;
+  serverLine.textContent = `-Server ${serverNum}-`;
+  introTextEl.textContent = introText;
+  const pending = terminalNavigation.pending;
+  const target = pending.targetTerminalName || pending.targetTerminalId;
+  renderCommandRecordSurface({
+    kind: 'terminal-navigation-pending',
+    key: `${pending.direction}:${pending.targetTerminalId}`,
+    title: `ПЕРЕХОД В ${target}`,
+    text: 'Выполняется запрос',
+    showBack: false,
   });
 }
 

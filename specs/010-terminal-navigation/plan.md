@@ -3,12 +3,15 @@
 **Feature**: `010-terminal-navigation` | **Date**: 2026-08-18 | **Spec**: [spec.md](./spec.md)
 
 **Bugfix**: 2026-08-19 — BUG-001 Updated from bugfix patch
+**Bugfix**: 2026-08-19 — BUG-002 Updated from bugfix patch
 
 ## Summary
 
 Функция добавляет к обычной авторской команде необязательную ссылку на другой терминал того же session JSON version 1. Выбор такой команды и возврат из корня создают один server-authoritative approve/reject request; только approve атомарно меняет активный терминал и LIFO-маршрут.
 
 Существующий coordinator остаётся единым владельцем broadcast state, per-terminal checkpoints, revisions, replay protection и stream publication. Переход использует отдельный runtime lifecycle вместо ручного `PendingTerminalSwitch`, поэтому сохраняет исходный checkpoint без второго диалога, повторно проверяет актуальную session перед approve и рассылает всем игрокам одну полную ревизионную проекцию.
+
+По BUG-002 отдельный protocol lifecycle перехода сохраняется, но его ожидающая public projection переиспользует в player UI полноэкранный record-description renderer изменяющей состояние команды: меню скрыто, показан точный текст «Выполняется запрос», а server-authoritative active terminal и маршрут не меняются до решения мастера.
 
 ## Project Structure
 
@@ -97,12 +100,12 @@ tests/browser/
 
 1. Обновить public/private adapters, App result, Wails method, desktop API normalization, generated bindings и exact allowlist/descriptor tests.
 2. Добавить master dialog с direction/source/command/target, request-ID deduplication, close-as-reject и stale callback guards; typed notice показывать отдельно.
-3. Добавить player route/pending mapping, root return control и input lock, сохранив current unary+stream acknowledgement discipline и observer read-only behavior.
+3. Добавить player route/pending mapping, root return control и input lock, сохранив current unary+stream acknowledgement discipline и observer read-only behavior. По BUG-002 прямой pending MUST скрывать меню и переиспользовать общий полноэкранный record-description renderer с точным текстом «Выполняется запрос», не объединяя `TerminalNavigationPresentation` с `CommandExecutionPresentation` и не выполняя optimistic terminal switch.
 
 ### Phase 5 — Верификация и cutover
 
 1. Покрыть legacy/new JSON, cross-reference validation, moved/deleted folder restoration, coordinator atomicity/replay/authority, hack continuity, stream reconnect и private capability separation.
-2. Добавить Playwright journey master + controller + observers для approve/reject, LIFO/cycle, pending reconnect, stale target и moved/deleted return location.
+2. Добавить Playwright journey master + controller + observers для approve/reject, LIFO/cycle, pending reconnect, stale target и moved/deleted return location. Для BUG-002 отдельно сравнить полноэкранную поверхность прямого pending с renderer ожидающей state-changing команды, проверить точный текст, отсутствие меню, блокировку `Back`/`Enter` и восстановление того же экрана после reconnect.
 3. Пройти protobuf format/lint/generation/breaking, Wails binding inventory, Go race, frontend/client builds и browser suite; generated drift и временные protocol paths не оставлять.
 
 ## Verification Strategy
@@ -112,9 +115,9 @@ tests/browser/
 | Session/domain | Legacy absence, new config round-trip, unknown fields, forward-reference order, missing/self target, state-change conflict, inbound delete guard. |
 | Navigation/live | Rename/move/delete folder, nearest parent/root fallback, destination root placement, solved/unfinished/failed hack retention, explicit reset/discard. |
 | Coordinator | Approve/reject/stale, exact-one pending, 20 replays, concurrent distinct IDs, LIFO A→B→C, cycle A→B→A, pop-after-approve, manual/end/shutdown clearing. |
-| Player stream | Controller-only mutation, observers read-only, monotonic complete update, pending snapshot/reconnect, active-terminal convergence, overflow resubscribe. |
+| Player stream | Controller-only mutation, observers read-only, monotonic complete update, pending snapshot/reconnect с тем же полноэкранным экраном «Выполняется запрос», active-terminal convergence без optimistic switch, overflow resubscribe. |
 | Private desktop | Exact prompt fields, dialog dedup/close/stale callback, typed notice, one new allowlisted Wails method, no public decision capability. |
-| Browser | Master, controller and at least two observers; approve/reject/return, nested source folder, stale target, reconnect while pending, retained hacking. |
+| Browser | Master, controller and at least two observers; approve/reject/return, nested source folder, stale target, reconnect while pending, retained hacking; для прямого pending — общий record-description renderer, точный текст «Выполняется запрос», скрытое меню и заблокированные `Back`/`Enter`. |
 | Master/native persistence | Реальный `sessions/demo.json`: полный terminal set до и после Wails `SaveSession`, успешная durable revision для `t_demo1` → `t_demo2`, reopen с сохранённой целью; missing/self target по-прежнему отклоняются. |
 
 Applicable commands:

@@ -49,7 +49,7 @@ async function openParticipant(browser, token = '') {
 
 async function approveForwardTransition(master, player) {
   await player.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).click();
-  await expect(player.locator('#playerNotice')).toContainText('ОЖИДАЕТ РЕШЕНИЯ МАСТЕРА');
+  await expectPendingTransitionSurface(player);
   const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
   await expect(dialog).toHaveCount(1);
   await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
@@ -68,6 +68,17 @@ async function finishHack(request, player) {
   expect((await request.post(`${FIXTURE}/force-hack`)).ok()).toBe(true);
   await expect(player.locator('#hackHeader')).toBeHidden({ timeout: 5000 });
   await expect(player.locator('#termList')).toBeVisible();
+}
+
+async function expectPendingTransitionSurface(page, timeout = 2000) {
+  await expect(page.locator('#termEntry')).toBeVisible({ timeout });
+  await page.keyboard.press('Shift');
+  await expect(page.locator('#entryBody')).toHaveText('Выполняется запрос', { timeout });
+  await expect(page.locator('#termList')).toBeHidden({ timeout });
+  await expect(page.locator('#termOutput')).toBeHidden({ timeout });
+  await expect(page.locator('#termPrompt')).toBeVisible({ timeout });
+  await expect(page.locator('#backBtn')).toBeHidden({ timeout });
+  await expect(page.locator('#playerNotice')).toBeHidden({ timeout });
 }
 
 test.beforeEach(async ({ request }) => {
@@ -138,6 +149,67 @@ test('approved first entry opens the destination hack at root without a terminal
     await player.context.close();
     await masterContext.close();
   }
+});
+
+test('direct pending replaces every player menu with the inert record surface across reconnect and decisions', async ({ browser, request }) => {
+  const runDecision = async decision => {
+    const masterContext = await browser.newContext();
+    const master = await masterContext.newPage();
+    await openMaster(master);
+    const controller = await openParticipant(browser);
+    const firstObserver = await openParticipant(browser);
+    let secondObserver = await openParticipant(browser);
+    try {
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+      await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+      const sourceMenu = await controller.page.locator('#termList').textContent();
+
+      await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
+      await Promise.all([controller, firstObserver, secondObserver].map(participant =>
+        expectPendingTransitionSurface(participant.page)));
+
+      const retainedToken = await secondObserver.page.evaluate(() =>
+        localStorage.getItem('fallout-terminal.player-token'));
+      await secondObserver.context.close();
+      secondObserver = await openParticipant(browser, retainedToken);
+      await expectPendingTransitionSurface(secondObserver.page);
+
+      for (const participant of [controller, firstObserver, secondObserver]) {
+        await participant.page.keyboard.press('Enter');
+        await participant.page.keyboard.press('Backspace');
+        await expectPendingTransitionSurface(participant.page);
+      }
+
+      const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+      await expect(dialog).toBeVisible();
+      if (decision === 'close') await dialog.press('Escape');
+      else await dialog.getByRole('button', { name: decision === 'approve' ? 'ОДОБРИТЬ' : 'ОТКЛОНИТЬ' }).click();
+      await expect(dialog).toBeHidden();
+
+      if (decision === 'approve') {
+        await Promise.all([controller, firstObserver, secondObserver].map(participant =>
+          expect(participant.page.locator('#hackHeader')).toBeVisible({ timeout: 2000 })));
+      } else {
+        await Promise.all([controller, firstObserver, secondObserver].map(async participant => {
+          await expect(participant.page.locator('#termList')).toBeVisible({ timeout: 2000 });
+          await expect(participant.page.locator('#termList')).toHaveText(sourceMenu);
+          await expect(participant.page.locator('#termEntry')).toBeHidden();
+        }));
+      }
+    } finally {
+      await controller.context.close();
+      await firstObserver.context.close();
+      await secondObserver.context.close();
+      await masterContext.close();
+    }
+  };
+
+  await runDecision('approve');
+  expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+  await runDecision('reject');
+  expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+  await runDecision('close');
 });
 
 test('an unfinished destination hack resumes with the exact retained progress', async ({ browser, request }) => {
@@ -231,12 +303,17 @@ test('controller and two observers reconnect during pending and converge before 
     await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
     await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
     await Promise.all([controller, observer, secondObserver].map(participant =>
-      expect(participant.page.locator('#playerNotice')).toContainText('ОЖИДАЕТ РЕШЕНИЯ МАСТЕРА', { timeout: 2000 })));
+      expectPendingTransitionSurface(participant.page)));
+    await Promise.all([controller, observer, secondObserver].map(async participant => {
+      await participant.page.keyboard.press('Enter');
+      await participant.page.keyboard.press('Backspace');
+      await expectPendingTransitionSurface(participant.page);
+    }));
 
     const token = await observer.page.evaluate(() => localStorage.getItem('fallout-terminal.player-token'));
     await observer.context.close();
     observer = await openParticipant(browser, token);
-    await expect(observer.page.locator('#playerNotice')).toContainText('ОЖИДАЕТ РЕШЕНИЯ МАСТЕРА');
+    await expectPendingTransitionSurface(observer.page);
     await decideNavigation(master, 'approve');
     await Promise.all([controller, observer, secondObserver].map(participant =>
       expect(participant.page.locator('#hackHeader')).toBeVisible({ timeout: 2000 })));

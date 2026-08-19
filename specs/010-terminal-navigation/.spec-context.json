@@ -429,9 +429,70 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-18T23:39:24.784Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T00:14:44.549Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:16:51.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:18:13.349Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:19:03.479Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:21:14.213Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:39:31.816Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:39:32.009Z",
+      "reopened": true
     }
   ],
-  "last_action": "BUG-001 fixed; 35/35 tasks complete; automated gates and packaged demo save/reopen smoke pass",
+  "last_action": "BUG-002 implemented; 37/37 tasks complete; automated gates and accepted packaged presentation smoke pass",
   "coverage": {
     "FR-001": {
       "title": "Мастер MUST иметь возможность настроить обычную команду как команду перехода и выбрать для неё другой терминал из текущей сессии.",
@@ -865,6 +926,12 @@
         "wails_host_test.go::TestWailsSaveSessionBindingRetainsBothRealDemoTerminals",
         "native packaged demo persistence smoke"
       ]
+    },
+    "FR-029": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::direct pending replaces every player menu with the inert record surface across reconnect and decisions",
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ]
     }
   },
   "size": "oversized",
@@ -953,6 +1020,11 @@
       "decision": "Validate live terminal payloads against the complete active session and use the private protobuf adapter only for tree shape routing",
       "why": "Cross-terminal references are document-wide; synthetic one-terminal projections falsely reject valid links",
       "rejected": "Weakening domain.ValidateSession or stripping terminalTransition from native payloads"
+    },
+    {
+      "decision": "Render only direct terminal-navigation pending through the existing record-description surface while keeping TerminalNavigationPresentation separate from CommandExecutionPresentation",
+      "why": "Meets FR-029/SC-010 without merging independent protocol lifecycles or introducing an optimistic terminal switch",
+      "rejected": "Reuse command-execution state or keep the transition-specific notice overlay"
     }
   ],
   "step_summaries": {
@@ -964,7 +1036,7 @@
       "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
     },
     "implement": {
-      "summary": "Completed T036 and the terminal-navigation implementation with accepted packaged native evidence",
+      "summary": "Direct terminal transitions now use the shared full-screen pending record across controller, observers, and reconnect; all 37 tasks and automated/native gates are complete.",
       "key_finding": "The native boundary had two synthetic one-terminal projections that rejected valid cross-terminal references during activation and protobuf routing; both now operate with the correct validation context",
       "risks": "No open implementation tasks; the historical manual-gate concern is superseded by the accepted T036 verification record"
     }
@@ -1094,10 +1166,9 @@
     },
     "T016": {
       "status": "DONE",
-      "did": "Rendered authoritative forward/return pending status and made shared player controls inert without optimistic terminal changes",
+      "did": "Routed direct terminal-navigation pending through the shared full-screen record renderer, suppressed its old overlay, and blocked acknowledgement keys",
       "files": [
-        "client/client.js",
-        "client/client.css"
+        "client/client.js"
       ]
     },
     "T017": {
@@ -1190,10 +1261,9 @@
     },
     "T027": {
       "status": "DONE",
-      "did": "Added controller plus two-observer pending reconnect, two-second convergence, stale target, moved/deleted return recovery, and new-broadcast cleanup browser journeys",
+      "did": "Extended the multiplayer/reconnect journey to require the shared full-screen pending record, hidden menu, and inert Enter/Back; all 11 focused tests pass",
       "files": [
-        "tests/browser/terminal-navigation.spec.mjs",
-        "tests/browser/fixture-server/main.go"
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T028": {
@@ -1222,24 +1292,21 @@
     },
     "T030": {
       "status": "DONE",
-      "did": "Passed SC-009 boundary tests, focused/race/all Go tests, frontend/client builds, 90-test browser gate, focused navigation, and make check",
+      "did": "Passed targeted, race, full Go suites, frontend/client builds, 11 focused navigation journeys, and make check; removed an invalid durable runtime snapshot from the bundled demo",
       "files": [
-        "app_test.go",
-        "wails_host_test.go",
-        "internal/session/service_test.go",
-        "frontend/src/desktop-api.js",
-        "tests/browser/desktop-api.spec.mjs",
+        "client/client.js",
         "tests/browser/terminal-navigation.spec.mjs",
-        "tests/browser/state-changing-command-authoring.spec.mjs"
+        "sessions/demo.json"
       ]
     },
     "T031": {
       "status": "DONE",
-      "did": "Packaged macOS smoke opened sessions/demo.json, applied the cross-terminal command, confirmed revision 1 persisted both t_demo1 and t_demo2 with target t_demo2, restarted the production bundle, reopened the same file, and confirmed the transition remained enabled with the second terminal selected.",
+      "did": "Packaged Wails smoke passed native reject/approve, controller plus two observers and reconnect full-screen pending, ten solved-terminal revisits, A-B-C LIFO unwind, shutdown, and real demo save/reopen",
       "files": [
         "build/bin/Fallout Terminal.app",
         "sessions/demo.json",
-        "frontend/src/desktop-api.js"
+        "client/client.js",
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T032": {
@@ -1281,13 +1348,18 @@
     },
     "T036": {
       "status": "DONE",
-      "did": "Passed the packaged native master plus controller and two observers acceptance journey; fixed complete-session activation and private tree routing for cross-terminal links",
+      "did": "Revalidated SC-010 on the accepted packaged runtime across controller, two observers, and reconnect; combined with the prior accepted native lifecycle pass, the complete gate remains green",
       "files": [
-        "app.go",
-        "app_contract.go",
-        "app_test.go",
-        "internal/session/contract.go",
-        "build/bin/Fallout Terminal.app"
+        "build/bin/Fallout Terminal.app",
+        "sessions/demo.json",
+        "specs/010-terminal-navigation/.spec-context.json"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Added controller, two-observer, reconnect, input-lock, approve/reject/close regression; confirmed it fails because the record surface stays hidden",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     }
   },
@@ -1419,6 +1491,34 @@
       "warnings": [
         "benign macOS newer-object-version linker warnings during Go tests"
       ]
+    },
+    {
+      "what": "BUG-002 red/green focused regression and complete navigation journey",
+      "command": "npm test -- terminal-navigation.spec.mjs",
+      "result": "11/11 passed after the new regression first failed because #termEntry was hidden",
+      "warnings": []
+    },
+    {
+      "what": "Full automated quality gate",
+      "command": "targeted Go tests; race tests; go test ./...; frontend/client builds; make check",
+      "result": "passed",
+      "warnings": [
+        "macOS linker reported objects built for 26.0 while the test link target was 11.0; tests still passed"
+      ]
+    },
+    {
+      "what": "Accepted packaged Wails BUG-002 journey",
+      "command": "signed bundle with native master plus controller, two observers, and reconnect",
+      "result": "passed exact full-screen pending text and hidden menu/Back, reject/approve, ten solved-terminal revisits, A-B-C LIFO unwind, and shutdown disconnect",
+      "warnings": [
+        "end-broadcast confirmation remained inaccessible to Computer Use; unchanged new-broadcast behavior is retained from the prior accepted T036 pass and automated journey"
+      ]
+    },
+    {
+      "what": "Real demo durable save/reopen",
+      "command": "open sessions/demo.json in packaged app, Apply t_demo1 to t_demo2, inspect file, restart, reopen",
+      "result": "passed with both terminal IDs retained and t_demo2 selected after reopen",
+      "warnings": []
     }
   ],
   "concerns": [
@@ -1426,6 +1526,10 @@
       "note": "Full packaged macOS master + controller + two observers smoke remains a manual gate: Open panel automation could not select the session, so approve/reject, ten revisits, three-terminal unwind, reconnect, and shutdown cleanup were not claimed as native PASS.",
       "step": "implement",
       "kind": "manual-gate"
+    },
+    {
+      "note": "The packaged end-broadcast confirmation button was not exposed to Computer Use coordinate/AX activation; current shutdown cleanup and automated new-broadcast coverage passed, while the prior accepted packaged T036 run remains the evidence for the unchanged end/new-broadcast dialog path.",
+      "step": "implement"
     }
   ]
 }
