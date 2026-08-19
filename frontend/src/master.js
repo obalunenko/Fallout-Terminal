@@ -57,9 +57,7 @@ const playerConfigStatus = document.getElementById('playerConfigStatus');
 const playerConfigError = document.getElementById('playerConfigError');
 const btnOpenPlayerConfig = document.getElementById('btnOpenPlayerConfig');
 const btnNewPlayerConfig = document.getElementById('btnNewPlayerConfig');
-const characterRoster = document.getElementById('characterRoster');
-const characterNameInput = document.getElementById('characterNameInput');
-const btnAddCharacter = document.getElementById('btnAddCharacter');
+const btnManagePlayers = document.getElementById('btnManagePlayers');
 const btnStartBroadcast = document.getElementById('btnStartBroadcast');
 const btnEndBroadcast = document.getElementById('btnEndBroadcast');
 const endBroadcastDialog = document.getElementById('endBroadcastDialog');
@@ -68,8 +66,24 @@ const btnConfirmEndBroadcast = document.getElementById('btnConfirmEndBroadcast')
 const coordinationStatus = document.getElementById('coordinationStatus');
 const coordinationError = document.getElementById('coordinationError');
 const logicalSessionList = document.getElementById('logicalSessionList');
-const characterRosterRowTemplate = document.getElementById('characterRosterRowTemplate');
 const logicalSessionRowTemplate = document.getElementById('logicalSessionRowTemplate');
+const playerManagementDialog = document.getElementById('playerManagementDialog');
+const playerManagementMode = document.getElementById('playerManagementMode');
+const playerManagementRoster = document.getElementById('playerManagementRoster');
+const playerManagementEmpty = document.getElementById('playerManagementEmpty');
+const playerManagementAddForm = document.getElementById('playerManagementAddForm');
+const playerNameInput = document.getElementById('playerNameInput');
+const playerIntelligenceInput = document.getElementById('playerIntelligenceInput');
+const playerHackerPerkAvailability = document.getElementById('playerHackerPerkAvailability');
+const btnAddPlayer = document.getElementById('btnAddPlayer');
+const playerManagementStatus = document.getElementById('playerManagementStatus');
+const playerManagementError = document.getElementById('playerManagementError');
+const btnClosePlayerManagement = document.getElementById('btnClosePlayerManagement');
+const playerManagementRowTemplate = document.getElementById('playerManagementRowTemplate');
+const playerDeleteDialog = document.getElementById('playerDeleteDialog');
+const playerDeleteDialogDescription = document.getElementById('playerDeleteDialogDescription');
+const btnConfirmPlayerDelete = document.getElementById('btnConfirmPlayerDelete');
+const btnCancelPlayerDelete = document.getElementById('btnCancelPlayerDelete');
 const terminalSwitchDialog = document.getElementById('terminalSwitchDialog');
 const terminalSwitchStatus = document.getElementById('terminalSwitchStatus');
 const terminalSwitchError = document.getElementById('terminalSwitchError');
@@ -121,6 +135,8 @@ let terminalNavigationDialogRequestID = null;
 let terminalNavigationDecisionRequestID = null;
 let terminalNavigationDialogEpoch = 0;
 const resolvedTerminalNavigationRequestIDs = new Set();
+let playerManagementOpener = null;
+let pendingPlayerDelete = null;
 
 const commandStateActions = document.createElement('div');
 commandStateActions.className = 'settings-row command-state-terminal-actions';
@@ -752,66 +768,12 @@ function renderCoordination() {
     : 'НЕ ВЫБРАНА · СОЗДАЙТЕ ИЛИ ВЫБЕРИТЕ ФАЙЛ';
   btnOpenPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
   btnNewPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
+  btnManagePlayers.disabled = !playerConfig;
   btnStartBroadcast.disabled = coordinationCommandPending || Boolean(broadcast) || !playerConfig;
   btnEndBroadcast.hidden = !broadcast;
   btnEndBroadcast.disabled = coordinationCommandPending || !broadcast;
-  btnAddCharacter.disabled = coordinationCommandPending || !playerConfig;
-  characterNameInput.disabled = coordinationCommandPending || !playerConfig;
 
-  characterRoster.replaceChildren();
-  if (!roster.length) {
-    const empty = document.createElement('div');
-    empty.className = 'roster-empty';
-    empty.textContent = 'ПЕРСОНАЖИ НЕ ЗАДАНЫ';
-    characterRoster.appendChild(empty);
-  } else {
-    for (const character of roster) {
-      const fragment = characterRosterRowTemplate.content.cloneNode(true);
-      const row = fragment.querySelector('.roster-row');
-      const claimed = Boolean(character.claimedBySessionId);
-      row.dataset.characterId = character.id;
-      row.dataset.claimed = String(claimed);
-      row.querySelector('.roster-name').textContent = character.name || '—';
-      const claimStatus = row.querySelector('.roster-claim-status');
-      claimStatus.dataset.claimState = claimed ? 'claimed' : 'available';
-      claimStatus.textContent = claimed ? 'ЗАНЯТ' : 'СВОБОДЕН';
-
-      const nameInput = row.querySelector('.roster-name-input');
-      nameInput.value = character.name || '';
-      const renameButton = row.querySelector('.roster-rename');
-      const deleteButton = row.querySelector('.roster-delete');
-      const moveControls = row.querySelector('.roster-move-controls');
-      const moveSelect = row.querySelector('.roster-move-session-select');
-      const moveButton = row.querySelector('.roster-move');
-      for (const control of row.querySelectorAll('input, select, button')) {
-        control.disabled = coordinationCommandPending || !playerConfig;
-      }
-      renameButton.addEventListener('click', () => {
-        const name = nameInput.value.trim();
-        if (!name) return setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
-        runCoordinationCommand(
-          () => desktopAPI.renameCharacter({ characterId: character.id, name }),
-          'ПЕРСОНАЖ ПЕРЕИМЕНОВАН',
-          'ПЕРЕИМЕНОВАНИЕ ПЕРСОНАЖА...'
-        );
-      });
-      deleteButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.deleteCharacter(character.id),
-        'ПЕРСОНАЖ УДАЛЁН',
-        claimed ? 'ПРОВЕРКА АКТИВНОГО НАЗНАЧЕНИЯ...' : 'УДАЛЕНИЕ ПЕРСОНАЖА...'
-      ));
-
-      moveControls.hidden = !claimed;
-      fillSelect(moveSelect, unassignedSessions, session => session.id, session => sessionLabel(session), 'НЕТ СВОБОДНЫХ СЕССИЙ');
-      moveButton.disabled = coordinationCommandPending || !claimed || !moveSelect.value;
-      moveButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.moveCharacter({ characterId: character.id, toSessionId: moveSelect.value }),
-        'НАЗНАЧЕНИЕ ПЕРЕМЕЩЕНО',
-        'ПЕРЕМЕЩЕНИЕ НАЗНАЧЕНИЯ...'
-      ));
-      characterRoster.appendChild(fragment);
-    }
-  }
+  renderPlayerManagementRoster(roster, Boolean(broadcast), Boolean(playerConfig));
 
   logicalSessionList.replaceChildren();
   if (!sessions.length) {
@@ -856,10 +818,14 @@ function renderCoordination() {
     const claimedControls = row.querySelector('.session-claimed-controls');
     const releaseButton = row.querySelector('.session-release');
     const controllerButton = row.querySelector('.session-controller');
+    const moveSelect = row.querySelector('.session-move-session-select');
+    const moveButton = row.querySelector('.session-move');
     for (const control of row.querySelectorAll('input, select, button')) {
       control.disabled = coordinationCommandPending;
     }
     renameButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      if (coordinationCommandPending || !currentSession) return;
       const fallbackName = nameInput.value.trim();
       if (!fallbackName) return setCoordinationStatus('УКАЖИТЕ МЕТКУ СЕССИИ', true);
       runCoordinationCommand(
@@ -872,31 +838,271 @@ function renderCoordination() {
     assignmentControls.hidden = assigned || !broadcast;
     fillSelect(characterSelect, availableCharacters, character => character.id, character => character.name, 'НЕТ ДОСТУПНЫХ ПЕРСОНАЖЕЙ');
     assignButton.disabled = coordinationCommandPending || assigned || !broadcast || !characterSelect.value;
-    assignButton.addEventListener('click', () => runCoordinationCommand(
-      () => desktopAPI.assignCharacter({ sessionId: session.id, characterId: characterSelect.value }),
-      'ПЕРСОНАЖ НАЗНАЧЕН',
-      'НАЗНАЧЕНИЕ ПЕРСОНАЖА...'
-    ));
+    assignButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      const currentCharacter = findRosterCharacter(characterSelect.value);
+      if (coordinationCommandPending || !state.coordination?.broadcast || currentSession?.character ||
+          !currentCharacter || currentCharacter.claimedBySessionId) return;
+      runCoordinationCommand(
+        () => desktopAPI.assignCharacter({ sessionId: session.id, characterId: characterSelect.value }),
+        'ПЕРСОНАЖ НАЗНАЧЕН',
+        'НАЗНАЧЕНИЕ ПЕРСОНАЖА...'
+      );
+    });
 
     claimedControls.hidden = !assigned;
     releaseButton.disabled = coordinationCommandPending || !assigned;
-    releaseButton.addEventListener('click', () => runCoordinationCommand(
-      () => desktopAPI.releaseCharacter(session.id),
-      'ПЕРСОНАЖ ОСВОБОЖДЁН',
-      'ОСВОБОЖДЕНИЕ ПЕРСОНАЖА...'
-    ));
+    releaseButton.addEventListener('click', () => {
+      if (coordinationCommandPending || !findLogicalSession(session.id)?.character) return;
+      runCoordinationCommand(
+        () => desktopAPI.releaseCharacter(session.id),
+        'ПЕРСОНАЖ ОСВОБОЖДЁН',
+        'ОСВОБОЖДЕНИЕ ПЕРСОНАЖА...'
+      );
+    });
     controllerButton.disabled = true;
     controllerButton.hidden = role === 'active';
     if (assigned && session.connected && role !== 'active') {
       controllerButton.disabled = coordinationCommandPending;
-      controllerButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.setActiveController(session.id),
-        'УПРАВЛЕНИЕ ПЕРЕДАНО',
-        'ПЕРЕДАЧА УПРАВЛЕНИЯ...'
-      ));
+      controllerButton.addEventListener('click', () => {
+        const currentSession = findLogicalSession(session.id);
+        if (coordinationCommandPending || !currentSession?.character || !currentSession.connected ||
+            currentSession.role === 'active') return;
+        runCoordinationCommand(
+          () => desktopAPI.setActiveController(session.id),
+          'УПРАВЛЕНИЕ ПЕРЕДАНО',
+          'ПЕРЕДАЧА УПРАВЛЕНИЯ...'
+        );
+      });
     }
+
+    fillSelect(moveSelect, unassignedSessions, candidate => candidate.id, candidate => sessionLabel(candidate), 'НЕТ СВОБОДНЫХ СЕССИЙ');
+    moveSelect.disabled = coordinationCommandPending || !assigned || !playerConfig || !moveSelect.value;
+    moveButton.disabled = coordinationCommandPending || !assigned || !playerConfig || !moveSelect.value;
+    moveButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      const destination = findLogicalSession(moveSelect.value);
+      if (coordinationCommandPending || !state.coordination?.playerConfig ||
+          !currentSession?.character || destination?.character || !destination) return;
+      runCoordinationCommand(
+        () => desktopAPI.moveCharacter({
+          characterId: currentSession.character.id,
+          toSessionId: destination.id,
+        }),
+        'НАЗНАЧЕНИЕ ПЕРЕМЕЩЕНО',
+        'ПЕРЕМЕЩЕНИЕ НАЗНАЧЕНИЯ...'
+      );
+    });
     logicalSessionList.appendChild(fragment);
   }
+}
+
+function findLogicalSession(sessionId) {
+  const sessions = Array.isArray(state.coordination?.sessions) ? state.coordination.sessions : [];
+  return sessions.find(session => session.id === sessionId) || null;
+}
+
+function findRosterCharacter(characterId) {
+  const roster = Array.isArray(state.coordination?.roster) ? state.coordination.roster : [];
+  return roster.find(character => character.id === characterId) || null;
+}
+
+function renderPlayerManagementRoster(roster, broadcastActive, playerConfigActive) {
+  const readOnly = broadcastActive || !playerConfigActive;
+  playerManagementDialog.setAttribute('aria-readonly', String(readOnly));
+  playerManagementMode.textContent = broadcastActive
+    ? 'ТРАНСЛЯЦИЯ АКТИВНА · ПРОСМОТР БЕЗ РЕДАКТИРОВАНИЯ'
+    : playerConfigActive ? 'РЕДАКТИРОВАНИЕ ДОСТУПНО' : 'КОНФИГУРАЦИЯ ИГРОКОВ НЕ ВЫБРАНА';
+
+  const addDisabled = coordinationCommandPending || readOnly;
+  for (const control of playerManagementAddForm.elements) control.disabled = addDisabled;
+  syncPlayerDeleteDialogControls();
+  playerManagementRoster.replaceChildren();
+  playerManagementEmpty.hidden = roster.length > 0;
+
+  for (const character of roster) {
+    const fragment = playerManagementRowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('.player-management-row');
+    const nameInput = row.querySelector('.player-name-input');
+    const intelligenceInput = row.querySelector('.player-intelligence-input');
+    const hackerInput = row.querySelector('.player-hacker-perk-availability');
+    row.dataset.characterId = character.id;
+    nameInput.value = character.name || '';
+    intelligenceInput.value = String(Number.isInteger(character.intelligence) ? character.intelligence : 1);
+    hackerInput.value = character.hackerPerkAvailable === true ? 'true' : 'false';
+    const saveButton = row.querySelector('.player-save');
+    const deleteButton = row.querySelector('.player-delete');
+    for (const control of row.querySelectorAll('input, select, button')) {
+      control.disabled = coordinationCommandPending || readOnly;
+    }
+    saveButton.addEventListener('click', async () => {
+      if (!playerMutationAllowed()) return;
+      const name = nameInput.value.trim();
+      const intelligence = intelligenceInput.valueAsNumber;
+      const hackerChoice = hackerInput.value;
+      if (!name) {
+        setPlayerManagementFeedback('УКАЖИТЕ ИМЯ ИГРОКА', true);
+        nameInput.focus();
+        return;
+      }
+      if (!Number.isInteger(intelligence) || intelligence < 1 || intelligence > 10) {
+        setPlayerManagementFeedback('ИНТЕЛЛЕКТ ДОЛЖЕН БЫТЬ ЦЕЛЫМ ЧИСЛОМ ОТ 1 ДО 10', true);
+        intelligenceInput.focus();
+        return;
+      }
+      if (hackerChoice !== 'true' && hackerChoice !== 'false') {
+        setPlayerManagementFeedback('ВЫБЕРИТЕ ДОСТУПНОСТЬ ПЕРКА «ХАКЕР»', true);
+        hackerInput.focus();
+        return;
+      }
+      await runPlayerManagementMutation(
+        () => desktopAPI.updateCharacter({
+          characterId: character.id,
+          name,
+          intelligence,
+          hackerPerkAvailable: hackerChoice === 'true',
+          expectedRevision: coordinationRevision(state.coordination),
+        }),
+        'ПРОФИЛЬ ИГРОКА СОХРАНЁН',
+        'СОХРАНЕНИЕ ПРОФИЛЯ ИГРОКА...'
+      );
+    });
+    deleteButton.addEventListener('click', () => {
+      if (!playerMutationAllowed()) return;
+      showPlayerDeleteConfirmation(character.id, character.name || '', deleteButton);
+    });
+    playerManagementRoster.appendChild(fragment);
+  }
+}
+
+function playerMutationAllowed() {
+  return !coordinationCommandPending &&
+    !state.coordination?.broadcast &&
+    Boolean(state.coordination?.playerConfig);
+}
+
+function syncPlayerDeleteDialogControls() {
+  if (!pendingPlayerDelete) return;
+  const active = Boolean(state.coordination?.broadcast);
+  const configMissing = !state.coordination?.playerConfig;
+  btnConfirmPlayerDelete.disabled = coordinationCommandPending || active || configMissing;
+  btnCancelPlayerDelete.disabled = coordinationCommandPending;
+}
+
+function showPlayerDeleteConfirmation(characterId, name, opener) {
+  if (!playerMutationAllowed()) return;
+  pendingPlayerDelete = { characterId, opener };
+  playerDeleteDialogDescription.textContent = `Удалить игрока «${name}»? Это действие нельзя отменить.`;
+  playerDeleteDialog.hidden = false;
+  syncPlayerDeleteDialogControls();
+  if (!playerDeleteDialog.open) playerDeleteDialog.showModal();
+  btnCancelPlayerDelete.focus();
+}
+
+function hidePlayerDeleteConfirmation(restoreFocus = true) {
+  const pending = pendingPlayerDelete;
+  pendingPlayerDelete = null;
+  if (playerDeleteDialog.open) playerDeleteDialog.close();
+  playerDeleteDialog.hidden = true;
+  btnConfirmPlayerDelete.disabled = false;
+  btnCancelPlayerDelete.disabled = false;
+  if (!restoreFocus) return;
+  const currentDelete = pending?.characterId
+    ? playerManagementRoster.querySelector(`[data-character-id="${CSS.escape(pending.characterId)}"] .player-delete`)
+    : null;
+  if (currentDelete instanceof HTMLElement) currentDelete.focus();
+  else if (pending?.opener?.isConnected) pending.opener.focus();
+}
+
+async function runPlayerManagementMutation(command, successMessage, pendingMessage) {
+  if (!playerMutationAllowed()) return null;
+  coordinationCommandPending = true;
+  setPlayerManagementFeedback(pendingMessage);
+  setCoordinationStatus(pendingMessage);
+  renderCoordination();
+
+  let result;
+  try {
+    result = await command();
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  if (result?.state) applyCoordinationState(result.state);
+  renderCoordination();
+
+  if (!result?.ok) {
+    const message = result?.error || 'ОПЕРАЦИЯ СО СПИСКОМ ИГРОКОВ ОТКЛОНЕНА';
+    setPlayerManagementFeedback(message, true);
+    setCoordinationStatus(message, true);
+    return result;
+  }
+
+  setPlayerManagementFeedback(successMessage);
+  setCoordinationStatus(successMessage);
+  return result;
+}
+
+function setPlayerManagementFeedback(message = '', isError = false) {
+  playerManagementStatus.textContent = isError ? '' : message;
+  playerManagementError.textContent = isError ? message : '';
+  playerManagementError.hidden = !isError || !message;
+}
+
+function showPlayerManagement() {
+  if (!state.coordination?.playerConfig || btnManagePlayers.disabled) return;
+  playerManagementOpener = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : btnManagePlayers;
+  setPlayerManagementFeedback('');
+  playerManagementDialog.hidden = false;
+  if (!playerManagementDialog.open) playerManagementDialog.showModal();
+  queueMicrotask(() => btnClosePlayerManagement.focus());
+}
+
+function hidePlayerManagement() {
+  if (pendingPlayerDelete) hidePlayerDeleteConfirmation(false);
+  if (playerManagementDialog.open) playerManagementDialog.close();
+  playerManagementDialog.hidden = true;
+  const opener = playerManagementOpener;
+  playerManagementOpener = null;
+  if (opener?.isConnected) opener.focus();
+}
+
+async function addPlayerProfile({ name, intelligence, hackerPerkAvailable }) {
+  if (coordinationCommandPending || state.coordination?.broadcast || !state.coordination?.playerConfig) return null;
+  coordinationCommandPending = true;
+  setPlayerManagementFeedback('ДОБАВЛЕНИЕ ИГРОКА...');
+  setCoordinationStatus('ДОБАВЛЕНИЕ ПЕРСОНАЖА...');
+  renderCoordination();
+
+  let result;
+  try {
+    result = await desktopAPI.addCharacter({
+      name,
+      intelligence,
+      hackerPerkAvailable,
+      expectedRevision: coordinationRevision(state.coordination),
+    });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  applyCoordinationState(result?.state || state.coordination);
+
+  if (!result?.ok) {
+    const message = result?.error || 'НЕ УДАЛОСЬ ДОБАВИТЬ ИГРОКА';
+    setPlayerManagementFeedback(message, true);
+    setCoordinationStatus(message, true);
+    renderCoordination();
+    return result;
+  }
+
+  playerManagementAddForm.reset();
+  setPlayerManagementFeedback('ИГРОК ДОБАВЛЕН');
+  setCoordinationStatus('ПЕРСОНАЖ ДОБАВЛЕН');
+  renderCoordination();
+  return result;
 }
 
 function setPlayerConfigError(message = '') {
@@ -1825,36 +2031,62 @@ btnAddCommand.addEventListener('click', () => addNode('command'));
 btnAddEntry.addEventListener('click', () => addNode('entry'));
 
 // ── Player roster and broadcast management ──────────────────
-btnAddCharacter.addEventListener('click', async () => {
-  if (coordinationCommandPending || !state.coordination?.playerConfig) return;
-  const name = characterNameInput.value.trim();
-  if (!name) {
-    setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
-    return;
-  }
-
-  coordinationCommandPending = true;
-  setCoordinationStatus('ДОБАВЛЕНИЕ ПЕРСОНАЖА...');
-  renderCoordination();
-  const result = await desktopAPI.addCharacter(name);
-  coordinationCommandPending = false;
-  if (!result?.ok) {
-    setCoordinationStatus(result?.error || 'НЕ УДАЛОСЬ ДОБАВИТЬ ПЕРСОНАЖА', true);
-    renderCoordination();
-    return;
-  }
-
-  state.coordination = result.state || state.coordination;
-  characterNameInput.value = '';
-  setCoordinationStatus('ПЕРСОНАЖ ДОБАВЛЕН');
-  renderCoordination();
+btnManagePlayers.addEventListener('click', showPlayerManagement);
+btnClosePlayerManagement.addEventListener('click', hidePlayerManagement);
+playerManagementDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  hidePlayerManagement();
+});
+btnCancelPlayerDelete.addEventListener('click', () => hidePlayerDeleteConfirmation(true));
+playerDeleteDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!coordinationCommandPending) hidePlayerDeleteConfirmation(true);
+});
+btnConfirmPlayerDelete.addEventListener('click', async () => {
+  const characterId = pendingPlayerDelete?.characterId || '';
+  if (!characterId || !playerMutationAllowed()) return;
+  const result = await runPlayerManagementMutation(
+    () => desktopAPI.deleteCharacter({
+      characterId,
+      expectedRevision: coordinationRevision(state.coordination),
+    }),
+    'ИГРОК УДАЛЁН',
+    'УДАЛЕНИЕ ИГРОКА...'
+  );
+  hidePlayerDeleteConfirmation(!result?.ok);
 });
 
-characterNameInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    btnAddCharacter.click();
+playerManagementAddForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!playerManagementAddForm.checkValidity()) {
+    playerManagementAddForm.reportValidity();
+    return;
   }
+
+  const name = playerNameInput.value.trim();
+  const intelligence = playerIntelligenceInput.valueAsNumber;
+  const hackerChoice = playerHackerPerkAvailability.value;
+  if (!name) {
+    setPlayerManagementFeedback('УКАЖИТЕ ИМЯ ИГРОКА', true);
+    playerNameInput.focus();
+    return;
+  }
+  if (!Number.isInteger(intelligence) || intelligence < 1 || intelligence > 10) {
+    setPlayerManagementFeedback('ИНТЕЛЛЕКТ ДОЛЖЕН БЫТЬ ЦЕЛЫМ ЧИСЛОМ ОТ 1 ДО 10', true);
+    playerIntelligenceInput.focus();
+    return;
+  }
+  if (hackerChoice !== 'true' && hackerChoice !== 'false') {
+    setPlayerManagementFeedback('ВЫБЕРИТЕ ДОСТУПНОСТЬ ПЕРКА «ХАКЕР»', true);
+    playerHackerPerkAvailability.focus();
+    return;
+  }
+
+  await addPlayerProfile({
+    name,
+    intelligence,
+    hackerPerkAvailable: hackerChoice === 'true',
+  });
 });
 
 btnStartBroadcast.addEventListener('click', async () => {

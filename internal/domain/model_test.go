@@ -663,15 +663,35 @@ func TestPlayerConfigV1StrictValidationAndStableEncoding(t *testing.T) {
 		Version: 1,
 		Name:    "Vault 13 Players",
 		Roster: []CharacterRosterEntry{
-			{ID: "mara", Name: "Mara"},
-			{ID: "boone", Name: "Boone"},
+			{ID: "mara", Name: "Mara", Intelligence: 10, HackerPerkAvailable: true},
+			{ID: "boone", Name: "Boone", Intelligence: 1, HackerPerkAvailable: false},
 		},
 	}
 	encoded, err := EncodePlayerConfig(config)
 	require.NoError(t, err)
+	assert.Equal(t, `{
+  "version": 1,
+  "name": "Vault 13 Players",
+  "roster": [
+    {
+      "id": "mara",
+      "name": "Mara",
+      "intelligence": 10,
+      "hackerPerkAvailable": true
+    },
+    {
+      "id": "boone",
+      "name": "Boone",
+      "intelligence": 1,
+      "hackerPerkAvailable": false
+    }
+  ]
+}
+`, string(encoded), "canonical player config must emit both attributes in stable order")
 	decoded, err := DecodePlayerConfig(encoded)
 	require.NoError(t, err)
 	assert.Equal(t, config, decoded)
+	assert.Equal(t, []CharacterID{"mara", "boone"}, []CharacterID{decoded.Roster[0].ID, decoded.Roster[1].ID})
 	assert.True(t, bytes.HasSuffix(encoded, []byte("\n")), "player config must end with a newline")
 	var document map[string]any
 	require.NoError(t, json.Unmarshal(encoded, &document))
@@ -684,17 +704,76 @@ func TestPlayerConfigV1StrictValidationAndStableEncoding(t *testing.T) {
 		assert.False(t, containsJSONField(document, forbidden), "player config contains runtime field %q: %s", forbidden, encoded)
 	}
 
-	invalid := []string{
-		`{"version":2,"name":"Players","roster":[]}`,
-		`{"version":1,"name":" ","roster":[]}`,
-		`{"version":1,"name":"Players","roster":null}`,
-		`{"version":1,"name":"Players","roster":[{"id":"same","name":"One"},{"id":"same","name":"Two"}]}`,
-		`{"version":1,"name":"Players","roster":[],"browserToken":"secret"}`,
+	invalid := []struct {
+		name string
+		raw  string
+	}{
+		{name: "unsupported version", raw: `{"version":2,"name":"Players","roster":[]}`},
+		{name: "blank name", raw: `{"version":1,"name":" ","roster":[]}`},
+		{name: "null roster", raw: `{"version":1,"name":"Players","roster":null}`},
+		{name: "duplicate stable ID", raw: `{"version":1,"name":"Players","roster":[{"id":"same","name":"One","intelligence":1,"hackerPerkAvailable":false},{"id":"same","name":"Two","intelligence":2,"hackerPerkAvailable":true}]}`},
+		{name: "unknown top level field", raw: `{"version":1,"name":"Players","roster":[],"browserToken":"secret"}`},
+		{name: "unknown nested field", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":5,"hackerPerkAvailable":true,"futureAttribute":1}]}`},
+		{name: "trailing value", raw: `{"version":1,"name":"Players","roster":[]} {}`},
+		{name: "explicit zero intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":0,"hackerPerkAvailable":false}]}`},
+		{name: "intelligence above maximum", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":11,"hackerPerkAvailable":false}]}`},
+		{name: "fractional intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":1.5,"hackerPerkAvailable":false}]}`},
+		{name: "string intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":"5","hackerPerkAvailable":false}]}`},
+		{name: "null intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":null,"hackerPerkAvailable":false}]}`},
+		{name: "null hacker perk", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":5,"hackerPerkAvailable":null}]}`},
 	}
-	for _, raw := range invalid {
-		_, err := DecodePlayerConfig([]byte(raw))
-		assert.Error(t, err, "DecodePlayerConfig(%s) unexpectedly succeeded", raw)
+	for _, test := range invalid {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := DecodePlayerConfig([]byte(test.raw))
+			assert.Error(t, err, "DecodePlayerConfig(%s) unexpectedly succeeded", test.raw)
+		})
 	}
+}
+
+func TestDecodePlayerConfigV1AppliesOnlyLegacyAttributeDefaults(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := DecodePlayerConfig([]byte(`{
+  "version": 1,
+  "name": "Legacy Players",
+  "roster": [
+    {"id":"legacy","name":"Legacy"},
+    {"id":"smart","name":"Smart","intelligence":8},
+    {"id":"hacker","name":"Hacker","hackerPerkAvailable":true}
+  ]
+}`))
+	require.NoError(t, err)
+	require.Len(t, decoded.Roster, 3)
+	assert.Equal(t, []CharacterRosterEntry{
+		{ID: "legacy", Name: "Legacy", Intelligence: 1, HackerPerkAvailable: false},
+		{ID: "smart", Name: "Smart", Intelligence: 8, HackerPerkAvailable: false},
+		{ID: "hacker", Name: "Hacker", Intelligence: 1, HackerPerkAvailable: true},
+	}, decoded.Roster, "legacy defaults must preserve stable identities and authored order")
+
+	encoded, err := EncodePlayerConfig(decoded)
+	require.NoError(t, err)
+	assert.Equal(t, 3, bytes.Count(encoded, []byte(`"intelligence"`)))
+	assert.Equal(t, 3, bytes.Count(encoded, []byte(`"hackerPerkAvailable"`)))
+}
+
+func TestCloneMasterCoordinationStatePreservesPlayerAttributesAndDetachesRoster(t *testing.T) {
+	t.Parallel()
+
+	original := &MasterCoordinationState{Roster: []MasterRosterEntry{
+		{ID: "mara", Name: "Mara", Intelligence: 9, HackerPerkAvailable: true},
+		{ID: "boone", Name: "Boone", Intelligence: 3, HackerPerkAvailable: false},
+	}}
+	clone := CloneMasterCoordinationState(original)
+	require.Equal(t, original, clone)
+
+	clone.Roster[0].Name = "Changed"
+	clone.Roster[0].Intelligence = 1
+	clone.Roster[0].HackerPerkAvailable = false
+	assert.Equal(t, MasterRosterEntry{
+		ID: "mara", Name: "Mara", Intelligence: 9, HackerPerkAvailable: true,
+	}, original.Roster[0])
 }
 
 func validSessionForPlayerConfigTest() Session {

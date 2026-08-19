@@ -62,7 +62,7 @@ type TrustedHackRuntime interface {
 // RosterStore persists one complete candidate player config. The coordinator
 // calls it while holding the transition lock and commits only after success.
 type RosterStore interface {
-	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) error
+	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) (domain.PlayerConfigHandle, error)
 }
 
 // CommandStateMutation is the detached durable document result returned by a
@@ -388,34 +388,65 @@ func (service *Service) CurrentLiveForSession(sessionID domain.LogicalSessionID)
 	return clonePublicLiveState(projection), service.runtime.Revision, true
 }
 
-// AddCharacter appends one stable process-local roster entry.
-func (service *Service) AddCharacter(name string) (*domain.MasterCoordinationState, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return service.Snapshot(), fmt.Errorf("character name must not be blank")
+// AddCharacter appends one complete stable roster profile while no broadcast
+// is active. All transaction guards run before stable-ID allocation or disk
+// persistence so stale and retried requests cannot create duplicate players.
+func (service *Service) AddCharacter(payload domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error) {
+	name, err := validatedCoordinationName(payload.Name, "character name")
+	if err != nil {
+		return service.Snapshot(), err
 	}
-	if utf8.RuneCountInString(name) > 80 {
-		return service.Snapshot(), fmt.Errorf("character name must not exceed 80 characters")
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return service.Snapshot(), fmt.Errorf("character intelligence must be between 1 and 10")
 	}
 
 	var state *domain.MasterCoordinationState
 	var addErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
 			addErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf("player roster cannot change during a broadcast")
+			return transition{}
+		}
 		characterID := domain.CharacterID(service.nextID())
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		candidateByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		candidateByID[characterID] = &domain.CharacterRosterEntry{
+			ID:                  characterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
 		candidateOrder = append(candidateOrder, characterID)
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
 			addErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
-		runtime.RosterByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
+		runtime.RosterByID[characterID] = &domain.CharacterRosterEntry{
+			ID:                  characterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
 		runtime.RosterOrder = append(runtime.RosterOrder, characterID)
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
@@ -424,86 +455,135 @@ func (service *Service) AddCharacter(name string) (*domain.MasterCoordinationSta
 	return domain.CloneMasterCoordinationState(state), addErr
 }
 
-// RenameCharacter updates the player-facing name while retaining the stable
-// roster identity and any current claim.
-func (service *Service) RenameCharacter(characterID domain.CharacterID, name string) (*domain.MasterCoordinationState, error) {
-	name, err := validatedCoordinationName(name, "character name")
-	if err != nil {
-		return service.Snapshot(), err
-	}
-
+// UpdateCharacter replaces one complete roster profile while retaining its
+// stable identity and position. No-op replacements do not write, publish, or
+// advance the coordination revision.
+func (service *Service) UpdateCharacter(payload domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error) {
 	var state *domain.MasterCoordinationState
-	var renameErr error
+	var updateErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("select or create a player config first")
+			updateErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
-		character := runtime.RosterByID[characterID]
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("player roster cannot change during a broadcast")
+			return transition{}
+		}
+		character := runtime.RosterByID[payload.CharacterID]
 		if character == nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("character %q does not exist", characterID)
+			updateErr = fmt.Errorf("character %q does not exist", payload.CharacterID)
 			return transition{}
 		}
-		if character.Name == name {
+		name, err := validatedCoordinationName(payload.Name, "character name")
+		if err != nil {
+			state = masterSnapshot(runtime)
+			updateErr = err
+			return transition{}
+		}
+		if payload.Intelligence < 1 || payload.Intelligence > 10 {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("character intelligence must be between 1 and 10")
+			return transition{}
+		}
+		if character.Name == name &&
+			character.Intelligence == payload.Intelligence &&
+			character.HackerPerkAvailable == payload.HackerPerkAvailable {
 			state = masterSnapshot(runtime)
 			return transition{}
 		}
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		candidateByID[characterID].Name = name
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		candidateByID[payload.CharacterID] = &domain.CharacterRosterEntry{
+			ID:                  payload.CharacterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("could not save player config: %w", err)
+			updateErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
 		character.Name = name
+		character.Intelligence = payload.Intelligence
+		character.HackerPerkAvailable = payload.HackerPerkAvailable
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
 	})
 	state.Revision = result.revision
-	return domain.CloneMasterCoordinationState(state), renameErr
+	return domain.CloneMasterCoordinationState(state), updateErr
 }
 
 // DeleteCharacter removes an unclaimed roster entry while preserving the
 // stable order of every survivor.
-func (service *Service) DeleteCharacter(characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
+func (service *Service) DeleteCharacter(payload domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error) {
 	var state *domain.MasterCoordinationState
 	var deleteErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
 			deleteErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
-		if runtime.RosterByID[characterID] == nil {
+		if runtime.Broadcast != nil {
 			state = masterSnapshot(runtime)
-			deleteErr = fmt.Errorf("character %q does not exist", characterID)
+			deleteErr = fmt.Errorf("player roster cannot change during a broadcast")
 			return transition{}
 		}
-		if characterClaimed(runtime.Broadcast, characterID) {
+		if runtime.RosterByID[payload.CharacterID] == nil {
 			state = masterSnapshot(runtime)
-			deleteErr = fmt.Errorf("character %q is currently claimed", characterID)
+			deleteErr = fmt.Errorf("character %q does not exist", payload.CharacterID)
 			return transition{}
 		}
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		delete(candidateByID, characterID)
+		delete(candidateByID, payload.CharacterID)
 		filtered := candidateOrder[:0]
 		for _, candidate := range candidateOrder {
-			if candidate != characterID {
+			if candidate != payload.CharacterID {
 				filtered = append(filtered, candidate)
 			}
 		}
 		candidateOrder = filtered
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
 			deleteErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
-		delete(runtime.RosterByID, characterID)
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
+		delete(runtime.RosterByID, payload.CharacterID)
 		order := runtime.RosterOrder[:0]
 		for _, candidate := range runtime.RosterOrder {
-			if candidate != characterID {
+			if candidate != payload.CharacterID {
 				order = append(order, candidate)
 			}
 		}
@@ -2491,7 +2571,12 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 		if character == nil {
 			continue
 		}
-		entry := domain.MasterRosterEntry{ID: character.ID, Name: character.Name}
+		entry := domain.MasterRosterEntry{
+			ID:                  character.ID,
+			Name:                character.Name,
+			Intelligence:        character.Intelligence,
+			HackerPerkAvailable: character.HackerPerkAvailable,
+		}
 		if runtime.Broadcast != nil {
 			if sessionID, claimed := runtime.Broadcast.SessionByCharacter[character.ID]; claimed {
 				claimedBy := sessionID
@@ -2666,12 +2751,15 @@ func rosterEntries(byID map[domain.CharacterID]*domain.CharacterRosterEntry, ord
 	return entries
 }
 
-func (service *Service) persistRoster(runtime *domain.ProcessRuntime, byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) error {
+func (service *Service) persistRoster(runtime *domain.ProcessRuntime, byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) (domain.PlayerConfigHandle, error) {
 	if !service.requirePlayerConfig {
-		return nil
+		if runtime.ActivePlayerConfig == nil {
+			return domain.PlayerConfigHandle{}, nil
+		}
+		return *runtime.ActivePlayerConfig, nil
 	}
 	if runtime.ActivePlayerConfig == nil || service.rosterStore == nil {
-		return fmt.Errorf("no active player config")
+		return domain.PlayerConfigHandle{}, fmt.Errorf("no active player config")
 	}
 	return service.rosterStore.Save(*runtime.ActivePlayerConfig, rosterEntries(byID, order))
 }

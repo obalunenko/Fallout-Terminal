@@ -7,7 +7,9 @@ export {
 
 export {
     AssignmentPayload,
-    CharacterRenamePayload,
+    CharacterCreatePayload,
+    CharacterDeletePayload,
+    CharacterUpdatePayload,
     CommandExecutionDecisionPayload,
     CommandResult,
     CoordinationCommandResult,

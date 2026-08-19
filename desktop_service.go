@@ -89,16 +89,16 @@ func (service *desktopService) ResetTerminalCommandStates(payload ResetTerminalC
 	return service.core.ResetTerminalCommandStates(payload)
 }
 
-func (service *desktopService) AddCharacter(name string) CoordinationCommandResult {
-	return service.core.AddCharacter(name)
+func (service *desktopService) AddCharacter(payload CharacterCreatePayload) CoordinationCommandResult {
+	return service.core.AddCharacter(payload)
 }
 
-func (service *desktopService) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
-	return service.core.RenameCharacter(payload)
+func (service *desktopService) UpdateCharacter(payload CharacterUpdatePayload) CoordinationCommandResult {
+	return service.core.UpdateCharacter(payload)
 }
 
-func (service *desktopService) DeleteCharacter(characterID string) CoordinationCommandResult {
-	return service.core.DeleteCharacter(characterID)
+func (service *desktopService) DeleteCharacter(payload CharacterDeletePayload) CoordinationCommandResult {
+	return service.core.DeleteCharacter(payload)
 }
 
 func (service *desktopService) RenameLogicalSession(payload LogicalSessionRenamePayload) CoordinationCommandResult {

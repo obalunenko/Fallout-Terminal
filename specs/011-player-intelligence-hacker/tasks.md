@@ -14,12 +14,12 @@
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T001** [P] Add optional roster Intelligence field 3 and Hacker-perk-availability field 4 without changing player-config version or existing field numbers · `proto/fallout/terminal/persistence/v1/player_config.proto`
-- [ ] **T002** [P] Add master-only roster projection fields plus complete add/update/delete inputs with Hacker presence and expected revision · `proto/fallout/terminal/private/v1/coordination.proto`, `proto/fallout/terminal/private/v1/desktop.proto`
+- [x] **T001** [P] Add optional roster Intelligence field 3 and Hacker-perk-availability field 4 without changing player-config version or existing field numbers · `proto/fallout/terminal/persistence/v1/player_config.proto`
+- [x] **T002** [P] Add master-only roster projection fields plus complete add/update/delete inputs with Hacker presence and expected revision · `proto/fallout/terminal/private/v1/coordination.proto`, `proto/fallout/terminal/private/v1/desktop.proto`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T003** Regenerate pinned Go protobuf output and the reviewed schema revision without editing generated files or the compatibility baseline manually · `internal/gen/fallout/terminal/persistence/v1/player_config.pb.go`, `internal/gen/fallout/terminal/private/v1/coordination.pb.go`, `internal/gen/fallout/terminal/private/v1/desktop.pb.go`, `proto/schema-revision.txt`
+- [x] **T003** Regenerate pinned Go protobuf output and the reviewed schema revision without editing generated files or the compatibility baseline manually · `internal/gen/fallout/terminal/persistence/v1/player_config.pb.go`, `internal/gen/fallout/terminal/private/v1/coordination.pb.go`, `internal/gen/fallout/terminal/private/v1/desktop.pb.go`, `proto/schema-revision.txt`
 
 ---
 
@@ -31,21 +31,21 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [ ] **T004** [P] Cover Intelligence 1/10 acceptance, explicit 0/11/fraction/string/null rejection, legacy missing-field defaults, canonical JSON emission, unknown/trailing rejection, stable IDs/order, and clone behavior · `internal/domain/model_test.go`, `internal/domain/validate_test.go`
-- [ ] **T005** [P] Cover persistence-protobuf presence/default mapping, create/open/save/reopen, content-digest advance, missing/replaced/unreadable conflicts, and unchanged content after atomic failure · `internal/playerconfig/contract_test.go`, `internal/playerconfig/service_test.go`
-- [ ] **T006** [P] Cover private CharacterState field numbers/values, detached mapping, and absence of Intelligence/Hacker data from public player descriptors and projections · `app_contract_test.go`, `internal/player/adapter_test.go`
+- [x] **T004** [P] Cover Intelligence 1/10 acceptance, explicit 0/11/fraction/string/null rejection, legacy missing-field defaults, canonical JSON emission, unknown/trailing rejection, stable IDs/order, and clone behavior · `internal/domain/model_test.go`, `internal/domain/validate_test.go`
+- [x] **T005** [P] Cover persistence-protobuf presence/default mapping, create/open/save/reopen, content-digest advance, missing/replaced/unreadable conflicts, and unchanged content after atomic failure · `internal/playerconfig/contract_test.go`, `internal/playerconfig/service_test.go`
+- [x] **T006** [P] Cover private CharacterState field numbers/values, detached mapping, and absence of Intelligence/Hacker data from public player descriptors and projections · `app_contract_test.go`, `internal/player/adapter_test.go`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T007** Add canonical profile/digest fields, deep-copy propagation, strict presence-aware player-config decoding, canonical encoding, and Intelligence validation · `internal/domain/model.go`, `internal/domain/json.go`, `internal/domain/validate.go`
+- [x] **T007** Add canonical profile/digest fields, deep-copy propagation, strict presence-aware player-config decoding, canonical encoding, and Intelligence validation · `internal/domain/model.go`, `internal/domain/json.go`, `internal/domain/validate.go`
 
 **⟶ Wait for T007 to finish, then Wave 3 — independent (different files):**
 
-- [ ] **T008** [P] Map optional persistence fields and implement SHA-256 conditional complete-file saves while reusing the existing atomic storage replacement · `internal/playerconfig/contract.go`, `internal/playerconfig/service.go`
-- [ ] **T009** [P] Propagate profile values and the refreshed content digest through active-config installation, clone-safe snapshots, roster candidates, and the persistence-before-publication seam · `internal/control/service.go`
-- [ ] **T010** [P] Map Intelligence and Hacker availability through the private coordination bootstrap/result/event projection without changing public player state · `app_contract.go`
+- [x] **T008** [P] Map optional persistence fields and implement SHA-256 conditional complete-file saves while reusing the existing atomic storage replacement · `internal/playerconfig/contract.go`, `internal/playerconfig/service.go`
+- [x] **T009** [P] Propagate profile values and the refreshed content digest through active-config installation, clone-safe snapshots, roster candidates, and the persistence-before-publication seam · `internal/control/service.go`
+- [x] **T010** [P] Map Intelligence and Hacker availability through the private coordination bootstrap/result/event projection without changing public player state · `app_contract.go`
 
 **Checkpoint**: Legacy and canonical player configs, strict validation, conditional atomic storage, and detached private profile projections are independently testable foundations.
 
@@ -61,25 +61,25 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [ ] **T011** [P] [US1] Add control/App tests for complete add payload validation, explicit Hacker false/presence, inactive/config/revision guards, duplicate retry, persistence failure, one revision/effect, and canonical reopen · `internal/control/service_test.go`, `app_test.go`, `app_contract_test.go`
-- [ ] **T012** [P] [US1] Add failing browser/API tests for opening the dialog, required fields, Intelligence 1/10 and invalid inputs, both Hacker choices, exact expected-revision payload, authoritative result rendering, and reopen persistence · `tests/browser/player-management.spec.mjs`, `tests/browser/desktop-api.spec.mjs`
+- [x] **T011** [P] [US1] Add control/App tests for complete add payload validation, explicit Hacker false/presence, inactive/config/revision guards, duplicate retry, persistence failure, one revision/effect, and canonical reopen · `internal/control/service_test.go`, `app_test.go`, `app_contract_test.go`
+- [x] **T012** [P] [US1] Add failing browser/API tests for opening the dialog, required fields, Intelligence 1/10 and invalid inputs, both Hacker choices, exact expected-revision payload, authoritative result rendering, and reopen persistence · `tests/browser/player-management.spec.mjs`, `tests/browser/desktop-api.spec.mjs`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then Wave 2 — independent (different files):**
 
-- [ ] **T013** [P] [US1] Implement revision-conditional inactive-only AddCharacter candidate persistence, delayed ID allocation, digest refresh, and one authoritative commit/effect · `internal/control/service.go`
-- [ ] **T014** [P] [US1] Add the player-management trigger, base modal/detail/add markup, required controls, accessible status/error regions, and responsive dialog styling · `frontend/src/index.html`, `frontend/src/master.css`
-- [ ] **T015** [P] [US1] Add deterministic dialog roster state, add mutation, reload, invalid-input, and failure support for browser journeys · `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/fixture-server/main.go`
+- [x] **T013** [P] [US1] Implement revision-conditional inactive-only AddCharacter candidate persistence, delayed ID allocation, digest refresh, and one authoritative commit/effect · `internal/control/service.go`
+- [x] **T014** [P] [US1] Add the player-management trigger, base modal/detail/add markup, required controls, accessible status/error regions, and responsive dialog styling · `frontend/src/index.html`, `frontend/src/master.css`
+- [x] **T015** [P] [US1] Add deterministic dialog roster state, add mutation, reload, invalid-input, and failure support for browser journeys · `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/fixture-server/main.go`
 
 **⟶ Wait for Wave 2 to finish, then Wave 3 — independent (different files):**
 
-- [ ] **T016** [P] [US1] Route the structured create payload through the private protobuf adapter, validate it at App, and expose the typed AddCharacter Wails method · `app.go`, `app_contract.go`, `desktop_service.go`
-- [ ] **T017** [P] [US1] Implement the typed desktop facade and authoritative dialog add/render flow with no optimistic roster mutation · `frontend/src/desktop-api.js`, `frontend/src/master.js`
+- [x] **T016** [P] [US1] Route the structured create payload through the private protobuf adapter, validate it at App, and expose the typed AddCharacter Wails method · `app.go`, `app_contract.go`, `desktop_service.go`
+- [x] **T017** [P] [US1] Implement the typed desktop facade and authoritative dialog add/render flow with no optimistic roster mutation · `frontend/src/desktop-api.js`, `frontend/src/master.js`
 
 **⟶ Wait for Wave 3 to finish, then:**
 
-- [ ] **T018** [US1] Regenerate the Wails bindings, update the exact binding inventory, and run the focused Go/frontend/browser tests until the complete add journey passes without generated drift · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/internal/domain/models.js`, `scripts/wails-bindings-check.sh`
+- [x] **T018** [US1] Regenerate the Wails bindings, update the exact binding inventory, and run the focused Go/frontend/browser tests until the complete add journey passes without generated drift · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/internal/domain/models.js`, `scripts/wails-bindings-check.sh`
 
 **Checkpoint**: User Story 1 independently adds and reloads complete valid profiles from the popup, while every invalid or failed add preserves the stored roster.
 
@@ -95,24 +95,24 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [ ] **T019** [P] [US2] Add control/App tests for full-profile update, stable identity/order, delete, no-op behavior, expected-revision replay, active-broadcast rejection, stale file digest, atomic-save failure, and authoritative error state · `internal/control/service_test.go`, `app_test.go`, `app_contract_test.go`
-- [ ] **T020** [P] [US2] Extend browser/API tests for update/delete confirmation and cancellation, explicit Hacker false, storage/stale errors, live event to read-only, crafted active mutation refusal, and unchanged detailed values · `tests/browser/player-management.spec.mjs`, `tests/browser/desktop-api.spec.mjs`
+- [x] **T019** [P] [US2] Add control/App tests for full-profile update, stable identity/order, delete, no-op behavior, expected-revision replay, active-broadcast rejection, stale file digest, atomic-save failure, and authoritative error state · `internal/control/service_test.go`, `app_test.go`, `app_contract_test.go`
+- [x] **T020** [P] [US2] Extend browser/API tests for update/delete confirmation and cancellation, explicit Hacker false, storage/stale errors, live event to read-only, crafted active mutation refusal, and unchanged detailed values · `tests/browser/player-management.spec.mjs`, `tests/browser/desktop-api.spec.mjs`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then Wave 2 — independent (different files):**
 
-- [ ] **T021** [P] [US2] Replace name-only correction with full-profile UpdateCharacter and enforce revision/config/broadcast guards plus conditional persistence for update and delete · `internal/control/service.go`
-- [ ] **T022** [P] [US2] Add row edit/delete-confirmation/read-only markup and styles, typed update/delete facade calls, authoritative failure rendering, and immediate event-driven mutation disabling · `frontend/src/index.html`, `frontend/src/master.css`, `frontend/src/desktop-api.js`, `frontend/src/master.js`
-- [ ] **T023** [P] [US2] Extend deterministic fixture mutations for update/delete, fail-next save, stale revision, external-file conflict, and broadcast-start-while-open scenarios · `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/fixture-server/main.go`
+- [x] **T021** [P] [US2] Replace name-only correction with full-profile UpdateCharacter and enforce revision/config/broadcast guards plus conditional persistence for update and delete · `internal/control/service.go`
+- [x] **T022** [P] [US2] Add row edit/delete-confirmation/read-only markup and styles, typed update/delete facade calls, authoritative failure rendering, and immediate event-driven mutation disabling · `frontend/src/index.html`, `frontend/src/master.css`, `frontend/src/desktop-api.js`, `frontend/src/master.js`
+- [x] **T023** [P] [US2] Extend deterministic fixture mutations for update/delete, fail-next save, stale revision, external-file conflict, and broadcast-start-while-open scenarios · `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/fixture-server/main.go`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T024** [US2] Route complete update/delete payloads, replace the exposed RenameCharacter Wails path with UpdateCharacter, preserve safe authoritative failure results, and remove the live name-only path · `app.go`, `app_contract.go`, `desktop_service.go`
+- [x] **T024** [US2] Route complete update/delete payloads, replace the exposed RenameCharacter Wails path with UpdateCharacter, preserve safe authoritative failure results, and remove the live name-only path · `app.go`, `app_contract.go`, `desktop_service.go`
 
 **⟶ Wait for T024 to finish, then:**
 
-- [ ] **T025** [US2] Regenerate Wails bindings, update the exact allowlist, and run focused race/frontend/browser tests until update, delete, storage conflict, stale retry, and active-broadcast refusal pass without drift · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `scripts/wails-bindings-check.sh`
+- [x] **T025** [US2] Regenerate Wails bindings, update the exact allowlist, and run focused race/frontend/browser tests until update, delete, storage conflict, stale retry, and active-broadcast refusal pass without drift · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `scripts/wails-bindings-check.sh`
 
 **Checkpoint**: User Story 2 independently edits and removes inactive profiles, preserves identity/order and atomic storage, and renders the same roster read-only throughout an active broadcast.
 
@@ -128,17 +128,17 @@
 
 **Wave 1 — write these tests to fail first:**
 
-- [ ] **T026** [US3] Complete Playwright coverage for detailed populated/empty presentation, accessible labels, Escape/close-without-call, focus restoration, responsive scrolling, read-only detail visibility, and retained logical-session assignment/transfer controls · `tests/browser/player-management.spec.mjs`
+- [x] **T026** [US3] Complete Playwright coverage for detailed populated/empty presentation, accessible labels, Escape/close-without-call, focus restoration, responsive scrolling, read-only detail visibility, and retained logical-session assignment/transfer controls · `tests/browser/player-management.spec.mjs`
 
 ### Implementation
 
 **⟶ Wait for T026 to finish, then:**
 
-- [ ] **T027** [US3] Remove the inline durable-roster editor, finalize modal/empty-state/delete dialog semantics and responsive layout, and keep configuration status plus the popup trigger on the master screen · `frontend/src/index.html`, `frontend/src/master.css`
+- [x] **T027** [US3] Remove the inline durable-roster editor, finalize modal/empty-state/delete dialog semantics and responsive layout, and keep configuration status plus the popup trigger on the master screen · `frontend/src/index.html`, `frontend/src/master.css`
 
 **⟶ Wait for T027 to finish, then:**
 
-- [ ] **T028** [US3] Finalize open/close/Escape/focus lifecycle, no-submit behavior, empty/detail rendering, and relocation of claimed-character transfer controls into logical-session management · `frontend/src/master.js`
+- [x] **T028** [US3] Finalize open/close/Escape/focus lifecycle, no-submit behavior, empty/detail rendering, and relocation of claimed-character transfer controls into logical-session management · `frontend/src/master.js`
 
 **Checkpoint**: User Story 3 independently provides a focused, accessible detailed window without changing state on close or regressing live assignment correction.
 
@@ -150,15 +150,15 @@
 
 **Wave 1:**
 
-- [ ] **T029** Update the bundled player-config example with explicit attributes and cover its packaged-asset decode while retaining public-player non-disclosure assertions · `sessions/demo-players.json`, `internal/platform/assets_test.go`, `internal/player/adapter_test.go`
+- [x] **T029** Update the bundled player-config example with explicit attributes and cover its packaged-asset decode while retaining public-player non-disclosure assertions · `sessions/demo-players.json`, `internal/platform/assets_test.go`, `internal/player/adapter_test.go`
 
 **⟶ Wait for T029 to finish, then:**
 
-- [ ] **T030** Run the single complete automated Success Criteria gate—protobuf format/lint/generation/breaking, Wails binding drift, formatting, vet, Go and race tests, frontend build, focused/full Playwright, owned build—and record exact PASS/FAIL/NOT RUN evidence for SC-001–SC-006 · `specs/011-player-intelligence-hacker/validation.md`
+- [x] **T030** Run the single complete automated Success Criteria gate—protobuf format/lint/generation/breaking, Wails binding drift, formatting, vet, Go and race tests, frontend build, focused/full Playwright, owned build—and record exact PASS/FAIL/NOT RUN evidence for SC-001–SC-006 · `specs/011-player-intelligence-hacker/validation.md`
 
 **⟶ Wait for T030 to finish, then:**
 
-- [ ] **T031** Run `go run ./cmd/build dev` for the native master add/update/delete/reopen/read-only journey, verify the under-60-second add outcome and rollback caveat, and append honest interactive evidence or NOT RUN reasons · `specs/011-player-intelligence-hacker/validation.md`
+- [x] **T031** Run `go run ./cmd/build dev` for the native master add/update/delete/reopen/read-only journey, verify the under-60-second add outcome and rollback caveat, and append honest interactive evidence or NOT RUN reasons · `specs/011-player-intelligence-hacker/validation.md`
 
 ---
 
@@ -172,3 +172,13 @@
 - Phase 5: failing browser task `T026` → structural cutover `T027` → dialog and assignment integration `T028`.
 - Polish: examples/separation `T029` → single automated validation owner `T030` → interactive acceptance `T031`.
 - Parallel opportunities are limited to tasks explicitly marked `[P]`; work revisiting `internal/control/service.go`, `app.go`, `app_contract.go`, `frontend/src/master.js`, generated Wails bindings, or `tests/browser/player-management.spec.mjs` remains ordered by phase and wave.
+
+---
+
+## Phase 6: Convergence
+
+- [x] T032 Add production-safe missing/unreadable/replaced player-config conflict guidance that explicitly tells the master to reopen or reselect the configuration, and cover the authoritative App/UI-facing failure result while preserving the stored roster per FR-013 and the removed/unreadable/replaced-config edge case (partial) · `internal/playerconfig/service.go`, `internal/playerconfig/service_test.go`, `internal/control/service_test.go`, `app_test.go`, `tests/browser/player-management.spec.mjs`
+
+## Phase 7: Convergence
+
+- [x] T033 CRITICAL: Remove the superseded `RenameCharacter` export from the generated-binding browser test double and assert that its inventory cannot expose the retired name-only Wails method per Constitution VII and plan: verification and cutover (contradicts) · `tests/browser/fixtures/desktop-bindings.js`, `tests/browser/desktop-api.spec.mjs`

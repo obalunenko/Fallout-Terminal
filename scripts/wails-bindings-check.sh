@@ -29,10 +29,10 @@ sed -n 's/^export function \([A-Za-z0-9_]*\)(.*/\1/p' "$service" | LC_ALL=C sort
 printf '%s\n' \
     AddCharacter AssignCharacter CopyDemo DeleteCharacter EndBroadcast ForceHackSuccess \
     GeneratePlayerPassword GetPublicAccess GetRuntimeStatus LoadReferencedPlayerConfig MoveCharacter NewPlayerConfig NewSession \
-    OpenPlayerConfig OpenSession OpenURL ReleaseCharacter RenameCharacter RenameLogicalSession \
+    OpenPlayerConfig OpenSession OpenURL ReleaseCharacter RenameLogicalSession \
     RequestTerminalActivation RequestTerminalClear ResetCommandState ResetFailedHack ResetTerminalCommandStates ResolveCommandExecution ResolveTerminalNavigation ResolveTerminalSwitch \
     SavePublicAccessSettings SaveSession SetActiveController StartBroadcast StartPublicAccess \
-    StopPublicAccess UpdateLiveTerminal | LC_ALL=C sort >"$expected"
+    StopPublicAccess UpdateCharacter UpdateLiveTerminal | LC_ALL=C sort >"$expected"
 diff -u "$expected" "$actual"
 test "$(wc -l <"$actual" | tr -d ' ')" = 34
 

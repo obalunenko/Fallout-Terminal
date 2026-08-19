@@ -182,8 +182,12 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	require.Falsef(t, created.Config.FilePath != target || created.Session.PlayerConfig == "" || created.State.PlayerConfig == nil || len(created.State.Roster) != 0,
 		"new empty player config was not associated and installed: %#v", created)
 
-	added := app.AddCharacter("Mara")
-	require.Falsef(t, !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara",
+	hackerUnavailable := false
+	added := app.AddCharacter(CharacterCreatePayload{
+		Name: "Mara", Intelligence: 10, HackerPerkAvailable: &hackerUnavailable,
+		ExpectedRevision: created.State.Revision,
+	})
+	require.Falsef(t, !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara" || added.State.Roster[0].Intelligence != 10 || added.State.Roster[0].HackerPerkAvailable,
 		"AddCharacter() after empty config = %#v", added)
 
 	stored, ok := fileSystem.File(target)
@@ -193,9 +197,121 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	persisted, err := domain.DecodePlayerConfig(stored)
 	require.Falsef(t, err != nil,
 		"DecodePlayerConfig() after first add: %v", err)
-	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara",
+	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara" || persisted.Roster[0].Intelligence != 10 || persisted.Roster[0].HackerPerkAvailable,
 		"persisted roster after first add = %#v", persisted.Roster)
 
+	reopened := playerconfigservice.NewService(
+		playerconfigservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		"/Campaigns",
+	).Open(t.Context())
+	require.True(t, reopened.OK, "Open() after add = %#v", reopened)
+	require.NotNil(t, reopened.Config)
+	require.Equal(t, persisted, *reopened.Config)
+	require.NotEmpty(t, reopened.ContentDigest)
+
+}
+
+func TestRosterMutationConflictReturnsAuthoritativeReselectionGuidance(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, replacement []byte)
+		check  func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, original, replacement []byte)
+	}{
+		{
+			name: "missing",
+			mutate: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _ []byte) {
+				t.Helper()
+				require.NoError(t, fileSystem.Remove(target))
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _, _ []byte) {
+				t.Helper()
+				_, exists := fileSystem.File(target)
+				require.False(t, exists)
+			},
+		},
+		{
+			name: "unreadable",
+			mutate: func(_ *testing.T, fileSystem *testutil.FakeFileSystem, target string, _ []byte) {
+				fileSystem.ReadErrors[target] = errors.New("permission denied: private path detail")
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, original, _ []byte) {
+				t.Helper()
+				stored, exists := fileSystem.File(target)
+				require.True(t, exists)
+				require.Equal(t, original, stored)
+			},
+		},
+		{
+			name: "replaced",
+			mutate: func(_ *testing.T, fileSystem *testutil.FakeFileSystem, target string, replacement []byte) {
+				fileSystem.SeedFile(target, replacement)
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _, replacement []byte) {
+				t.Helper()
+				stored, exists := fileSystem.File(target)
+				require.True(t, exists)
+				require.Equal(t, replacement, stored)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			fileSystem := testutil.NewFakeFileSystem()
+			target := "/Campaigns/players/conflict-" + test.name + ".json"
+			configs := playerconfigservice.NewService(
+				playerconfigservice.NewStorage(fileSystem),
+				&testutil.FakeDialog{SaveResult: target},
+				"/Campaigns",
+			)
+			coordination := controlservice.New(controlservice.Config{RosterStore: configs})
+			app := NewAppWithDependencies(AppDependencies{
+				Sessions: &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{
+					Path: "/Campaigns/game.json",
+					Session: &domain.Session{
+						Version: 1, Name: "Game", Terminals: []domain.Terminal{},
+					},
+				}},
+				PlayerConfigs: configs,
+				Coordination:  coordination,
+			})
+
+			created := app.NewPlayerConfig()
+			require.True(t, created.OK, "NewPlayerConfig() = %#v", created)
+			hackerUnavailable := false
+			added := app.AddCharacter(CharacterCreatePayload{
+				Name: "Mara", Intelligence: 8, HackerPerkAvailable: &hackerUnavailable,
+				ExpectedRevision: created.State.Revision,
+			})
+			require.True(t, added.OK, "AddCharacter() = %#v", added)
+			require.Len(t, added.State.Roster, 1)
+			original, exists := fileSystem.File(target)
+			require.True(t, exists)
+			replacement := []byte("{\n  \"version\": 1,\n  \"name\": \"External\",\n  \"roster\": []\n}\n")
+			beforeWrites := len(fileSystem.WriteCalls())
+			beforeRenames := len(fileSystem.RenameCalls())
+			test.mutate(t, fileSystem, target, replacement)
+
+			hackerAvailable := true
+			failed := app.UpdateCharacter(CharacterUpdatePayload{
+				CharacterID: added.State.Roster[0].ID,
+				Name:        "Changed Draft", Intelligence: 10, HackerPerkAvailable: &hackerAvailable,
+				ExpectedRevision: added.State.Revision,
+			})
+			require.False(t, failed.OK)
+			require.Contains(t, failed.Error, "reopen or reselect it")
+			require.NotContains(t, failed.Error, "private path detail")
+			require.Equal(t, added.State, failed.State, "failure must return the last authoritative roster")
+			require.Equal(t, beforeWrites, len(fileSystem.WriteCalls()))
+			require.Equal(t, beforeRenames, len(fileSystem.RenameCalls()))
+			test.check(t, fileSystem, target, original, replacement)
+		})
+	}
 }
 
 func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision(t *testing.T) {
@@ -486,7 +602,9 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 		state: &domain.MasterCoordinationState{Revision: 4},
 		addState: &domain.MasterCoordinationState{
 			Revision: 5,
-			Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara"}},
+			Roster: []domain.MasterRosterEntry{{
+				ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: false,
+			}},
 		},
 		startState: &domain.MasterCoordinationState{
 			Revision: 6,
@@ -502,12 +620,17 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 	require.Falsef(t, initial.CoordinationState == nil || initial.CoordinationState.Revision != 4,
 		"initial coordination status = %#v, want replayable revision 4", initial.CoordinationState)
 
-	added := app.AddCharacter("  Mara  ")
-	require.Falsef(t, !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5,
+	hackerUnavailable := false
+	added := app.AddCharacter(CharacterCreatePayload{
+		Name: "  Mara  ", Intelligence: 8, HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 4,
+	})
+	require.Falsef(t, !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5 || added.State.Roster[0].Intelligence != 8 || added.State.Roster[0].HackerPerkAvailable,
 		"AddCharacter() = %#v, want accepted revision 5", added)
 	{
 
-		got, want := service.addNames, []string{"Mara"}
+		got, want := service.addPayloads, []domain.CharacterCreatePayload{{
+			Name: "Mara", Intelligence: 8, HackerPerkAvailable: false, ExpectedRevision: 4,
+		}}
 		require.Falsef(t, !cmp.Equal(got, want),
 			"coordinator AddCharacter calls = %v, want %v", got, want)
 	}
@@ -553,11 +676,23 @@ func TestCoordinationBridgeRejectsInvalidOrFailedCommandsWithoutPartialState(t *
 		Events:       &recordingEventSink{recorder: recorder},
 	})
 
-	invalid := app.AddCharacter("   ")
-	require.Falsef(t, invalid.OK || invalid.Error == "" || len(service.addNames) != 0,
-		"AddCharacter(blank) = %#v, calls = %v", invalid, service.addNames)
+	hackerAvailable := true
+	invalidPayloads := []CharacterCreatePayload{
+		{Name: "   ", Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: strings.Repeat("x", 81), Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 0, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 11, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 5, HackerPerkAvailable: nil, ExpectedRevision: 9},
+	}
+	for index, payload := range invalidPayloads {
+		invalid := app.AddCharacter(payload)
+		require.Falsef(t, invalid.OK || invalid.Error == "" || len(service.addPayloads) != 0,
+			"AddCharacter(invalid %d) = %#v, calls = %v", index, invalid, service.addPayloads)
+	}
 
-	failedAdd := app.AddCharacter("Boone")
+	failedAdd := app.AddCharacter(CharacterCreatePayload{
+		Name: "Boone", Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9,
+	})
 	require.Falsef(t, failedAdd.OK || !strings.Contains(failedAdd.Error, "roster"),
 		"AddCharacter(failed) = %#v", failedAdd)
 
@@ -624,7 +759,7 @@ func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMut
 
 }
 
-func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *testing.T) {
+func TestCoordinationBridgeValidatesSessionAndAssignmentCorrections(t *testing.T) {
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
 		Revision: 20,
@@ -652,10 +787,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 		name string
 		run  func() CoordinationCommandResult
 	}{
-		{"rename-character", func() CoordinationCommandResult {
-			return app.RenameCharacter(CharacterRenamePayload{CharacterID: "character-1", Name: "  Mara Voss  "})
-		}},
-		{"delete-character", func() CoordinationCommandResult { return app.DeleteCharacter("character-2") }},
 		{"rename-session", func() CoordinationCommandResult {
 			return app.RenameLogicalSession(LogicalSessionRenamePayload{SessionID: "session-1", FallbackName: "  TABLET LEFT  "})
 		}},
@@ -683,8 +814,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 	}
 
 	wantCalls := []string{
-		"rename-character:character-1:Mara Voss",
-		"delete-character:character-2",
 		"rename-session:session-1:TABLET LEFT",
 		"assign-character:session-1:character-1",
 		"release-character:session-1",
@@ -727,7 +856,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 
 	invalidCalls := len(service.calls)
 	invalid := []CoordinationCommandResult{
-		app.RenameCharacter(CharacterRenamePayload{CharacterID: "", Name: "Mara"}),
 		app.RenameLogicalSession(LogicalSessionRenamePayload{SessionID: "session-1", FallbackName: "  "}),
 		app.AssignCharacter(AssignmentPayload{SessionID: "", CharacterID: "character-1"}),
 		app.ReleaseCharacter("   "),
@@ -741,6 +869,112 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 	require.Falsef(t, len(service.calls) != invalidCalls,
 		"invalid payloads reached coordinator: %v", service.calls[invalidCalls:])
 
+}
+
+func TestCoordinationBridgeRoutesCompleteUpdateAndDeletePayloads(t *testing.T) {
+	recorder := &callRecorder{}
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 20,
+			Roster: []domain.MasterRosterEntry{
+				{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
+				{ID: "character-2", Name: "Boone", Intelligence: 3},
+			},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		Coordination: service,
+		Events:       &recordingEventSink{recorder: recorder},
+	})
+
+	hackerUnavailable := false
+	service.nextRevision = 1
+	updated := app.UpdateCharacter(CharacterUpdatePayload{
+		CharacterID: "character-1", Name: "  Mara Voss  ", Intelligence: 10,
+		HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 20,
+	})
+	require.True(t, updated.OK)
+	require.Empty(t, updated.Error)
+	require.NotNil(t, updated.State)
+	require.Equal(t, uint64(21), updated.State.Revision)
+	require.Equal(t, []domain.CharacterUpdatePayload{{
+		CharacterID: "character-1", Name: "Mara Voss", Intelligence: 10,
+		HackerPerkAvailable: false, ExpectedRevision: 20,
+	}}, service.updatePayloads)
+
+	service.nextRevision = 2
+	deleted := app.DeleteCharacter(CharacterDeletePayload{
+		CharacterID: "character-2", ExpectedRevision: 21,
+	})
+	require.True(t, deleted.OK)
+	require.Empty(t, deleted.Error)
+	require.NotNil(t, deleted.State)
+	require.Equal(t, uint64(22), deleted.State.Revision)
+	require.Equal(t, []domain.CharacterDeletePayload{{
+		CharacterID: "character-2", ExpectedRevision: 21,
+	}}, service.deletePayloads)
+	require.Equal(t, []string{
+		"update-character:character-1:Mara Voss:10:false:20",
+		"delete-character:character-2:21",
+	}, service.calls)
+	require.Equal(t, []string{"event:coordination-state", "event:coordination-state"}, recorder.Calls())
+}
+
+func TestCoordinationBridgeRejectsInvalidCompleteRosterMutationsBeforeCoordinator(t *testing.T) {
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 20,
+			Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{Coordination: service})
+	hackerAvailable := true
+
+	invalid := []CoordinationCommandResult{
+		app.UpdateCharacter(CharacterUpdatePayload{Name: "Mara", Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "   ", Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: strings.Repeat("x", 81), Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 0, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 11, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 8, ExpectedRevision: 20}),
+		app.DeleteCharacter(CharacterDeletePayload{ExpectedRevision: 20}),
+	}
+	for index, result := range invalid {
+		require.Falsef(t, result.OK || result.Error == "", "invalid roster mutation %d = %#v", index, result)
+		require.NotNil(t, result.State, "validation failure must return authoritative state")
+		require.Equal(t, uint64(20), result.State.Revision)
+	}
+	require.Empty(t, service.updatePayloads)
+	require.Empty(t, service.deletePayloads)
+	require.Empty(t, service.calls)
+}
+
+func TestCoordinationBridgeRosterMutationFailureReturnsAuthoritativeState(t *testing.T) {
+	recorder := &callRecorder{}
+	canonical := &domain.MasterCoordinationState{
+		Revision: 32,
+		Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
+	}
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: canonical},
+		failCommand:                  "update-character",
+		commandErr:                   errors.New("player config changed on disk"),
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		Coordination: service,
+		Events:       &recordingEventSink{recorder: recorder},
+	})
+	hackerUnavailable := false
+
+	result := app.UpdateCharacter(CharacterUpdatePayload{
+		CharacterID: "character-1", Name: "Mara Voss", Intelligence: 10,
+		HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 32,
+	})
+	require.False(t, result.OK)
+	require.ErrorContains(t, errors.New(result.Error), "changed on disk")
+	require.Equal(t, canonical, result.State)
+	require.Equal(t, canonical, app.GetRuntimeStatus().CoordinationState)
+	require.Empty(t, recorder.Calls(), "failed mutation must not publish")
 }
 
 func TestCoordinationBridgeValidatesAndPublishesActiveControllerReassignment(t *testing.T) {
@@ -1175,7 +1409,9 @@ func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T)
 		Runtime: live, Terminals: live, TrustedHack: live,
 		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
 	})
-	master, err := coordination.AddCharacter("Mara")
+	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Mara", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
 	require.NoError(t, err)
 	characterID := master.Roster[0].ID
 	master, err = coordination.StartBroadcast()
@@ -1295,9 +1531,13 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 		Runtime: live, Terminals: live, TrustedHack: live,
 		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
 	})
-	master, err := coordination.AddCharacter("Mara")
+	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Mara", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
 	require.NoError(t, err)
-	master, err = coordination.AddCharacter("Boone")
+	master, err = coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Boone", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
 	require.NoError(t, err)
 	controllerCharacterID := master.Roster[0].ID
 	observerCharacterID := master.Roster[1].ID
@@ -2045,7 +2285,7 @@ type recordingCoordinationService struct {
 	startState          *domain.MasterCoordinationState
 	addErr              error
 	startErr            error
-	addNames            []string
+	addPayloads         []domain.CharacterCreatePayload
 	startCalls          int
 	navigationDecisions []recordedTerminalNavigationDecision
 }
@@ -2216,11 +2456,13 @@ func (service *recordingTerminalCoordinationService) UpdateLiveTerminal(tree dom
 
 type recordingCorrectionCoordinationService struct {
 	recordingCoordinationService
-	calls        []string
-	nextRevision int
-	failCommand  string
-	commandErr   error
-	order        *callRecorder
+	calls          []string
+	updatePayloads []domain.CharacterUpdatePayload
+	deletePayloads []domain.CharacterDeletePayload
+	nextRevision   int
+	failCommand    string
+	commandErr     error
+	order          *callRecorder
 }
 
 func (service *recordingCorrectionCoordinationService) correction(command string) (*domain.MasterCoordinationState, error) {
@@ -2233,13 +2475,15 @@ func (service *recordingCorrectionCoordinationService) correction(command string
 	return domain.CloneMasterCoordinationState(state), nil
 }
 
-func (service *recordingCorrectionCoordinationService) RenameCharacter(characterID domain.CharacterID, name string) (*domain.MasterCoordinationState, error) {
-	service.calls = append(service.calls, fmt.Sprintf("rename-character:%s:%s", characterID, name))
-	return service.correction("rename-character")
+func (service *recordingCorrectionCoordinationService) UpdateCharacter(payload domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error) {
+	service.updatePayloads = append(service.updatePayloads, payload)
+	service.calls = append(service.calls, fmt.Sprintf("update-character:%s:%s:%d:%t:%d", payload.CharacterID, payload.Name, payload.Intelligence, payload.HackerPerkAvailable, payload.ExpectedRevision))
+	return service.correction("update-character")
 }
 
-func (service *recordingCorrectionCoordinationService) DeleteCharacter(characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
-	service.calls = append(service.calls, "delete-character:"+string(characterID))
+func (service *recordingCorrectionCoordinationService) DeleteCharacter(payload domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error) {
+	service.deletePayloads = append(service.deletePayloads, payload)
+	service.calls = append(service.calls, fmt.Sprintf("delete-character:%s:%d", payload.CharacterID, payload.ExpectedRevision))
 	return service.correction("delete-character")
 }
 
@@ -2304,8 +2548,8 @@ func (service *recordingCoordinationService) Snapshot() *domain.MasterCoordinati
 	return domain.CloneMasterCoordinationState(service.state)
 }
 
-func (service *recordingCoordinationService) AddCharacter(name string) (*domain.MasterCoordinationState, error) {
-	service.addNames = append(service.addNames, name)
+func (service *recordingCoordinationService) AddCharacter(payload domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error) {
+	service.addPayloads = append(service.addPayloads, payload)
 	if service.addErr != nil {
 		return domain.CloneMasterCoordinationState(service.state), service.addErr
 	}

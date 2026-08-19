@@ -33,9 +33,10 @@ type PlayerConfig struct {
 // PlayerConfigHandle is the private active-file identity used for atomic
 // roster saves. Path is exposed only to the trusted desktop projection.
 type PlayerConfigHandle struct {
-	Path    string
-	Version int
-	Name    string
+	Path          string
+	Version       int
+	Name          string
+	ContentDigest string
 }
 
 // PlayerConfigMetadata is the detached game-master view of the active config.
@@ -494,10 +495,40 @@ type LogicalSession struct {
 	Notice         *PlayerNotice
 }
 
+// CharacterCreatePayload is the complete trusted roster profile requested by
+// the game master. ExpectedRevision makes retries and concurrent edits
+// explicit at the coordinator transaction boundary.
+type CharacterCreatePayload struct {
+	Name                string
+	Intelligence        int
+	HackerPerkAvailable bool
+	ExpectedRevision    uint64
+}
+
+// CharacterUpdatePayload is the complete replacement profile for one stable
+// roster identity. ExpectedRevision serializes trusted desktop edits against
+// the coordinator's authoritative state.
+type CharacterUpdatePayload struct {
+	CharacterID         CharacterID
+	Name                string
+	Intelligence        int
+	HackerPerkAvailable bool
+	ExpectedRevision    uint64
+}
+
+// CharacterDeletePayload identifies one roster profile to remove at an exact
+// coordinator revision.
+type CharacterDeletePayload struct {
+	CharacterID      CharacterID
+	ExpectedRevision uint64
+}
+
 // CharacterRosterEntry is one stable process-local player identity option.
 type CharacterRosterEntry struct {
-	ID   CharacterID `json:"id"`
-	Name string      `json:"name"`
+	ID                  CharacterID `json:"id"`
+	Name                string      `json:"name"`
+	Intelligence        int         `json:"intelligence"`
+	HackerPerkAvailable bool        `json:"hackerPerkAvailable"`
 }
 
 // CharacterAssignment is one broadcast-scoped exclusive claim.
@@ -715,9 +746,11 @@ func (state PlayerState) MarshalJSON() ([]byte, error) {
 
 // MasterRosterEntry is the game-master view of one roster claim.
 type MasterRosterEntry struct {
-	ID                 CharacterID       `json:"id"`
-	Name               string            `json:"name"`
-	ClaimedBySessionID *LogicalSessionID `json:"claimedBySessionId"`
+	ID                  CharacterID       `json:"id"`
+	Name                string            `json:"name"`
+	Intelligence        int               `json:"intelligence"`
+	HackerPerkAvailable bool              `json:"hackerPerkAvailable"`
+	ClaimedBySessionID  *LogicalSessionID `json:"claimedBySessionId"`
 }
 
 // MasterSessionEntry is the game-master view of one recognized logical session.

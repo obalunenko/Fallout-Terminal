@@ -4,19 +4,27 @@
   "roster": [
     {
       "id": "demo_scout",
-      "name": "Пайпер Райт"
+      "name": "Пайпер Райт",
+      "intelligence": 7,
+      "hackerPerkAvailable": false
     },
     {
       "id": "demo_technician",
-      "name": "Ник Валентайн"
+      "name": "Ник Валентайн",
+      "intelligence": 8,
+      "hackerPerkAvailable": true
     },
     {
       "id": "demo_medic",
-      "name": "Кюри"
+      "name": "Кюри",
+      "intelligence": 10,
+      "hackerPerkAvailable": true
     },
     {
       "id": "demo_guard",
-      "name": "Престон Гарви"
+      "name": "Престон Гарви",
+      "intelligence": 6,
+      "hackerPerkAvailable": false
     }
   ]
 }

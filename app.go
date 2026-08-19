@@ -70,7 +70,7 @@ type LiveService interface {
 // broadcast lifetime, and controller state behind one transaction boundary.
 type CoordinationService interface {
 	Snapshot() *domain.MasterCoordinationState
-	AddCharacter(string) (*domain.MasterCoordinationState, error)
+	AddCharacter(domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error)
 	StartBroadcast() (*domain.MasterCoordinationState, error)
 }
 
@@ -78,8 +78,8 @@ type CoordinationService interface {
 // Keeping it additive lets focused lifecycle fakes provide only the commands
 // they exercise while production control.Service implements the complete set.
 type coordinationCorrectionService interface {
-	RenameCharacter(domain.CharacterID, string) (*domain.MasterCoordinationState, error)
-	DeleteCharacter(domain.CharacterID) (*domain.MasterCoordinationState, error)
+	UpdateCharacter(domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error)
+	DeleteCharacter(domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error)
 	RenameLogicalSession(domain.LogicalSessionID, string) (*domain.MasterCoordinationState, error)
 	AssignCharacter(domain.LogicalSessionID, domain.CharacterID) (*domain.MasterCoordinationState, error)
 	ReleaseCharacter(domain.LogicalSessionID) (*domain.MasterCoordinationState, error)
@@ -343,11 +343,30 @@ type TerminalSwitchCommandResult struct {
 	State    *domain.MasterCoordinationState `json:"state"`
 }
 
-// CharacterRenamePayload identifies one stable roster entry and its new
-// player-facing display name.
-type CharacterRenamePayload struct {
-	CharacterID domain.CharacterID `json:"characterId"`
-	Name        string             `json:"name"`
+// CharacterCreatePayload carries one complete trusted player profile and the
+// coordination revision it was based on.
+type CharacterCreatePayload struct {
+	Name                string `json:"name"`
+	Intelligence        int    `json:"intelligence"`
+	HackerPerkAvailable *bool  `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64 `json:"expectedRevision"`
+}
+
+// CharacterUpdatePayload carries a complete replacement profile for one
+// stable roster identity and the coordination revision it was based on.
+type CharacterUpdatePayload struct {
+	CharacterID         domain.CharacterID `json:"characterId"`
+	Name                string             `json:"name"`
+	Intelligence        int                `json:"intelligence"`
+	HackerPerkAvailable *bool              `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64             `json:"expectedRevision"`
+}
+
+// CharacterDeletePayload identifies one stable roster identity and the
+// coordination revision the deletion was based on.
+type CharacterDeletePayload struct {
+	CharacterID      domain.CharacterID `json:"characterId"`
+	ExpectedRevision uint64             `json:"expectedRevision"`
 }
 
 // LogicalSessionRenamePayload changes only a process-local fallback label.
@@ -1171,7 +1190,12 @@ func (app *App) installPlayerConfig(result playerconfigservice.Result, associate
 	} else if sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands); ok {
 		associatedSession = sessions.Snapshot().Session
 	}
-	handle := domain.PlayerConfigHandle{Path: result.FilePath, Version: result.Config.Version, Name: result.Config.Name}
+	handle := domain.PlayerConfigHandle{
+		Path:          result.FilePath,
+		Version:       result.Config.Version,
+		Name:          result.Config.Name,
+		ContentDigest: result.ContentDigest,
+	}
 	state, err := coordination.InstallPlayerConfig(handle, result.Config.Roster)
 	if err != nil {
 		return app.playerConfigFailure(err.Error(), false)
@@ -1206,35 +1230,42 @@ func (app *App) resetPlayerConfigForSession(result sessionservice.SessionResult)
 	}
 }
 
-// AddCharacter validates the game-master display name before entering the
-// coordinator and publishes only its detached authoritative projection.
-func (app *App) AddCharacter(name string) CoordinationCommandResult {
-	name = routeAddCharacterRequest(name)
-	name = strings.TrimSpace(name)
-	if name == "" {
+// AddCharacter validates the complete trusted player profile before entering
+// the coordinator and publishes only its detached authoritative projection.
+func (app *App) AddCharacter(payload CharacterCreatePayload) CoordinationCommandResult {
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return app.coordinationFailure("character intelligence must be between 1 and 10")
+	}
+	payload = routeAddCharacterRequest(payload)
+	payload.Name = strings.TrimSpace(payload.Name)
+	if payload.Name == "" {
 		return app.coordinationFailure("character name must not be blank")
 	}
-	if len([]rune(name)) > 80 {
+	if len([]rune(payload.Name)) > 80 {
 		return app.coordinationFailure("character name must be at most 80 characters")
+	}
+	if payload.HackerPerkAvailable == nil {
+		return app.coordinationFailure("character Hacker perk availability is required")
 	}
 	if app.deps.Coordination == nil {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, err := app.deps.Coordination.AddCharacter(name)
-	if err != nil {
-		return app.coordinationFailure(err.Error())
-	}
-	if state == nil {
-		return app.coordinationFailure("character could not be added")
-	}
-	app.publishCoordinationState(state)
-	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
+	state, err := app.deps.Coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name:                payload.Name,
+		Intelligence:        payload.Intelligence,
+		HackerPerkAvailable: *payload.HackerPerkAvailable,
+		ExpectedRevision:    payload.ExpectedRevision,
+	})
+	return app.completeCoordinationCommand(state, err, "character could not be added")
 }
 
-// RenameCharacter validates the stable roster ID and display name before
-// entering the coordinator transaction.
-func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
-	payload = routeRenameCharacterRequest(payload)
+// UpdateCharacter validates a complete trusted player profile before entering
+// the coordinator transaction.
+func (app *App) UpdateCharacter(payload CharacterUpdatePayload) CoordinationCommandResult {
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return app.coordinationFailure("character intelligence must be between 1 and 10")
+	}
+	payload = routeUpdateCharacterRequest(payload)
 	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
@@ -1242,25 +1273,37 @@ func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationComm
 	if err != nil {
 		return app.coordinationFailure(err.Error())
 	}
+	if payload.HackerPerkAvailable == nil {
+		return app.coordinationFailure("character Hacker perk availability is required")
+	}
 	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, commandErr := coordination.RenameCharacter(payload.CharacterID, name)
-	return app.completeCoordinationCommand(state, commandErr, "character could not be renamed")
+	state, commandErr := coordination.UpdateCharacter(domain.CharacterUpdatePayload{
+		CharacterID:         payload.CharacterID,
+		Name:                name,
+		Intelligence:        payload.Intelligence,
+		HackerPerkAvailable: *payload.HackerPerkAvailable,
+		ExpectedRevision:    payload.ExpectedRevision,
+	})
+	return app.completeCoordinationCommand(state, commandErr, "character could not be updated")
 }
 
 // DeleteCharacter removes only an existing unclaimed roster identity.
-func (app *App) DeleteCharacter(characterID string) CoordinationCommandResult {
-	characterID = routeDeleteCharacterRequest(characterID)
-	if strings.TrimSpace(characterID) == "" {
+func (app *App) DeleteCharacter(payload CharacterDeletePayload) CoordinationCommandResult {
+	payload = routeDeleteCharacterRequest(payload)
+	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
 	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, err := coordination.DeleteCharacter(domain.CharacterID(characterID))
+	state, err := coordination.DeleteCharacter(domain.CharacterDeletePayload{
+		CharacterID:      payload.CharacterID,
+		ExpectedRevision: payload.ExpectedRevision,
+	})
 	return app.completeCoordinationCommand(state, err, "character could not be deleted")
 }
 

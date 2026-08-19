@@ -292,12 +292,14 @@ func (TerminalNavigationNoticeReason) EnumDescriptor() ([]byte, []int) {
 }
 
 type CharacterState struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	CharacterId      string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
-	DisplayName      string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	LogicalSessionId *string                `protobuf:"bytes,3,opt,name=logical_session_id,json=logicalSessionId,proto3,oneof" json:"logical_session_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	CharacterId         string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
+	DisplayName         string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	LogicalSessionId    *string                `protobuf:"bytes,3,opt,name=logical_session_id,json=logicalSessionId,proto3,oneof" json:"logical_session_id,omitempty"`
+	Intelligence        int32                  `protobuf:"varint,4,opt,name=intelligence,proto3" json:"intelligence,omitempty"`
+	HackerPerkAvailable bool                   `protobuf:"varint,5,opt,name=hacker_perk_available,json=hackerPerkAvailable,proto3" json:"hacker_perk_available,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CharacterState) Reset() {
@@ -349,6 +351,20 @@ func (x *CharacterState) GetLogicalSessionId() string {
 		return *x.LogicalSessionId
 	}
 	return ""
+}
+
+func (x *CharacterState) GetIntelligence() int32 {
+	if x != nil {
+		return x.Intelligence
+	}
+	return 0
+}
+
+func (x *CharacterState) GetHackerPerkAvailable() bool {
+	if x != nil {
+		return x.HackerPerkAvailable
+	}
+	return false
 }
 
 type LogicalSessionState struct {
@@ -1043,11 +1059,13 @@ var File_fallout_terminal_private_v1_coordination_proto protoreflect.FileDescrip
 
 const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\n" +
-	".fallout/terminal/private/v1/coordination.proto\x12\x1bfallout.terminal.private.v1\x1a'fallout/terminal/player/v1/player.proto\x1a)fallout/terminal/player/v1/terminal.proto\"\xa0\x01\n" +
+	".fallout/terminal/private/v1/coordination.proto\x12\x1bfallout.terminal.private.v1\x1a'fallout/terminal/player/v1/player.proto\x1a)fallout/terminal/player/v1/terminal.proto\"\xf8\x01\n" +
 	"\x0eCharacterState\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x121\n" +
-	"\x12logical_session_id\x18\x03 \x01(\tH\x00R\x10logicalSessionId\x88\x01\x01B\x15\n" +
+	"\x12logical_session_id\x18\x03 \x01(\tH\x00R\x10logicalSessionId\x88\x01\x01\x12\"\n" +
+	"\fintelligence\x18\x04 \x01(\x05R\fintelligence\x122\n" +
+	"\x15hacker_perk_available\x18\x05 \x01(\bR\x13hackerPerkAvailableB\x15\n" +
 	"\x13_logical_session_id\"\xa2\x02\n" +
 	"\x13LogicalSessionState\x12,\n" +
 	"\x12logical_session_id\x18\x01 \x01(\tR\x10logicalSessionId\x12#\n" +

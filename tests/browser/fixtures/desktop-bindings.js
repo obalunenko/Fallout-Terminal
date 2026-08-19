@@ -172,6 +172,20 @@ function syncFixtureActive() {
   return globalThis.location?.pathname === '/__fixture/state-changing-command-sync/master';
 }
 
+function playerManagementFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/player-management';
+}
+
+async function playerManagementFixtureCommand(path, payload) {
+  const response = await fetch(`/__fixture/player-management/${path}`, {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: payload === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`player-management fixture ${path} failed`);
+  return response.json();
+}
+
 function stateChangingLifecycleBase() {
 	if (terminalNavigationFixtureActive()) return '/__fixture/terminal-navigation';
   if (approvalFixtureActive()) return '/__fixture/state-changing-command-approval';
@@ -293,6 +307,12 @@ export const Clipboard = {
 
 export function GetRuntimeStatus() {
   state.calls.push({ method: 'GetRuntimeStatus', args: [] });
+  if (playerManagementFixtureActive()) {
+    return playerManagementFixtureCommand('state').then(coordinationState => ({
+      ...state.status,
+      coordinationState,
+    }));
+  }
   if (stateChangingLifecycleBase()) {
     return stateChangingCoordinationState().then(coordinationState => ({
       ...state.status,
@@ -377,10 +397,26 @@ export function StopPublicAccess(request) {
   return Promise.resolve({ ok: true, snapshot: snapshot() });
 }
 
-export const AddCharacter = (...args) => record('AddCharacter', args);
+export async function AddCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('AddCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'AddCharacter', args: [retained] });
+  return playerManagementFixtureCommand('add', retained);
+}
+export async function UpdateCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('UpdateCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'UpdateCharacter', args: [retained] });
+  return playerManagementFixtureCommand('update', retained);
+}
+export async function DeleteCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('DeleteCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'DeleteCharacter', args: [retained] });
+  return playerManagementFixtureCommand('delete', retained);
+}
 export const AssignCharacter = (...args) => record('AssignCharacter', args);
 export const CopyDemo = (...args) => record('CopyDemo', args);
-export const DeleteCharacter = (...args) => record('DeleteCharacter', args);
 export const EndBroadcast = (...args) => record('EndBroadcast', args);
 export const ForceHackSuccess = (...args) => record('ForceHackSuccess', args);
 export const LoadReferencedPlayerConfig = (...args) => record('LoadReferencedPlayerConfig', args);
@@ -424,7 +460,6 @@ export async function OpenSession(...args) {
 }
 export const OpenURL = (...args) => record('OpenURL', args);
 export const ReleaseCharacter = (...args) => record('ReleaseCharacter', args);
-export const RenameCharacter = (...args) => record('RenameCharacter', args);
 export const RenameLogicalSession = (...args) => record('RenameLogicalSession', args);
 export const RequestTerminalActivation = (...args) => record('RequestTerminalActivation', args);
 export const RequestTerminalClear = (...args) => record('RequestTerminalClear', args);

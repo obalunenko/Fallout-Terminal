@@ -238,7 +238,7 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
 		"proto/fallout/terminal/private/v1/runtime.proto": "4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9",
-		"proto/schema-revision.txt":                       "35007cbc0b309d8aa03f6a7de0aa61797e8b421c97989dae059a4b2456af0413",
+		"proto/schema-revision.txt":                       "311b76a8d320f9c773ad3f93b0339f158bd5665ab0d0fc5aa0b832ce5b0085b9",
 		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {
@@ -1814,7 +1814,12 @@ func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 	playerConfig, err := domain.DecodePlayerConfig(playerConfigRaw)
 	require.NoError(t, err)
 	require.Equal(t, 1, playerConfig.Version)
-	require.Len(t, playerConfig.Roster, 4)
+	require.Equal(t, []domain.CharacterRosterEntry{
+		{ID: "demo_scout", Name: "Пайпер Райт", Intelligence: 7, HackerPerkAvailable: false},
+		{ID: "demo_technician", Name: "Ник Валентайн", Intelligence: 8, HackerPerkAvailable: true},
+		{ID: "demo_medic", Name: "Кюри", Intelligence: 10, HackerPerkAvailable: true},
+		{ID: "demo_guard", Name: "Престон Гарви", Intelligence: 6, HackerPerkAvailable: false},
+	}, playerConfig.Roster, "bundled player profiles must preserve authored IDs, order, and private attributes")
 
 	locations, err := NewSessionLocations(filepath.Join(root, ".manifest-home"), root)
 	if err != nil {
@@ -2053,7 +2058,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 	}
 
 	for _, fragment := range []string{
-		`row.querySelector('.roster-name').textContent = character.name || '—'`,
+		`nameInput.value = character.name || ''`,
 		`row.querySelector('.session-primary-name').textContent = assigned`,
 		`row.querySelector('.session-character-name').textContent = assigned`,
 		`row.querySelector('.session-fallback-label').textContent = `,
@@ -2166,7 +2171,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 
 	}
 	for _, fragment := range []string{
-		`.coord-panel[data-player-config-active="false"] .roster-management`,
+		`.player-management-dialog[aria-readonly="true"] .player-management-mode`,
 		`.player-config-error[hidden]`,
 	} {
 		assert.Falsef(t, !strings.Contains(masterCSS, fragment),

@@ -22,7 +22,7 @@ const APP_METHODS = Object.freeze({
   resetCommandState: desktopService.ResetCommandState,
   resetTerminalCommandStates: desktopService.ResetTerminalCommandStates,
   addCharacter: desktopService.AddCharacter,
-  renameCharacter: desktopService.RenameCharacter,
+  updateCharacter: desktopService.UpdateCharacter,
   deleteCharacter: desktopService.DeleteCharacter,
   renameLogicalSession: desktopService.RenameLogicalSession,
   assignCharacter: desktopService.AssignCharacter,
@@ -160,6 +160,45 @@ function normalizeSessionStateResult(result) {
 
 function sessionStateCommand(binding, payload) {
   return command(binding, payload).then(normalizeSessionStateResult);
+}
+
+function normalizeAddCharacterPayload(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  return {
+    name: typeof source.name === 'string' ? source.name : '',
+    intelligence: Number.isInteger(source.intelligence) ? source.intelligence : 0,
+    hackerPerkAvailable: typeof source.hackerPerkAvailable === 'boolean'
+      ? source.hackerPerkAvailable
+      : undefined,
+    expectedRevision: Number.isSafeInteger(source.expectedRevision) && source.expectedRevision >= 0
+      ? source.expectedRevision
+      : 0,
+  };
+}
+
+function normalizeUpdateCharacterPayload(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  return {
+    characterId: typeof source.characterId === 'string' ? source.characterId : '',
+    name: typeof source.name === 'string' ? source.name : '',
+    intelligence: Number.isInteger(source.intelligence) ? source.intelligence : 0,
+    hackerPerkAvailable: typeof source.hackerPerkAvailable === 'boolean'
+      ? source.hackerPerkAvailable
+      : undefined,
+    expectedRevision: Number.isSafeInteger(source.expectedRevision) && source.expectedRevision >= 0
+      ? source.expectedRevision
+      : 0,
+  };
+}
+
+function normalizeDeleteCharacterPayload(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  return {
+    characterId: typeof source.characterId === 'string' ? source.characterId : '',
+    expectedRevision: Number.isSafeInteger(source.expectedRevision) && source.expectedRevision >= 0
+      ? source.expectedRevision
+      : 0,
+  };
 }
 
 function normalizeSessionStateEvent(event) {
@@ -431,9 +470,9 @@ const desktopAPI = {
   resetTerminalCommandStates: (payload) => sessionStateCommand(APP_METHODS.resetTerminalCommandStates, {
     terminalId: typeof payload?.terminalId === 'string' ? payload.terminalId : '',
   }),
-  addCharacter: (name) => command(APP_METHODS.addCharacter, name),
-  renameCharacter: (payload) => command(APP_METHODS.renameCharacter, payload),
-  deleteCharacter: (characterId) => command(APP_METHODS.deleteCharacter, characterId),
+  addCharacter: (payload) => command(APP_METHODS.addCharacter, normalizeAddCharacterPayload(payload)),
+  updateCharacter: (payload) => command(APP_METHODS.updateCharacter, normalizeUpdateCharacterPayload(payload)),
+  deleteCharacter: (payload) => command(APP_METHODS.deleteCharacter, normalizeDeleteCharacterPayload(payload)),
   renameLogicalSession: (payload) => command(APP_METHODS.renameLogicalSession, payload),
   assignCharacter: (payload) => command(APP_METHODS.assignCharacter, payload),
   releaseCharacter: (sessionId) => command(APP_METHODS.releaseCharacter, sessionId),

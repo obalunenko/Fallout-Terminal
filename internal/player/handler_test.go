@@ -405,7 +405,7 @@ func newConnectTestCoordinator(t *testing.T, publish ...func(control.Effect)) *c
 		enqueue = publish[0]
 	}
 	coordinator := control.New(control.Config{IDs: ids, Enqueue: enqueue})
-	_, err := coordinator.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/player.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	_, err := coordinator.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/player.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy", Intelligence: 1}})
 	require.NoError(t, err)
 	_, err = coordinator.StartBroadcast()
 	require.NoError(t, err)

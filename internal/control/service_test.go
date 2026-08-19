@@ -29,7 +29,7 @@ func TestAttachSubscriptionCreatesCompleteSnapshotAndSelectionCommitsOnce(t *tes
 	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
-	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy", Intelligence: 1}})
 	require.NoError(t, err)
 	_, err = service.StartBroadcast()
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestAttachSubscriptionRegistrationIsOrderedBeforeConcurrentMutation(t *test
 	<-registrationEntered
 	mutationDone := make(chan struct{})
 	go func() {
-		_, err := service.AddCharacter("Lucy")
+		_, err := addCharacter(service, "Lucy")
 		require.NoError(t, err)
 		close(mutationDone)
 	}()
@@ -107,7 +107,7 @@ func TestAcceptedMutationPublishesOnePreassembledUpdatePerSessionBeforeReturn(t 
 	require.NoError(t, err)
 	baseline := effects.Calls()
 
-	state, err := service.AddCharacter("Lucy")
+	state, err := addCharacter(service, "Lucy")
 	require.NoError(t, err)
 	require.Equal(t, service.Revision(), state.Revision)
 
@@ -129,7 +129,7 @@ func TestUnassignedSubscriptionCannotMutateSharedTerminalState(t *testing.T) {
 	ids := testutil.NewFakeOpaqueIDSource("broadcast-1", "session-1", "recognition-1")
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: ids, Enqueue: effects.Enqueue})
-	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/players.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy", Intelligence: 1}})
 	require.NoError(t, err)
 	_, err = service.StartBroadcast()
 	require.NoError(t, err)
@@ -300,11 +300,11 @@ func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
 func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 	service := newUS1Service()
 
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	require.Falsef(t, err != nil,
 		"AddCharacter(Mara) error = %v", err)
 
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	require.Falsef(t, err != nil,
 		"AddCharacter(Boone) error = %v", err)
 	require.Falsef(t, len(state.Roster) != 2 || state.Roster[0].Name != "Mara" || state.Roster[1].Name != "Boone",
@@ -353,7 +353,7 @@ func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testing.T) {
 	for trial := 0; trial < 100; trial++ {
 		service := newUS1Service()
-		state, err := service.AddCharacter("Mara")
+		state, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter() error = %v", trial, err)
 
@@ -405,11 +405,11 @@ func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testi
 func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100Trials(t *testing.T) {
 	for trial := 0; trial < 100; trial++ {
 		service := newUS1Service()
-		state, err := service.AddCharacter("Mara")
+		state, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter(Mara) error = %v", trial, err)
 
-		state, err = service.AddCharacter("Boone")
+		state, err = addCharacter(service, "Boone")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter(Boone) error = %v", trial, err)
 
@@ -456,11 +456,11 @@ func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100T
 
 func TestSessionCannotClaimTwoCharactersAndCharacterCannotHaveTwoSessions(t *testing.T) {
 	service := newUS1Service()
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -793,7 +793,7 @@ func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequence
 			IDs: &counterIDSource{}, Enqueue: effects.Enqueue,
 			Runtime: liveRuntime, Terminals: liveRuntime, TrustedHack: liveRuntime,
 		})
-		state, err := service.AddCharacter("Mara")
+		state, err := addCharacter(service, "Mara")
 		if err != nil {
 			require.NoError(t, err)
 		}
@@ -1760,7 +1760,7 @@ func TestKnownTokenReusesStableSessionAcrossFirstAndLastPresenceTransitions(t *t
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue})
 	firstConnection := domain.ConnectionID("connection-first")
 	token, initial := service.AttachConnection(firstConnection, "")
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1840,7 +1840,7 @@ func TestUnrecognizedSessionAttachmentDoesNotReleaseExistingClaim(t *testing.T) 
 	service := New(Config{IDs: &counterIDSource{}})
 	ownerConnection := domain.ConnectionID("connection-owner")
 	ownerToken, owner := service.AttachConnection(ownerConnection, "")
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1976,17 +1976,17 @@ func TestDirectTerminalActivationClearAndLateAssignmentPreserveBroadcastIdentity
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
 
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
 	booneID := state.Roster[1].ID
-	state, err = service.AddCharacter("Arcade")
+	state, err = addCharacter(service, "Arcade")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2112,7 +2112,7 @@ func TestInactiveAndClearedTerminalActionsAreRejectedWithoutTouchingRuntimeSlots
 	terminals := &recordingTerminalLifecycle{}
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2457,7 +2457,7 @@ func TestResetFailedHackSerializesConcurrentDuplicateRequests(t *testing.T) {
 func TestCurrentLiveForSessionResumesCoordinatorOwnedRuntimeWithoutRegeneration(t *testing.T) {
 	liveService := live.New(nil, nil)
 	service := New(Config{IDs: &counterIDSource{}, Runtime: liveService, Terminals: liveService})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2513,7 +2513,7 @@ func TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime(t *testing.T) 
 		IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: liveService,
 		Terminals: liveService, TrustedHack: liveService,
 	})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2606,12 +2606,12 @@ func TestEndAndRestartBroadcastClearsEpochStateWhileRetainingProcessIdentity(t *
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
 
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2820,7 +2820,7 @@ func newUS8SwitchFixture(t *testing.T) us8SwitchFixture {
 	terminals := newRecordingDecisionTerminalLifecycle()
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: actions, Terminals: terminals})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -3056,23 +3056,38 @@ func assertPresenceOnlyEffects(t *testing.T, effects []Effect, revision uint64) 
 func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	runtime := &recordingTerminalRuntime{}
 	service := New(Config{IDs: &counterIDSource{}, Runtime: runtime})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
 	maraID := state.Roster[0].ID
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
 	booneID := state.Roster[1].ID
-	state, err = service.AddCharacter("Mara")
+	state, err = addCharacter(service, "Mara")
 	require.Falsef(t, err != nil,
 		"duplicate character names must remain valid: %v", err)
 	require.Falsef(t, len(state.Roster) != 3 || state.Roster[2].Name != "Mara" || state.Roster[2].ID == maraID,
 		"duplicate-name roster entry = %#v, want a distinct stable identity", state.Roster)
 
 	duplicateMaraID := state.Roster[2].ID
+	state, err = service.UpdateCharacter(domain.CharacterUpdatePayload{
+		CharacterID: maraID, Name: "  Mara Voss  ", Intelligence: 9,
+		HackerPerkAvailable: true, ExpectedRevision: service.Revision(),
+	})
+	require.Falsef(t, err != nil,
+		"UpdateCharacter() error = %v", err)
+	require.Falsef(t, state.Roster[0].ID != maraID || state.Roster[0].Name != "Mara Voss" || state.Roster[0].Intelligence != 9 || !state.Roster[0].HackerPerkAvailable,
+		"updated roster entry = %#v, want stable ID and complete trimmed profile", state.Roster[0])
+	assertRejectedCoordinationMutation(t, service, func() error {
+		_, updateErr := service.UpdateCharacter(domain.CharacterUpdatePayload{
+			CharacterID: maraID, Name: strings.Repeat("x", 81), Intelligence: 9,
+			HackerPerkAvailable: true, ExpectedRevision: service.Revision(),
+		})
+		return updateErr
+	})
 
 	state, err = service.StartBroadcast()
 	if err != nil {
@@ -3088,17 +3103,6 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 		return transition{accepted: true}
 	})
 	runtimeBefore := canonicalTerminalBytes(t, service, terminalID)
-
-	state, err = service.RenameCharacter(maraID, "  Mara Voss  ")
-	require.Falsef(t, err != nil,
-		"RenameCharacter() error = %v", err)
-	require.Falsef(t, state.Roster[0].ID != maraID || state.Roster[0].Name != "Mara Voss",
-		"renamed roster entry = %#v, want stable ID and trimmed name", state.Roster[0])
-
-	assertRejectedCoordinationMutation(t, service, func() error {
-		_, renameErr := service.RenameCharacter(maraID, strings.Repeat("x", 81))
-		return renameErr
-	})
 
 	state, err = service.RenameLogicalSession(first.SessionID, "  TABLET LEFT  ")
 	require.Falsef(t, err != nil,
@@ -3141,7 +3145,9 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 		return assignErr
 	})
 	assertRejectedCoordinationMutation(t, service, func() error {
-		_, deleteErr := service.DeleteCharacter(maraID)
+		_, deleteErr := service.DeleteCharacter(domain.CharacterDeletePayload{
+			CharacterID: maraID, ExpectedRevision: service.Revision(),
+		})
 		return deleteErr
 	})
 
@@ -3176,17 +3182,13 @@ func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 			"released session = %#v, want unassigned", got)
 	}
 
-	state, err = service.DeleteCharacter(booneID)
-	require.Falsef(t, err != nil,
-		"DeleteCharacter(unclaimed) error = %v", err)
-
-	for _, rosterEntry := range state.Roster {
-		require.Falsef(t, rosterEntry.ID == booneID,
-			"deleted character remains in roster: %#v", state.Roster)
-
-	}
-	require.Falsef(t, state.Roster[1].ID != duplicateMaraID,
-		"delete changed surviving stable roster order: %#v", state.Roster)
+	assertRejectedCoordinationMutation(t, service, func() error {
+		_, deleteErr := service.DeleteCharacter(domain.CharacterDeletePayload{
+			CharacterID: booneID, ExpectedRevision: service.Revision(),
+		})
+		return deleteErr
+	})
+	require.Equal(t, duplicateMaraID, state.Roster[2].ID)
 	require.Falsef(t, runtime.RandomCalls() != 0,
 		"roster/assignment commands consumed runtime randomness %d times", runtime.RandomCalls())
 	{
@@ -3773,11 +3775,11 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 	t.Helper()
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: runtime})
-	state, err := service.AddCharacter("Mara")
+	state, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.AddCharacter("Boone")
+	state, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -4104,6 +4106,15 @@ func (source *counterIDSource) Next() string {
 	return fmt.Sprintf("opaque-%d", source.next.Add(1))
 }
 
+func addCharacter(service *Service, name string) (*domain.MasterCoordinationState, error) {
+	return service.AddCharacter(domain.CharacterCreatePayload{
+		Name:                name,
+		Intelligence:        1,
+		HackerPerkAvailable: false,
+		ExpectedRevision:    service.Revision(),
+	})
+}
+
 type sequenceIDSource struct {
 	mu     sync.Mutex
 	values []string
@@ -4153,7 +4164,7 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
 	{
 
-		_, err := service.AddCharacter("No Store Yet")
+		_, err := addCharacter(service, "No Store Yet")
 		require.False(t, err == nil,
 			"AddCharacter() without an active player config succeeded")
 	}
@@ -4164,7 +4175,7 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 			"failed add changed state: %#v", got)
 	}
 
-	handle := domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players"}
+	handle := domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0"}
 	emptyInstalled, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{})
 	require.Falsef(t, err != nil,
 		"InstallPlayerConfig() empty roster error = %v", err)
@@ -4184,20 +4195,30 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 			"nil roster changed coordinator\nbefore=%#v\nafter=%#v", beforeNil, afterNil)
 	}
 
-	roster := []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}, {ID: "boone", Name: "Boone"}}
+	roster := []domain.CharacterRosterEntry{
+		{ID: "mara", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
+		{ID: "boone", Name: "Boone", Intelligence: 3},
+	}
 	installed, err := service.InstallPlayerConfig(handle, roster)
 	require.Falsef(t, err != nil,
 		"InstallPlayerConfig() error = %v", err)
 	require.Falsef(t, installed.PlayerConfig == nil || installed.PlayerConfig.Name != "Players" || len(installed.Roster) != 2,
 		"installed state = %#v", installed)
+	require.Equal(t, 8, installed.Roster[0].Intelligence)
+	require.True(t, installed.Roster[0].HackerPerkAvailable)
+	require.Equal(t, 3, installed.Roster[1].Intelligence)
+	require.False(t, installed.Roster[1].HackerPerkAvailable)
 
 	store.fail = true
 	before := service.Snapshot()
 	effectsBefore := effects.Calls()
 	{
-		_, err := service.RenameCharacter("mara", "Mara Voss")
+		_, err := service.UpdateCharacter(domain.CharacterUpdatePayload{
+			CharacterID: "mara", Name: "Mara Voss", Intelligence: 10,
+			HackerPerkAvailable: false, ExpectedRevision: service.Revision(),
+		})
 		require.False(t, err == nil,
-			"RenameCharacter() with failed persistence succeeded")
+			"UpdateCharacter() with failed persistence succeeded")
 	}
 	{
 
@@ -4209,21 +4230,35 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 		"failed persistence published %d effects", effects.Calls()-effectsBefore)
 
 	store.fail = false
-	renamed, err := service.RenameCharacter("mara", "Mara Voss")
+	renamed, err := service.UpdateCharacter(domain.CharacterUpdatePayload{
+		CharacterID: "mara", Name: "Mara Voss", Intelligence: 10,
+		HackerPerkAvailable: false, ExpectedRevision: service.Revision(),
+	})
 	require.Falsef(t, err != nil || renamed.Roster[0].Name != "Mara Voss",
-		"RenameCharacter() = state %#v, error %v", renamed, err)
+		"UpdateCharacter() = state %#v, error %v", renamed, err)
+	require.Equal(t, 10, renamed.Roster[0].Intelligence)
+	require.False(t, renamed.Roster[0].HackerPerkAvailable)
 	require.Falsef(t, len(store.saves) != 1 || store.saves[0].Roster[0].Name != "Mara Voss",
 		"persisted candidates = %#v", store.saves)
 
-	added, err := service.AddCharacter("Arcade")
+	added, err := addCharacter(service, "Arcade")
 	require.Falsef(t, err != nil || len(added.Roster) != 3,
 		"AddCharacter() = state %#v, error %v", added, err)
+	require.Equal(t, 1, added.Roster[2].Intelligence)
+	require.False(t, added.Roster[2].HackerPerkAvailable)
 
-	deleted, err := service.DeleteCharacter("boone")
+	deleted, err := service.DeleteCharacter(domain.CharacterDeletePayload{
+		CharacterID: "boone", ExpectedRevision: service.Revision(),
+	})
 	require.Falsef(t, err != nil || len(deleted.Roster) != 2,
 		"DeleteCharacter() = state %#v, error %v", deleted, err)
 	require.Falsef(t, len(store.saves) != 3,
 		"successful roster mutations saved %d candidates, want 3", len(store.saves))
+	require.Equal(t, []string{"digest-0", "digest-1", "digest-2"}, []string{
+		store.handles[0].ContentDigest,
+		store.handles[1].ContentDigest,
+		store.handles[2].ContentDigest,
+	})
 	{
 
 		got := store.saves[2].Roster
@@ -4233,13 +4268,425 @@ func TestPlayerConfigRosterInstallAndSaveBeforePublication(t *testing.T) {
 
 }
 
+func TestAddCharacterPersistsCompleteProfileOnceAndRejectsDuplicateRevision(t *testing.T) {
+	t.Parallel()
+
+	ids := &counterIDSource{}
+	store := &fakeRosterStore{}
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue, RosterStore: store})
+	handle := domain.PlayerConfigHandle{
+		Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+	}
+	installed, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{})
+	require.NoError(t, err)
+	baselineEffects := effects.Calls()
+
+	request := domain.CharacterCreatePayload{
+		Name:                "  Mara Voss  ",
+		Intelligence:        10,
+		HackerPerkAvailable: false,
+		ExpectedRevision:    installed.Revision,
+	}
+	added, err := service.AddCharacter(request)
+	require.NoError(t, err)
+	require.Equal(t, installed.Revision+1, added.Revision)
+	require.Equal(t, uint64(1), ids.next.Load(), "accepted add must allocate exactly one stable ID")
+	require.Len(t, added.Roster, 1)
+	require.Equal(t, domain.MasterRosterEntry{
+		ID: "opaque-1", Name: "Mara Voss", Intelligence: 10, HackerPerkAvailable: false,
+	}, added.Roster[0])
+	require.Len(t, store.saves, 1)
+	require.Equal(t, []domain.CharacterRosterEntry{{
+		ID: "opaque-1", Name: "Mara Voss", Intelligence: 10, HackerPerkAvailable: false,
+	}}, store.saves[0].Roster)
+	require.Equal(t, "digest-0", store.handles[0].ContentDigest)
+	require.NotNil(t, service.runtime.ActivePlayerConfig)
+	require.Equal(t, "digest-1", service.runtime.ActivePlayerConfig.ContentDigest)
+	require.Equal(t, baselineEffects+1, effects.Calls(), "accepted add must publish one master effect")
+	require.Equal(t, added.Revision, effects.Values()[baselineEffects].Revision)
+	require.NotNil(t, effects.Values()[baselineEffects].Master)
+
+	beforeRetry := service.Snapshot()
+	retry, retryErr := service.AddCharacter(request)
+	require.ErrorContains(t, retryErr, "revision")
+	require.Equal(t, beforeRetry, retry)
+	require.Equal(t, uint64(1), ids.next.Load(), "stale retry must not allocate another ID")
+	require.Len(t, store.saves, 1, "stale retry must not repeat persistence")
+	require.Equal(t, baselineEffects+1, effects.Calls(), "stale retry must not publish")
+
+	reopened := New(Config{IDs: &counterIDSource{}, RosterStore: &fakeRosterStore{}})
+	reopenedState, reopenErr := reopened.InstallPlayerConfig(*service.runtime.ActivePlayerConfig, store.saves[0].Roster)
+	require.NoError(t, reopenErr)
+	require.Equal(t, added.Roster, reopenedState.Roster, "canonical reopen must preserve the exact profile")
+}
+
+func TestAddCharacterGuardsRunBeforeIDAllocationOrPersistence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		prepare func(t *testing.T, service *Service) uint64
+		request func(current uint64) domain.CharacterCreatePayload
+		wantErr string
+	}{
+		{
+			name: "missing active config",
+			prepare: func(t *testing.T, service *Service) uint64 {
+				t.Helper()
+				return service.Revision()
+			},
+			request: validCharacterCreatePayload,
+			wantErr: "player config",
+		},
+		{
+			name:    "stale coordination revision",
+			prepare: installEmptyPlayerConfig,
+			request: func(current uint64) domain.CharacterCreatePayload {
+				payload := validCharacterCreatePayload(current)
+				payload.ExpectedRevision = current - 1
+				return payload
+			},
+			wantErr: "revision",
+		},
+		{
+			name: "active broadcast",
+			prepare: func(t *testing.T, service *Service) uint64 {
+				t.Helper()
+				installEmptyPlayerConfig(t, service)
+				state, err := service.StartBroadcast()
+				require.NoError(t, err)
+				return state.Revision
+			},
+			request: validCharacterCreatePayload,
+			wantErr: "broadcast",
+		},
+		{
+			name:    "blank name",
+			prepare: installEmptyPlayerConfig,
+			request: func(current uint64) domain.CharacterCreatePayload {
+				payload := validCharacterCreatePayload(current)
+				payload.Name = "   "
+				return payload
+			},
+			wantErr: "blank",
+		},
+		{
+			name:    "intelligence below range",
+			prepare: installEmptyPlayerConfig,
+			request: func(current uint64) domain.CharacterCreatePayload {
+				payload := validCharacterCreatePayload(current)
+				payload.Intelligence = 0
+				return payload
+			},
+			wantErr: "intelligence",
+		},
+		{
+			name:    "intelligence above range",
+			prepare: installEmptyPlayerConfig,
+			request: func(current uint64) domain.CharacterCreatePayload {
+				payload := validCharacterCreatePayload(current)
+				payload.Intelligence = 11
+				return payload
+			},
+			wantErr: "intelligence",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ids := &counterIDSource{}
+			store := &fakeRosterStore{}
+			effects := testutil.NewFakeOrderedEffectSink[Effect]()
+			service := New(Config{IDs: ids, Enqueue: effects.Enqueue, RosterStore: store})
+			current := test.prepare(t, service)
+			before := service.Snapshot()
+			beforeIDs := ids.next.Load()
+			beforeEffects := effects.Calls()
+
+			state, err := service.AddCharacter(test.request(current))
+			require.ErrorContains(t, err, test.wantErr)
+			require.Equal(t, before, state)
+			require.Equal(t, before, service.Snapshot())
+			require.Equal(t, beforeIDs, ids.next.Load(), "guard rejection must occur before stable ID allocation")
+			require.Empty(t, store.saves, "guard rejection must not persist")
+			require.Equal(t, beforeEffects, effects.Calls(), "guard rejection must not publish")
+		})
+	}
+}
+
+func TestAddCharacterPersistenceFailureKeepsCanonicalStateAndRevision(t *testing.T) {
+	t.Parallel()
+
+	ids := &counterIDSource{}
+	store := &fakeRosterStore{fail: true}
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: ids, Enqueue: effects.Enqueue, RosterStore: store})
+	current := installEmptyPlayerConfig(t, service)
+	before := service.Snapshot()
+	beforeEffects := effects.Calls()
+
+	state, err := service.AddCharacter(validCharacterCreatePayload(current))
+	require.ErrorContains(t, err, "save")
+	require.Equal(t, before, state)
+	require.Equal(t, before, service.Snapshot())
+	require.Empty(t, store.saves)
+	require.Equal(t, beforeEffects, effects.Calls())
+	require.Equal(t, "digest-0", service.runtime.ActivePlayerConfig.ContentDigest)
+}
+
+func TestUpdateCharacterPersistsCompleteProfilePreservesIdentityOrderAndNoop(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeRosterStore{}
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
+	installed, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{
+		Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+	}, []domain.CharacterRosterEntry{
+		{ID: "mara", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
+		{ID: "boone", Name: "Boone", Intelligence: 3, HackerPerkAvailable: false},
+		{ID: "arcade", Name: "Arcade", Intelligence: 9, HackerPerkAvailable: true},
+	})
+	require.NoError(t, err)
+	baselineEffects := effects.Calls()
+
+	request := domain.CharacterUpdatePayload{
+		CharacterID: "boone", Name: "  Craig Boone  ", Intelligence: 10,
+		HackerPerkAvailable: true, ExpectedRevision: installed.Revision,
+	}
+	updated, err := service.UpdateCharacter(request)
+	require.NoError(t, err)
+	require.Equal(t, installed.Revision+1, updated.Revision)
+	require.Equal(t, []domain.CharacterID{"mara", "boone", "arcade"}, []domain.CharacterID{
+		updated.Roster[0].ID, updated.Roster[1].ID, updated.Roster[2].ID,
+	})
+	require.Equal(t, domain.MasterRosterEntry{
+		ID: "boone", Name: "Craig Boone", Intelligence: 10, HackerPerkAvailable: true,
+	}, updated.Roster[1])
+	require.Len(t, store.saves, 1)
+	require.Equal(t, []domain.CharacterID{"mara", "boone", "arcade"}, []domain.CharacterID{
+		store.saves[0].Roster[0].ID, store.saves[0].Roster[1].ID, store.saves[0].Roster[2].ID,
+	})
+	require.Equal(t, domain.CharacterRosterEntry{
+		ID: "boone", Name: "Craig Boone", Intelligence: 10, HackerPerkAvailable: true,
+	}, store.saves[0].Roster[1])
+	require.Equal(t, baselineEffects+1, effects.Calls())
+	require.Equal(t, "digest-1", service.runtime.ActivePlayerConfig.ContentDigest)
+
+	noOpRequest := request
+	noOpRequest.Name = "Craig Boone"
+	noOpRequest.ExpectedRevision = updated.Revision
+	beforeNoOp := service.Snapshot()
+	noOp, noOpErr := service.UpdateCharacter(noOpRequest)
+	require.NoError(t, noOpErr)
+	require.Equal(t, beforeNoOp, noOp)
+	require.Equal(t, beforeNoOp.Revision, service.Revision())
+	require.Len(t, store.saves, 1, "no-op update must not write player config")
+	require.Equal(t, baselineEffects+1, effects.Calls(), "no-op update must not publish")
+
+	replayed, replayErr := service.UpdateCharacter(request)
+	require.ErrorContains(t, replayErr, "revision")
+	require.Equal(t, beforeNoOp, replayed, "stale replay must return the authoritative state")
+	require.Len(t, store.saves, 1, "stale replay must not repeat persistence")
+	require.Equal(t, baselineEffects+1, effects.Calls(), "stale replay must not publish")
+}
+
+func TestDeleteCharacterPreservesSurvivorOrderAndRejectsDuplicateRevision(t *testing.T) {
+	t.Parallel()
+
+	store := &fakeRosterStore{}
+	effects := testutil.NewFakeOrderedEffectSink[Effect]()
+	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
+	installed, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{
+		Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+	}, []domain.CharacterRosterEntry{
+		{ID: "mara", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
+		{ID: "boone", Name: "Boone", Intelligence: 3},
+		{ID: "arcade", Name: "Arcade", Intelligence: 9, HackerPerkAvailable: true},
+	})
+	require.NoError(t, err)
+	baselineEffects := effects.Calls()
+
+	request := domain.CharacterDeletePayload{CharacterID: "boone", ExpectedRevision: installed.Revision}
+	deleted, err := service.DeleteCharacter(request)
+	require.NoError(t, err)
+	require.Equal(t, installed.Revision+1, deleted.Revision)
+	require.Equal(t, []domain.CharacterID{"mara", "arcade"}, []domain.CharacterID{
+		deleted.Roster[0].ID, deleted.Roster[1].ID,
+	})
+	require.Len(t, store.saves, 1)
+	require.Equal(t, []domain.CharacterID{"mara", "arcade"}, []domain.CharacterID{
+		store.saves[0].Roster[0].ID, store.saves[0].Roster[1].ID,
+	})
+	require.Equal(t, baselineEffects+1, effects.Calls())
+
+	replayed, replayErr := service.DeleteCharacter(request)
+	require.ErrorContains(t, replayErr, "revision")
+	require.Equal(t, deleted, replayed)
+	require.Len(t, store.saves, 1)
+	require.Equal(t, baselineEffects+1, effects.Calls())
+}
+
+func TestRosterMutationsRejectActiveBroadcastWithoutPersistence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		command func(service *Service) (*domain.MasterCoordinationState, error)
+	}{
+		{
+			name: "add",
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.AddCharacter(domain.CharacterCreatePayload{
+					Name: "Arcade", Intelligence: 9, HackerPerkAvailable: true,
+					ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+		{
+			name: "update",
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.UpdateCharacter(domain.CharacterUpdatePayload{
+					CharacterID: "mara", Name: "Mara Voss", Intelligence: 10,
+					HackerPerkAvailable: false, ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+		{
+			name: "delete",
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.DeleteCharacter(domain.CharacterDeletePayload{
+					CharacterID: "mara", ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			store := &fakeRosterStore{}
+			effects := testutil.NewFakeOrderedEffectSink[Effect]()
+			service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
+			_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{
+				Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+			}, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}})
+			require.NoError(t, err)
+			_, err = service.StartBroadcast()
+			require.NoError(t, err)
+			before := service.Snapshot()
+			beforeEffects := effects.Calls()
+
+			state, commandErr := test.command(service)
+			require.ErrorContains(t, commandErr, "broadcast")
+			require.Equal(t, before, state)
+			require.Equal(t, before, service.Snapshot())
+			require.Empty(t, store.saves)
+			require.Equal(t, beforeEffects, effects.Calls())
+		})
+	}
+}
+
+func TestUpdateAndDeletePersistenceConflictsKeepAuthoritativeState(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		saveErr      error
+		wantGuidance bool
+		command      func(service *Service) (*domain.MasterCoordinationState, error)
+	}{
+		{
+			name: "update stale content digest", saveErr: errors.New("active player configuration is missing, unreadable, or changed; reopen or reselect it"), wantGuidance: true,
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.UpdateCharacter(domain.CharacterUpdatePayload{
+					CharacterID: "mara", Name: "Mara Voss", Intelligence: 10,
+					HackerPerkAvailable: false, ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+		{
+			name: "update atomic save failure", saveErr: errors.New("injected atomic replacement failure"),
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.UpdateCharacter(domain.CharacterUpdatePayload{
+					CharacterID: "mara", Name: "Mara Voss", Intelligence: 10,
+					HackerPerkAvailable: false, ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+		{
+			name: "delete stale content digest", saveErr: errors.New("active player configuration is missing, unreadable, or changed; reopen or reselect it"), wantGuidance: true,
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.DeleteCharacter(domain.CharacterDeletePayload{
+					CharacterID: "mara", ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+		{
+			name: "delete atomic save failure", saveErr: errors.New("injected atomic replacement failure"),
+			command: func(service *Service) (*domain.MasterCoordinationState, error) {
+				return service.DeleteCharacter(domain.CharacterDeletePayload{
+					CharacterID: "mara", ExpectedRevision: service.Revision(),
+				})
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			store := &fakeRosterStore{saveErr: test.saveErr}
+			effects := testutil.NewFakeOrderedEffectSink[Effect]()
+			service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, RosterStore: store})
+			_, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{
+				Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+			}, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}})
+			require.NoError(t, err)
+			before := service.Snapshot()
+			beforeEffects := effects.Calls()
+
+			state, commandErr := test.command(service)
+			require.ErrorContains(t, commandErr, test.saveErr.Error())
+			if test.wantGuidance {
+				require.ErrorContains(t, commandErr, "reopen or reselect it")
+			}
+			require.Equal(t, before, state, "failure result must carry authoritative state")
+			require.Equal(t, before, service.Snapshot())
+			require.Empty(t, store.saves)
+			require.Equal(t, beforeEffects, effects.Calls())
+			require.NotNil(t, service.runtime.ActivePlayerConfig)
+			require.Equal(t, "digest-0", service.runtime.ActivePlayerConfig.ContentDigest)
+		})
+	}
+}
+
+func validCharacterCreatePayload(revision uint64) domain.CharacterCreatePayload {
+	return domain.CharacterCreatePayload{
+		Name:                "Mara",
+		Intelligence:        1,
+		HackerPerkAvailable: true,
+		ExpectedRevision:    revision,
+	}
+}
+
+func installEmptyPlayerConfig(t *testing.T, service *Service) uint64 {
+	t.Helper()
+	state, err := service.InstallPlayerConfig(domain.PlayerConfigHandle{
+		Path: "/Campaigns/players.json", Version: 1, Name: "Players", ContentDigest: "digest-0",
+	}, []domain.CharacterRosterEntry{})
+	require.NoError(t, err)
+	return state.Revision
+}
+
 func TestPlayerConfigReplacementRequiresNoBroadcastAndPreservesRuntimeOnFailure(t *testing.T) {
 	t.Parallel()
 
 	store := &fakeRosterStore{}
 	service := New(Config{IDs: &counterIDSource{}, RosterStore: store})
 	handle := domain.PlayerConfigHandle{Path: "/Campaigns/players.json", Version: 1, Name: "Players"}
-	if _, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}}); err != nil {
+	if _, err := service.InstallPlayerConfig(handle, []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara", Intelligence: 1}}); err != nil {
 		require.NoError(t, err)
 	}
 	if _, err := service.StartBroadcast(); err != nil {
@@ -4261,18 +4708,25 @@ func TestPlayerConfigReplacementRequiresNoBroadcastAndPreservesRuntimeOnFailure(
 }
 
 type fakeRosterStore struct {
-	fail  bool
-	saves []domain.PlayerConfig
+	fail    bool
+	saveErr error
+	handles []domain.PlayerConfigHandle
+	saves   []domain.PlayerConfig
 }
 
-func (store *fakeRosterStore) Save(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) error {
+func (store *fakeRosterStore) Save(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) (domain.PlayerConfigHandle, error) {
+	if store.saveErr != nil {
+		return domain.PlayerConfigHandle{}, store.saveErr
+	}
 	if store.fail {
-		return errors.New("injected player-config write failure")
+		return domain.PlayerConfigHandle{}, errors.New("injected player-config write failure")
 	}
 	store.saves = append(store.saves, domain.PlayerConfig{
 		Version: handle.Version,
 		Name:    handle.Name,
 		Roster:  append([]domain.CharacterRosterEntry(nil), roster...),
 	})
-	return nil
+	store.handles = append(store.handles, handle)
+	handle.ContentDigest = fmt.Sprintf("digest-%d", len(store.saves))
+	return handle, nil
 }
