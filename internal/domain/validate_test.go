@@ -79,6 +79,44 @@ func TestValidateSessionRejectsDocumentLimits(t *testing.T) {
 	assert.Error(t, ValidateSession(tooDeep))
 }
 
+func TestValidatePlayerConfigAcceptsIntelligenceBoundaries(t *testing.T) {
+	t.Parallel()
+
+	for _, intelligence := range []int{1, 10} {
+		intelligence := intelligence
+		t.Run(fmt.Sprintf("intelligence %d", intelligence), func(t *testing.T) {
+			t.Parallel()
+			config := PlayerConfig{
+				Version: 1,
+				Name:    "Players",
+				Roster: []CharacterRosterEntry{{
+					ID: "mara", Name: "Mara", Intelligence: intelligence, HackerPerkAvailable: true,
+				}},
+			}
+			require.NoError(t, ValidatePlayerConfig(config))
+		})
+	}
+}
+
+func TestValidatePlayerConfigRejectsOutOfRangeIntelligence(t *testing.T) {
+	t.Parallel()
+
+	for _, intelligence := range []int{0, 11} {
+		intelligence := intelligence
+		t.Run(fmt.Sprintf("intelligence %d", intelligence), func(t *testing.T) {
+			t.Parallel()
+			config := PlayerConfig{
+				Version: 1,
+				Name:    "Players",
+				Roster: []CharacterRosterEntry{{
+					ID: "mara", Name: "Mara", Intelligence: intelligence, HackerPerkAvailable: false,
+				}},
+			}
+			require.ErrorContains(t, ValidatePlayerConfig(config), "intelligence")
+		})
+	}
+}
+
 func TestValidateSessionAcceptsStateChangingCommandStateByStableID(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,8 @@ package playerconfig
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -11,7 +13,10 @@ import (
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 )
 
-var errStorageUnavailable = errors.New("player config storage is unavailable")
+var (
+	errStorageUnavailable                 = errors.New("player config storage is unavailable")
+	errActivePlayerConfigNeedsReselection = errors.New("active player configuration is missing, unreadable, or changed; reopen or reselect it")
+)
 
 // Dialog is the native trusted file-dialog boundary. Empty paths mean cancel.
 type Dialog interface {
@@ -27,11 +32,12 @@ type Store interface {
 
 // Result reports a selected, created, or referenced player config.
 type Result struct {
-	OK       bool                 `json:"ok"`
-	Canceled bool                 `json:"canceled"`
-	Error    string               `json:"error,omitempty"`
-	FilePath string               `json:"filePath,omitempty"`
-	Config   *domain.PlayerConfig `json:"config,omitempty"`
+	OK            bool                 `json:"ok"`
+	Canceled      bool                 `json:"canceled"`
+	Error         string               `json:"error,omitempty"`
+	FilePath      string               `json:"filePath,omitempty"`
+	Config        *domain.PlayerConfig `json:"config,omitempty"`
+	ContentDigest string               `json:"-"`
 }
 
 // Service owns player-config dialogs, strict decoding, and atomic saves.
@@ -69,10 +75,11 @@ func (service *Service) Create(ctx context.Context) Result {
 	if err := verifyPlayerConfigContract(config); err != nil {
 		return failure("could not verify the new player config contract")
 	}
-	if err := service.write(target, config); err != nil {
+	digest, err := service.write(target, config)
+	if err != nil {
 		return failure("could not write the new player config")
 	}
-	return success(target, config)
+	return success(target, config, digest)
 }
 
 // Open asks for and strictly loads one existing player config.
@@ -110,14 +117,34 @@ func (service *Service) LoadReferenced(sessionPath, reference string) Result {
 	return service.load(filepath.Clean(filepath.Join(filepath.Dir(sessionPath), reference)))
 }
 
-// Save atomically replaces the complete active roster before coordinator commit.
-func (service *Service) Save(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) error {
+// Save conditionally replaces the complete active roster before coordinator commit.
+func (service *Service) Save(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) (domain.PlayerConfigHandle, error) {
 	path, err := absoluteFilePath(handle.Path)
 	if err != nil {
-		return err
+		return domain.PlayerConfigHandle{}, err
 	}
+	if service == nil || service.store == nil {
+		return domain.PlayerConfigHandle{}, errStorageUnavailable
+	}
+	current, err := service.store.Read(path)
+	if err != nil {
+		return domain.PlayerConfigHandle{}, errActivePlayerConfigNeedsReselection
+	}
+	if contentDigest(current) != handle.ContentDigest {
+		return domain.PlayerConfigHandle{}, errActivePlayerConfigNeedsReselection
+	}
+
 	config := domain.PlayerConfig{Version: handle.Version, Name: handle.Name, Roster: cloneRoster(roster)}
-	return service.write(path, config)
+	digest, err := service.write(path, config)
+	if err != nil {
+		return domain.PlayerConfigHandle{}, err
+	}
+	return domain.PlayerConfigHandle{
+		Path:          path,
+		Version:       config.Version,
+		Name:          config.Name,
+		ContentDigest: digest,
+	}, nil
 }
 
 // RelativeReference normalizes configPath relative to the session directory.
@@ -152,24 +179,24 @@ func (service *Service) load(path string) Result {
 	if err := verifyPlayerConfigContract(config); err != nil {
 		return failure("the selected file does not satisfy the player config contract")
 	}
-	return success(path, config)
+	return success(path, config, contentDigest(data))
 }
 
-func (service *Service) write(path string, config domain.PlayerConfig) error {
+func (service *Service) write(path string, config domain.PlayerConfig) (string, error) {
 	if service == nil || service.store == nil {
-		return errStorageUnavailable
+		return "", errStorageUnavailable
 	}
 	if err := verifyPlayerConfigContract(config); err != nil {
-		return err
+		return "", err
 	}
 	data, err := domain.EncodePlayerConfig(config)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := service.store.WriteAtomic(path, data); err != nil {
-		return fmt.Errorf("write player config: %w", err)
+		return "", fmt.Errorf("write player config: %w", err)
 	}
-	return nil
+	return contentDigest(data), nil
 }
 
 func absoluteFilePath(path string) (string, error) {
@@ -192,10 +219,15 @@ func nameFromPath(path string) string {
 	return name
 }
 
-func success(path string, config domain.PlayerConfig) Result {
+func success(path string, config domain.PlayerConfig, digest string) Result {
 	copy := config
 	copy.Roster = cloneRoster(config.Roster)
-	return Result{OK: true, FilePath: path, Config: &copy}
+	return Result{OK: true, FilePath: path, Config: &copy, ContentDigest: digest}
+}
+
+func contentDigest(data []byte) string {
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
 }
 
 func failure(message string) Result { return Result{Error: message} }

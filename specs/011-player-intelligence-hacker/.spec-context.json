@@ -1,0 +1,1015 @@
+{
+  "workflow": "companion",
+  "specName": "player intelligence hacker",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T17:51:40.737Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T17:54:41.624Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T17:57:26.361Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:05:12.210Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:07:22.576Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T18:08:01.737Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T18:10:13.107Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:14:06.715Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T18:14:48.712Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T18:16:12.186Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:16:45.113Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:16:54.236Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:17:38.439Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:19:16.765Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:20:36.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:21:05.804Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:21:57.814Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:23:24.054Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:23:31.941Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:24:52.692Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:28:25.947Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:30:17.350Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:20.061Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:50.503Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:33:44.996Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:36:08.803Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:36:52.371Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:37:57.719Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:41:12.419Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:42:25.607Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:44:50.038Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:45:07.088Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:46:44.215Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:48:37.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:49:39.991Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:52:28.950Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:54:48.891Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:57:52.645Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:59:19.712Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T19:04:21.952Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T19:12:46.120Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T19:12:46.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T19:20:04.361Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T19:22:36.592Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T19:46:21.237Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T19:46:51.139Z"
+    }
+  ],
+  "last_action": "all 33 tasks complete — 112 browser tests pass, 2 opt-in authenticated-ngrok tests skipped",
+  "coverage": {
+    "FR-001": {
+      "title": "The master screen MUST provide a control that opens player management in a dedicated pop-up window.",
+      "tasks": [
+        "T014",
+        "T017",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-002": {
+      "title": "The player-management pop-up MUST display every configured player's name, Intelligence level, and Hacker perk availability.",
+      "tasks": [
+        "T006",
+        "T010",
+        "T017",
+        "T026"
+      ],
+      "tests": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-003": {
+      "title": "The player-management pop-up MUST show a clear empty-roster state when the selected player configuration contains no players.",
+      "tasks": [
+        "T014",
+        "T017",
+        "T026"
+      ],
+      "tests": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-004": {
+      "title": "The system MUST allow the game master to add a player only when a player configuration is selected and no broadcast is active.",
+      "tasks": [
+        "T011",
+        "T013",
+        "T017"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-005": {
+      "title": "Adding a player MUST require a non-blank name, a whole-number Intelligence level from 1 through 10 inclusive, and an explicit Hacker perk availability choice.",
+      "tasks": [
+        "T004",
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "internal/domain/validate_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-006": {
+      "title": "The system MUST store each player's Intelligence level and Hacker perk availability as part of that player's persistent roster entry.",
+      "tasks": [
+        "T005",
+        "T007",
+        "T008"
+      ],
+      "tests": [
+        "internal/playerconfig/service_test.go",
+        "internal/playerconfig/contract_test.go"
+      ]
+    },
+    "FR-007": {
+      "title": "The system MUST allow the game master to change a player's name, Intelligence level, and Hacker perk availability when no broadcast is active.",
+      "tasks": [
+        "T019",
+        "T021",
+        "T022"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-008": {
+      "title": "The system MUST allow the game master to remove a player from the roster when no broadcast is active.",
+      "tasks": [
+        "T019",
+        "T021",
+        "T022"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-009": {
+      "title": "The system MUST reject every add, edit, or removal attempt while a broadcast is active without changing the stored roster.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021",
+        "T022"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-010": {
+      "title": "The player-management pop-up MUST remain available as a read-only detailed list while a broadcast is active.",
+      "tasks": [
+        "T020",
+        "T022",
+        "T026"
+      ],
+      "tests": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-011": {
+      "title": "Editing a player's attributes MUST preserve that player's stable identity and roster position.",
+      "tasks": [
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-012": {
+      "title": "A successful roster mutation MUST be stored before the interface reports the operation as complete.",
+      "tasks": [
+        "T005",
+        "T008",
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "internal/playerconfig/service_test.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "FR-013": {
+      "title": "A failed roster mutation MUST leave the last stored roster unchanged and present an actionable error to the game master.",
+      "tasks": [
+        "T005",
+        "T019",
+        "T020",
+        "T021",
+        "T022"
+      ],
+      "tests": [
+        "internal/playerconfig/service_test.go::TestPlayerConfigSaveRejectsMissingReplacedOrUnreadableActiveFile",
+        "app_test.go::TestRosterMutationConflictReturnsAuthoritativeReselectionGuidance",
+        "tests/browser/player-management.spec.mjs::storage and stale-revision failures keep the dialog open and restore authoritative details"
+      ]
+    },
+    "FR-014": {
+      "title": "Reopening a player configuration MUST restore every player's stored name, Intelligence level, Hacker perk availability, identity, and roster order.",
+      "tasks": [
+        "T004",
+        "T005",
+        "T012"
+      ],
+      "tests": [
+        "internal/domain/model_test.go",
+        "internal/playerconfig/service_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "FR-015": {
+      "title": "A player configuration created before this feature MUST load without manual repair by assigning Intelligence 1 and Hacker perk unavailable to entries that do not contain those attributes.",
+      "tasks": [
+        "T004",
+        "T005",
+        "T007",
+        "T008"
+      ],
+      "tests": [
+        "internal/domain/model_test.go",
+        "internal/playerconfig/contract_test.go",
+        "internal/playerconfig/service_test.go"
+      ]
+    },
+    "FR-016": {
+      "title": "Closing the player-management pop-up without submitting a roster mutation MUST leave the player configuration and current session state unchanged.",
+      "tasks": [
+        "T026",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 17,
+    "projectedTasks": 14,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: persistent player configuration and roster contracts",
+    "area: master coordination and roster-management interface",
+    "constraint: roster mutations are permitted only without an active broadcast",
+    "constraint: detailed display and editing live in a dedicated pop-up window"
+  ],
+  "intent": "Give the game master a safe, persistent way to manage each player's Intelligence and Hacker perk attributes in a dedicated roster pop-up.",
+  "expectations": [
+    "Hacking rules and automatic gameplay effects remain unchanged by this attribute-storage feature."
+  ],
+  "approach": "Extend the version-1 player-config and private desktop protobuf contracts, normalize legacy field absence at strict adapters, and keep all roster mutations revision-conditional, inactive-only, persistence-first coordinator transitions. Replace inline durable roster editing with an authoritative modal dialog while keeping attributes private from players and gameplay.",
+  "decisions": [
+    {
+      "decision": "Keep player-config JSON at version 1 with strict presence-aware legacy defaults",
+      "why": "The new attributes are additive and canonical domain values must never treat explicit invalid zero or null as absence",
+      "rejected": "A version-2 document or domain-level zero default"
+    },
+    {
+      "decision": "Add persistence fields 3 and 4 with optional presence and private projection fields 4 and 5",
+      "why": "Presence preserves legacy semantics without renumbering and master projections remain canonical",
+      "rejected": "Field reuse or publishing attributes in the public player schema"
+    },
+    {
+      "decision": "Track an exact player-config content digest and refuse stale external replacements",
+      "why": "A deterministic digest prevents silently recreating or overwriting a file changed while the dialog is open",
+      "rejected": "Timestamp checks, file watchers, or platform-specific cross-process locks"
+    },
+    {
+      "decision": "Require expected coordination revision and no active broadcast inside every roster mutation transaction",
+      "why": "One authoritative guard prevents duplicate, stale, and live-session changes before allocation or persistence",
+      "rejected": "UI-only disabling or a separate replay cache"
+    },
+    {
+      "decision": "Submit one complete player profile and replace the Wails rename method with update",
+      "why": "Atomic full-profile persistence avoids partial revisions while the compatible protobuf container retains published field identity",
+      "rejected": "Separate attribute mutations or dual live rename/update paths"
+    },
+    {
+      "decision": "Use an in-page HTML dialog and keep live assignment controls in logical-session management",
+      "why": "This matches the existing single-window architecture and preserves broadcast-scoped correction while durable editing is read-only",
+      "rejected": "A second Wails window or disabling established assignment correction"
+    },
+    {
+      "decision": "Keep Intelligence and Hacker availability master-private and add no dependencies",
+      "why": "The approved scope is storage and master management, and existing generated-contract, modal, persistence, and test tooling is sufficient",
+      "rejected": "Public player fields, automatic hacking effects, or new state/UI libraries"
+    },
+    {
+      "decision": "Collapse missing, unreadable, and digest-mismatch active player-config failures into one safe reopen-or-reselect recovery message.",
+      "why": "The master needs the same actionable recovery for each conflict while filesystem details must not leak through the private UI result.",
+      "rejected": "Forwarding raw storage errors or maintaining separate UI-only fixture wording."
+    },
+    {
+      "decision": "Assert the retired method is absent from the imported binding module as well as the desktopAPI facade",
+      "why": "The shared fixture stands in for generated Wails bindings, so module-level inventory verification prevents a hidden superseded protocol seam",
+      "rejected": "Only checking desktopAPI.renameCharacter, which would allow an obsolete fixture export to remain callable directly"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned a backward-compatible, atomic roster-profile extension with inactive-only modal management.",
+      "key_finding": "The coordinator already persists candidate rosters before publication, so the feature can preserve atomicity by adding revision, broadcast, and file-digest guards around that existing path."
+    },
+    "tasks": {
+      "summary": "31 tasks across Setup, Foundational, three user-story phases, and one single-owner validation phase."
+    },
+    "implement": {
+      "summary": "Completed convergence task T033 by removing the retired RenameCharacter browser binding fixture and enforcing the cutover inventory in Playwright.",
+      "key_finding": "All 31 tasks, automated gates, and the native interactive journey passed.",
+      "risks": "Rollback to the old strict reader requires restoring a pre-feature file or removing the two additive roster fields."
+    }
+  },
+  "currentTask": "T033",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added additive optional Intelligence and Hacker availability fields to player-config roster schema",
+      "files": [
+        "proto/fallout/terminal/persistence/v1/player_config.proto"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Extended private roster projection and mutation request schemas with profiles and revisions",
+      "files": [
+        "proto/fallout/terminal/private/v1/coordination.proto",
+        "proto/fallout/terminal/private/v1/desktop.proto"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Regenerated pinned protobuf outputs and synchronized schema revision; generation is clean and adapter coverage now fails on the intentionally unmapped new fields",
+      "files": [
+        "internal/gen/fallout/terminal/persistence/v1/player_config.pb.go",
+        "internal/gen/fallout/terminal/private/v1/coordination.pb.go",
+        "internal/gen/fallout/terminal/private/v1/desktop.pb.go",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added failing domain compatibility and profile validation tests for canonical and legacy player configs",
+      "files": [
+        "internal/domain/model_test.go",
+        "internal/domain/validate_test.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added failing private profile projection and public non-disclosure contract tests",
+      "files": [
+        "app_contract_test.go",
+        "internal/player/adapter_test.go"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added failing player-config protobuf, persistence, digest, conflict, and atomicity tests",
+      "files": [
+        "internal/playerconfig/contract_test.go",
+        "internal/playerconfig/service_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added canonical player profile and digest fields, strict legacy-aware JSON normalization, canonical encoding, and Intelligence validation",
+      "files": [
+        "internal/domain/model.go",
+        "internal/domain/json.go",
+        "internal/domain/validate.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Mapped Intelligence and HackerPerkAvailable through private coordination state conversion in both directions, covering runtime bootstrap, command results, and events while leaving public player adapters unchanged; focused root contract and player adapter tests pass.",
+      "files": [
+        "app_contract.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Mapped optional roster profile fields with legacy defaults and added exact-content SHA-256 conditional player-config saves that return refreshed handles.",
+      "files": [
+        "internal/playerconfig/contract.go",
+        "internal/playerconfig/service.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Propagated complete private player profiles through control snapshots and roster candidates, changed roster persistence to return and publish refreshed content digests only after successful saves, and retained canonical defaults on the temporary legacy add path.",
+      "files": [
+        "internal/control/service.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added failing Playwright coverage for the dedicated player-management dialog, required profile inputs, Intelligence boundary and invalid values, explicit Hacker availability, exact add payload revisions, authoritative result rendering, and reload persistence; extended the desktop facade boundary test for the complete add payload.",
+      "files": [
+        "tests/browser/player-management.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Added failing-first coordinator and App tests for complete add-player profiles, explicit Hacker false presence, validation and inactive/config/revision guards, stale retry, persistence rollback, one revision/effect, delayed ID allocation, digest refresh, and canonical reopen.",
+      "files": [
+        "internal/control/service_test.go",
+        "app_test.go",
+        "app_contract_test.go"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Added the accessible player-management trigger and responsive native dialog markup with required profile controls and row template.",
+      "files": [
+        "frontend/src/index.html",
+        "frontend/src/master.css"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Implemented atomic add-player profile mutation with expected-revision, active-config, and inactive-broadcast guards before ID allocation; persisted Intelligence and Hacker perk attributes and refreshed the active config digest only on success.",
+      "files": [
+        "internal/domain/model.go",
+        "internal/control/service.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Added a deterministic server-backed player-management fixture with selected empty roster revision 41, strict complete-profile add validation, authoritative reload-persistent mutation results, sequential fixture IDs, revision increments, and stale/storage failure controls; wired the desktop binding to retain exact payloads and call the fixture only on the dedicated route.",
+      "files": [
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/fixtures/desktop-bindings.js"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Routed the typed player-create profile through the private protobuf adapter with explicit Hacker false presence, validated it at the App boundary, forwarded the expected revision to control, exposed the typed desktop method, and propagated the player-config content digest into the active handle.",
+      "files": [
+        "app.go",
+        "app_contract.go",
+        "desktop_service.go"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Implemented the structured add-player facade and modal add flow with complete profile validation, expected-revision submission, authoritative-state rendering, local feedback, and dialog focus lifecycle.",
+      "files": [
+        "frontend/src/desktop-api.js",
+        "frontend/src/master.js"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Regenerated deterministic Wails bindings and passed binding drift, frontend build, focused add-player Go, and 11 browser/API tests",
+      "files": [
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/internal/domain/models.js"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added failing-first browser and desktop API acceptance tests for full-profile update, custom delete cancel/confirm, authoritative storage and stale rejection rendering, live read-only switching, and active mutation refusal.",
+      "files": [
+        "tests/browser/player-management.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added failing-first control and App contract tests for full-profile update, ordered delete, no-op/replay semantics, inactive-only guards, persistence conflicts, authoritative error state, and explicit false adapter presence.",
+      "files": [
+        "internal/control/service_test.go",
+        "app_test.go",
+        "app_contract_test.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Added canonical update/delete payloads and transactional full-profile update/delete semantics with revision, active-config, inactive-broadcast, existence, validation, no-op, conditional persistence, refreshed-handle, and authoritative failure behavior; removed the control RenameCharacter API.",
+      "files": [
+        "internal/domain/model.go",
+        "internal/control/service.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Extended the player-management browser fixture with exact payload capture and authoritative add/update/delete, revision, broadcast, validation, no-op, failure, and ordering semantics.",
+      "files": [
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Implemented authoritative full-profile update and revisioned delete flows in the player-management dialog, including accessible confirmation, validation, read-only broadcast behavior, failure-state restoration, and removal of the legacy inline rename/delete mutation path; frontend build and 16 focused browser tests passed.",
+      "files": [
+        "frontend/src/index.html",
+        "frontend/src/master.css",
+        "frontend/src/desktop-api.js",
+        "frontend/src/master.js"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Replaced the legacy rename/string-delete desktop bridge with complete update/delete payloads, protobuf presence-preserving adapters, validation, canonical control calls, and authoritative failure results.",
+      "files": [
+        "app.go",
+        "app_contract.go",
+        "desktop_service.go"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Regenerated the 34-method Wails cutover to UpdateCharacter and passed binding drift, control race, frontend build, focused root, and 16 browser/API tests",
+      "files": [
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js",
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added Playwright coverage for populated and empty accessible player details, close/Escape focus restoration with zero durable mutations, mobile scroll containment, active read-only detail visibility, and retained logical-session assignment/release/controller/transfer corrections; focused suite is intentionally red only at the T028 transfer-relocation seam.",
+      "files": [
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Removed the inline durable roster UI, finalized the scrollable player dialog markup, and placed claimed-character transfer controls in logical-session rows",
+      "files": [
+        "frontend/src/index.html",
+        "frontend/src/master.css"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Removed legacy inline roster scripting, preserved the dedicated player-management dialog lifecycle, and relocated guarded MoveCharacter correction controls into assigned logical-session rows.",
+      "files": [
+        "frontend/src/master.js"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Added explicit varied Intelligence and Hacker perk attributes to every bundled demo player; verified exact decoded roster order and attributes; strengthened public player projection non-disclosure for Intelligence, Hacker, and digest fields.",
+      "files": [
+        "sessions/demo-players.json",
+        "internal/platform/assets_test.go",
+        "internal/player/adapter_test.go"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Passed make check, 20 focused and 112 full browser tests, frontend and owned arm64 builds, and recorded SC-001 through SC-006 evidence",
+      "files": [
+        "specs/011-player-intelligence-hacker/validation.md",
+        "internal/platform/assets_test.go",
+        "internal/player/handler_test.go",
+        "internal/session/service_test.go"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Completed native Wails acceptance: add/update/delete, popup reopen persistence, under-60-second add, and active-broadcast read-only details all passed.",
+      "files": [
+        "specs/011-player-intelligence-hacker/validation.md"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Added safe reopen-or-reselect guidance for missing, unreadable, and replaced active player configs, preserving authoritative state through service, coordinator, App, and popup results.",
+      "files": [
+        "internal/playerconfig/service.go",
+        "internal/playerconfig/service_test.go",
+        "internal/control/service_test.go",
+        "app_test.go",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Removed the retired RenameCharacter browser binding export and asserted the test-double inventory exposes only UpdateCharacter and DeleteCharacter for roster corrections",
+      "files": [
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Repository quality gate",
+      "result": "PASS",
+      "command": "make check",
+      "warnings": "Cached Wails linker target-version warnings only"
+    },
+    {
+      "what": "Focused player-management browser and desktop API",
+      "result": "PASS",
+      "command": "npm test --prefix tests/browser -- desktop-api.spec.mjs player-management.spec.mjs"
+    },
+    {
+      "what": "Full deterministic browser regression",
+      "result": "PASS: 112 passed, 2 opt-in ngrok tests skipped",
+      "command": "npm test --prefix tests/browser"
+    },
+    {
+      "what": "Owned macOS application build",
+      "result": "PASS",
+      "command": "env GOCACHE=/private/tmp/fallout-root-gocache go run ./cmd/build build"
+    },
+    {
+      "what": "Native Wails add/update/delete/reopen/read-only journey",
+      "result": "PASS",
+      "command": "env GOCACHE=/private/tmp/fallout-root-gocache go run ./cmd/build dev"
+    },
+    {
+      "what": "T032 focused persistence, coordinator, and App conflict guidance",
+      "command": "go test ./internal/playerconfig ./internal/control and go test . -run TestRosterMutationConflictReturnsAuthoritativeReselectionGuidance -count=1",
+      "result": "PASS",
+      "warnings": [
+        "Root test binary emits the existing cached Wails macOS target-version linker warning"
+      ]
+    },
+    {
+      "what": "T032 focused player-management browser behavior",
+      "command": "npm test --prefix tests/browser -- desktop-api.spec.mjs player-management.spec.mjs",
+      "result": "PASS: 20/20"
+    },
+    {
+      "what": "T032 repository quality gate",
+      "command": "make check",
+      "result": "PASS"
+    },
+    {
+      "what": "T032 full browser regression",
+      "command": "npm test --prefix tests/browser",
+      "result": "PASS: 112 passed, 2 opt-in authenticated ngrok tests skipped"
+    },
+    {
+      "what": "T033 JavaScript syntax",
+      "command": "node --check tests/browser/fixtures/desktop-bindings.js && node --check tests/browser/desktop-api.spec.mjs",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "Focused desktop API browser contract",
+      "command": "npm test --prefix tests/browser -- desktop-api.spec.mjs",
+      "result": "PASS: 8/8",
+      "warnings": [
+        "Playwright reported the benign NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    },
+    {
+      "what": "Generated Wails method inventory",
+      "command": "scripts/wails-bindings-check.sh",
+      "result": "PASS: deterministic bindings expose exactly 34 accepted methods and no RenameCharacter",
+      "warnings": []
+    },
+    {
+      "what": "Full browser regression after fixture cutover",
+      "command": "npm test --prefix tests/browser",
+      "result": "PASS: 112 passed, 2 expected opt-in authenticated-ngrok tests skipped",
+      "warnings": [
+        "Authenticated ngrok tests were NOT RUN because they are opt-in",
+        "Playwright reported the benign NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Two full-browser cases remain intentionally skipped because they require real authenticated ngrok credentials; deterministic public-access regressions passed.",
+      "step": "implement",
+      "kind": "validation"
+    },
+    {
+      "note": "Cached Wails linker objects emit a newer-macOS target warning, but all tests and the owned arm64 build pass.",
+      "step": "implement",
+      "kind": "toolchain"
+    }
+  ]
+}

@@ -49,6 +49,8 @@ message CharacterState {
   string character_id = 1;
   string display_name = 2;
   optional string logical_session_id = 3;
+  int32 intelligence = 4;
+  bool hacker_perk_available = 5;
 }
 
 message LogicalSessionState {

@@ -50,13 +50,105 @@ export class AssignmentPayload {
 }
 
 /**
- * CharacterRenamePayload identifies one stable roster entry and its new
- * player-facing display name.
+ * CharacterCreatePayload carries one complete trusted player profile and the
+ * coordination revision it was based on.
  */
-export class CharacterRenamePayload {
+export class CharacterCreatePayload {
     /**
-     * Creates a new CharacterRenamePayload instance.
-     * @param {Partial<CharacterRenamePayload>} [$$source = {}] - The source object to create the CharacterRenamePayload.
+     * Creates a new CharacterCreatePayload instance.
+     * @param {Partial<CharacterCreatePayload>} [$$source = {}] - The source object to create the CharacterCreatePayload.
+     */
+    constructor($$source = {}) {
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (!("intelligence" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["intelligence"] = 0;
+        }
+        if (!("hackerPerkAvailable" in $$source)) {
+            /**
+             * @member
+             * @type {boolean | null}
+             */
+            this["hackerPerkAvailable"] = null;
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CharacterCreatePayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CharacterCreatePayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CharacterCreatePayload(/** @type {Partial<CharacterCreatePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * CharacterDeletePayload identifies one stable roster identity and the
+ * coordination revision the deletion was based on.
+ */
+export class CharacterDeletePayload {
+    /**
+     * Creates a new CharacterDeletePayload instance.
+     * @param {Partial<CharacterDeletePayload>} [$$source = {}] - The source object to create the CharacterDeletePayload.
+     */
+    constructor($$source = {}) {
+        if (!("characterId" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.CharacterID}
+             */
+            this["characterId"] = "";
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CharacterDeletePayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CharacterDeletePayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CharacterDeletePayload(/** @type {Partial<CharacterDeletePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * CharacterUpdatePayload carries a complete replacement profile for one
+ * stable roster identity and the coordination revision it was based on.
+ */
+export class CharacterUpdatePayload {
+    /**
+     * Creates a new CharacterUpdatePayload instance.
+     * @param {Partial<CharacterUpdatePayload>} [$$source = {}] - The source object to create the CharacterUpdatePayload.
      */
     constructor($$source = {}) {
         if (!("characterId" in $$source)) {
@@ -73,18 +165,39 @@ export class CharacterRenamePayload {
              */
             this["name"] = "";
         }
+        if (!("intelligence" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["intelligence"] = 0;
+        }
+        if (!("hackerPerkAvailable" in $$source)) {
+            /**
+             * @member
+             * @type {boolean | null}
+             */
+            this["hackerPerkAvailable"] = null;
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
 
         Object.assign(this, $$source);
     }
 
     /**
-     * Creates a new CharacterRenamePayload instance from a string or object.
+     * Creates a new CharacterUpdatePayload instance from a string or object.
      * @param {any} [$$source = {}]
-     * @returns {CharacterRenamePayload}
+     * @returns {CharacterUpdatePayload}
      */
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new CharacterRenamePayload(/** @type {Partial<CharacterRenamePayload>} */($$parsedSource));
+        return new CharacterUpdatePayload(/** @type {Partial<CharacterUpdatePayload>} */($$parsedSource));
     }
 }
 

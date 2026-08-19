@@ -30,6 +30,7 @@ const (
 	fixtureEdgePassword      = "password-long-enough"
 	fixtureRandomSeed        = uint64(0x435254)
 	fixtureApprovalRequestID = "approval-request-1"
+	fixturePlayerRevision    = uint64(41)
 )
 
 type ids struct{ next atomic.Uint64 }
@@ -58,6 +59,256 @@ type fixtureAuthoringStore struct {
 	mu       sync.Mutex
 	session  domain.Session
 	revision uint64
+}
+
+type fixturePlayerManagementStore struct {
+	mu        sync.Mutex
+	revision  uint64
+	nextID    uint64
+	roster    []fixturePlayerProfile
+	broadcast bool
+	failNext  string
+}
+
+type fixturePlayerProfile struct {
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Intelligence        int    `json:"intelligence"`
+	HackerPerkAvailable bool   `json:"hackerPerkAvailable"`
+}
+
+type fixtureAddPlayerRequest struct {
+	Name                string `json:"name"`
+	Intelligence        int    `json:"intelligence"`
+	HackerPerkAvailable *bool  `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64 `json:"expectedRevision"`
+}
+
+type fixtureUpdatePlayerRequest struct {
+	CharacterID         string `json:"characterId"`
+	Name                string `json:"name"`
+	Intelligence        int    `json:"intelligence"`
+	HackerPerkAvailable *bool  `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64 `json:"expectedRevision"`
+}
+
+type fixtureDeletePlayerRequest struct {
+	CharacterID      string `json:"characterId"`
+	ExpectedRevision uint64 `json:"expectedRevision"`
+}
+
+type fixturePlayerManagementState struct {
+	Revision     uint64                 `json:"revision"`
+	PlayerConfig map[string]any         `json:"playerConfig"`
+	Roster       []fixturePlayerProfile `json:"roster"`
+	Sessions     []map[string]any       `json:"sessions"`
+	Broadcast    map[string]any         `json:"broadcast"`
+}
+
+type fixturePlayerManagementResult struct {
+	OK    bool                         `json:"ok"`
+	Error string                       `json:"error,omitempty"`
+	State fixturePlayerManagementState `json:"state"`
+}
+
+func (store *fixturePlayerManagementStore) reset() {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.revision = fixturePlayerRevision
+	store.nextID = 1
+	store.roster = nil
+	store.broadcast = false
+	store.failNext = ""
+}
+
+func (store *fixturePlayerManagementStore) snapshot() fixturePlayerManagementState {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return store.snapshotLocked()
+}
+
+func (store *fixturePlayerManagementStore) failNextSave(message string) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.failNext = strings.TrimSpace(message)
+	if store.failNext == "" {
+		store.failNext = "fixture player configuration save failed"
+	}
+}
+
+func (store *fixturePlayerManagementStore) advanceRevision() fixturePlayerManagementState {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	store.revision++
+	return store.snapshotLocked()
+}
+
+func (store *fixturePlayerManagementStore) setBroadcast(active bool) fixturePlayerManagementState {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.broadcast != active {
+		store.broadcast = active
+		store.revision++
+	}
+	return store.snapshotLocked()
+}
+
+func validateFixturePlayerProfile(name string, intelligence int, hackerPerkAvailable *bool) (string, string) {
+	trimmedName := strings.TrimSpace(name)
+	if trimmedName == "" {
+		return "", "character name must not be blank"
+	}
+	if len([]rune(trimmedName)) > 80 {
+		return "", "character name must be at most 80 characters"
+	}
+	if intelligence < 1 || intelligence > 10 {
+		return "", "Intelligence must be an integer from 1 to 10"
+	}
+	if hackerPerkAvailable == nil {
+		return "", "Hacker perk availability must be selected"
+	}
+	return trimmedName, ""
+}
+
+func (store *fixturePlayerManagementStore) add(request fixtureAddPlayerRequest) fixturePlayerManagementResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	failure := func(message string) fixturePlayerManagementResult {
+		return fixturePlayerManagementResult{Error: message, State: store.snapshotLocked()}
+	}
+	if store.broadcast {
+		return failure("player profiles cannot be changed while a broadcast is active")
+	}
+	name, validationError := validateFixturePlayerProfile(request.Name, request.Intelligence, request.HackerPerkAvailable)
+	if validationError != "" {
+		return failure(validationError)
+	}
+	if request.ExpectedRevision != store.revision {
+		return failure("coordination state changed; review the latest player list")
+	}
+	if store.failNext != "" {
+		message := store.failNext
+		store.failNext = ""
+		return failure(message)
+	}
+
+	profile := fixturePlayerProfile{
+		ID:                  fmt.Sprintf("fixture-player-%d", store.nextID),
+		Name:                name,
+		Intelligence:        request.Intelligence,
+		HackerPerkAvailable: *request.HackerPerkAvailable,
+	}
+	store.nextID++
+	store.roster = append(store.roster, profile)
+	store.revision++
+	return fixturePlayerManagementResult{OK: true, State: store.snapshotLocked()}
+}
+
+func (store *fixturePlayerManagementStore) update(request fixtureUpdatePlayerRequest) fixturePlayerManagementResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	failure := func(message string) fixturePlayerManagementResult {
+		return fixturePlayerManagementResult{Error: message, State: store.snapshotLocked()}
+	}
+	if store.broadcast {
+		return failure("player profiles cannot be changed while a broadcast is active")
+	}
+	name, validationError := validateFixturePlayerProfile(request.Name, request.Intelligence, request.HackerPerkAvailable)
+	if validationError != "" {
+		return failure(validationError)
+	}
+	if request.ExpectedRevision != store.revision {
+		return failure("coordination state changed; review the latest player list")
+	}
+	characterID := strings.TrimSpace(request.CharacterID)
+	if characterID == "" {
+		return failure("character ID must not be blank")
+	}
+	index := -1
+	for candidateIndex := range store.roster {
+		if store.roster[candidateIndex].ID == characterID {
+			index = candidateIndex
+			break
+		}
+	}
+	if index < 0 {
+		return failure("character does not exist")
+	}
+	current := store.roster[index]
+	if current.Name == name && current.Intelligence == request.Intelligence && current.HackerPerkAvailable == *request.HackerPerkAvailable {
+		return fixturePlayerManagementResult{OK: true, State: store.snapshotLocked()}
+	}
+	if store.failNext != "" {
+		message := store.failNext
+		store.failNext = ""
+		return failure(message)
+	}
+	store.roster[index] = fixturePlayerProfile{
+		ID:                  current.ID,
+		Name:                name,
+		Intelligence:        request.Intelligence,
+		HackerPerkAvailable: *request.HackerPerkAvailable,
+	}
+	store.revision++
+	return fixturePlayerManagementResult{OK: true, State: store.snapshotLocked()}
+}
+
+func (store *fixturePlayerManagementStore) delete(request fixtureDeletePlayerRequest) fixturePlayerManagementResult {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	failure := func(message string) fixturePlayerManagementResult {
+		return fixturePlayerManagementResult{Error: message, State: store.snapshotLocked()}
+	}
+	if store.broadcast {
+		return failure("player profiles cannot be changed while a broadcast is active")
+	}
+	if request.ExpectedRevision != store.revision {
+		return failure("coordination state changed; review the latest player list")
+	}
+	characterID := strings.TrimSpace(request.CharacterID)
+	if characterID == "" {
+		return failure("character ID must not be blank")
+	}
+	index := -1
+	for candidateIndex := range store.roster {
+		if store.roster[candidateIndex].ID == characterID {
+			index = candidateIndex
+			break
+		}
+	}
+	if index < 0 {
+		return failure("character does not exist")
+	}
+	if store.failNext != "" {
+		message := store.failNext
+		store.failNext = ""
+		return failure(message)
+	}
+	store.roster = append(store.roster[:index:index], store.roster[index+1:]...)
+	store.revision++
+	return fixturePlayerManagementResult{OK: true, State: store.snapshotLocked()}
+}
+
+func (store *fixturePlayerManagementStore) snapshotLocked() fixturePlayerManagementState {
+	roster := append([]fixturePlayerProfile(nil), store.roster...)
+	if roster == nil {
+		roster = []fixturePlayerProfile{}
+	}
+	var broadcast map[string]any
+	if store.broadcast {
+		broadcast = map[string]any{"id": "fixture-player-management-broadcast"}
+	}
+	return fixturePlayerManagementState{
+		Revision: store.revision,
+		PlayerConfig: map[string]any{
+			"status": "loaded", "name": "Player management fixture",
+			"filePath": "/private/tmp/fallout-player-management.json", "version": 1,
+		},
+		Roster: roster, Sessions: []map[string]any{}, Broadcast: broadcast,
+	}
 }
 
 type fixtureTerminalCatalog struct {
@@ -565,6 +816,8 @@ func run() error {
 	approvalStore.reset()
 	authoringStore := &fixtureAuthoringStore{}
 	authoringStore.reset()
+	playerManagementStore := &fixturePlayerManagementStore{}
+	playerManagementStore.reset()
 	navigationCatalog := &fixtureTerminalCatalog{session: terminalNavigationSession()}
 	var navigationPending atomic.Bool
 	var navigationProjectionRevision atomic.Uint64
@@ -592,7 +845,9 @@ func run() error {
 	edge := &fixtureEdge{service: service, connect: connectPlayer}
 
 	for _, name := range []string{"Mara", "Boone", "Arcade", "Cass", "Veronica", "Raul", "Lily"} {
-		if _, err := service.AddCharacter(name); err != nil {
+		if _, err := service.AddCharacter(domain.CharacterCreatePayload{
+			Name: name, Intelligence: 1, ExpectedRevision: service.Snapshot().Revision,
+		}); err != nil {
 			return err
 		}
 	}
@@ -608,6 +863,88 @@ func run() error {
 		_, _ = fmt.Fprint(response, `<!doctype html><meta charset="utf-8">
 <script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>
 <script type="module" src="/__fixture/desktop-api.js"></script>`)
+	})
+	mux.HandleFunc("GET /__fixture/player-management", func(response http.ResponseWriter, _ *http.Request) {
+		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))
+		if readErr != nil {
+			http.Error(response, "fixture master page is unavailable", http.StatusInternalServerError)
+			return
+		}
+		page := strings.Replace(string(raw), `<head>`, `<head>
+<script type="importmap">{"imports":{"@wailsio/runtime":"/__fixture/desktop-bindings.js","/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js":"/__fixture/desktop-bindings.js"}}</script>`, 1)
+		page = strings.Replace(page, `class="start-screen" id="startScreen"`, `class="start-screen" id="startScreen" style="display:none"`, 1)
+		page = strings.Replace(page, `id="mainLayout" style="display:none"`, `id="mainLayout" style="display:flex"`, 1)
+		page = strings.ReplaceAll(page, `./master.css`, `/__fixture/master.css`)
+		page = strings.ReplaceAll(page, `./master.js`, `/__fixture/master.js`)
+		page = strings.ReplaceAll(page, `./desktop-api.js`, `/__fixture/desktop-api.js`)
+		response.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = response.Write([]byte(page))
+	})
+	mux.HandleFunc("POST /__fixture/player-management/reset", func(response http.ResponseWriter, _ *http.Request) {
+		playerManagementStore.reset()
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("GET /__fixture/player-management/state", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.snapshot())
+	})
+	mux.HandleFunc("POST /__fixture/player-management/add", func(response http.ResponseWriter, request *http.Request) {
+		decoder := json.NewDecoder(request.Body)
+		decoder.DisallowUnknownFields()
+		var payload fixtureAddPlayerRequest
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(response, "invalid player profile", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.add(payload))
+	})
+	mux.HandleFunc("POST /__fixture/player-management/update", func(response http.ResponseWriter, request *http.Request) {
+		decoder := json.NewDecoder(request.Body)
+		decoder.DisallowUnknownFields()
+		var payload fixtureUpdatePlayerRequest
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(response, "invalid player profile", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.update(payload))
+	})
+	mux.HandleFunc("POST /__fixture/player-management/delete", func(response http.ResponseWriter, request *http.Request) {
+		decoder := json.NewDecoder(request.Body)
+		decoder.DisallowUnknownFields()
+		var payload fixtureDeletePlayerRequest
+		if err := decoder.Decode(&payload); err != nil {
+			http.Error(response, "invalid player deletion", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.delete(payload))
+	})
+	mux.HandleFunc("POST /__fixture/player-management/set-broadcast", func(response http.ResponseWriter, request *http.Request) {
+		decoder := json.NewDecoder(request.Body)
+		decoder.DisallowUnknownFields()
+		var payload struct {
+			Active *bool `json:"active"`
+		}
+		if err := decoder.Decode(&payload); err != nil || payload.Active == nil {
+			http.Error(response, "invalid broadcast state", http.StatusBadRequest)
+			return
+		}
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.setBroadcast(*payload.Active))
+	})
+	mux.HandleFunc("POST /__fixture/player-management/fail-next-save", func(response http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			Error string `json:"error"`
+		}
+		_ = json.NewDecoder(request.Body).Decode(&payload)
+		playerManagementStore.failNextSave(payload.Error)
+		response.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /__fixture/player-management/advance-revision", func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(playerManagementStore.advanceRevision())
 	})
 	mux.HandleFunc("GET /__fixture/public-access-settings", func(response http.ResponseWriter, _ *http.Request) {
 		raw, readErr := os.ReadFile(filepath.Clean("../../frontend/src/index.html"))

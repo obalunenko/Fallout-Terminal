@@ -536,6 +536,20 @@ export class MasterRosterEntry {
              */
             this["name"] = "";
         }
+        if (!("intelligence" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["intelligence"] = 0;
+        }
+        if (!("hackerPerkAvailable" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["hackerPerkAvailable"] = false;
+        }
         if (!("claimedBySessionId" in $$source)) {
             /**
              * @member

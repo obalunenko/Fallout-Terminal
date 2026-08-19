@@ -95,6 +95,46 @@ func TestPlayerStateToProtoMapsSafePersistenceNoticeAndClearsItWithoutStickyDeta
 	require.Nil(t, cleared.GetNotice(), "a later authoritative state without a notice must clear it")
 }
 
+func TestPlayerStateProjectionExcludesMasterOnlyPlayerProfileAttributes(t *testing.T) {
+	t.Parallel()
+
+	state := &domain.PlayerState{
+		SessionID: "session-1", FallbackName: "PLAYER 1",
+		Character: &domain.PlayerCharacter{ID: "character-mara", Name: "Mara"},
+		Roster: []domain.PlayerRosterEntry{
+			{ID: "character-mara", Name: "Mara", Status: domain.RosterStatusClaimed},
+			{ID: "character-boone", Name: "Boone", Status: domain.RosterStatusAvailable},
+		},
+	}
+
+	got := PlayerStateToProto(state)
+	require.NotNil(t, got)
+	require.Equal(t, "Mara", got.GetAssignedCharacter().GetDisplayName())
+	require.Equal(t, "Boone", got.GetRoster()[1].GetDisplayName())
+
+	assertExactPlayerSafeFields := func(message proto.Message, expected []string) {
+		t.Helper()
+		fields := message.ProtoReflect().Descriptor().Fields()
+		actual := make([]string, 0, fields.Len())
+		for index := range fields.Len() {
+			name := string(fields.Get(index).Name())
+			actual = append(actual, name)
+			lowerName := strings.ToLower(name)
+			require.NotContains(t, lowerName, "intelligence")
+			require.NotContains(t, lowerName, "hacker")
+			require.NotContains(t, lowerName, "digest")
+		}
+		require.Equal(t, expected, actual)
+	}
+	assertExactPlayerSafeFields(got.GetAssignedCharacter(), []string{"character_id", "display_name"})
+	assertExactPlayerSafeFields(got.GetRoster()[0], []string{"character_id", "display_name", "availability"})
+
+	state.Character.Name = "mutated source"
+	state.Roster[0].Name = "mutated source"
+	require.Equal(t, "Mara", got.GetAssignedCharacter().GetDisplayName())
+	require.Equal(t, "Mara", got.GetRoster()[0].GetDisplayName(), "public projection must remain detached")
+}
+
 func TestOrdinaryCommandProjectionRemainsUnchangedAndHasNoExecutionPresentation(t *testing.T) {
 	state := &domain.PublicLiveState{
 		TerminalID: "terminal-1", TerminalName: "Overseer",

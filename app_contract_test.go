@@ -163,9 +163,9 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.ResetTerminalCommandStatesRequest{}, []string{"terminal_id"}},
 		{&privatev1.SessionStateResult{}, []string{"ok", "error", "revision", "session"}},
 		{&privatev1.ResetFailedHackRequest{}, []string{"terminal_id", "terminal_name", "tree", "hack_level", "intro_text"}},
-		{&privatev1.AddCharacterRequest{}, []string{"display_name"}},
-		{&privatev1.RenameCharacterRequest{}, []string{"character_id", "display_name"}},
-		{&privatev1.DeleteCharacterRequest{}, []string{"character_id"}},
+		{&privatev1.AddCharacterRequest{}, []string{"display_name", "intelligence", "hacker_perk_available", "expected_revision"}},
+		{&privatev1.RenameCharacterRequest{}, []string{"character_id", "display_name", "intelligence", "hacker_perk_available", "expected_revision"}},
+		{&privatev1.DeleteCharacterRequest{}, []string{"character_id", "expected_revision"}},
 		{&privatev1.RenameLogicalSessionRequest{}, []string{"logical_session_id", "fallback_name"}},
 		{&privatev1.AssignCharacterRequest{}, []string{"logical_session_id", "character_id"}},
 		{&privatev1.ReleaseCharacterRequest{}, []string{"logical_session_id"}},
@@ -179,7 +179,7 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.HackStateEvent{}, []string{"hack_state"}},
 		{&privatev1.CoordinationStateEvent{}, []string{"coordination_state"}},
 		{&privatev1.SessionStateEvent{}, []string{"revision", "session"}},
-		{&privatev1.CharacterState{}, []string{"character_id", "display_name", "logical_session_id"}},
+		{&privatev1.CharacterState{}, []string{"character_id", "display_name", "logical_session_id", "intelligence", "hacker_perk_available"}},
 		{&privatev1.LogicalSessionState{}, []string{"logical_session_id", "fallback_name", "connected", "active_streams", "character_id", "role"}},
 		{&privatev1.BroadcastState{}, []string{"broadcast_id", "active_controller_session_id", "active_terminal_id", "revision"}},
 		{&privatev1.PendingTerminalSwitch{}, []string{"switch_id", "terminal_id", "terminal_name", "requested_terminal", "broadcast_id", "source_terminal_id", "target_terminal_id"}},
@@ -214,6 +214,197 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		"TERMINAL_NAVIGATION_DECISION_APPROVE",
 		"TERMINAL_NAVIGATION_DECISION_REJECT",
 	}, descriptorEnumNames(navigationDecision))
+}
+
+func TestPrivatePlayerProfileDescriptorsPreserveFieldNumbersAndHackerPresence(t *testing.T) {
+	t.Parallel()
+
+	assertFields := func(message proto.Message, expected map[protoreflect.Name]protoreflect.FieldNumber) {
+		t.Helper()
+		descriptor := message.ProtoReflect().Descriptor()
+		require.Equal(t, len(expected), descriptor.Fields().Len())
+		for name, number := range expected {
+			field := descriptor.Fields().ByName(name)
+			require.NotNil(t, field, "%s must expose %s", descriptor.FullName(), name)
+			require.Equal(t, number, field.Number(), "%s.%s field number drifted", descriptor.FullName(), name)
+		}
+	}
+
+	assertFields(&privatev1.CharacterState{}, map[protoreflect.Name]protoreflect.FieldNumber{
+		"character_id": 1, "display_name": 2, "logical_session_id": 3,
+		"intelligence": 4, "hacker_perk_available": 5,
+	})
+	assertFields(&privatev1.AddCharacterRequest{}, map[protoreflect.Name]protoreflect.FieldNumber{
+		"display_name": 1, "intelligence": 2, "hacker_perk_available": 3, "expected_revision": 4,
+	})
+	assertFields(&privatev1.RenameCharacterRequest{}, map[protoreflect.Name]protoreflect.FieldNumber{
+		"character_id": 1, "display_name": 2, "intelligence": 3,
+		"hacker_perk_available": 4, "expected_revision": 5,
+	})
+	assertFields(&privatev1.DeleteCharacterRequest{}, map[protoreflect.Name]protoreflect.FieldNumber{
+		"character_id": 1, "expected_revision": 2,
+	})
+
+	hackerUnavailable := false
+	add := &privatev1.AddCharacterRequest{
+		DisplayName: "Mara", Intelligence: 8,
+		HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 42,
+	}
+	cloned := proto.Clone(add).(*privatev1.AddCharacterRequest)
+	require.NotNil(t, cloned.HackerPerkAvailable, "explicit false must retain presence")
+	require.False(t, cloned.GetHackerPerkAvailable())
+	require.Equal(t, int32(8), cloned.GetIntelligence())
+	require.Equal(t, uint64(42), cloned.GetExpectedRevision())
+}
+
+func TestAddCharacterRequestAdapterPreservesCompletePayloadAndExplicitFalsePresence(t *testing.T) {
+	t.Parallel()
+
+	hackerUnavailable := false
+	input := CharacterCreatePayload{
+		Name:                "  Mara  ",
+		Intelligence:        8,
+		HackerPerkAvailable: &hackerUnavailable,
+		ExpectedRevision:    42,
+	}
+	routed := routeAddCharacterRequest(input)
+	require.Equal(t, input.Name, routed.Name)
+	require.Equal(t, input.Intelligence, routed.Intelligence)
+	require.Equal(t, input.ExpectedRevision, routed.ExpectedRevision)
+	require.NotNil(t, routed.HackerPerkAvailable, "explicit false must retain protobuf presence")
+	require.False(t, *routed.HackerPerkAvailable)
+	require.NotSame(t, input.HackerPerkAvailable, routed.HackerPerkAvailable, "adapter result must detach optional scalar storage")
+
+	missing := routeAddCharacterRequest(CharacterCreatePayload{
+		Name: "Boone", Intelligence: 4, ExpectedRevision: 42,
+	})
+	require.Nil(t, missing.HackerPerkAvailable, "omission must remain distinguishable from explicit false")
+}
+
+func TestUpdateAndDeleteCharacterRequestAdaptersPreserveCompletePayloads(t *testing.T) {
+	t.Parallel()
+
+	hackerUnavailable := false
+	updateInput := CharacterUpdatePayload{
+		CharacterID:         "character-1",
+		Name:                "  Mara Voss  ",
+		Intelligence:        10,
+		HackerPerkAvailable: &hackerUnavailable,
+		ExpectedRevision:    42,
+	}
+	updated := routeUpdateCharacterRequest(updateInput)
+	require.Equal(t, updateInput.CharacterID, updated.CharacterID)
+	require.Equal(t, updateInput.Name, updated.Name)
+	require.Equal(t, updateInput.Intelligence, updated.Intelligence)
+	require.Equal(t, updateInput.ExpectedRevision, updated.ExpectedRevision)
+	require.NotNil(t, updated.HackerPerkAvailable, "explicit false must retain protobuf presence")
+	require.False(t, *updated.HackerPerkAvailable)
+	require.NotSame(t, updateInput.HackerPerkAvailable, updated.HackerPerkAvailable)
+
+	missing := routeUpdateCharacterRequest(CharacterUpdatePayload{
+		CharacterID: "character-2", Name: "Boone", Intelligence: 4, ExpectedRevision: 42,
+	})
+	require.Nil(t, missing.HackerPerkAvailable, "omitted Hacker availability must remain distinguishable from explicit false")
+
+	deleteInput := CharacterDeletePayload{CharacterID: "character-2", ExpectedRevision: 43}
+	require.Equal(t, deleteInput, routeDeleteCharacterRequest(deleteInput))
+}
+
+func TestPrivatePlayerProfileProjectionPreservesValuesAndDetachesBothDirections(t *testing.T) {
+	t.Parallel()
+
+	controller := domain.LogicalSessionID("session-1")
+	state := &domain.MasterCoordinationState{Revision: 17, Roster: []domain.MasterRosterEntry{
+		{ID: "character-mara", Name: "Mara", ClaimedBySessionID: &controller},
+		{ID: "character-boone", Name: "Boone"},
+	}}
+	setMasterRosterProfile(t, &state.Roster[0], 8, true)
+	setMasterRosterProfile(t, &state.Roster[1], 4, false)
+
+	semantic := coordinationStateToPrivate(state)
+	require.Len(t, semantic.GetRoster(), 2)
+	require.Equal(t, int32(8), semantic.GetRoster()[0].GetIntelligence())
+	require.True(t, semantic.GetRoster()[0].GetHackerPerkAvailable())
+	require.Equal(t, int32(4), semantic.GetRoster()[1].GetIntelligence())
+	require.False(t, semantic.GetRoster()[1].GetHackerPerkAvailable(), "canonical false must survive private projection")
+
+	state.Roster[0].Name = "mutated source"
+	setMasterRosterProfile(t, &state.Roster[0], 1, false)
+	require.Equal(t, "Mara", semantic.GetRoster()[0].GetDisplayName())
+	require.Equal(t, int32(8), semantic.GetRoster()[0].GetIntelligence())
+	require.True(t, semantic.GetRoster()[0].GetHackerPerkAvailable())
+
+	routed := coordinationStateFromPrivate(semantic)
+	require.Len(t, routed.Roster, 2)
+	require.Equal(t, 8, masterRosterIntelligence(t, routed.Roster[0]))
+	require.True(t, masterRosterHackerAvailable(t, routed.Roster[0]))
+	require.Equal(t, 4, masterRosterIntelligence(t, routed.Roster[1]))
+	require.False(t, masterRosterHackerAvailable(t, routed.Roster[1]))
+
+	semantic.Roster[0].Intelligence = 2
+	semantic.Roster[0].HackerPerkAvailable = false
+	require.Equal(t, 8, masterRosterIntelligence(t, routed.Roster[0]))
+	require.True(t, masterRosterHackerAvailable(t, routed.Roster[0]))
+}
+
+func TestPublicPlayerDescriptorsExcludePrivatePlayerProfileCapabilities(t *testing.T) {
+	t.Parallel()
+
+	protoregistry.GlobalFiles.RangeFiles(func(file protoreflect.FileDescriptor) bool {
+		if !strings.HasPrefix(file.Path(), "fallout/terminal/player/v1/") {
+			return true
+		}
+		for messageIndex := range file.Messages().Len() {
+			message := file.Messages().Get(messageIndex)
+			for fieldIndex := range message.Fields().Len() {
+				name := strings.ToLower(string(message.Fields().Get(fieldIndex).Name()))
+				for _, forbidden := range []string{"intelligence", "hacker", "player_config", "digest"} {
+					require.NotContains(t, name, forbidden, "%s must remain player-safe", message.FullName())
+				}
+			}
+		}
+		return true
+	})
+
+	for _, fullName := range []protoreflect.FullName{
+		"fallout.terminal.player.v1.AddCharacterRequest",
+		"fallout.terminal.player.v1.RenameCharacterRequest",
+		"fallout.terminal.player.v1.DeleteCharacterRequest",
+	} {
+		_, err := protoregistry.GlobalTypes.FindMessageByName(fullName)
+		require.Error(t, err, "%s must remain private", fullName)
+	}
+}
+
+func setMasterRosterProfile(t *testing.T, entry *domain.MasterRosterEntry, intelligence int, hackerAvailable bool) {
+	t.Helper()
+	value := reflect.ValueOf(entry).Elem()
+	intelligenceField := value.FieldByName("Intelligence")
+	require.True(t, intelligenceField.IsValid(), "MasterRosterEntry must expose Intelligence")
+	require.True(t, intelligenceField.CanSet())
+	require.Equal(t, reflect.Int, intelligenceField.Kind())
+	intelligenceField.SetInt(int64(intelligence))
+	hackerField := value.FieldByName("HackerPerkAvailable")
+	require.True(t, hackerField.IsValid(), "MasterRosterEntry must expose HackerPerkAvailable")
+	require.True(t, hackerField.CanSet())
+	require.Equal(t, reflect.Bool, hackerField.Kind())
+	hackerField.SetBool(hackerAvailable)
+}
+
+func masterRosterIntelligence(t *testing.T, entry domain.MasterRosterEntry) int {
+	t.Helper()
+	field := reflect.ValueOf(entry).FieldByName("Intelligence")
+	require.True(t, field.IsValid(), "MasterRosterEntry must expose Intelligence")
+	require.Equal(t, reflect.Int, field.Kind())
+	return int(field.Int())
+}
+
+func masterRosterHackerAvailable(t *testing.T, entry domain.MasterRosterEntry) bool {
+	t.Helper()
+	field := reflect.ValueOf(entry).FieldByName("HackerPerkAvailable")
+	require.True(t, field.IsValid(), "MasterRosterEntry must expose HackerPerkAvailable")
+	require.Equal(t, reflect.Bool, field.Kind())
+	return field.Bool()
 }
 
 func TestPublicPlayerDescriptorsExcludePrivateTerminalNavigationCapabilities(t *testing.T) {
@@ -319,7 +510,7 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 	requiredMethods := []string{
 		"GetRuntimeStatus", "NewSession", "OpenSession", "CopyDemo", "SaveSession", "LoadReferencedPlayerConfig", "NewPlayerConfig", "OpenPlayerConfig",
 		"RequestTerminalActivation", "UpdateLiveTerminal", "RequestTerminalClear", "ResolveTerminalSwitch", "ResolveCommandExecution", "ResolveTerminalNavigation", "ForceHackSuccess", "ResetFailedHack", "ResetCommandState", "ResetTerminalCommandStates",
-		"AddCharacter", "RenameCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
+		"AddCharacter", "UpdateCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
 		"StartBroadcast", "EndBroadcast", "OpenURL", "GetPublicAccess", "SavePublicAccessSettings", "GeneratePlayerPassword", "StartPublicAccess", "StopPublicAccess",
 	}
 	serviceType := reflect.TypeOf((*desktopService)(nil))

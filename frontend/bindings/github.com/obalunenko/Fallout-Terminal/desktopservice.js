@@ -26,11 +26,11 @@ import * as session$0 from "./internal/session/models.js";
 import * as $models from "./models.js";
 
 /**
- * @param {string} name
+ * @param {$models.CharacterCreatePayload} payload
  * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
  */
-export function AddCharacter(name) {
-    return $Call.ByID(3737199611, name).then(/** @type {($result: any) => any} */(($result) => {
+export function AddCharacter(payload) {
+    return $Call.ByID(3737199611, payload).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType0($result);
     }));
 }
@@ -55,11 +55,11 @@ export function CopyDemo() {
 }
 
 /**
- * @param {string} characterID
+ * @param {$models.CharacterDeletePayload} payload
  * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
  */
-export function DeleteCharacter(characterID) {
-    return $Call.ByID(1813121085, characterID).then(/** @type {($result: any) => any} */(($result) => {
+export function DeleteCharacter(payload) {
+    return $Call.ByID(1813121085, payload).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType0($result);
     }));
 }
@@ -181,16 +181,6 @@ export function OpenURL(rawURL) {
  */
 export function ReleaseCharacter(sessionID) {
     return $Call.ByID(4229942025, sessionID).then(/** @type {($result: any) => any} */(($result) => {
-        return $$createType0($result);
-    }));
-}
-
-/**
- * @param {$models.CharacterRenamePayload} payload
- * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
- */
-export function RenameCharacter(payload) {
-    return $Call.ByID(547121714, payload).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType0($result);
     }));
 }
@@ -340,6 +330,16 @@ export function StartPublicAccess(payload) {
 export function StopPublicAccess(payload) {
     return $Call.ByID(887374898, payload).then(/** @type {($result: any) => any} */(($result) => {
         return $$createType11($result);
+    }));
+}
+
+/**
+ * @param {$models.CharacterUpdatePayload} payload
+ * @returns {$CancellablePromise<$models.CoordinationCommandResult>}
+ */
+export function UpdateCharacter(payload) {
+    return $Call.ByID(3997927035, payload).then(/** @type {($result: any) => any} */(($result) => {
+        return $$createType0($result);
     }));
 }
 

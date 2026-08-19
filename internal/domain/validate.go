@@ -241,6 +241,9 @@ func ValidatePlayerConfig(config PlayerConfig) error {
 		if utf8.RuneCountInString(entry.Name) > MaxCharacterNameRunes {
 			return fmt.Errorf("%s.name exceeds %d characters", path, MaxCharacterNameRunes)
 		}
+		if entry.Intelligence < 1 || entry.Intelligence > 10 {
+			return fmt.Errorf("%s.intelligence must be between 1 and 10", path)
+		}
 	}
 	return nil
 }

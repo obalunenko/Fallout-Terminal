@@ -15,10 +15,10 @@ var (
 
 // DecodePlayerConfig strictly decodes one standalone version-1 authored roster.
 func DecodePlayerConfig(data []byte) (PlayerConfig, error) {
-	var config PlayerConfig
+	var wire playerConfigWire
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&config); err != nil {
+	if err := decoder.Decode(&wire); err != nil {
 		return PlayerConfig{}, fmt.Errorf("decode player config: %w", err)
 	}
 	var trailing any
@@ -28,10 +28,76 @@ func DecodePlayerConfig(data []byte) (PlayerConfig, error) {
 		}
 		return PlayerConfig{}, fmt.Errorf("decode player config: %w", err)
 	}
+	config, err := wire.canonical()
+	if err != nil {
+		return PlayerConfig{}, fmt.Errorf("decode player config: %w", err)
+	}
 	if err := ValidatePlayerConfig(config); err != nil {
 		return PlayerConfig{}, fmt.Errorf("validate player config: %w", err)
 	}
 	return config, nil
+}
+
+type playerConfigWire struct {
+	Version int                           `json:"version"`
+	Name    string                        `json:"name"`
+	Roster  []playerConfigRosterEntryWire `json:"roster"`
+}
+
+type playerConfigRosterEntryWire struct {
+	ID                  CharacterID     `json:"id"`
+	Name                string          `json:"name"`
+	Intelligence        json.RawMessage `json:"intelligence"`
+	HackerPerkAvailable json.RawMessage `json:"hackerPerkAvailable"`
+}
+
+func (wire playerConfigWire) canonical() (PlayerConfig, error) {
+	config := PlayerConfig{Version: wire.Version, Name: wire.Name}
+	if wire.Roster != nil {
+		config.Roster = make([]CharacterRosterEntry, 0, len(wire.Roster))
+	}
+	for index, entry := range wire.Roster {
+		intelligence, err := decodeLegacyInt(entry.Intelligence, 1)
+		if err != nil {
+			return PlayerConfig{}, fmt.Errorf("roster[%d].intelligence: %w", index, err)
+		}
+		hackerAvailable, err := decodeLegacyBool(entry.HackerPerkAvailable, false)
+		if err != nil {
+			return PlayerConfig{}, fmt.Errorf("roster[%d].hackerPerkAvailable: %w", index, err)
+		}
+		config.Roster = append(config.Roster, CharacterRosterEntry{
+			ID: entry.ID, Name: entry.Name, Intelligence: intelligence, HackerPerkAvailable: hackerAvailable,
+		})
+	}
+	return config, nil
+}
+
+func decodeLegacyInt(raw json.RawMessage, fallback int) (int, error) {
+	if len(raw) == 0 {
+		return fallback, nil
+	}
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return 0, fmt.Errorf("must be an integer")
+	}
+	var value int
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return 0, fmt.Errorf("must be an integer: %w", err)
+	}
+	return value, nil
+}
+
+func decodeLegacyBool(raw json.RawMessage, fallback bool) (bool, error) {
+	if len(raw) == 0 {
+		return fallback, nil
+	}
+	if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return false, fmt.Errorf("must be a boolean")
+	}
+	var value bool
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return false, fmt.Errorf("must be a boolean: %w", err)
+	}
+	return value, nil
 }
 
 // EncodePlayerConfig emits stable, human-readable version-1 JSON.

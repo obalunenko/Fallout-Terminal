@@ -265,17 +265,61 @@ func publicAccessStatusFromNative(status PublicAccessStatus) tunnelservice.Publi
 	return tunnelservice.PublicAccessStatus{State: states[status.State], Generation: status.Generation, SettingsRevision: status.SettingsRevision, PublicURL: status.PublicURL, ErrorCategory: publicAccessErrorFromNative(status.ErrorCategory), ErrorMessage: status.ErrorMessage}
 }
 
-func routeAddCharacterRequest(name string) string {
-	return (&privatev1.AddCharacterRequest{DisplayName: name}).GetDisplayName()
+func routeAddCharacterRequest(payload CharacterCreatePayload) CharacterCreatePayload {
+	semantic := &privatev1.AddCharacterRequest{
+		DisplayName:      payload.Name,
+		Intelligence:     int32(payload.Intelligence),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	if payload.HackerPerkAvailable != nil {
+		value := *payload.HackerPerkAvailable
+		semantic.HackerPerkAvailable = &value
+	}
+	routed := CharacterCreatePayload{
+		Name:             semantic.GetDisplayName(),
+		Intelligence:     int(semantic.GetIntelligence()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
+	if semantic.HackerPerkAvailable != nil {
+		value := semantic.GetHackerPerkAvailable()
+		routed.HackerPerkAvailable = &value
+	}
+	return routed
 }
 
-func routeRenameCharacterRequest(payload CharacterRenamePayload) CharacterRenamePayload {
-	semantic := &privatev1.RenameCharacterRequest{CharacterId: string(payload.CharacterID), DisplayName: payload.Name}
-	return CharacterRenamePayload{CharacterID: domain.CharacterID(semantic.GetCharacterId()), Name: semantic.GetDisplayName()}
+func routeUpdateCharacterRequest(payload CharacterUpdatePayload) CharacterUpdatePayload {
+	semantic := &privatev1.RenameCharacterRequest{
+		CharacterId:      string(payload.CharacterID),
+		DisplayName:      payload.Name,
+		Intelligence:     int32(payload.Intelligence),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	if payload.HackerPerkAvailable != nil {
+		value := *payload.HackerPerkAvailable
+		semantic.HackerPerkAvailable = &value
+	}
+	routed := CharacterUpdatePayload{
+		CharacterID:      domain.CharacterID(semantic.GetCharacterId()),
+		Name:             semantic.GetDisplayName(),
+		Intelligence:     int(semantic.GetIntelligence()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
+	if semantic.HackerPerkAvailable != nil {
+		value := semantic.GetHackerPerkAvailable()
+		routed.HackerPerkAvailable = &value
+	}
+	return routed
 }
 
-func routeDeleteCharacterRequest(characterID string) string {
-	return (&privatev1.DeleteCharacterRequest{CharacterId: characterID}).GetCharacterId()
+func routeDeleteCharacterRequest(payload CharacterDeletePayload) CharacterDeletePayload {
+	semantic := &privatev1.DeleteCharacterRequest{
+		CharacterId:      string(payload.CharacterID),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	return CharacterDeletePayload{
+		CharacterID:      domain.CharacterID(semantic.GetCharacterId()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
 }
 
 func routeRenameLogicalSessionRequest(payload LogicalSessionRenamePayload) LogicalSessionRenamePayload {
@@ -692,7 +736,12 @@ func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev
 		PlayerConfig:    playerConfigMetadataToPrivate(state.PlayerConfig),
 	}
 	for _, entry := range state.Roster {
-		mapped := &privatev1.CharacterState{CharacterId: string(entry.ID), DisplayName: entry.Name}
+		mapped := &privatev1.CharacterState{
+			CharacterId:         string(entry.ID),
+			DisplayName:         entry.Name,
+			Intelligence:        int32(entry.Intelligence),
+			HackerPerkAvailable: entry.HackerPerkAvailable,
+		}
 		if entry.ClaimedBySessionID != nil {
 			value := string(*entry.ClaimedBySessionID)
 			mapped.LogicalSessionId = &value
@@ -773,7 +822,12 @@ func coordinationStateFromPrivate(state *privatev1.CoordinationState) *domain.Ma
 	}
 	result := &domain.MasterCoordinationState{Revision: state.GetRevision(), PlayerConfig: playerConfigMetadataFromPrivate(state.GetPlayerConfig())}
 	for _, entry := range state.GetRoster() {
-		mapped := domain.MasterRosterEntry{ID: domain.CharacterID(entry.GetCharacterId()), Name: entry.GetDisplayName()}
+		mapped := domain.MasterRosterEntry{
+			ID:                  domain.CharacterID(entry.GetCharacterId()),
+			Name:                entry.GetDisplayName(),
+			Intelligence:        int(entry.GetIntelligence()),
+			HackerPerkAvailable: entry.GetHackerPerkAvailable(),
+		}
 		if entry.LogicalSessionId != nil {
 			value := domain.LogicalSessionID(entry.GetLogicalSessionId())
 			mapped.ClaimedBySessionID = &value

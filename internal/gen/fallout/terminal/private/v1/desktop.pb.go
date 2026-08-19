@@ -1091,10 +1091,13 @@ func (x *ResetFailedHackRequest) GetIntroText() string {
 }
 
 type AddCharacterRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DisplayName   string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	DisplayName         string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Intelligence        int32                  `protobuf:"varint,2,opt,name=intelligence,proto3" json:"intelligence,omitempty"`
+	HackerPerkAvailable *bool                  `protobuf:"varint,3,opt,name=hacker_perk_available,json=hackerPerkAvailable,proto3,oneof" json:"hacker_perk_available,omitempty"`
+	ExpectedRevision    uint64                 `protobuf:"varint,4,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AddCharacterRequest) Reset() {
@@ -1134,12 +1137,36 @@ func (x *AddCharacterRequest) GetDisplayName() string {
 	return ""
 }
 
+func (x *AddCharacterRequest) GetIntelligence() int32 {
+	if x != nil {
+		return x.Intelligence
+	}
+	return 0
+}
+
+func (x *AddCharacterRequest) GetHackerPerkAvailable() bool {
+	if x != nil && x.HackerPerkAvailable != nil {
+		return *x.HackerPerkAvailable
+	}
+	return false
+}
+
+func (x *AddCharacterRequest) GetExpectedRevision() uint64 {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return 0
+}
+
 type RenameCharacterRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CharacterId   string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	CharacterId         string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
+	DisplayName         string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Intelligence        int32                  `protobuf:"varint,3,opt,name=intelligence,proto3" json:"intelligence,omitempty"`
+	HackerPerkAvailable *bool                  `protobuf:"varint,4,opt,name=hacker_perk_available,json=hackerPerkAvailable,proto3,oneof" json:"hacker_perk_available,omitempty"`
+	ExpectedRevision    uint64                 `protobuf:"varint,5,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RenameCharacterRequest) Reset() {
@@ -1186,11 +1213,33 @@ func (x *RenameCharacterRequest) GetDisplayName() string {
 	return ""
 }
 
+func (x *RenameCharacterRequest) GetIntelligence() int32 {
+	if x != nil {
+		return x.Intelligence
+	}
+	return 0
+}
+
+func (x *RenameCharacterRequest) GetHackerPerkAvailable() bool {
+	if x != nil && x.HackerPerkAvailable != nil {
+		return *x.HackerPerkAvailable
+	}
+	return false
+}
+
+func (x *RenameCharacterRequest) GetExpectedRevision() uint64 {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return 0
+}
+
 type DeleteCharacterRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CharacterId   string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	CharacterId      string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
+	ExpectedRevision uint64                 `protobuf:"varint,2,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DeleteCharacterRequest) Reset() {
@@ -1228,6 +1277,13 @@ func (x *DeleteCharacterRequest) GetCharacterId() string {
 		return x.CharacterId
 	}
 	return ""
+}
+
+func (x *DeleteCharacterRequest) GetExpectedRevision() uint64 {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return 0
 }
 
 type RenameLogicalSessionRequest struct {
@@ -1623,14 +1679,23 @@ const file_fallout_terminal_private_v1_desktop_proto_rawDesc = "" +
 	"\n" +
 	"hack_level\x18\x04 \x01(\x05R\thackLevel\x12\x1d\n" +
 	"\n" +
-	"intro_text\x18\x05 \x01(\tR\tintroText\"8\n" +
+	"intro_text\x18\x05 \x01(\tR\tintroText\"\xdc\x01\n" +
 	"\x13AddCharacterRequest\x12!\n" +
-	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\"^\n" +
+	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12\"\n" +
+	"\fintelligence\x18\x02 \x01(\x05R\fintelligence\x127\n" +
+	"\x15hacker_perk_available\x18\x03 \x01(\bH\x00R\x13hackerPerkAvailable\x88\x01\x01\x12+\n" +
+	"\x11expected_revision\x18\x04 \x01(\x04R\x10expectedRevisionB\x18\n" +
+	"\x16_hacker_perk_available\"\x82\x02\n" +
 	"\x16RenameCharacterRequest\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\";\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\"\n" +
+	"\fintelligence\x18\x03 \x01(\x05R\fintelligence\x127\n" +
+	"\x15hacker_perk_available\x18\x04 \x01(\bH\x00R\x13hackerPerkAvailable\x88\x01\x01\x12+\n" +
+	"\x11expected_revision\x18\x05 \x01(\x04R\x10expectedRevisionB\x18\n" +
+	"\x16_hacker_perk_available\"h\n" +
 	"\x16DeleteCharacterRequest\x12!\n" +
-	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\"p\n" +
+	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12+\n" +
+	"\x11expected_revision\x18\x02 \x01(\x04R\x10expectedRevision\"p\n" +
 	"\x1bRenameLogicalSessionRequest\x12,\n" +
 	"\x12logical_session_id\x18\x01 \x01(\tR\x10logicalSessionId\x12#\n" +
 	"\rfallback_name\x18\x02 \x01(\tR\ffallbackName\"i\n" +
@@ -1738,6 +1803,8 @@ func file_fallout_terminal_private_v1_desktop_proto_init() {
 	file_fallout_terminal_private_v1_desktop_proto_msgTypes[10].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_desktop_proto_msgTypes[12].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_desktop_proto_msgTypes[15].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_desktop_proto_msgTypes[17].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_desktop_proto_msgTypes[18].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

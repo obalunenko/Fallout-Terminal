@@ -335,8 +335,8 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 		Version: 1,
 		Name:    "demo-players",
 		Roster: []domain.CharacterRosterEntry{
-			{ID: "scout", Name: "Разведчик"},
-			{ID: "medic", Name: "Медик"},
+			{ID: "scout", Name: "Разведчик", Intelligence: 6, HackerPerkAvailable: false},
+			{ID: "medic", Name: "Медик", Intelligence: 9, HackerPerkAvailable: true},
 		},
 	})
 	require.NoError(t, err)
