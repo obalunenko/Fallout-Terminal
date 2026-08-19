@@ -65,6 +65,20 @@
       },
       "registered_skills": [],
       "installed_at": "2026-08-09T00:33:03.948757+00:00"
+    },
+    "feature-numbering": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:b5cc65de3f11e0704197179a043459750244bf1deb35619ae699eb59cde1ef2d",
+      "enabled": true,
+      "priority": 5,
+      "registered_commands": {
+        "codex": [
+          "speckit.feature-numbering.before-specify"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-19T17:28:27.273692+00:00"
     }
   }
 }
