@@ -68,6 +68,62 @@ Expected reveal and keyboard coverage:
 - Pending-row dud removal updates the queued row descriptor without exposing its cells early; existing rows remain connected and subsequent rows continue at the original 40ms cadence until all 32 are visible.
 - A replacement hacking generation disconnects every old row, cancels stale callbacks, and starts exactly one fresh reveal.
 - A key pressed during the hacking reveal completes all 32 rows within 100ms and is consumed before typed input, guessing, pattern activation, or navigation; a later key works normally.
+- A fresh hacking generation calculates one complete-board row font before its first row appears; uninterrupted row insertion and skip completion retain that exact computed size rather than visibly zooming out.
+- Normal, compact/stacked, 200%-zoom-equivalent, bundled-font, and fallback-font layouts each use one computed row font throughout their reveal.
+- A genuine viewport, orientation, or active-font change may choose a new size, but it measures revealed and queued rows together, preserves already-revealed row nodes, and starts no new reveal.
+
+### BUG-003 hacking font-stability observation
+
+Before activating a fresh `hacking` fixture, install an observer that samples the
+first visible row after every progressive append:
+
+```js
+window.hackRevealFonts = [];
+window.hackFontObserver = new MutationObserver(records => {
+  if (!records.some(record => [...record.addedNodes].some(node =>
+    node.nodeType === Node.ELEMENT_NODE &&
+    (node.matches?.('.hack-row') || node.querySelector?.('.hack-row'))))) return;
+  requestAnimationFrame(() => {
+    const rows = document.querySelectorAll('#hackColumns .hack-row');
+    if (!rows.length) return;
+    hackRevealFonts.push({
+      count: rows.length,
+      font: Number.parseFloat(getComputedStyle(rows[0]).fontSize),
+    });
+  });
+});
+hackFontObserver.observe(document.querySelector('#hackColumns'), {
+  childList: true,
+  subtree: true,
+});
+```
+
+Let one run complete normally and press a key during a second run to complete it
+early. For each run, inspect:
+
+```js
+({
+  samples: hackRevealFonts,
+  uniqueFonts: [...new Set(hackRevealFonts.map(sample => sample.font.toFixed(3)))],
+})
+```
+
+Expected: sampling begins before all 32 rows are present and `uniqueFonts` has
+exactly one value through either normal or skipped completion. Repeat at
+1440×900, 360×640, and a 512×300 viewport that exercises the automated
+200%-zoom fallback layout. Verify the default bundled font, then set
+`document.body.style.fontFamily = "'Courier New', monospace"`, await
+`document.fonts.ready`, and repeat for fallback metrics. In a real browser also
+set page zoom to 200% and confirm visually that rows reveal without growing or
+shrinking.
+
+For a legitimate refit, retain the first row object while fewer than 32 rows are
+visible, change the viewport width or orientation, switch the body font, await
+font readiness, and dispatch `resize`. The computed size may change once. The
+visible row count must remain below 32 until its original reveal turns arrive;
+after completion, the first row must still be the retained object and the final
+font must equal the post-refit partial font. This proves the refit included the
+queued rows without replaying or exposing them.
 
 ### Deterministic dud-removal observation
 
@@ -177,13 +233,16 @@ Publish content containing a 25-row folder, an empty folder, a multiline record,
 2. Scanlines and vignette never intercept pointer or keyboard controls.
 3. New list, record, and command identities reveal once at the historical cadence.
 4. Enter a fresh hacking generation: the 32 complete address-and-code rows appear one at a time at the same 40ms cadence instead of the full grid appearing at once.
-5. During that reveal, verify only visible complete rows can be focused or clicked; trigger an unchanged hacking update, reconnect, and resize, and confirm existing rows stay in place while the reveal continues or remains complete.
-6. Replace the hacking generation mid-reveal and confirm no old row reappears after the fresh board begins.
-7. Press a key during each normal-content and hacking reveal: the full visible page or board appears immediately and that key performs no normal or hacking action.
-8. Hold the consumed key: repeats do nothing until release; press a later key and confirm its normal action works.
-9. Change pages and resize the viewport: already-opened content does not replay.
-10. Confirm flicker, cursor blink, pending pulse, scanlines, and vignette continue after every reveal skip.
-11. Confirm there is no player setting or operating-system preference path that disables those persistent effects.
+5. Watch the hacking code text from the first row through all 32 rows and through a key-driven skip: its size must remain visually fixed, with no zoom-out during either completion path.
+6. Repeat at compact/stacked width, real 200% browser zoom, and with fallback-font metrics; inspect `getComputedStyle` as described above and confirm one size per reveal.
+7. During that reveal, verify only visible complete rows can be focused or clicked; trigger an unchanged hacking update and reconnect, and confirm existing rows stay in place while the reveal continues or remains complete.
+8. Resize or rotate the viewport and change the active font mid-reveal. A legitimate refit may change the size once, but must use the full queued board, keep revealed nodes in place, and continue the original reveal without replay.
+9. Replace the hacking generation mid-reveal and confirm no old row reappears after the fresh board begins.
+10. Press a key during each normal-content and hacking reveal: the full visible page or board appears immediately and that key performs no normal or hacking action.
+11. Hold the consumed key: repeats do nothing until release; press a later key and confirm its normal action works.
+12. Change pages and resize the viewport: already-opened content does not replay.
+13. Confirm flicker, cursor blink, pending pulse, scanlines, and vignette continue after every reveal skip.
+14. Confirm there is no player setting or operating-system preference path that disables those persistent effects.
 
 Record unavailable manual checks honestly; do not infer them from automation.
 
@@ -211,3 +270,15 @@ Race, packaging, signing, notarization, and real external-provider checks remain
 - `go run ./cmd/build build` passed and produced the unsigned macOS application at `build/bin/Fallout Terminal.app`.
 
 FR-018, FR-019, FR-022, SC-010, and SC-011 are covered by the focused asset and browser checks above. No separate signed, notarized, or real-provider run was performed; those remain conditional repository gates.
+
+## BUG-003 validation record — 2026-08-19
+
+- `node --check client/client.js` passed, and `go test ./internal/platform -run 'TestPlayer(HackingColumnFontFitContract|CRTHackingRevealFontStabilityAssetContract|CRTHackingRevealAssetContract)' -count=1` passed the focused complete-board asset contracts.
+- The five focused BUG-003 Playwright cases passed at normal, compact/stacked, 200%-zoom-equivalent, skip-completion, and mid-reveal viewport/font-refit layouts. The browser-interactive journey observed one computed size throughout ordinary or skipped insertion and proved that a legitimate refit preserved the first row object, used queued rows, and replayed zero rows.
+- `npm test --prefix tests/browser -- crt-rendering.spec.mjs` passed all 30 focused CRT tests, including inherited responsive containment, reveal cadence, same-generation reconciliation, replacement, input, safety, and persistent-effect coverage.
+- `npm run build --prefix client`, `gofmt -l .`, `go vet ./...`, and `go test ./...` passed. Go linking emitted only the repository/environment macOS deployment-target warnings.
+- `npm test --prefix tests/browser` passed all 98 local browser tests; 2 conditional authenticated-ngrok checks were skipped because the external provider was not enabled. Convergence aligned the stale bundled-demo authoring assertion with the accepted completed-example contract while leaving `sessions/demo.json` and the CRT persistence non-goal unchanged.
+- `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` completed, and `git diff --exit-code -- frontend/bindings` confirmed zero generated-binding drift.
+- `go run ./cmd/build build` passed and produced the unsigned macOS application at `build/bin/Fallout Terminal.app`.
+
+FR-023 and SC-012 are covered by the BUG-003 asset and browser checks above; FR-015 through FR-017 and SC-010 remain green in the full focused CRT journey, and the complete browser regression gate is green after convergence.
