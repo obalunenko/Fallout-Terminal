@@ -41,7 +41,36 @@ make package    # локальный .app
 make test       # тесты
 make test-race  # тесты с race detector
 make check      # полный набор проверок
+make speckit-install      # Spec Kit и расширения
+make speckit-update-check # проверить обновления Spec Kit
 ```
+
+### Spec Kit и расширения
+
+Для работы со спецификациями нужны Python 3.11+ и [uv](https://docs.astral.sh/uv/getting-started/installation/). Репозиторий уже инициализирован для Codex, поэтому повторно запускать `specify init` не нужно. Из корня проекта одной командой установите закреплённую версию [GitHub Spec Kit](https://github.com/github/spec-kit) и все используемые расширения:
+
+```bash
+make speckit-install
+```
+
+Цель устанавливает Spec Kit 0.16.5 и воспроизводимо переустанавливает `companion` 0.20.1, `brownfield` 1.0.0, `bugfix` 1.1.0 и локальный `feature-numbering` 1.0.0. Для собственного расширения используется обязательный `--dev` и приоритет 5; для остальных — приоритет 10. В конце команда выводит версии и зарегистрированные расширения.
+
+Все закреплённые версии объявлены в `Makefile` и передаются установочному скрипту через environment. Проверить доступные обновления без установки и изменения файлов можно отдельной командой:
+
+```bash
+make speckit-update-check
+```
+
+Она запускает read-only `specify self check`, сравнивает установленные extensions/plugins с версиями из `Makefile`, проверяет последние стабильные upstream-теги и сверяет локальный manifest `feature-numbering`.
+
+Проверить установку отдельно можно так:
+
+```bash
+specify version
+specify extension list
+```
+
+После установки или переустановки расширений перезапустите Codex, чтобы он перечитал сгенерированные skills. Конфигурация hooks хранится в `.specify/extensions.yml`, а исходники собственного расширения — в `.speckit/feature-numbering/`.
 
 ## Как настроить терминал
 
