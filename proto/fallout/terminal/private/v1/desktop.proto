@@ -81,6 +81,17 @@ message ResolveCommandExecutionResult {
   CoordinationState state = 3;
 }
 
+message ResolveTerminalNavigationRequest {
+  string request_id = 1;
+  TerminalNavigationDecision decision = 2;
+}
+
+message ResolveTerminalNavigationResult {
+  bool ok = 1;
+  optional string error = 2;
+  CoordinationState state = 3;
+}
+
 message ResetCommandStateRequest {
   string terminal_id = 1;
   string command_id = 2;

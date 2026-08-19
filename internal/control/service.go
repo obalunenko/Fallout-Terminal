@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/Fallout-Terminal/internal/nav"
 )
 
 const defaultRequestResultLimit = 256
@@ -82,6 +83,12 @@ type CommandStateStore interface {
 	ResetTerminalCommandStates(terminalID string) (CommandStateMutation, error)
 }
 
+// TerminalCatalog resolves only detached values from the latest validated session.
+type TerminalCatalog interface {
+	LookupTerminal(terminalID string) (domain.TerminalTarget, bool)
+	LookupTerminalTransition(sourceTerminalID, commandID string) (domain.TerminalTransitionTarget, bool)
+}
+
 // Config supplies deterministic seams for identifiers and ordered effects.
 // Enqueue must only place the detached effect onto another owner; it must not
 // call back into Service while the coordinator transaction is still locked.
@@ -93,6 +100,7 @@ type Config struct {
 	TrustedHack        TrustedHackRuntime
 	RosterStore        RosterStore
 	CommandStateStore  CommandStateStore
+	TerminalCatalog    TerminalCatalog
 	RequestResultLimit int
 }
 
@@ -143,6 +151,7 @@ type Service struct {
 	trustedHack         TrustedHackRuntime
 	rosterStore         RosterStore
 	commandStateStore   CommandStateStore
+	terminalCatalog     TerminalCatalog
 	requirePlayerConfig bool
 	requestResultLimit  int
 }
@@ -194,6 +203,7 @@ func New(config Config) *Service {
 		trustedHack:         config.TrustedHack,
 		rosterStore:         config.RosterStore,
 		commandStateStore:   config.CommandStateStore,
+		terminalCatalog:     config.TerminalCatalog,
 		requirePlayerConfig: config.RosterStore != nil,
 		requestResultLimit:  requestResultLimit,
 	}
@@ -327,7 +337,7 @@ func (service *Service) compoundUpdateLocked(runtime *domain.ProcessRuntime, ses
 		update.Terminal = &presentation
 		return update
 	}
-	if live := service.terminals.ProjectRuntime(terminal); live != nil {
+	if live := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal)); live != nil {
 		presentation := domain.TerminalPresentation{Live: clonePublicLiveState(live)}
 		update.Terminal = &presentation
 		update.Nav = &live.Nav
@@ -371,7 +381,7 @@ func (service *Service) CurrentLiveForSession(sessionID domain.LogicalSessionID)
 	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
 		return nil, service.runtime.Revision, false
 	}
-	projection := service.terminals.ProjectRuntime(terminal)
+	projection := decorateTerminalNavigation(&service.runtime, service.terminals.ProjectRuntime(terminal))
 	if projection == nil {
 		return nil, service.runtime.Revision, false
 	}
@@ -710,6 +720,7 @@ func (service *Service) RequestTerminalActivation(target domain.TerminalTarget) 
 			return transition{}
 		}
 		clearCommandExecutionRuntime(runtime)
+		clearTerminalNavigationRuntime(runtime)
 		if source := activeTerminalRuntime(broadcast); unfinishedTerminalRuntime(source) && source.TerminalID != target.TerminalID {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -777,6 +788,7 @@ func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState,
 		}
 		source := activeTerminalRuntime(broadcast)
 		clearCommandExecutionRuntime(runtime)
+		navigationCleared := clearTerminalNavigationRuntime(runtime)
 		if unfinishedTerminalRuntime(source) {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -787,6 +799,9 @@ func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState,
 		}
 		if source == nil && broadcast.ActiveTerminalID == nil {
 			state = masterSnapshot(runtime)
+			if navigationCleared {
+				return transition{accepted: true, effects: stateEffects(runtime)}
+			}
 			return transition{}
 		}
 		if source != nil {
@@ -968,6 +983,152 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 	}
 	state.Revision = result.revision
 	return domain.CloneMasterCoordinationState(state), mutation, resolveErr
+}
+
+// ResolveTerminalNavigation applies one exact game-master decision without
+// entering the manual terminal-switch lifecycle.
+func (service *Service) ResolveTerminalNavigation(requestID string, decision domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return service.Snapshot(), fmt.Errorf("terminal navigation request ID must not be blank")
+	}
+	if decision != domain.TerminalNavigationApprove && decision != domain.TerminalNavigationReject {
+		return service.Snapshot(), fmt.Errorf("terminal navigation decision must be approve or reject")
+	}
+
+	var state *domain.MasterCoordinationState
+	var resolveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		pending := runtime.PendingTerminalNavigation
+		broadcast := runtime.Broadcast
+		source := activeTerminalRuntime(broadcast)
+		if pending == nil || pending.RequestID != requestID || broadcast == nil || pending.BroadcastID != broadcast.ID ||
+			source == nil || source.TerminalID != pending.SourceTerminalID {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation decision is stale")
+			return transition{}
+		}
+		if decision == domain.TerminalNavigationReject {
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = nil
+			state = masterSnapshot(runtime)
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+		if pending.Direction == domain.TerminalNavigationReturn {
+			if service.terminalCatalog == nil || len(broadcast.Route) == 0 ||
+				!sameTerminalReturnPoint(broadcast.Route[len(broadcast.Route)-1], pending.ReturnPoint) {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation route changed")
+				return transition{}
+			}
+			latest, ok := service.terminalCatalog.LookupTerminal(pending.TargetTerminalID)
+			if !ok || latest.TerminalID != pending.ReturnPoint.TerminalID {
+				targetID := pending.TargetTerminalID
+				runtime.PendingTerminalNavigation = nil
+				runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+					Reason: domain.TerminalNavigationNoticeTargetMissing, SourceTerminalID: pending.SourceTerminalID,
+					CommandID: pending.CommandID, TargetTerminalID: &targetID,
+				}
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation return target is unavailable")
+				effects := stateEffects(runtime)
+				if projection := service.projectActiveTerminal(runtime); projection != nil {
+					effects = append(effects, Effect{Live: projection})
+				}
+				return transition{accepted: true, effects: effects}
+			}
+			lifecycle, ok := service.terminals.(terminalDecisionLifecycle)
+			if !ok {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation lifecycle is unavailable")
+				return transition{}
+			}
+			lifecycle.SuspendRuntime(source)
+			targetRuntime := broadcast.TerminalRuntimes[latest.TerminalID]
+			var projection *domain.PublicLiveState
+			if targetRuntime == nil {
+				targetRuntime, projection = lifecycle.CreateRuntime(latest)
+				broadcast.TerminalRuntimes[latest.TerminalID] = targetRuntime
+			} else {
+				projection = lifecycle.ReactivateRuntime(targetRuntime, latest)
+			}
+			if targetRuntime == nil || projection == nil {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation return target could not be activated")
+				return transition{}
+			}
+			targetRuntime.Nav = nav.RestoreFolder(latest.Tree, pending.ReturnPoint.FolderID, pending.ReturnPoint.AncestorFolderIDs)
+			projection.Nav = targetRuntime.Nav
+			broadcast.Route = broadcast.Route[:len(broadcast.Route)-1]
+			targetID := latest.TerminalID
+			broadcast.ActiveTerminalID = &targetID
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = nil
+			projection = decorateTerminalNavigation(runtime, projection)
+			state = masterSnapshot(runtime)
+			return transition{accepted: true, effects: append(stateEffects(runtime), Effect{Live: projection})}
+		}
+		if pending.Direction != domain.TerminalNavigationForward || service.terminalCatalog == nil {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target is unavailable")
+			return transition{}
+		}
+		latest, ok := service.terminalCatalog.LookupTerminalTransition(pending.SourceTerminalID, pending.CommandID)
+		if !ok || latest.Target.TerminalID != pending.TargetTerminalID || latest.Target.TerminalID == pending.SourceTerminalID {
+			targetID := pending.TargetTerminalID
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+				Reason: domain.TerminalNavigationNoticeTargetChanged, SourceTerminalID: pending.SourceTerminalID,
+				CommandID: pending.CommandID, TargetTerminalID: &targetID,
+			}
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target changed")
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+		lifecycle, ok := service.terminals.(terminalDecisionLifecycle)
+		if !ok {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation lifecycle is unavailable")
+			return transition{}
+		}
+		lifecycle.SuspendRuntime(source)
+		targetRuntime := broadcast.TerminalRuntimes[latest.Target.TerminalID]
+		var projection *domain.PublicLiveState
+		if targetRuntime == nil {
+			targetRuntime, projection = lifecycle.CreateRuntime(latest.Target)
+			broadcast.TerminalRuntimes[latest.Target.TerminalID] = targetRuntime
+		} else {
+			projection = lifecycle.ReactivateRuntime(targetRuntime, latest.Target)
+		}
+		if targetRuntime == nil || projection == nil {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target could not be activated")
+			return transition{}
+		}
+		targetRuntime.Nav = domain.NavState{Path: []string{"root"}, Mode: "list"}
+		projection.Nav = targetRuntime.Nav
+		broadcast.Route = append(broadcast.Route, pending.ReturnPoint)
+		targetID := latest.Target.TerminalID
+		broadcast.ActiveTerminalID = &targetID
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
+		projection = decorateTerminalNavigation(runtime, projection)
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: append(stateEffects(runtime), Effect{Live: projection})}
+	})
+	if state == nil {
+		state = service.Snapshot()
+	}
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), resolveErr
 }
 
 func (service *Service) failPendingCommandExecution(runtime *domain.ProcessRuntime, terminal *domain.TerminalRuntime, pending *domain.PendingCommandExecution, state **domain.MasterCoordinationState) transition {
@@ -1172,6 +1333,8 @@ func (service *Service) StartBroadcast() (*domain.MasterCoordinationState, error
 			TerminalRuntimes:     make(map[string]*domain.TerminalRuntime),
 		}
 		runtime.PendingSwitch = nil
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
 		clearRequestResults(runtime)
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
@@ -1195,6 +1358,8 @@ func (service *Service) EndBroadcast() (*domain.MasterCoordinationState, error) 
 		runtime.Broadcast = nil
 		runtime.PendingSwitch = nil
 		runtime.PendingCommandExecution = nil
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
 		clearRequestResults(runtime)
 		state = masterSnapshot(runtime)
 		effects := stateEffects(runtime)
@@ -1341,7 +1506,7 @@ func (service *Service) subscriptionSnapshot(runtime *domain.ProcessRuntime, ses
 	if service.terminals != nil && runtime.Broadcast != nil && sessionAssigned(runtime.Broadcast, sessionID) {
 		terminal := activeTerminalRuntime(runtime.Broadcast)
 		if terminal != nil && terminal.Lifecycle == domain.TerminalLifecycleActive {
-			if live := service.terminals.ProjectRuntime(terminal); live != nil {
+			if live := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal)); live != nil {
 				presentation = domain.TerminalPresentation{Live: clonePublicLiveState(live)}
 			}
 		}
@@ -1523,9 +1688,72 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
-		if runtime.PendingCommandExecution != nil {
+		if runtime.PendingCommandExecution != nil || runtime.PendingTerminalNavigation != nil {
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonConflict, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
+		}
+		if rootReturnRequested(terminal, command, runtime.Broadcast.Route) {
+			top := cloneTerminalReturnPoint(runtime.Broadcast.Route[len(runtime.Broadcast.Route)-1])
+			runtime.PendingTerminalNavigation = &domain.PendingTerminalNavigation{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID, ControllerSessionID: sessionID,
+				Direction:        domain.TerminalNavigationReturn,
+				SourceTerminalID: terminal.TerminalID, SourceTerminalName: terminal.TerminalName,
+				CommandID: top.CommandID, CommandName: top.CommandName,
+				TargetTerminalID: top.TerminalID, TargetTerminalName: top.TerminalName,
+				ReturnPoint: top,
+			}
+			runtime.TerminalNavigationNotice = nil
+			outcome = domain.ActionResult{RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted, Revision: runtime.Revision + 1}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
+		}
+		if authored, linked := authoredLinkedCommand(terminal, command); linked {
+			lookup, ok := domain.TerminalTransitionTarget{}, false
+			if service.terminalCatalog != nil {
+				lookup, ok = service.terminalCatalog.LookupTerminalTransition(terminal.TerminalID, authored.ID)
+			}
+			if !ok || lookup.Target.TerminalID == terminal.TerminalID || lookup.Target.TerminalID != authored.TerminalTransition.TargetTerminalID {
+				targetID := authored.TerminalTransition.TargetTerminalID
+				runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+					Reason: domain.TerminalNavigationNoticeTargetMissing, SourceTerminalID: terminal.TerminalID,
+					CommandID: authored.ID, TargetTerminalID: &targetID,
+				}
+				outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision+1)
+				service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+				return transition{accepted: true, effects: append(stateEffects(runtime), playerActionResultEffect(connectionID, sessionID, outcome))}
+			}
+			folderID := "root"
+			ancestors := []string(nil)
+			if len(terminal.Nav.Path) != 0 {
+				folderID = terminal.Nav.Path[len(terminal.Nav.Path)-1]
+				ancestors = append([]string(nil), terminal.Nav.Path[:len(terminal.Nav.Path)-1]...)
+			}
+			runtime.PendingTerminalNavigation = &domain.PendingTerminalNavigation{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID, ControllerSessionID: sessionID,
+				Direction:        domain.TerminalNavigationForward,
+				SourceTerminalID: terminal.TerminalID, SourceTerminalName: terminal.TerminalName,
+				CommandID: authored.ID, CommandName: authored.Name,
+				TargetTerminalID: lookup.Target.TerminalID, TargetTerminalName: lookup.Target.TerminalName,
+				ReturnPoint: domain.TerminalReturnPoint{
+					TerminalID: terminal.TerminalID, TerminalName: terminal.TerminalName,
+					FolderID: folderID, AncestorFolderIDs: ancestors,
+					CommandID: authored.ID, CommandName: authored.Name,
+				},
+			}
+			runtime.TerminalNavigationNotice = nil
+			outcome = domain.ActionResult{RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted, Revision: runtime.Revision + 1}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
 		}
 		if authored, initial := initialStateChangingCommand(terminal, command); initial {
 			runtime.PendingCommandExecution = &domain.PendingCommandExecution{
@@ -1794,6 +2022,37 @@ func clearCommandExecutionRuntime(runtime *domain.ProcessRuntime) {
 	}
 }
 
+func authoredLinkedCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
+	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
+		return nil, false
+	}
+	folder := &runtime.Tree
+	if len(runtime.Nav.Path) == 0 || runtime.Nav.Path[0] != runtime.Tree.ID {
+		return nil, false
+	}
+	for _, folderID := range runtime.Nav.Path[1:] {
+		var next *domain.ContentNode
+		for index := range folder.Children {
+			child := &folder.Children[index]
+			if child.ID == folderID && child.Type == domain.NodeFolder {
+				next = child
+				break
+			}
+		}
+		if next == nil {
+			return nil, false
+		}
+		folder = next
+	}
+	for index := range folder.Children {
+		candidate := &folder.Children[index]
+		if candidate.ID == command.NodeID && candidate.Type == domain.NodeCommand && candidate.TerminalTransition != nil {
+			return candidate, true
+		}
+	}
+	return nil, false
+}
+
 func initialStateChangingCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
 	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
 		return nil, false
@@ -1884,11 +2143,77 @@ func (service *Service) projectActiveTerminal(runtime *domain.ProcessRuntime) *d
 	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
 		return nil
 	}
-	return service.terminals.ProjectRuntime(terminal)
+	return decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal))
+}
+
+func decorateTerminalNavigation(runtime *domain.ProcessRuntime, live *domain.PublicLiveState) *domain.PublicLiveState {
+	if live == nil {
+		return nil
+	}
+	result := clonePublicLiveState(live)
+	if runtime == nil || runtime.Broadcast == nil {
+		result.TerminalNavigation = nil
+		return result
+	}
+	broadcast := runtime.Broadcast
+	if len(broadcast.Route) == 0 && runtime.PendingTerminalNavigation == nil {
+		result.TerminalNavigation = nil
+		return result
+	}
+	presentation := &domain.TerminalNavigationPresentation{RouteDepth: uint32(len(broadcast.Route))}
+	if len(broadcast.Route) != 0 {
+		top := broadcast.Route[len(broadcast.Route)-1]
+		presentation.ReturnTarget = &domain.TerminalReturnTarget{TerminalID: top.TerminalID, TerminalName: top.TerminalName}
+	}
+	if pending := runtime.PendingTerminalNavigation; pending != nil {
+		presentation.Pending = &domain.PendingTerminalNavigationPresentation{
+			Direction: pending.Direction, TargetTerminalID: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+		}
+	}
+	result.TerminalNavigation = presentation
+	return result
 }
 
 func unfinishedTerminalRuntime(runtime *domain.TerminalRuntime) bool {
 	return runtime != nil && runtime.Hack != nil && !runtime.Hack.Solved && !runtime.Hack.Failed
+}
+
+func clearTerminalNavigationRuntime(runtime *domain.ProcessRuntime) bool {
+	if runtime == nil {
+		return false
+	}
+	changed := runtime.PendingTerminalNavigation != nil || runtime.TerminalNavigationNotice != nil
+	runtime.PendingTerminalNavigation = nil
+	runtime.TerminalNavigationNotice = nil
+	if runtime.Broadcast != nil && len(runtime.Broadcast.Route) != 0 {
+		runtime.Broadcast.Route = nil
+		changed = true
+	}
+	return changed
+}
+
+func rootReturnRequested(terminal *domain.TerminalRuntime, command domain.RuntimeCommand, route []domain.TerminalReturnPoint) bool {
+	return terminal != nil && command.Kind == domain.RuntimeCommandNavigate && command.Action == "back" &&
+		len(route) != 0 && terminal.Nav.Mode == "list" && len(terminal.Nav.Path) == 1 && terminal.Nav.Path[0] == "root" &&
+		terminal.Nav.ViewEntryID == nil && terminal.Nav.CommandNodeID == nil
+}
+
+func cloneTerminalReturnPoint(point domain.TerminalReturnPoint) domain.TerminalReturnPoint {
+	point.AncestorFolderIDs = append([]string(nil), point.AncestorFolderIDs...)
+	return point
+}
+
+func sameTerminalReturnPoint(left, right domain.TerminalReturnPoint) bool {
+	if left.TerminalID != right.TerminalID || left.TerminalName != right.TerminalName || left.FolderID != right.FolderID ||
+		left.CommandID != right.CommandID || left.CommandName != right.CommandName || len(left.AncestorFolderIDs) != len(right.AncestorFolderIDs) {
+		return false
+	}
+	for index := range left.AncestorFolderIDs {
+		if left.AncestorFolderIDs[index] != right.AncestorFolderIDs[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func sessionAssigned(broadcast *domain.LiveBroadcast, sessionID domain.LogicalSessionID) bool {
@@ -1983,7 +2308,7 @@ func (service *Service) appendCurrentTerminalEffect(runtime *domain.ProcessRunti
 	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
 		return effects
 	}
-	projection := service.terminals.ProjectRuntime(terminal)
+	projection := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal))
 	if projection == nil {
 		return effects
 	}
@@ -2218,6 +2543,25 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
 		}
 	}
+	if pending := runtime.PendingTerminalNavigation; pending != nil {
+		routeDepth := uint32(0)
+		if runtime.Broadcast != nil {
+			routeDepth = uint32(len(runtime.Broadcast.Route))
+		}
+		state.PendingTerminalNavigation = &domain.MasterPendingTerminalNavigation{
+			RequestID: pending.RequestID, BroadcastID: pending.BroadcastID, Direction: pending.Direction,
+			SourceTerminalID: pending.SourceTerminalID, SourceTerminalName: pending.SourceTerminalName,
+			CommandID: pending.CommandID, CommandName: pending.CommandName,
+			TargetTerminalID: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+			RouteDepth: routeDepth,
+		}
+	}
+	if notice := runtime.TerminalNavigationNotice; notice != nil {
+		state.TerminalNavigationNotice = &domain.MasterTerminalNavigationNotice{
+			Reason: notice.Reason, SourceTerminalID: notice.SourceTerminalID,
+			CommandID: notice.CommandID, TargetTerminalID: cloneString(notice.TargetTerminalID),
+		}
+	}
 	return state
 }
 
@@ -2414,6 +2758,16 @@ func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime 
 		pending := *runtime.PendingCommandExecution
 		clone.PendingCommandExecution = &pending
 	}
+	if runtime.PendingTerminalNavigation != nil {
+		pending := *runtime.PendingTerminalNavigation
+		pending.ReturnPoint.AncestorFolderIDs = append([]string(nil), runtime.PendingTerminalNavigation.ReturnPoint.AncestorFolderIDs...)
+		clone.PendingTerminalNavigation = &pending
+	}
+	if runtime.TerminalNavigationNotice != nil {
+		notice := *runtime.TerminalNavigationNotice
+		notice.TargetTerminalID = cloneString(runtime.TerminalNavigationNotice.TargetTerminalID)
+		clone.TerminalNavigationNotice = &notice
+	}
 	return &clone
 }
 
@@ -2455,6 +2809,11 @@ func cloneBroadcast(broadcast *domain.LiveBroadcast) *domain.LiveBroadcast {
 	clone.TerminalRuntimes = make(map[string]*domain.TerminalRuntime, len(broadcast.TerminalRuntimes))
 	for terminalID, runtime := range broadcast.TerminalRuntimes {
 		clone.TerminalRuntimes[terminalID] = cloneTerminalRuntime(runtime)
+	}
+	clone.Route = make([]domain.TerminalReturnPoint, len(broadcast.Route))
+	for index, point := range broadcast.Route {
+		clone.Route[index] = point
+		clone.Route[index].AncestorFolderIDs = append([]string(nil), point.AncestorFolderIDs...)
 	}
 	return &clone
 }
@@ -2508,11 +2867,31 @@ func clonePublicLiveState(state *domain.PublicLiveState) *domain.PublicLiveState
 		execution := *state.CommandExecution
 		clone.CommandExecution = &execution
 	}
+	if state.TerminalNavigation != nil {
+		navigation := *state.TerminalNavigation
+		if state.TerminalNavigation.ReturnTarget != nil {
+			value := *state.TerminalNavigation.ReturnTarget
+			navigation.ReturnTarget = &value
+		}
+		if state.TerminalNavigation.Pending != nil {
+			value := *state.TerminalNavigation.Pending
+			navigation.Pending = &value
+		}
+		clone.TerminalNavigation = &navigation
+	}
 	return &clone
 }
 
 func cloneContentNode(node domain.ContentNode) domain.ContentNode {
 	clone := node
+	if node.StateChange != nil {
+		value := *node.StateChange
+		clone.StateChange = &value
+	}
+	if node.TerminalTransition != nil {
+		value := *node.TerminalTransition
+		clone.TerminalTransition = &value
+	}
 	if node.Children != nil {
 		clone.Children = make([]domain.ContentNode, len(node.Children))
 		for index := range node.Children {

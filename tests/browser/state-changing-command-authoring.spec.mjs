@@ -54,8 +54,15 @@ test.beforeEach(async ({ page }) => {
   await openAuthoringFixture(page);
 });
 
-test('bundled read-only demo exposes state-changing examples only in their initial state', async () => {
+test('bundled read-only demo exposes every configurable command mode in its initial state', async () => {
   const demo = JSON.parse(await readFile(BUNDLED_DEMO_URL, 'utf8'));
+  const terminalIDs = new Set(demo.terminals.map(terminal => terminal.id));
+  expect([...terminalIDs]).toEqual(['t_demo1', 't_demo2']);
+  expect(demo.playerConfig).toBe('demo-players.json');
+  expect(demo.terminals.some(terminal => terminal.hackLevel === 0)).toBe(true);
+  expect(demo.terminals.some(terminal => terminal.hackLevel > 0 && terminal.hackLevel <= 5)).toBe(true);
+  expect(demo.terminals.some(terminal => terminal.introText.trim() !== '')).toBe(true);
+  expect(demo.terminals.some(terminal => terminal.introText === '')).toBe(true);
   const nodes = demo.terminals.flatMap((terminal) => {
     const collected = [];
     const visit = (node, isRoot = false) => {
@@ -66,35 +73,51 @@ test('bundled read-only demo exposes state-changing examples only in their initi
     return collected;
   });
   const commands = nodes.filter(node => node.type === 'command');
+  const ordinaryCommands = commands.filter(command => !command.stateChange && !command.terminalTransition);
+  const stateChangingCommands = commands.filter(command => command.stateChange);
+  const terminalTransitionCommands = commands.filter(command => command.terminalTransition);
   const completed = demo.terminals.flatMap(terminal => Object.keys(terminal.commandStates ?? {}));
 
   expect(nodes.some(node => node.type === 'folder')).toBe(true);
   expect(nodes.some(node => node.type === 'entry')).toBe(true);
-  expect(commands.length).toBeGreaterThan(0);
-  for (const command of commands) {
+  expect(ordinaryCommands.length).toBeGreaterThan(0);
+  for (const command of ordinaryCommands) {
+    expect(command.name.trim()).not.toBe('');
+    expect(command.text.trim()).not.toBe('');
+  }
+  expect(stateChangingCommands.length).toBeGreaterThan(0);
+  for (const command of stateChangingCommands) {
     expect(command.name.trim()).not.toBe('');
     expect(command.text.trim()).not.toBe('');
     expect(command.stateChange?.completedName?.trim()).not.toBe('');
     expect(command.stateChange?.confirmationText?.trim()).not.toBe('');
     expect(command.stateChange.confirmationText).not.toContain(command.name);
+    expect(command.terminalTransition).toBeUndefined();
+  }
+  expect(terminalTransitionCommands.length).toBeGreaterThan(0);
+  for (const command of terminalTransitionCommands) {
+    expect(command.name.trim()).not.toBe('');
+    expect(command.stateChange).toBeUndefined();
+    expect(command.terminalTransition.targetTerminalId.trim()).not.toBe('');
+    expect(terminalIDs.has(command.terminalTransition.targetTerminalId)).toBe(true);
   }
   expect(completed).toEqual([]);
 });
 
-test('state-change toggle requires all four authored texts and persists an optional config', async ({ page }) => {
+test('state-change mode requires all four authored texts and persists one config', async ({ page }) => {
   await selectCommand(page, 'Включить аварийный свет');
 
   const form = page.locator('#nodeForm');
-  const enabled = form.getByLabel('ИЗМЕНЯЕТ СОСТОЯНИЕ');
+  const mode = form.getByLabel('РЕЖИМ КОМАНДЫ');
   const initialName = form.getByLabel('ИСХОДНОЕ НАЗВАНИЕ');
   const completedName = form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ');
   const confirmationText = form.getByLabel('ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ');
   const successText = form.getByLabel('ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ');
 
-  await expect(enabled).not.toBeChecked();
+  await expect(mode).toHaveValue('ordinary');
   await expect(completedName).toBeHidden();
   await expect(confirmationText).toBeHidden();
-  await enabled.check();
+  await mode.selectOption('state-change');
   await expect(completedName).toBeVisible();
   await expect(confirmationText).toBeVisible();
 
@@ -128,7 +151,7 @@ test('state-change toggle requires all four authored texts and persists an optio
     },
   }));
 
-  await enabled.uncheck();
+  await mode.selectOption('ordinary');
   await expect(completedName).toBeHidden();
   await expect(confirmationText).toBeHidden();
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
@@ -145,7 +168,7 @@ test('completed command displays its frozen snapshot while authored fields remai
   await selectCommand(page, 'Двери открыты');
 
   const form = page.locator('#nodeForm');
-  await expect(form.getByLabel('ИЗМЕНЯЕТ СОСТОЯНИЕ')).toBeChecked();
+  await expect(form.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('state-change');
   await expect(form.getByLabel('ИСХОДНОЕ НАЗВАНИЕ')).toHaveValue('Открыть двери');
   await expect(form.getByLabel('НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ')).toHaveValue('Двери разблокированы');
   await expect(form.getByLabel('ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ')).toHaveValue('Новая редакция результата открытия.');

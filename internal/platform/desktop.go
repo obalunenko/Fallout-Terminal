@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -61,7 +63,7 @@ func (manager wailsV3DialogManager) OpenFile(_ context.Context, options OpenFile
 	}
 	filters := make([]application.FileFilter, 0, len(options.Filters))
 	for _, filter := range options.Filters {
-		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: filter.Pattern})
+		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: wailsFileFilterPattern(filter.Pattern)})
 	}
 	dialog := manager.manager.OpenFileWithOptions(&application.OpenFileDialogOptions{
 		Title:           options.Title,
@@ -78,7 +80,7 @@ func (manager wailsV3DialogManager) SaveFile(_ context.Context, options SaveFile
 	}
 	filters := make([]application.FileFilter, 0, len(options.Filters))
 	for _, filter := range options.Filters {
-		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: filter.Pattern})
+		filters = append(filters, application.FileFilter{DisplayName: filter.DisplayName, Pattern: wailsFileFilterPattern(filter.Pattern)})
 	}
 	dialog := manager.manager.SaveFileWithOptions(&application.SaveFileDialogOptions{
 		Title:                options.Title,
@@ -88,6 +90,22 @@ func (manager wailsV3DialogManager) SaveFile(_ context.Context, options SaveFile
 		CanCreateDirectories: options.CanCreateDirectories,
 	})
 	return dialog.PromptForSingleSelection()
+}
+
+// Wails v3 beta passes filter patterns directly to
+// UTType.typeWithFilenameExtension on Darwin. That API expects bare
+// extensions, while the cross-platform Wails contract documents glob patterns.
+// Normalize only the Darwin boundary so the native panel can select JSON files
+// without changing the platform-independent dialog contract.
+func wailsFileFilterPattern(pattern string) string {
+	if runtime.GOOS != "darwin" {
+		return pattern
+	}
+	parts := strings.Split(pattern, ";")
+	for index, part := range parts {
+		parts[index] = strings.TrimPrefix(part, "*.")
+	}
+	return strings.Join(parts, ";")
 }
 
 type wailsV3BrowserManager struct {

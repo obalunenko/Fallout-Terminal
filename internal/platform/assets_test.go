@@ -174,7 +174,7 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
-func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testing.T) {
+func TestBundledDemoShowcasesEveryCommandBehavior(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -183,14 +183,25 @@ func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testi
 	demo, err := domain.DecodeSession(raw)
 	require.NoError(t, err)
 
+	ordinaryCommands := 0
 	stateChangingCommands := 0
+	completedCommandStates := 0
+	terminalTransitions := 0
 	for _, terminal := range demo.Terminals {
-		require.Empty(t, terminal.CommandStates,
-			"read-only bundled demo must not expose reset controls for snapshots it cannot mutate")
 		var visit func(domain.ContentNode)
 		visit = func(node domain.ContentNode) {
-			if node.Type == domain.NodeCommand && node.StateChange != nil {
-				stateChangingCommands++
+			if node.Type == domain.NodeCommand {
+				switch {
+				case node.StateChange != nil:
+					stateChangingCommands++
+					if _, completed := terminal.CommandStates[node.ID]; completed {
+						completedCommandStates++
+					}
+				case node.TerminalTransition != nil:
+					terminalTransitions++
+				default:
+					ordinaryCommands++
+				}
 			}
 			for _, child := range node.Children {
 				visit(child)
@@ -198,8 +209,14 @@ func TestBundledStateChangingDemoStartsWithoutDurableExecutionSnapshots(t *testi
 		}
 		visit(terminal.Root)
 	}
+	require.GreaterOrEqual(t, ordinaryCommands, 1,
+		"bundled demo must showcase an ordinary command")
 	require.GreaterOrEqual(t, stateChangingCommands, 1,
-		"bundled demo must retain an initial-state example of the feature")
+		"bundled demo must showcase a state-changing command")
+	require.GreaterOrEqual(t, completedCommandStates, 1,
+		"bundled demo must showcase a completed command that can be reset in its writable copy")
+	require.GreaterOrEqual(t, terminalTransitions, 1,
+		"bundled demo must showcase cross-terminal navigation")
 }
 
 func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
@@ -221,7 +238,7 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
 		"proto/fallout/terminal/private/v1/runtime.proto": "4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9",
-		"proto/schema-revision.txt":                       "e1ccd2d6b5669c4a431aae2c1cb7eece07df2ab177d1140b8c9983820b9006e1",
+		"proto/schema-revision.txt":                       "35007cbc0b309d8aa03f6a7de0aa61797e8b421c97989dae059a4b2456af0413",
 		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {

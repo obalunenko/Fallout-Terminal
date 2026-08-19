@@ -27,6 +27,38 @@ test('generated desktop service calls remain explicit and normalized behind the 
   expect(calls).not.toContain('Call');
 });
 
+test('saveSession snapshots the complete cross-terminal document at the Wails boundary', async ({ page }) => {
+  const retained = await page.evaluate(async () => {
+    const candidate = {
+      version: 1,
+      name: 'demo boundary candidate',
+      terminals: [
+        {
+          id: 't_demo1', name: 'Source', hackLevel: 0, introText: '',
+          root: {
+            id: 'root', type: 'folder', name: 'ROOT',
+            children: [{
+              id: 'go', type: 'command', name: 'GO',
+              terminalTransition: { targetTerminalId: 't_demo2' },
+            }],
+          },
+        },
+        {
+          id: 't_demo2', name: 'Target', hackLevel: 0, introText: '',
+          root: { id: 'root', type: 'folder', name: 'ROOT', children: [] },
+        },
+      ],
+    };
+    const pending = desktopAPI.saveSession(candidate);
+    candidate.terminals.splice(1, 1);
+    await pending;
+    return __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1).args[0];
+  });
+
+  expect(retained.terminals.map(terminal => terminal.id)).toEqual(['t_demo1', 't_demo2']);
+  expect(retained.terminals[0].root.children[0].terminalTransition.targetTerminalId).toBe('t_demo2');
+});
+
 test('all four listeners precede the snapshot and newer wrapped events win per field', async ({ page }) => {
   const result = await page.evaluate(async () => {
     __desktopFixture.deferStatus();

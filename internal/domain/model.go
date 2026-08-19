@@ -53,6 +53,24 @@ type StateChangeConfig struct {
 	ConfirmationText string `json:"confirmationText"`
 }
 
+// TerminalTransitionConfig links an authored command to another terminal in
+// the same durable version-1 session.
+type TerminalTransitionConfig struct {
+	TargetTerminalID string `json:"targetTerminalId"`
+}
+
+// CommandBehavior is the single semantic variant selected for a command.
+// The durable JSON-v1 fields remain pointers so malformed documents containing
+// both known fields can be decoded and rejected instead of silently losing data.
+type CommandBehavior string
+
+const (
+	CommandBehaviorOrdinary           CommandBehavior = "ordinary"
+	CommandBehaviorStateChange        CommandBehavior = "state-change"
+	CommandBehaviorTerminalTransition CommandBehavior = "terminal-transition"
+	CommandBehaviorInvalid            CommandBehavior = "invalid"
+)
+
 // CommandExecutionState is the immutable durable snapshot captured from a
 // state-changing command's first successfully persisted execution.
 type CommandExecutionState struct {
@@ -73,14 +91,30 @@ type Terminal struct {
 
 // ContentNode is a tagged folder, command, or entry node.
 type ContentNode struct {
-	ID          string                     `json:"id"`
-	Type        string                     `json:"type"`
-	Name        string                     `json:"name"`
-	Children    []ContentNode              `json:"children,omitempty"`
-	Text        string                     `json:"text,omitempty"`
-	Description string                     `json:"description,omitempty"`
-	StateChange *StateChangeConfig         `json:"stateChange,omitempty"`
-	Extra       map[string]json.RawMessage `json:"-"`
+	ID                 string                     `json:"id"`
+	Type               string                     `json:"type"`
+	Name               string                     `json:"name"`
+	Children           []ContentNode              `json:"children,omitempty"`
+	Text               string                     `json:"text,omitempty"`
+	Description        string                     `json:"description,omitempty"`
+	StateChange        *StateChangeConfig         `json:"stateChange,omitempty"`
+	TerminalTransition *TerminalTransitionConfig  `json:"terminalTransition,omitempty"`
+	Extra              map[string]json.RawMessage `json:"-"`
+}
+
+// Behavior returns the command's discriminated behavior without mutating its
+// JSON-v1 representation. Invalid identifies a defensive dual-config state.
+func (n ContentNode) Behavior() CommandBehavior {
+	switch {
+	case n.StateChange != nil && n.TerminalTransition != nil:
+		return CommandBehaviorInvalid
+	case n.StateChange != nil:
+		return CommandBehaviorStateChange
+	case n.TerminalTransition != nil:
+		return CommandBehaviorTerminalTransition
+	default:
+		return CommandBehaviorOrdinary
+	}
 }
 
 // NavState is the shared server-authoritative player position.
@@ -181,14 +215,15 @@ type LiveState struct {
 
 // PublicLiveState is the immutable client-facing live snapshot.
 type PublicLiveState struct {
-	TerminalID       string                        `json:"terminalId"`
-	TerminalName     string                        `json:"terminalName"`
-	Tree             ContentNode                   `json:"tree"`
-	HackLevel        int                           `json:"hackLevel"`
-	IntroText        string                        `json:"introText"`
-	Nav              NavState                      `json:"nav"`
-	Hack             *PublicHackState              `json:"hack"`
-	CommandExecution *CommandExecutionPresentation `json:"commandExecution,omitempty"`
+	TerminalID         string                          `json:"terminalId"`
+	TerminalName       string                          `json:"terminalName"`
+	Tree               ContentNode                     `json:"tree"`
+	HackLevel          int                             `json:"hackLevel"`
+	IntroText          string                          `json:"introText"`
+	Nav                NavState                        `json:"nav"`
+	Hack               *PublicHackState                `json:"hack"`
+	CommandExecution   *CommandExecutionPresentation   `json:"commandExecution,omitempty"`
+	TerminalNavigation *TerminalNavigationPresentation `json:"terminalNavigation,omitempty"`
 }
 
 // LogicalSessionID identifies one browser profile for the lifetime of a server process.
@@ -304,6 +339,80 @@ const (
 type CommandExecutionPresentation struct {
 	Phase     CommandExecutionPhase `json:"phase"`
 	CommandID string                `json:"commandId"`
+}
+
+// TerminalNavigationDirection distinguishes forward links from LIFO returns.
+type TerminalNavigationDirection string
+
+const (
+	TerminalNavigationForward TerminalNavigationDirection = "forward"
+	TerminalNavigationReturn  TerminalNavigationDirection = "return"
+)
+
+type TerminalNavigationDecision string
+
+const (
+	TerminalNavigationApprove TerminalNavigationDecision = "approve"
+	TerminalNavigationReject  TerminalNavigationDecision = "reject"
+)
+
+// TerminalReturnPoint is one immutable broadcast-scoped route stack entry.
+type TerminalReturnPoint struct {
+	TerminalID        string
+	TerminalName      string
+	FolderID          string
+	AncestorFolderIDs []string
+	CommandID         string
+	CommandName       string
+}
+
+// PendingTerminalNavigation is the exact private decision awaiting the game master.
+type PendingTerminalNavigation struct {
+	RequestID           string
+	BroadcastID         BroadcastID
+	ControllerSessionID LogicalSessionID
+	Direction           TerminalNavigationDirection
+	SourceTerminalID    string
+	SourceTerminalName  string
+	CommandID           string
+	CommandName         string
+	TargetTerminalID    string
+	TargetTerminalName  string
+	ReturnPoint         TerminalReturnPoint
+}
+
+// TerminalNavigationNoticeReason is a safe private failure category.
+type TerminalNavigationNoticeReason string
+
+const (
+	TerminalNavigationNoticeTargetMissing TerminalNavigationNoticeReason = "target-missing"
+	TerminalNavigationNoticeSelfTarget    TerminalNavigationNoticeReason = "self-target"
+	TerminalNavigationNoticeCommandStale  TerminalNavigationNoticeReason = "command-stale"
+	TerminalNavigationNoticeTargetChanged TerminalNavigationNoticeReason = "target-changed"
+)
+
+type TerminalNavigationNotice struct {
+	Reason           TerminalNavigationNoticeReason
+	SourceTerminalID string
+	CommandID        string
+	TargetTerminalID *string
+}
+
+type TerminalReturnTarget struct {
+	TerminalID   string `json:"terminalId"`
+	TerminalName string `json:"terminalName"`
+}
+
+type PendingTerminalNavigationPresentation struct {
+	Direction          TerminalNavigationDirection `json:"direction"`
+	TargetTerminalID   string                      `json:"targetTerminalId"`
+	TargetTerminalName string                      `json:"targetTerminalName"`
+}
+
+type TerminalNavigationPresentation struct {
+	RouteDepth   uint32                                 `json:"routeDepth"`
+	ReturnTarget *TerminalReturnTarget                  `json:"returnTarget,omitempty"`
+	Pending      *PendingTerminalNavigationPresentation `json:"pending,omitempty"`
 }
 
 // PlayerNoticeKind is an enum-only, detail-free personalized notice.
@@ -425,6 +534,7 @@ type LiveBroadcast struct {
 	ControllerSessionID  *LogicalSessionID
 	ActiveTerminalID     *string
 	TerminalRuntimes     map[string]*TerminalRuntime
+	Route                []TerminalReturnPoint
 }
 
 // TerminalTarget is the validated authored payload retained by a pending switch.
@@ -435,6 +545,15 @@ type TerminalTarget struct {
 	CommandStates map[string]CommandExecutionState
 	HackLevel     int
 	IntroText     string
+}
+
+// TerminalTransitionTarget is a detached trusted lookup of an authored link.
+type TerminalTransitionTarget struct {
+	SourceTerminalID   string
+	SourceTerminalName string
+	CommandID          string
+	CommandName        string
+	Target             TerminalTarget
 }
 
 // PendingCommandExecution is the single broadcast-scoped request awaiting a
@@ -461,15 +580,17 @@ type TerminalSwitchDecision struct {
 // ProcessRuntime is the private canonical root owned by the coordination service.
 // It is intentionally unrelated to the durable version-1 Session document.
 type ProcessRuntime struct {
-	Revision                uint64
-	SessionsByID            map[LogicalSessionID]*LogicalSession
-	SessionIDByBrowserToken map[BrowserToken]LogicalSessionID
-	RosterByID              map[CharacterID]*CharacterRosterEntry
-	RosterOrder             []CharacterID
-	ActivePlayerConfig      *PlayerConfigHandle
-	Broadcast               *LiveBroadcast
-	PendingSwitch           *TerminalSwitchDecision
-	PendingCommandExecution *PendingCommandExecution
+	Revision                  uint64
+	SessionsByID              map[LogicalSessionID]*LogicalSession
+	SessionIDByBrowserToken   map[BrowserToken]LogicalSessionID
+	RosterByID                map[CharacterID]*CharacterRosterEntry
+	RosterOrder               []CharacterID
+	ActivePlayerConfig        *PlayerConfigHandle
+	Broadcast                 *LiveBroadcast
+	PendingSwitch             *TerminalSwitchDecision
+	PendingCommandExecution   *PendingCommandExecution
+	PendingTerminalNavigation *PendingTerminalNavigation
+	TerminalNavigationNotice  *TerminalNavigationNotice
 }
 
 // PlayerCharacter is the assigned identity visible at a projection boundary.
@@ -633,15 +754,37 @@ type MasterPendingCommandExecution struct {
 	ConfirmationText string      `json:"confirmationText"`
 }
 
+type MasterPendingTerminalNavigation struct {
+	RequestID          string                      `json:"requestId"`
+	BroadcastID        BroadcastID                 `json:"broadcastId"`
+	Direction          TerminalNavigationDirection `json:"direction"`
+	SourceTerminalID   string                      `json:"sourceTerminalId"`
+	SourceTerminalName string                      `json:"sourceTerminalName"`
+	CommandID          string                      `json:"commandId"`
+	CommandName        string                      `json:"commandName"`
+	TargetTerminalID   string                      `json:"targetTerminalId"`
+	TargetTerminalName string                      `json:"targetTerminalName"`
+	RouteDepth         uint32                      `json:"routeDepth"`
+}
+
+type MasterTerminalNavigationNotice struct {
+	Reason           TerminalNavigationNoticeReason `json:"reason"`
+	SourceTerminalID string                         `json:"sourceTerminalId"`
+	CommandID        string                         `json:"commandId"`
+	TargetTerminalID *string                        `json:"targetTerminalId,omitempty"`
+}
+
 // MasterCoordinationState is one detached private-desktop projection.
 type MasterCoordinationState struct {
-	Revision                uint64                         `json:"revision"`
-	PlayerConfig            *PlayerConfigMetadata          `json:"playerConfig"`
-	Roster                  []MasterRosterEntry            `json:"roster"`
-	Sessions                []MasterSessionEntry           `json:"sessions"`
-	Broadcast               *MasterBroadcastState          `json:"broadcast"`
-	PendingSwitch           *MasterPendingSwitch           `json:"pendingSwitch"`
-	PendingCommandExecution *MasterPendingCommandExecution `json:"pendingCommandExecution"`
+	Revision                  uint64                           `json:"revision"`
+	PlayerConfig              *PlayerConfigMetadata            `json:"playerConfig"`
+	Roster                    []MasterRosterEntry              `json:"roster"`
+	Sessions                  []MasterSessionEntry             `json:"sessions"`
+	Broadcast                 *MasterBroadcastState            `json:"broadcast"`
+	PendingSwitch             *MasterPendingSwitch             `json:"pendingSwitch"`
+	PendingCommandExecution   *MasterPendingCommandExecution   `json:"pendingCommandExecution"`
+	PendingTerminalNavigation *MasterPendingTerminalNavigation `json:"pendingTerminalNavigation"`
+	TerminalNavigationNotice  *MasterTerminalNavigationNotice  `json:"terminalNavigationNotice"`
 }
 
 // CloneMasterCoordinationState returns a deeply detached desktop projection.
@@ -676,6 +819,15 @@ func CloneMasterCoordinationState(state *MasterCoordinationState) *MasterCoordin
 	if state.PendingCommandExecution != nil {
 		pending := *state.PendingCommandExecution
 		clone.PendingCommandExecution = &pending
+	}
+	if state.PendingTerminalNavigation != nil {
+		pending := *state.PendingTerminalNavigation
+		clone.PendingTerminalNavigation = &pending
+	}
+	if state.TerminalNavigationNotice != nil {
+		notice := *state.TerminalNavigationNotice
+		notice.TargetTerminalID = cloneString(state.TerminalNavigationNotice.TargetTerminalID)
+		clone.TerminalNavigationNotice = &notice
 	}
 	return &clone
 }
@@ -750,6 +902,18 @@ func clonePublicLiveState(state *PublicLiveState) *PublicLiveState {
 		execution := *state.CommandExecution
 		clone.CommandExecution = &execution
 	}
+	if state.TerminalNavigation != nil {
+		navigation := *state.TerminalNavigation
+		if state.TerminalNavigation.ReturnTarget != nil {
+			returnTarget := *state.TerminalNavigation.ReturnTarget
+			navigation.ReturnTarget = &returnTarget
+		}
+		if state.TerminalNavigation.Pending != nil {
+			pending := *state.TerminalNavigation.Pending
+			navigation.Pending = &pending
+		}
+		clone.TerminalNavigation = &navigation
+	}
 	return &clone
 }
 
@@ -759,10 +923,33 @@ func cloneContentNode(node ContentNode) ContentNode {
 		stateChange := *node.StateChange
 		clone.StateChange = &stateChange
 	}
+	if node.TerminalTransition != nil {
+		transition := *node.TerminalTransition
+		clone.TerminalTransition = &transition
+	}
 	clone.Extra = cloneRawMessages(node.Extra)
 	clone.Children = make([]ContentNode, len(node.Children))
 	for index := range node.Children {
 		clone.Children[index] = cloneContentNode(node.Children[index])
+	}
+	return clone
+}
+
+// CloneSession returns a deeply detached durable document.
+func CloneSession(session Session) Session {
+	clone := session
+	clone.Extra = cloneRawMessages(session.Extra)
+	clone.Terminals = make([]Terminal, len(session.Terminals))
+	for index, terminal := range session.Terminals {
+		clone.Terminals[index] = terminal
+		clone.Terminals[index].Extra = cloneRawMessages(terminal.Extra)
+		clone.Terminals[index].Root = cloneContentNode(terminal.Root)
+		if terminal.CommandStates != nil {
+			clone.Terminals[index].CommandStates = make(map[string]CommandExecutionState, len(terminal.CommandStates))
+			for id, state := range terminal.CommandStates {
+				clone.Terminals[index].CommandStates[id] = state
+			}
+		}
 	}
 	return clone
 }

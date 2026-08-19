@@ -243,6 +243,20 @@ export class MasterCoordinationState {
              */
             this["pendingCommandExecution"] = null;
         }
+        if (!("pendingTerminalNavigation" in $$source)) {
+            /**
+             * @member
+             * @type {MasterPendingTerminalNavigation | null}
+             */
+            this["pendingTerminalNavigation"] = null;
+        }
+        if (!("terminalNavigationNotice" in $$source)) {
+            /**
+             * @member
+             * @type {MasterTerminalNavigationNotice | null}
+             */
+            this["terminalNavigationNotice"] = null;
+        }
 
         Object.assign(this, $$source);
     }
@@ -259,6 +273,8 @@ export class MasterCoordinationState {
         const $$createField4_0 = $$createType10;
         const $$createField5_0 = $$createType12;
         const $$createField6_0 = $$createType14;
+        const $$createField7_0 = $$createType16;
+        const $$createField8_0 = $$createType18;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("playerConfig" in $$parsedSource) {
             $$parsedSource["playerConfig"] = $$createField1_0($$parsedSource["playerConfig"]);
@@ -277,6 +293,12 @@ export class MasterCoordinationState {
         }
         if ("pendingCommandExecution" in $$parsedSource) {
             $$parsedSource["pendingCommandExecution"] = $$createField6_0($$parsedSource["pendingCommandExecution"]);
+        }
+        if ("pendingTerminalNavigation" in $$parsedSource) {
+            $$parsedSource["pendingTerminalNavigation"] = $$createField7_0($$parsedSource["pendingTerminalNavigation"]);
+        }
+        if ("terminalNavigationNotice" in $$parsedSource) {
+            $$parsedSource["terminalNavigationNotice"] = $$createField8_0($$parsedSource["terminalNavigationNotice"]);
         }
         return new MasterCoordinationState(/** @type {Partial<MasterCoordinationState>} */($$parsedSource));
     }
@@ -400,6 +422,97 @@ export class MasterPendingSwitch {
     }
 }
 
+export class MasterPendingTerminalNavigation {
+    /**
+     * Creates a new MasterPendingTerminalNavigation instance.
+     * @param {Partial<MasterPendingTerminalNavigation>} [$$source = {}] - The source object to create the MasterPendingTerminalNavigation.
+     */
+    constructor($$source = {}) {
+        if (!("requestId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["requestId"] = "";
+        }
+        if (!("broadcastId" in $$source)) {
+            /**
+             * @member
+             * @type {BroadcastID}
+             */
+            this["broadcastId"] = "";
+        }
+        if (!("direction" in $$source)) {
+            /**
+             * @member
+             * @type {TerminalNavigationDirection}
+             */
+            this["direction"] = TerminalNavigationDirection.$zero;
+        }
+        if (!("sourceTerminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["sourceTerminalId"] = "";
+        }
+        if (!("sourceTerminalName" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["sourceTerminalName"] = "";
+        }
+        if (!("commandId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandId"] = "";
+        }
+        if (!("commandName" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandName"] = "";
+        }
+        if (!("targetTerminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["targetTerminalId"] = "";
+        }
+        if (!("targetTerminalName" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["targetTerminalName"] = "";
+        }
+        if (!("routeDepth" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["routeDepth"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MasterPendingTerminalNavigation instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {MasterPendingTerminalNavigation}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MasterPendingTerminalNavigation(/** @type {Partial<MasterPendingTerminalNavigation>} */($$parsedSource));
+    }
+}
+
 /**
  * MasterRosterEntry is the game-master view of one roster claim.
  */
@@ -499,12 +612,61 @@ export class MasterSessionEntry {
      * @returns {MasterSessionEntry}
      */
     static createFrom($$source = {}) {
-        const $$createField3_0 = $$createType16;
+        const $$createField3_0 = $$createType20;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("character" in $$parsedSource) {
             $$parsedSource["character"] = $$createField3_0($$parsedSource["character"]);
         }
         return new MasterSessionEntry(/** @type {Partial<MasterSessionEntry>} */($$parsedSource));
+    }
+}
+
+export class MasterTerminalNavigationNotice {
+    /**
+     * Creates a new MasterTerminalNavigationNotice instance.
+     * @param {Partial<MasterTerminalNavigationNotice>} [$$source = {}] - The source object to create the MasterTerminalNavigationNotice.
+     */
+    constructor($$source = {}) {
+        if (!("reason" in $$source)) {
+            /**
+             * @member
+             * @type {TerminalNavigationNoticeReason}
+             */
+            this["reason"] = TerminalNavigationNoticeReason.$zero;
+        }
+        if (!("sourceTerminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["sourceTerminalId"] = "";
+        }
+        if (!("commandId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandId"] = "";
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | null | undefined}
+             */
+            this["targetTerminalId"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new MasterTerminalNavigationNotice instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {MasterTerminalNavigationNotice}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new MasterTerminalNavigationNotice(/** @type {Partial<MasterTerminalNavigationNotice>} */($$parsedSource));
     }
 }
 
@@ -756,8 +918,8 @@ export class PublicHackState {
      */
     static createFrom($$source = {}) {
         const $$createField6_0 = $$createType0;
-        const $$createField7_0 = $$createType18;
-        const $$createField8_0 = $$createType20;
+        const $$createField7_0 = $$createType22;
+        const $$createField8_0 = $$createType24;
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         if ("log" in $$parsedSource) {
             $$parsedSource["log"] = $$createField6_0($$parsedSource["log"]);
@@ -849,6 +1011,52 @@ export class ServerInfo {
  */
 
 /**
+ * @readonly
+ * @enum {string}
+ */
+export const TerminalNavigationDecision = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    TerminalNavigationApprove: "approve",
+    TerminalNavigationReject: "reject",
+};
+
+/**
+ * TerminalNavigationDirection distinguishes forward links from LIFO returns.
+ * @readonly
+ * @enum {string}
+ */
+export const TerminalNavigationDirection = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    TerminalNavigationForward: "forward",
+    TerminalNavigationReturn: "return",
+};
+
+/**
+ * TerminalNavigationNoticeReason is a safe private failure category.
+ * @readonly
+ * @enum {string}
+ */
+export const TerminalNavigationNoticeReason = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    TerminalNavigationNoticeTargetMissing: "target-missing",
+    TerminalNavigationNoticeSelfTarget: "self-target",
+    TerminalNavigationNoticeCommandStale: "command-stale",
+    TerminalNavigationNoticeTargetChanged: "target-changed",
+};
+
+/**
  * TerminalSwitchChoice is the game master's explicit unfinished-puzzle decision.
  * @readonly
  * @enum {string}
@@ -880,9 +1088,13 @@ const $$createType11 = MasterPendingSwitch.createFrom;
 const $$createType12 = $Create.Nullable($$createType11);
 const $$createType13 = MasterPendingCommandExecution.createFrom;
 const $$createType14 = $Create.Nullable($$createType13);
-const $$createType15 = PlayerCharacter.createFrom;
+const $$createType15 = MasterPendingTerminalNavigation.createFrom;
 const $$createType16 = $Create.Nullable($$createType15);
-const $$createType17 = HackColumn.createFrom;
-const $$createType18 = $Create.Array($$createType17);
-const $$createType19 = PublicHackPattern.createFrom;
-const $$createType20 = $Create.Array($$createType19);
+const $$createType17 = MasterTerminalNavigationNotice.createFrom;
+const $$createType18 = $Create.Nullable($$createType17);
+const $$createType19 = PlayerCharacter.createFrom;
+const $$createType20 = $Create.Nullable($$createType19);
+const $$createType21 = HackColumn.createFrom;
+const $$createType22 = $Create.Array($$createType21);
+const $$createType23 = PublicHackPattern.createFrom;
+const $$createType24 = $Create.Array($$createType23);

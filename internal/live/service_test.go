@@ -416,6 +416,39 @@ func TestTerminalRuntimeLifecyclePreservesExactPrivateCheckpointAndDiscardRegene
 
 }
 
+func TestTerminalRuntimeReactivationRetainsSolvedUnfinishedAndFailedHackAcrossTenVisits(t *testing.T) {
+	t.Parallel()
+	for _, outcome := range []struct {
+		name   string
+		solved bool
+		failed bool
+	}{
+		{name: "solved", solved: true},
+		{name: "unfinished"},
+		{name: "failed", failed: true},
+	} {
+		outcome := outcome
+		t.Run(outcome.name, func(t *testing.T) {
+			t.Parallel()
+			service := New(&constantRandom{}, fixedWords{})
+			target := domain.TerminalTarget{TerminalID: "checkpoint", TerminalName: "Checkpoint", Tree: testTree(), HackLevel: 1}
+			runtime, _ := service.CreateRuntime(target)
+			require.NotNil(t, runtime.Hack)
+			runtime.Hack.Solved = outcome.solved
+			runtime.Hack.Failed = outcome.failed
+			runtime.Hack.AttemptsLeft = 2
+			runtime.Hack.Log = []string{"retained"}
+			before := cloneHackForLifecycleTest(runtime.Hack)
+			for visit := range 10 {
+				service.SuspendRuntime(runtime)
+				projection := service.ReactivateRuntime(runtime, target)
+				require.NotNil(t, projection, "visit %d", visit)
+				assert.Equal(t, before, runtime.Hack, "visit %d", visit)
+			}
+		})
+	}
+}
+
 func TestResetFailedHackReplacesOnlyEligibleRuntimeFromLatestTarget(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	service.generationIDs = &sequenceGenerationIDs{values: []string{"failed-generation", "retry-generation"}}

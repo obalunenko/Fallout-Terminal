@@ -325,6 +325,17 @@ func routeCommandExecutionDecisionRequest(payload CommandExecutionDecisionPayloa
 	}, nil
 }
 
+func routeTerminalNavigationDecisionRequest(payload TerminalNavigationDecisionPayload) (TerminalNavigationDecisionPayload, error) {
+	decision, err := terminalNavigationDecisionToPrivate(payload.Decision)
+	if err != nil {
+		return payload, err
+	}
+	semantic := &privatev1.ResolveTerminalNavigationRequest{RequestId: payload.RequestID, Decision: decision}
+	return TerminalNavigationDecisionPayload{
+		RequestID: semantic.GetRequestId(), Decision: terminalNavigationDecisionFromPrivate(semantic.GetDecision()),
+	}, nil
+}
+
 func routeResetCommandStateRequest(payload ResetCommandStatePayload) ResetCommandStatePayload {
 	semantic := &privatev1.ResetCommandStateRequest{TerminalId: payload.TerminalID, CommandId: payload.CommandID}
 	return ResetCommandStatePayload{TerminalID: semantic.GetTerminalId(), CommandID: semantic.GetCommandId()}
@@ -382,24 +393,14 @@ func liveTerminalFromPrivate(id, name string, tree *persistencev1.ContentNode, l
 
 func contentNodeToPrivate(node domain.ContentNode) (*persistencev1.ContentNode, error) {
 	node = cloneTreeForBridgeValidation(node)
-	semantic, err := sessionservice.SessionToProto(domain.Session{
-		Version: 1, Name: "private bridge", Terminals: []domain.Terminal{{ID: "bridge", Name: "bridge", Root: node}},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return semantic.GetTerminals()[0].GetRoot(), nil
+	return sessionservice.ContentNodeToProto(node)
 }
 
 func contentNodeFromPrivate(node *persistencev1.ContentNode, template domain.ContentNode) (domain.ContentNode, error) {
-	semantic := &persistencev1.Session{Version: 1, Name: "private bridge", Terminals: []*persistencev1.Terminal{{Id: "bridge", Name: "bridge", Root: node}}}
-	routed, err := sessionservice.SessionFromProto(semantic, domain.Session{
-		Version: 1, Name: "private bridge", Terminals: []domain.Terminal{{ID: "bridge", Name: "bridge", Root: template}},
-	})
+	result, err := sessionservice.ContentNodeFromProto(node, template)
 	if err != nil {
 		return domain.ContentNode{}, err
 	}
-	result := routed.Terminals[0].Root
 	restoreContentNodeShape(&result, template)
 	return result, nil
 }
@@ -594,6 +595,16 @@ func routeResolveCommandExecutionResult(result ResolveCommandExecutionResult) Re
 	}
 }
 
+func routeResolveTerminalNavigationResult(result ResolveTerminalNavigationResult) ResolveTerminalNavigationResult {
+	semantic := &privatev1.ResolveTerminalNavigationResult{Ok: result.OK, State: coordinationStateToPrivate(result.State)}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	return ResolveTerminalNavigationResult{
+		OK: semantic.GetOk(), Error: semantic.GetError(), State: coordinationStateFromPrivate(semantic.GetState()),
+	}
+}
+
 func terminalSwitchResultToPrivate(result TerminalSwitchCommandResult) *privatev1.TerminalSwitchResult {
 	semantic := &privatev1.TerminalSwitchResult{Ok: result.OK, State: coordinationStateToPrivate(result.State), Status: terminalSwitchStatusToPrivate(result.Status)}
 	if result.Error != "" {
@@ -732,6 +743,27 @@ func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev
 			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
 		}
 	}
+	if state.PendingTerminalNavigation != nil {
+		pending := state.PendingTerminalNavigation
+		result.PendingTerminalNavigation = &privatev1.PendingTerminalNavigation{
+			RequestId: pending.RequestID, BroadcastId: string(pending.BroadcastID),
+			Direction:        terminalNavigationDirectionToPrivate(pending.Direction),
+			SourceTerminalId: pending.SourceTerminalID, SourceTerminalName: pending.SourceTerminalName,
+			CommandId: pending.CommandID, CommandName: pending.CommandName,
+			TargetTerminalId: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+			RouteDepth: pending.RouteDepth,
+		}
+	}
+	if state.TerminalNavigationNotice != nil {
+		notice := state.TerminalNavigationNotice
+		result.TerminalNavigationNotice = &privatev1.TerminalNavigationNotice{
+			Reason: terminalNavigationNoticeToPrivate(notice.Reason), SourceTerminalId: notice.SourceTerminalID, CommandId: notice.CommandID,
+		}
+		if notice.TargetTerminalID != nil {
+			value := *notice.TargetTerminalID
+			result.TerminalNavigationNotice.TargetTerminalId = &value
+		}
+	}
 	return result
 }
 
@@ -795,7 +827,80 @@ func coordinationStateFromPrivate(state *privatev1.CoordinationState) *domain.Ma
 			CommandName: pending.GetCommandName(), ConfirmationText: pending.GetConfirmationText(),
 		}
 	}
+	if state.PendingTerminalNavigation != nil {
+		pending := state.PendingTerminalNavigation
+		result.PendingTerminalNavigation = &domain.MasterPendingTerminalNavigation{
+			RequestID: pending.GetRequestId(), BroadcastID: domain.BroadcastID(pending.GetBroadcastId()),
+			Direction:        terminalNavigationDirectionFromPrivate(pending.GetDirection()),
+			SourceTerminalID: pending.GetSourceTerminalId(), SourceTerminalName: pending.GetSourceTerminalName(),
+			CommandID: pending.GetCommandId(), CommandName: pending.GetCommandName(),
+			TargetTerminalID: pending.GetTargetTerminalId(), TargetTerminalName: pending.GetTargetTerminalName(),
+			RouteDepth: pending.GetRouteDepth(),
+		}
+	}
+	if state.TerminalNavigationNotice != nil {
+		notice := state.TerminalNavigationNotice
+		result.TerminalNavigationNotice = &domain.MasterTerminalNavigationNotice{
+			Reason: terminalNavigationNoticeFromPrivate(notice.GetReason()), SourceTerminalID: notice.GetSourceTerminalId(), CommandID: notice.GetCommandId(),
+		}
+		if notice.TargetTerminalId != nil {
+			value := notice.GetTargetTerminalId()
+			result.TerminalNavigationNotice.TargetTerminalID = &value
+		}
+	}
 	return result
+}
+
+func terminalNavigationDirectionToPrivate(direction domain.TerminalNavigationDirection) playerv1.TerminalNavigationDirection {
+	switch direction {
+	case domain.TerminalNavigationForward:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD
+	case domain.TerminalNavigationReturn:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN
+	default:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_UNSPECIFIED
+	}
+}
+
+func terminalNavigationDirectionFromPrivate(direction playerv1.TerminalNavigationDirection) domain.TerminalNavigationDirection {
+	switch direction {
+	case playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD:
+		return domain.TerminalNavigationForward
+	case playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN:
+		return domain.TerminalNavigationReturn
+	default:
+		return ""
+	}
+}
+
+func terminalNavigationNoticeToPrivate(reason domain.TerminalNavigationNoticeReason) privatev1.TerminalNavigationNoticeReason {
+	switch reason {
+	case domain.TerminalNavigationNoticeTargetMissing:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING
+	case domain.TerminalNavigationNoticeSelfTarget:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET
+	case domain.TerminalNavigationNoticeCommandStale:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE
+	case domain.TerminalNavigationNoticeTargetChanged:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED
+	default:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED
+	}
+}
+
+func terminalNavigationNoticeFromPrivate(reason privatev1.TerminalNavigationNoticeReason) domain.TerminalNavigationNoticeReason {
+	switch reason {
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING:
+		return domain.TerminalNavigationNoticeTargetMissing
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET:
+		return domain.TerminalNavigationNoticeSelfTarget
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE:
+		return domain.TerminalNavigationNoticeCommandStale
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED:
+		return domain.TerminalNavigationNoticeTargetChanged
+	default:
+		return ""
+	}
 }
 
 func serverInfoToPrivate(info domain.ServerInfo) *privatev1.ServerInformation {
@@ -988,6 +1093,28 @@ func commandExecutionDecisionFromPrivate(decision privatev1.CommandExecutionDeci
 		return domain.CommandExecutionApprove
 	case privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_REJECT:
 		return domain.CommandExecutionReject
+	default:
+		return ""
+	}
+}
+
+func terminalNavigationDecisionToPrivate(decision domain.TerminalNavigationDecision) (privatev1.TerminalNavigationDecision, error) {
+	switch decision {
+	case domain.TerminalNavigationApprove:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_APPROVE, nil
+	case domain.TerminalNavigationReject:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_REJECT, nil
+	default:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_UNSPECIFIED, fmt.Errorf("unsupported terminal navigation decision %q", decision)
+	}
+}
+
+func terminalNavigationDecisionFromPrivate(decision privatev1.TerminalNavigationDecision) domain.TerminalNavigationDecision {
+	switch decision {
+	case privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_APPROVE:
+		return domain.TerminalNavigationApprove
+	case privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_REJECT:
+		return domain.TerminalNavigationReject
 	default:
 		return ""
 	}

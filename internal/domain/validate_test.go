@@ -225,6 +225,52 @@ func TestValidateSessionRejectsStateChangeKnownFieldsInExtras(t *testing.T) {
 	}
 }
 
+func TestValidateSessionResolvesTerminalTransitionsInTwoPasses(t *testing.T) {
+	t.Parallel()
+
+	linked := Session{Version: 1, Name: "Links", Terminals: []Terminal{
+		{
+			ID: "a", Name: "A",
+			Root: ContentNode{
+				ID: "root", Type: NodeFolder, Name: "ROOT",
+				Children: []ContentNode{{
+					ID: "go", Type: NodeCommand, Name: "GO",
+					TerminalTransition: &TerminalTransitionConfig{TargetTerminalID: "b"},
+				}},
+			},
+		},
+		{
+			ID: "b", Name: "B",
+			Root: ContentNode{ID: "root", Type: NodeFolder, Name: "ROOT", Children: []ContentNode{}},
+		},
+	}}
+	require.NoError(t, ValidateSession(linked), "a forward reference must not depend on terminal ordering")
+
+	for _, test := range []struct {
+		name   string
+		mutate func(*Session)
+	}{
+		{name: "missing target", mutate: func(s *Session) { s.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID = "missing" }},
+		{name: "self target", mutate: func(s *Session) { s.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID = "a" }},
+		{name: "blank target", mutate: func(s *Session) { s.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID = " " }},
+		{name: "state change conflict", mutate: func(s *Session) {
+			s.Terminals[0].Root.Children[0].StateChange = &StateChangeConfig{CompletedName: "Done", ConfirmationText: "Proceed?"}
+			s.Terminals[0].Root.Children[0].Text = "Done"
+		}},
+		{name: "config on folder", mutate: func(s *Session) {
+			s.Terminals[0].Root.TerminalTransition = &TerminalTransitionConfig{TargetTerminalID: "b"}
+		}},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			candidate := CloneSession(linked)
+			test.mutate(&candidate)
+			require.Error(t, ValidateSession(candidate))
+		})
+	}
+}
+
 func validStateChangingSessionForTest() Session {
 	return Session{
 		Version: 1,

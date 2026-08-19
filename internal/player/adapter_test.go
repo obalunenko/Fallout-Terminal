@@ -9,6 +9,7 @@ import (
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func TestGeneratedMutationFingerprintsAreDeterministicProcedureQualifiedAndUnknownAware(t *testing.T) {
@@ -111,6 +112,39 @@ func TestOrdinaryCommandProjectionRemainsUnchangedAndHasNoExecutionPresentation(
 	require.Nil(t, got.GetCommandExecution())
 	require.Equal(t, "RUN DIAGNOSTIC", got.GetTree().GetFolder().GetChildren()[0].GetName())
 	require.Equal(t, "SYSTEM NOMINAL", got.GetTree().GetFolder().GetChildren()[0].GetCommand().GetText())
+}
+
+func TestTerminalNavigationProjectionContainsOnlyPlayerSafeRouteMetadata(t *testing.T) {
+	state := &domain.PublicLiveState{
+		TerminalID: "terminal-b", TerminalName: "Terminal B",
+		Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT"},
+		Nav:  domain.NavState{Path: []string{"root"}, Mode: "list"},
+		TerminalNavigation: &domain.TerminalNavigationPresentation{
+			RouteDepth:   2,
+			ReturnTarget: &domain.TerminalReturnTarget{TerminalID: "terminal-a", TerminalName: "Terminal A"},
+			Pending: &domain.PendingTerminalNavigationPresentation{
+				Direction: domain.TerminalNavigationReturn, TargetTerminalID: "terminal-a", TargetTerminalName: "Terminal A",
+			},
+		},
+	}
+	got := LiveToProto(state).GetTerminalNavigation()
+	require.NotNil(t, got)
+	require.Equal(t, uint32(2), got.GetRouteDepth())
+	require.Equal(t, "terminal-a", got.GetReturnTarget().GetTerminalId())
+	require.Equal(t, playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN, got.GetPending().GetDirection())
+
+	fields := got.ProtoReflect().Descriptor().Fields()
+	names := make([]string, 0, fields.Len())
+	for index := range fields.Len() {
+		names = append(names, string(fields.Get(index).Name()))
+	}
+	require.Equal(t, []string{"route_depth", "return_target", "pending"}, names)
+	for _, forbidden := range []protoreflect.Name{"request_id", "controller_session_id", "command_id", "return_point", "notice"} {
+		require.Nil(t, fields.ByName(forbidden))
+	}
+	encoded, err := proto.Marshal(got)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "private-request-identity")
 }
 
 // The runtime projection types are introduced by the implementation wave

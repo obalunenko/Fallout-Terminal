@@ -157,6 +157,7 @@ test('four through seven generated players converge across mixed navigation, rec
     for (let round = 0; round < 4; round += 1) {
       await pages[0].locator('.term-row', { hasText: 'DOCS' }).click();
       await Promise.all(pages.map(page => expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible()));
+      await expect(pages[0].locator('#screen')).not.toHaveClass(/shared-input-pending/);
       acceptedActions += 1;
 
       const observerRequestCount = observerRequests.length;

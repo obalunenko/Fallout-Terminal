@@ -438,6 +438,7 @@ test('retained request identity reused with a different typed payload is rejecte
 
   await page.locator('.term-row', { hasText: 'DOCS' }).click();
   await expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible();
+  await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
   await page.locator('#backBtn').click();
   await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
   await expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible();

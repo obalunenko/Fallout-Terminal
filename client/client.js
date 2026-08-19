@@ -8,7 +8,7 @@ import {
   PlayerService,
   RosterAvailability,
 } from './gen/fallout/terminal/player/v1/player_pb.js';
-import { CommandExecutionPhase } from './gen/fallout/terminal/player/v1/terminal_pb.js';
+import { CommandExecutionPhase, TerminalNavigationDirection } from './gen/fallout/terminal/player/v1/terminal_pb.js';
 import {
   playCharScroll,
   playEnter,
@@ -48,6 +48,7 @@ let viewEntryId   = null;
 let commandOutput = null;
 let currentCommandNodeId = null;
 let commandExecution = null;
+let terminalNavigation = null;
 
 // Typewriter reveal: only replay when the shown content actually changed.
 let lastRenderedFolderKey  = null;
@@ -428,6 +429,7 @@ function applyGeneratedSnapshot(snapshot) {
   screen.dataset.runtimeRevision = '0';
   terminalLiveBaselinePending = true;
   commandExecution = null;
+  terminalNavigation = null;
   applyRecognitionSnapshot(snapshot.recognitionHandle, generatedPlayerState(snapshot.playerState, snapshot.revision));
   applyGeneratedTerminal(snapshot.terminalPresentation, snapshot.revision);
 }
@@ -463,7 +465,24 @@ function applyGeneratedTerminal(presentation, revision) {
     nav: generatedNavigation(live.navigation),
     hack: generatedHack(live.hacking),
     commandExecution: generatedCommandExecution(live.commandExecution),
+  terminalNavigation: generatedTerminalNavigation(live.terminalNavigation),
   });
+}
+
+function generatedTerminalNavigation(navigation) {
+  if (!navigation) return null;
+  return {
+    routeDepth: Number(navigation.routeDepth || 0),
+    returnTarget: navigation.returnTarget ? {
+      terminalId: navigation.returnTarget.terminalId,
+      terminalName: navigation.returnTarget.terminalName,
+    } : null,
+    pending: navigation.pending ? {
+      direction: navigation.pending.direction === TerminalNavigationDirection.RETURN ? 'return' : 'forward',
+      targetTerminalId: navigation.pending.targetTerminalId,
+      targetTerminalName: navigation.pending.targetTerminalName,
+    } : null,
+  };
 }
 
 function generatedPlayerState(state, revision) {
@@ -683,6 +702,7 @@ function clearBroadcastMirrors() {
   commandOutput = null;
   currentCommandNodeId = null;
   commandExecution = null;
+  terminalNavigation = null;
   lastRenderedFolderKey = null;
   lastRenderedEntryId = null;
   lastRenderedCommandKey = null;
@@ -778,6 +798,7 @@ function applyLiveTerminal(msg) {
     hackLevel     = msg.hackLevel || 0;
     hack          = msg.hack || null;
     commandExecution = msg.commandExecution || null;
+  terminalNavigation = msg.terminalNavigation || null;
     serverNum     = 1 + Math.floor(Math.random() * 9);
     if (!isContinuousTerminalUpdate) {
       hackTyped     = '';
@@ -848,6 +869,7 @@ function applyNoLiveTerminal(revision) {
     tree = null;
     hack = null;
     commandExecution = null;
+  terminalNavigation = null;
     clearTimeout(hackSolvedTimer);
     hackSolvedTimer = null;
     setAmbientActive(false);
@@ -955,7 +977,10 @@ function applyActionResult(result) {
       pendingSharedAction.acceptedRevision = Number(result.revision) || 0;
       completeAcceptedSharedAction();
     }
-    renderPlayerContext();
+    // The authoritative stream may render the accepted navigation before the
+    // unary result arrives. Re-render the complete surface after clearing the
+    // request so controls disabled during that earlier render are restored.
+    render();
     return;
   }
 
@@ -993,6 +1018,7 @@ function canControlSharedTerminalAction(action) {
     (commandExecution.phase === 'rejected' && action === 'back');
   return sessionReady && playerState !== null && hasCurrentTerminalMirror() &&
     executionAllowsAction &&
+  terminalNavigation?.pending == null &&
     playerState.role === 'active' &&
     playerState.phase === 'controlling' &&
     playerState.broadcastId !== null &&
@@ -1067,12 +1093,18 @@ function showPlayerNotice(message) {
   renderPlayerNotice();
 }
 
+function isTerminalNavigationPending() {
+  return terminalNavigation?.pending != null;
+}
+
 function renderPlayerNotice() {
   const authoritativeMessage = playerState?.role === 'active' &&
     playerState.notice === 'command-persistence-failed'
     ? 'НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ КОМАНДЫ. СОСТОЯНИЕ КОМАНДЫ НЕ ИЗМЕНЕНО.'
     : '';
-  const message = authoritativeMessage || transientPlayerNotice;
+  const message = isTerminalNavigationPending()
+    ? ''
+    : authoritativeMessage || transientPlayerNotice;
   playerNotice.textContent = message;
   playerNotice.hidden = !message;
   playerNotice.dataset.kind = authoritativeMessage ? 'error' : '';
@@ -1102,10 +1134,11 @@ function renderPlayerContext() {
 
   const observerReadOnly = hasState && playerState.role === 'observer';
   const commandRequestPending = commandExecution?.phase === 'pending';
+  const terminalNavigationPending = terminalNavigation?.pending != null;
   const commandRequestRejected = commandExecution?.phase === 'rejected';
   roleBadge.dataset.role = hasState ? playerState.role : '';
   screen.classList.toggle('observer-read-only', observerReadOnly);
-  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null || commandRequestPending);
+  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null || commandRequestPending || terminalNavigationPending);
   screen.classList.toggle('shared-command-rejected', commandRequestRejected);
   screen.setAttribute('aria-readonly', String(observerReadOnly));
   renderPlayerNotice();
@@ -1408,7 +1441,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (commandExecution?.phase === 'pending') {
+  if (commandExecution?.phase === 'pending' || isTerminalNavigationPending()) {
     if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
       e.preventDefault();
     }
@@ -1887,6 +1920,8 @@ function render() {
 
   if (commandExecution !== null) {
     renderCommandExecutionScreen();
+  } else if (isTerminalNavigationPending()) {
+    renderTerminalNavigationPendingScreen();
   } else if (mode === MODE.HACK) {
     renderHackScreen();
   } else {
@@ -1917,6 +1952,24 @@ function renderCommandExecutionScreen() {
   });
 }
 
+function renderTerminalNavigationPendingScreen() {
+  hackHeader.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  normalHeader.hidden = false;
+  serverLine.textContent = `-Server ${serverNum}-`;
+  introTextEl.textContent = introText;
+  const pending = terminalNavigation.pending;
+  const target = pending.targetTerminalName || pending.targetTerminalId;
+  renderCommandRecordSurface({
+    kind: 'terminal-navigation-pending',
+    key: `${pending.direction}:${pending.targetTerminalId}`,
+    title: `${pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД'} В ${target}`,
+    text: 'Выполняется запрос',
+    showBack: false,
+  });
+}
+
 function renderCommandRecordSurface({ kind, key, title, text, showBack }) {
   cancelReveal(termList);
   cancelReveal(termOutput);
@@ -1942,7 +1995,8 @@ function renderCommandRecordSurface({ kind, key, title, text, showBack }) {
 
 function renderNormalScreen() {
   termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
-  backBtn.classList.remove('layout-placeholder');
+  backBtn.classList.remove('layout-placeholder', 'terminal-return');
+  backBtn.textContent = '[ НАЗАД ]';
   backBtn.disabled = false;
   backBtn.removeAttribute('aria-hidden');
   cancelReveal(hackColumns);
@@ -1995,7 +2049,17 @@ function renderNormalScreen() {
   cancelReveal(entryBody);
   termEntry.hidden = true;
   termList.hidden  = false;
-  backBtn.hidden   = navStack.length <= 1;
+  const atRoot = navStack.length === 1 && navStack[0] === 'root';
+  const returnTarget = atRoot ? terminalNavigation?.returnTarget : null;
+  backBtn.hidden = atRoot && !returnTarget;
+  backBtn.disabled = pendingSharedAction !== null || terminalNavigation?.pending != null;
+  if (returnTarget) {
+    backBtn.classList.add('terminal-return');
+    backBtn.textContent = `[ НАЗАД В ${returnTarget.terminalName || returnTarget.terminalId} ]`;
+    backBtn.setAttribute('aria-label', `НАЗАД В ${returnTarget.terminalName || returnTarget.terminalId}`);
+  } else {
+    backBtn.removeAttribute('aria-label');
+  }
   lastRenderedEntryId = null;
   lastMenuHoverIdx = null;
 

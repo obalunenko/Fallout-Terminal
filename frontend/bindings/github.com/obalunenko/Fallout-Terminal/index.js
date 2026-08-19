@@ -25,10 +25,12 @@ export {
     ResetCommandStatePayload,
     ResetTerminalCommandStatesPayload,
     ResolveCommandExecutionResult,
+    ResolveTerminalNavigationResult,
     RuntimeStatus,
     SavePublicAccessSettingsPayload,
     SessionStateEvent,
     SessionStateResult,
+    TerminalNavigationDecisionPayload,
     TerminalSwitchCommandResult,
     TerminalSwitchDecisionPayload
 } from "./models.js";

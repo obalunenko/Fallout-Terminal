@@ -30,11 +30,11 @@ printf '%s\n' \
     AddCharacter AssignCharacter CopyDemo DeleteCharacter EndBroadcast ForceHackSuccess \
     GeneratePlayerPassword GetPublicAccess GetRuntimeStatus LoadReferencedPlayerConfig MoveCharacter NewPlayerConfig NewSession \
     OpenPlayerConfig OpenSession OpenURL ReleaseCharacter RenameCharacter RenameLogicalSession \
-    RequestTerminalActivation RequestTerminalClear ResetCommandState ResetFailedHack ResetTerminalCommandStates ResolveCommandExecution ResolveTerminalSwitch \
+    RequestTerminalActivation RequestTerminalClear ResetCommandState ResetFailedHack ResetTerminalCommandStates ResolveCommandExecution ResolveTerminalNavigation ResolveTerminalSwitch \
     SavePublicAccessSettings SaveSession SetActiveController StartBroadcast StartPublicAccess \
     StopPublicAccess UpdateLiveTerminal | LC_ALL=C sort >"$expected"
 diff -u "$expected" "$actual"
-test "$(wc -l <"$actual" | tr -d ' ')" = 33
+test "$(wc -l <"$actual" | tr -d ' ')" = 34
 
 for forbidden in Start Shutdown ServiceStartup ServiceShutdown Dispatch Call Capabilities \
     ReadFile WriteFile Exec Environment OpenDialog Browser PlayerService Subscribe; do
@@ -51,4 +51,4 @@ for event in server-info client-count hack-state coordination-state session-stat
 done
 test "$(grep -E '^[[:space:]]+"(server-info|client-count|hack-state|coordination-state|session-state|public-access-status)"' "$event_types" | wc -l | tr -d ' ')" = 6
 
-echo "Wails bindings are deterministic and expose exactly 33 accepted desktop methods."
+echo "Wails bindings are deterministic and expose exactly 34 accepted desktop methods."

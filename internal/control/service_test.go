@@ -3285,6 +3285,414 @@ func newCommandExecutionFixture(t *testing.T, store *recordingCommandStateStore)
 	}
 }
 
+func TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically(t *testing.T) {
+	t.Parallel()
+
+	runtime := &recordingTerminalRuntime{}
+	fixture := newUS2Fixture(t, runtime)
+	lifecycle := newRecordingDecisionTerminalLifecycle()
+	fixture.service.terminals = lifecycle
+	catalog := &recordingTerminalCatalog{transitions: map[string]domain.TerminalTransitionTarget{
+		fixture.terminalID + "/linked-command": {
+			SourceTerminalID: fixture.terminalID, SourceTerminalName: "Terminal 1",
+			CommandID: "linked-command", CommandName: "Open B", Target: terminalTarget("terminal-b", "Terminal B"),
+		},
+	}}
+	fixture.service.terminalCatalog = catalog
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children = append(root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children, domain.ContentNode{
+			ID: "linked-command", Type: domain.NodeCommand, Name: "Open B",
+			TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "terminal-b"},
+		})
+		return transition{accepted: true}
+	})
+	command := domain.RuntimeCommand{
+		RequestID: "linked-request", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
+		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "linked-command", PayloadFingerprint: "linked-fingerprint",
+	}
+	observerCommand := command
+	observerCommand.RequestID, observerCommand.PayloadFingerprint = "observer-linked", "observer-linked"
+	beforeObserver := fixture.service.Snapshot()
+	assert.Equal(t, domain.ActionReasonNotController, fixture.service.DispatchPlayerAction(fixture.observerConnection, observerCommand).Reason)
+	require.Nil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+	assert.Equal(t, beforeObserver.Broadcast, fixture.service.Snapshot().Broadcast)
+	unassignedCommand := command
+	unassignedCommand.RequestID, unassignedCommand.PayloadFingerprint = "unassigned-linked", "unassigned-linked"
+	assert.Equal(t, domain.ActionReasonUnassigned, fixture.service.DispatchPlayerAction(fixture.unassignedConnection, unassignedCommand).Reason)
+	require.Nil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+
+	result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
+	require.True(t, result.Accepted)
+	first := fixture.service.Snapshot().PendingTerminalNavigation
+	require.NotNil(t, first)
+	assert.Equal(t, domain.TerminalNavigationForward, first.Direction)
+	assert.Equal(t, "terminal-b", first.TargetTerminalID)
+	assert.Equal(t, 0, runtime.Calls(), "linked command must not reach ordinary gameplay")
+	handle := domain.RecognitionHandle(fixture.controllerToken)
+	reconnected, err := fixture.service.AttachSubscription("linked-reconnect", &handle)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, reconnected.Revision, result.Revision)
+	require.NotNil(t, reconnected.Terminal.Live)
+	require.NotNil(t, reconnected.Terminal.Live.TerminalNavigation)
+	require.NotNil(t, reconnected.Terminal.Live.TerminalNavigation.Pending)
+	assert.Equal(t, domain.TerminalNavigationForward, reconnected.Terminal.Live.TerminalNavigation.Pending.Direction)
+	assert.Equal(t, "terminal-b", reconnected.Terminal.Live.TerminalNavigation.Pending.TargetTerminalID)
+	fixture.service.DetachConnection("linked-reconnect")
+
+	for range 20 {
+		replayed := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
+		assert.Equal(t, result, replayed)
+		assert.Equal(t, first.RequestID, fixture.service.Snapshot().PendingTerminalNavigation.RequestID)
+	}
+	competing := command
+	competing.RequestID, competing.PayloadFingerprint = "competing", "competing-fingerprint"
+	competing.Action, competing.NodeID = "back", ""
+	assert.Equal(t, domain.ActionReasonConflict, fixture.service.DispatchPlayerAction(fixture.controllerConnection, competing).Reason)
+
+	rejected, err := fixture.service.ResolveTerminalNavigation(first.RequestID, domain.TerminalNavigationReject)
+	require.NoError(t, err)
+	require.Nil(t, rejected.PendingTerminalNavigation)
+	require.Equal(t, fixture.terminalID, *rejected.Broadcast.ActiveTerminalID)
+
+	command.RequestID, command.PayloadFingerprint = "linked-request-approve", "linked-fingerprint-approve"
+	require.True(t, fixture.service.DispatchPlayerAction(fixture.controllerConnection, command).Accepted)
+	pending := fixture.service.Snapshot().PendingTerminalNavigation
+	require.NotNil(t, pending)
+	approved, err := fixture.service.ResolveTerminalNavigation(pending.RequestID, domain.TerminalNavigationApprove)
+	require.NoError(t, err)
+	require.Equal(t, "terminal-b", *approved.Broadcast.ActiveTerminalID)
+	require.Nil(t, approved.PendingTerminalNavigation)
+	fixture.service.mu.RLock()
+	assert.Len(t, fixture.service.runtime.Broadcast.Route, 1)
+	assert.Equal(t, domain.TerminalLifecycleSuspended, fixture.service.runtime.Broadcast.TerminalRuntimes[fixture.terminalID].Lifecycle)
+	assert.Nil(t, fixture.service.runtime.PendingSwitch)
+	assert.Equal(t, domain.NavState{Path: []string{"root"}, Mode: "list"}, fixture.service.runtime.Broadcast.TerminalRuntimes["terminal-b"].Nav)
+	fixture.service.mu.RUnlock()
+}
+
+func TestConcurrentLinkedRequestsCreateExactlyOnePendingDecision(t *testing.T) {
+	runtime := &recordingTerminalRuntime{}
+	fixture := newUS2Fixture(t, runtime)
+	fixture.service.terminals = newRecordingDecisionTerminalLifecycle()
+	fixture.service.terminalCatalog = &recordingTerminalCatalog{transitions: map[string]domain.TerminalTransitionTarget{
+		fixture.terminalID + "/linked-command": {
+			SourceTerminalID: fixture.terminalID, SourceTerminalName: "Terminal 1",
+			CommandID: "linked-command", CommandName: "Open B", Target: terminalTarget("terminal-b", "Terminal B"),
+		},
+	}}
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children = append(root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children, domain.ContentNode{
+			ID: "linked-command", Type: domain.NodeCommand, Name: "Open B",
+			TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "terminal-b"},
+		})
+		return transition{accepted: true}
+	})
+
+	start := make(chan struct{})
+	results := make(chan domain.ActionResult, 2)
+	for _, requestID := range []string{"concurrent-a", "concurrent-b"} {
+		requestID := requestID
+		go func() {
+			<-start
+			results <- fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+				RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
+				Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "linked-command",
+			})
+		}()
+	}
+	close(start)
+	first, second := <-results, <-results
+	reasons := []domain.ActionReason{first.Reason, second.Reason}
+	assert.ElementsMatch(t, []domain.ActionReason{domain.ActionReasonAccepted, domain.ActionReasonConflict}, reasons)
+	require.NotNil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+	assert.Equal(t, 0, runtime.Calls())
+}
+
+func TestLinkedCommandWithStaleCatalogTargetFailsWithoutPending(t *testing.T) {
+	t.Parallel()
+	fixture := newUS2Fixture(t, &recordingTerminalRuntime{})
+	fixture.service.terminalCatalog = &recordingTerminalCatalog{}
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children = append(root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children, domain.ContentNode{
+			ID: "stale-link", Type: domain.NodeCommand, Name: "Missing", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "missing"},
+		})
+		return transition{accepted: true}
+	})
+	result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+		RequestID: "stale-link", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
+		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "stale-link", PayloadFingerprint: "stale-link",
+	})
+	assert.Equal(t, domain.ActionReasonInvalidAction, result.Reason)
+	require.Nil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+}
+
+func TestStaleForwardApprovalClearsOnlyPendingAndPublishesTypedNotice(t *testing.T) {
+	t.Parallel()
+	runtime := &recordingTerminalRuntime{}
+	fixture := newUS2Fixture(t, runtime)
+	fixture.service.terminals = newRecordingDecisionTerminalLifecycle()
+	catalog := &recordingTerminalCatalog{transitions: map[string]domain.TerminalTransitionTarget{
+		fixture.terminalID + "/linked-command": {
+			SourceTerminalID: fixture.terminalID, SourceTerminalName: "Terminal 1",
+			CommandID: "linked-command", CommandName: "Open B", Target: terminalTarget("terminal-b", "Terminal B"),
+		},
+	}}
+	fixture.service.terminalCatalog = catalog
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children = append(root.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children, domain.ContentNode{
+			ID: "linked-command", Type: domain.NodeCommand, Name: "Open B",
+			TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "terminal-b"},
+		})
+		return transition{accepted: true}
+	})
+	result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+		RequestID: "stale-approval", BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,
+		Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: "linked-command",
+	})
+	require.True(t, result.Accepted)
+	pending := fixture.service.Snapshot().PendingTerminalNavigation
+	require.NotNil(t, pending)
+	catalog.transitions[fixture.terminalID+"/linked-command"] = domain.TerminalTransitionTarget{
+		SourceTerminalID: fixture.terminalID, SourceTerminalName: "Terminal 1",
+		CommandID: "linked-command", CommandName: "Open C", Target: terminalTarget("terminal-c", "Terminal C"),
+	}
+	state, err := fixture.service.ResolveTerminalNavigation(pending.RequestID, domain.TerminalNavigationApprove)
+	require.Error(t, err)
+	require.Nil(t, state.PendingTerminalNavigation)
+	require.NotNil(t, state.TerminalNavigationNotice)
+	assert.Equal(t, domain.TerminalNavigationNoticeTargetChanged, state.TerminalNavigationNotice.Reason)
+	require.Equal(t, fixture.terminalID, *state.Broadcast.ActiveTerminalID)
+	fixture.service.mu.RLock()
+	require.Empty(t, fixture.service.runtime.Broadcast.Route)
+	fixture.service.mu.RUnlock()
+}
+
+func TestManualAndBroadcastLifecycleClearTerminalNavigationState(t *testing.T) {
+	for _, boundary := range []string{"manual activation", "manual clear", "end broadcast", "shutdown"} {
+		t.Run(boundary, func(t *testing.T) {
+			fixture := newUS2Fixture(t, &recordingTerminalRuntime{})
+			fixture.service.terminals = newRecordingDecisionTerminalLifecycle()
+			fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+				terminal := root.Broadcast.TerminalRuntimes[fixture.terminalID]
+				terminal.Hack.Solved = true
+				root.Broadcast.Route = []domain.TerminalReturnPoint{{TerminalID: "terminal-old", FolderID: "root", CommandID: "old-link"}}
+				root.PendingTerminalNavigation = &domain.PendingTerminalNavigation{
+					RequestID: "navigation-old", BroadcastID: root.Broadcast.ID, Direction: domain.TerminalNavigationForward,
+					SourceTerminalID: fixture.terminalID, TargetTerminalID: "terminal-old",
+				}
+				targetID := "terminal-old"
+				root.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+					Reason: domain.TerminalNavigationNoticeTargetChanged, SourceTerminalID: fixture.terminalID,
+					CommandID: "old-link", TargetTerminalID: &targetID,
+				}
+				return transition{accepted: true}
+			})
+
+			switch boundary {
+			case "manual activation":
+				_, err := fixture.service.RequestTerminalActivation(terminalTarget("terminal-manual", "Manual"))
+				require.NoError(t, err)
+			case "manual clear":
+				_, err := fixture.service.RequestTerminalClear()
+				require.NoError(t, err)
+			case "end broadcast":
+				_, err := fixture.service.EndBroadcast()
+				require.NoError(t, err)
+			case "shutdown":
+				fixture.service.Shutdown()
+			}
+
+			state := fixture.service.Snapshot()
+			require.Nil(t, state.PendingTerminalNavigation)
+			require.Nil(t, state.TerminalNavigationNotice)
+			fixture.service.mu.RLock()
+			if fixture.service.runtime.Broadcast != nil {
+				require.Empty(t, fixture.service.runtime.Broadcast.Route)
+			}
+			fixture.service.mu.RUnlock()
+			if boundary == "end broadcast" {
+				started, err := fixture.service.StartBroadcast()
+				require.NoError(t, err)
+				require.Nil(t, started.PendingTerminalNavigation)
+				require.Nil(t, started.TerminalNavigationNotice)
+			}
+		})
+	}
+}
+
+func TestRootBackReturnRejectsWithoutMutationThenApprovesOneLIFOPoint(t *testing.T) {
+	t.Parallel()
+	runtime := &recordingTerminalRuntime{}
+	fixture := newUS2Fixture(t, runtime)
+	lifecycle := newRecordingDecisionTerminalLifecycle()
+	fixture.service.terminals = lifecycle
+
+	targetA := terminalTarget(fixture.terminalID, "Terminal A")
+	targetA.Tree = domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{
+		{ID: "archive", Type: domain.NodeFolder, Name: "ARCHIVE", Children: []domain.ContentNode{
+			{ID: "docs", Type: domain.NodeFolder, Name: "DOCS"},
+		}},
+	}}
+	fixture.service.terminalCatalog = &recordingTerminalCatalog{terminals: map[string]domain.TerminalTarget{
+		fixture.terminalID: targetA,
+	}}
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		source := root.Broadcast.TerminalRuntimes[fixture.terminalID]
+		source.Lifecycle = domain.TerminalLifecycleSuspended
+		destination := testTerminalRuntime("terminal-b")
+		destination.TerminalName = "Terminal B"
+		destination.Nav = domain.NavState{Path: []string{"root", "docs"}, Mode: "list"}
+		root.Broadcast.TerminalRuntimes["terminal-b"] = destination
+		active := "terminal-b"
+		root.Broadcast.ActiveTerminalID = &active
+		root.Broadcast.Route = []domain.TerminalReturnPoint{{
+			TerminalID: fixture.terminalID, TerminalName: "Terminal A", FolderID: "docs",
+			AncestorFolderIDs: []string{"root"}, CommandID: "open-b", CommandName: "Open B",
+		}}
+		return transition{accepted: true}
+	})
+
+	// Back inside a terminal folder keeps its legacy intra-terminal meaning.
+	inside := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+		RequestID: "return-inside", BroadcastID: fixture.broadcastID, TerminalID: "terminal-b",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.True(t, inside.Accepted)
+	require.Nil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+	assert.Equal(t, domain.NavState{Path: []string{"root"}, Mode: "list"}, canonicalTerminal(t, fixture.service, "terminal-b").Nav)
+
+	requestReturn := func(requestID string) *domain.MasterPendingTerminalNavigation {
+		result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+			RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: "terminal-b",
+			Kind: domain.RuntimeCommandNavigate, Action: "back",
+		})
+		require.True(t, result.Accepted)
+		pending := fixture.service.Snapshot().PendingTerminalNavigation
+		require.NotNil(t, pending)
+		assert.Equal(t, domain.TerminalNavigationReturn, pending.Direction)
+		assert.Equal(t, fixture.terminalID, pending.TargetTerminalID)
+		return pending
+	}
+
+	pending := requestReturn("return-reject")
+	beforeReject := fixture.service.Snapshot()
+	rejected, err := fixture.service.ResolveTerminalNavigation(pending.RequestID, domain.TerminalNavigationReject)
+	require.NoError(t, err)
+	require.Nil(t, rejected.PendingTerminalNavigation)
+	require.Equal(t, "terminal-b", *rejected.Broadcast.ActiveTerminalID)
+	fixture.service.mu.RLock()
+	require.Len(t, fixture.service.runtime.Broadcast.Route, 1)
+	fixture.service.mu.RUnlock()
+	assert.Greater(t, rejected.Revision, beforeReject.Revision)
+
+	pending = requestReturn("return-approve")
+	approved, err := fixture.service.ResolveTerminalNavigation(pending.RequestID, domain.TerminalNavigationApprove)
+	require.NoError(t, err)
+	require.Equal(t, fixture.terminalID, *approved.Broadcast.ActiveTerminalID)
+	require.Nil(t, approved.PendingTerminalNavigation)
+	fixture.service.mu.RLock()
+	require.Empty(t, fixture.service.runtime.Broadcast.Route)
+	assert.Equal(t, domain.NavState{Path: []string{"root", "archive", "docs"}, Mode: "list"}, fixture.service.runtime.Broadcast.TerminalRuntimes[fixture.terminalID].Nav)
+	fixture.service.mu.RUnlock()
+}
+
+func TestReturnApprovalRequiresUnchangedTopAndUnwindsCyclesOnePointAtATime(t *testing.T) {
+	t.Parallel()
+	runtime := &recordingTerminalRuntime{}
+	fixture := newUS2Fixture(t, runtime)
+	lifecycle := newRecordingDecisionTerminalLifecycle()
+	fixture.service.terminals = lifecycle
+	fixture.service.terminalCatalog = &recordingTerminalCatalog{terminals: map[string]domain.TerminalTarget{
+		"terminal-a": terminalTarget("terminal-a", "Terminal A"),
+		"terminal-b": terminalTarget("terminal-b", "Terminal B"),
+	}}
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		delete(root.Broadcast.TerminalRuntimes, fixture.terminalID)
+		for _, id := range []string{"terminal-a", "terminal-b", "terminal-c"} {
+			terminal := testTerminalRuntime(id)
+			terminal.Lifecycle = domain.TerminalLifecycleSuspended
+			root.Broadcast.TerminalRuntimes[id] = terminal
+		}
+		root.Broadcast.TerminalRuntimes["terminal-c"].Lifecycle = domain.TerminalLifecycleActive
+		active := "terminal-c"
+		root.Broadcast.ActiveTerminalID = &active
+		root.Broadcast.Route = []domain.TerminalReturnPoint{
+			{TerminalID: "terminal-a", TerminalName: "Terminal A", FolderID: "root", CommandID: "to-b", CommandName: "To B"},
+			{TerminalID: "terminal-b", TerminalName: "Terminal B", FolderID: "root", CommandID: "to-c", CommandName: "To C"},
+		}
+		return transition{accepted: true}
+	})
+
+	back := func(requestID, terminalID string) *domain.MasterPendingTerminalNavigation {
+		result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+			RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: terminalID,
+			Kind: domain.RuntimeCommandNavigate, Action: "back",
+		})
+		require.True(t, result.Accepted)
+		pending := fixture.service.Snapshot().PendingTerminalNavigation
+		require.NotNil(t, pending)
+		return pending
+	}
+
+	stale := back("return-stale", "terminal-c")
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.Broadcast.Route[len(root.Broadcast.Route)-1].CommandID = "changed-command"
+		return transition{accepted: true}
+	})
+	beforeStale := fixture.service.Snapshot()
+	got, err := fixture.service.ResolveTerminalNavigation(stale.RequestID, domain.TerminalNavigationApprove)
+	require.Error(t, err)
+	assert.Equal(t, beforeStale, got)
+	assert.Equal(t, beforeStale, fixture.service.Snapshot())
+
+	fixture.service.commit(func(root *domain.ProcessRuntime) transition {
+		root.PendingTerminalNavigation = nil
+		root.Broadcast.Route[len(root.Broadcast.Route)-1].CommandID = "to-c"
+		return transition{accepted: true}
+	})
+	first := back("return-c-b", "terminal-c")
+	state, err := fixture.service.ResolveTerminalNavigation(first.RequestID, domain.TerminalNavigationApprove)
+	require.NoError(t, err)
+	require.Equal(t, "terminal-b", *state.Broadcast.ActiveTerminalID)
+	fixture.service.mu.RLock()
+	require.Len(t, fixture.service.runtime.Broadcast.Route, 1)
+	fixture.service.mu.RUnlock()
+
+	second := back("return-b-a", "terminal-b")
+	state, err = fixture.service.ResolveTerminalNavigation(second.RequestID, domain.TerminalNavigationApprove)
+	require.NoError(t, err)
+	require.Equal(t, "terminal-a", *state.Broadcast.ActiveTerminalID)
+	fixture.service.mu.RLock()
+	require.Empty(t, fixture.service.runtime.Broadcast.Route)
+	fixture.service.mu.RUnlock()
+
+	ordinary := fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
+		RequestID: "no-route-back", BroadcastID: fixture.broadcastID, TerminalID: "terminal-a",
+		Kind: domain.RuntimeCommandNavigate, Action: "back",
+	})
+	require.True(t, ordinary.Accepted)
+	require.Nil(t, fixture.service.Snapshot().PendingTerminalNavigation)
+}
+
+type recordingTerminalCatalog struct {
+	transitions map[string]domain.TerminalTransitionTarget
+	terminals   map[string]domain.TerminalTarget
+}
+
+func (catalog *recordingTerminalCatalog) LookupTerminal(id string) (domain.TerminalTarget, bool) {
+	target, ok := catalog.terminals[id]
+	return *cloneTerminalTarget(&target), ok
+}
+
+func (catalog *recordingTerminalCatalog) LookupTerminalTransition(sourceID, commandID string) (domain.TerminalTransitionTarget, bool) {
+	transition, ok := catalog.transitions[sourceID+"/"+commandID]
+	if !ok {
+		return domain.TerminalTransitionTarget{}, false
+	}
+	transition.Target = *cloneTerminalTarget(&transition.Target)
+	return transition, true
+}
+
 func (fixture commandExecutionFixture) command(requestID domain.RequestID) domain.RuntimeCommand {
 	return domain.RuntimeCommand{
 		RequestID: requestID, BroadcastID: fixture.broadcastID, TerminalID: fixture.terminalID,

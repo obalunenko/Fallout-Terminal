@@ -411,6 +411,11 @@ html, body {
 .back-btn:hover, .page-btn:hover { background: rgba(87, 255, 110, .12); }
 .back-btn:active, .page-btn:active { background: #57ff6e; color: #021002; }
 .back-btn.layout-placeholder { visibility: hidden; pointer-events: none; }
+.back-btn.terminal-return {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
 .back-btn:focus-visible, .page-btn:focus-visible {
   outline: 2px solid #d8ffb8;
   outline-offset: 2px;
@@ -492,6 +497,11 @@ html, body {
 #screen.shared-input-pending :is(.term-row, .back-btn, .hcell) {
   cursor: not-allowed;
   opacity: .72;
+}
+#screen.shared-input-pending .player-notice {
+  border-color: #c99a3c;
+  color: #ffe08a;
+  text-shadow: 0 0 6px rgba(255, 224, 138, .35);
 }
 
 #screen.observer-read-only .term-row.sel,

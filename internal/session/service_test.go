@@ -183,6 +183,39 @@ func TestOpenAndSavePreserveUnknownFieldsAtExplicitPath(t *testing.T) {
 	assertNoApplicationSupportWrites(t, fileSystem)
 }
 
+func TestRealDemoCrossTerminalLinkSurvivesServiceSaveAndRejectsOnlyInvalidTargets(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../../sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Volumes/Campaigns/demo-transition.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
+	t.Cleanup(func() { require.NoError(t, service.Shutdown(context.WithoutCancel(t.Context()))) })
+
+	opened := service.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
+	require.Len(t, opened.Session.Terminals, 2)
+	require.Equal(t, "t_demo2", opened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+
+	saved := service.Save(t.Context(), *opened.Session, 1)
+	require.True(t, saved.OK, "Save() = %#v", saved)
+	reopened := service.Open(t.Context())
+	require.True(t, reopened.OK, "reopen = %#v", reopened)
+	require.Len(t, reopened.Session.Terminals, 2)
+	require.Equal(t, "t_demo2", reopened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+
+	missing := cloneSession(*reopened.Session)
+	missing.Terminals = missing.Terminals[:1]
+	require.False(t, service.Save(t.Context(), missing, 2).OK)
+
+	self := cloneSession(*reopened.Session)
+	self.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID = "t_demo1"
+	require.False(t, service.Save(t.Context(), self, 2).OK)
+}
+
 func TestOpenAndSaveLegacyVersionOnePreservesOrdinaryContentWithoutAddingStateFields(t *testing.T) {
 	t.Parallel()
 
@@ -289,8 +322,13 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	t.Parallel()
 
 	fileSystem := testutil.NewFakeFileSystem()
-	demo := validSession("demo")
+	demo := stateChangingSession("demo")
 	demo.PlayerConfig = "demo-players.json"
+	completedState := domain.CommandExecutionState{
+		CompletedName: "Двери открыты",
+		ResultText:    "Доступ в сектор разрешён.",
+	}
+	demo.Terminals[0].CommandStates = map[string]domain.CommandExecutionState{"doors": completedState}
 	demoData, err := domain.EncodeSession(demo)
 	require.NoError(t, err)
 	playerConfigData, err := domain.EncodePlayerConfig(domain.PlayerConfig{
@@ -316,6 +354,7 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	assert.Empty(t, result.Error)
 	assert.Equal(t, destination, result.FilePath)
 	require.NotNil(t, result.Session)
+	assert.Equal(t, completedState, result.Session.Terminals[0].CommandStates["doors"])
 	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, testLocations.BundledDemo))
 	assert.Equal(t, playerConfigData, fileSystemFileData(t, fileSystem, bundledPlayerConfig))
 	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, destination))
@@ -324,6 +363,18 @@ func TestCopyDemoRequiresExplicitDestinationAndActivatesWritableCopy(t *testing.
 	snapshot := service.Snapshot()
 	assert.Equal(t, destination, snapshot.Path)
 	assert.NotNil(t, snapshot.Session)
+
+	reset := service.ResetCommandState(t.Context(), "t1", "doors")
+	require.True(t, reset.OK, "ResetCommandState() in writable demo copy = %#v", reset)
+	assert.True(t, reset.Changed)
+	assert.Equal(t, uint64(1), reset.Revision)
+	require.NotNil(t, reset.Session)
+	assert.NotContains(t, reset.Session.Terminals[0].CommandStates, "doors")
+	assert.Equal(t, demoData, fileSystemFileData(t, fileSystem, testLocations.BundledDemo),
+		"resetting the writable copy mutated the bundled demo")
+	writtenCopy, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, destination))
+	require.NoError(t, err)
+	assert.NotContains(t, writtenCopy.Terminals[0].CommandStates, "doors")
 }
 
 func TestTwentyQueuedRevisionsFinishAtNewestAcceptedSession(t *testing.T) {
@@ -507,6 +558,36 @@ func TestFullSavePrunesFrozenStateWhenCommandIsDeleted(t *testing.T) {
 	written, err := domain.DecodeSession(fileSystemFileData(t, fileSystem, target))
 	require.NoError(t, err)
 	assert.Empty(t, written.Terminals[0].CommandStates)
+}
+
+func TestTerminalCatalogReturnsDetachedCurrentSessionSnapshotsAndInvalidSaveIsAtomic(t *testing.T) {
+	t.Parallel()
+
+	fileSystem := testutil.NewFakeFileSystem()
+	target := "/Volumes/Campaigns/linked.json"
+	fileSystem.SeedFile(target, mustEncodeSession(t, linkedSessionForTest()))
+	service := NewService(NewStorage(fileSystem), &testutil.FakeDialog{OpenResult: target}, testLocations)
+	t.Cleanup(func() { _ = service.Shutdown(context.WithoutCancel(t.Context())) })
+	require.True(t, service.Open(t.Context()).OK)
+
+	lookup, ok := service.LookupTerminalTransition("a", "go")
+	require.True(t, ok)
+	assert.Equal(t, "GO", lookup.CommandName)
+	assert.Equal(t, "b", lookup.Target.TerminalID)
+	lookup.Target.Tree.Name = "MUTATED"
+	again, ok := service.LookupTerminalTransition("a", "go")
+	require.True(t, ok)
+	assert.Equal(t, "ROOT", again.Target.Tree.Name, "catalog snapshots must be detached")
+
+	before := service.Snapshot()
+	writesBefore := len(fileSystem.WriteCalls())
+	invalid := domain.CloneSession(*before.Session)
+	invalid.Terminals = invalid.Terminals[:1]
+	result := service.Save(t.Context(), invalid, before.RequestedRevision+1)
+	assert.False(t, result.OK)
+	assert.Equal(t, writesBefore, len(fileSystem.WriteCalls()))
+	after := service.Snapshot()
+	require.Equal(t, before.Session, after.Session)
 }
 
 func TestStableIDAndFrozenStateRulesAcross100CompletedCommands(t *testing.T) {

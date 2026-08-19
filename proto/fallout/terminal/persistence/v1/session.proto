@@ -18,9 +18,16 @@ message CommandExecutionState {
   string result_text = 2;
 }
 
+message TerminalTransitionConfig {
+  string target_terminal_id = 1;
+}
+
 message CommandContent {
   string text = 1;
-  optional StateChangeConfig state_change = 2;
+  oneof behavior {
+    StateChangeConfig state_change = 2;
+    TerminalTransitionConfig terminal_transition = 3;
+  }
 }
 
 message EntryContent {

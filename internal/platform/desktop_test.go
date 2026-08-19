@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -117,6 +118,17 @@ func TestDesktopDialogAdaptersPreserveNativeOptionsAndOutcomes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWailsFileFilterPatternUsesDarwinExtensionsAndPreservesOtherGlobs(t *testing.T) {
+	t.Parallel()
+
+	got := wailsFileFilterPattern("*.json;*.yaml")
+	if runtime.GOOS == "darwin" {
+		require.Equal(t, "json;yaml", got)
+		return
+	}
+	require.Equal(t, "*.json;*.yaml", got)
 }
 
 func TestDesktopBrowserAdapterAllowsOnlyAbsoluteHTTPAndHTTPS(t *testing.T) {

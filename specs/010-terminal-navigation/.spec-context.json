@@ -1,0 +1,1940 @@
+{
+  "workflow": "companion",
+  "specName": "terminal navigation",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:18:42.136Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:23:15.119Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:26:27.218Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:36:46.843Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:43:57.072Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:44:33.345Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:48:06.921Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:52:33.374Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T13:52:46.796Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T13:55:30.313Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:55:46.713Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:55:59.108Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:56:17.841Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:56:37.396Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:57:55.167Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:58:56.380Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T13:59:17.981Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:01:44.323Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:02:33.392Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:02:57.084Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:05:06.157Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:06:20.508Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:07:24.177Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:09:17.760Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:11:35.684Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:13:18.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:14:24.380Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:18:24.519Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:19:14.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:24:01.625Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T14:24:01.731Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:25:25.441Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:25:25.555Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:25:25.667Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:25:25.767Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:34:08.158Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:34:08.263Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:34:08.384Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:34:40.735Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T15:50:29.820Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T16:06:09.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T16:06:09.726Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T22:23:36.745Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:24:37.053Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:25:31.361Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T22:48:29.185Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:54:29.773Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:55:05.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:55:43.274Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:57:10.022Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T22:58:39.442Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T23:05:15.941Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T23:13:58.545Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T23:39:24.784Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T00:14:44.549Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:16:51.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:18:13.349Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:19:03.479Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:21:14.213Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:39:31.816Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T00:39:32.009Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T01:03:40.119Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:05:02.763Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:05:48.932Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:06:30.047Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:06:30.147Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T01:08:18.053Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T08:53:08.707Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T08:53:08.975Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T14:17:05.050Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:19:26.472Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:19:26.720Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:20:03.828Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:20:21.867Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:21:22.481Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:21:22.796Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:22:33.218Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:22:47.091Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:23:45.996Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:25:34.836Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:26:32.879Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:37:56.741Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T14:43:40.064Z",
+      "reopened": true
+    }
+  ],
+  "last_action": "BUG-004 implemented; 40/40 tasks complete; automated and accepted packaged native gates pass",
+  "coverage": {
+    "FR-001": {
+      "title": "Мастер MUST иметь возможность настроить обычную команду как команду перехода и выбрать для неё другой терминал из текущей сессии.",
+      "tasks": [
+        "T013",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring and complete terminal round trip",
+        "tests/browser/desktop-api.spec.mjs::saveSession snapshots the complete cross-terminal document at the Wails boundary"
+      ]
+    },
+    "FR-002": {
+      "title": "Настройка команды перехода MUST сохраняться вместе с содержимым сессии и восстанавливаться после повторного открытия файла.",
+      "tasks": [
+        "T013",
+        "T031",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "app_test.go::TestDesktopSessionFacadeSavesRealDemoCrossTerminalLinkAndReopensIt",
+        "wails_host_test.go::TestWailsSaveSessionBindingRetainsBothRealDemoTerminals",
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring and complete terminal round trip"
+      ]
+    },
+    "FR-003": {
+      "title": "Система MUST отклонять сохранение или выполнение команды перехода без существующего целевого терминала либо с целью, совпадающей с исходным терминалом.",
+      "tasks": [
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/session/service_test.go::TestRealDemoCrossTerminalLinkSurvivesServiceSaveAndRejectsOnlyInvalidTargets"
+      ]
+    },
+    "FR-004": {
+      "title": "Выбор команды перехода контролирующим игроком MUST создавать ровно один ожидающий запрос решения мастера без немедленной смены активного терминала.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically",
+        "tests/browser/terminal-navigation.spec.mjs::one forward request opens one exact master dialog and close rejects it"
+      ]
+    },
+    "FR-005": {
+      "title": "Пока решение мастера ожидается, система MUST блокировать остальные действия общей навигации и не создавать конкурирующий запрос перехода.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T016"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically"
+      ]
+    },
+    "FR-006": {
+      "title": "Запрос решения мастеру MUST однозначно показывать направление перехода, исходный терминал, название выбранной команды и целевой терминал.",
+      "tasks": [
+        "T003",
+        "T011",
+        "T013",
+        "T015",
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::one forward request opens one exact master dialog and close rejects it"
+      ]
+    },
+    "FR-007": {
+      "title": "Одобрение команды перехода MUST сделать её целевой терминал единственным активным терминалом текущей трансляции.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T017"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically"
+      ]
+    },
+    "FR-008": {
+      "title": "Одобрение команды перехода MUST сохранить текущее состояние исходного терминала для возможного возврата.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically"
+      ]
+    },
+    "FR-009": {
+      "title": "Одобрение команды перехода MUST завершать смену терминала без второго диалога решения о переключении.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::approved first entry opens the destination hack at root without a terminal-switch decision"
+      ]
+    },
+    "FR-010": {
+      "title": "Отклонение команды перехода или закрытие окна решения MUST оставить активный терминал и историю переходов без изменений.",
+      "tasks": [
+        "T012",
+        "T013",
+        "T014",
+        "T015",
+        "T017"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::one forward request opens one exact master dialog and close rejects it"
+      ]
+    },
+    "FR-011": {
+      "title": "Первый вход в защищённый терминал MUST применять существующие правила показа и прохождения взлома.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::approved first entry opens the destination hack at root without a terminal-switch decision"
+      ]
+    },
+    "FR-012": {
+      "title": "Повторный вход в терминал с успешно завершённым в текущей трансляции взломом MUST сразу открывать его начальный экран без повторного взлома.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ],
+      "tests": [
+        "internal/live/service_test.go::TestTerminalRuntimeReactivationRetainsSolvedUnfinishedAndFailedHackAcrossTenVisits"
+      ]
+    },
+    "FR-013": {
+      "title": "Повторный вход в терминал с незавершённым или заблокированным взломом MUST восстанавливать его сохранённое состояние, если мастер явно не сбросил или не отбросил его.",
+      "tasks": [
+        "T019",
+        "T020",
+        "T021"
+      ],
+      "tests": [
+        "internal/live/service_test.go::TestTerminalRuntimeReactivationRetainsSolvedUnfinishedAndFailedHackAcrossTenVisits",
+        "tests/browser/terminal-navigation.spec.mjs::an unfinished destination hack resumes with the exact retained progress"
+      ]
+    },
+    "FR-014": {
+      "title": "Перед одобренным прямым переходом система MUST сохранить исходный терминал, уровень меню с выбранной командой и идентичность этой команды как одну точку возврата.",
+      "tasks": [
+        "T008",
+        "T010",
+        "T012",
+        "T014"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestRootBackReturnRejectsWithoutMutationThenApprovesOneLIFOPoint"
+      ]
+    },
+    "FR-015": {
+      "title": "Начальный экран терминала MUST предлагать межтерминальный возврат только при наличии точки возврата в текущем маршруте.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T023",
+        "T025"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::root return stays pending on reject",
+        "then restores the nested source menu on approve"
+      ]
+    },
+    "FR-016": {
+      "title": "Выбор межтерминального возврата контролирующим игроком MUST создавать ровно один ожидающий запрос решения мастера без немедленной смены активного терминала.",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestRootBackReturnRejectsWithoutMutationThenApprovesOneLIFOPoint"
+      ]
+    },
+    "FR-017": {
+      "title": "Одобрение возврата MUST активировать терминал из последней точки возврата и удалить только эту точку из маршрута.",
+      "tasks": [
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestRootBackReturnRejectsWithoutMutationThenApprovesOneLIFOPoint"
+      ]
+    },
+    "FR-018": {
+      "title": "Одобрённый возврат MUST открыть список сохранённого уровня меню исходного терминала, если этот уровень всё ещё существует.",
+      "tasks": [
+        "T007",
+        "T010",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/nav/nav_test.go::TestStableFolderLookupAndReturnRestoration",
+        "tests/browser/terminal-navigation.spec.mjs::root return stays pending on reject",
+        "then restores the nested source menu on approve"
+      ]
+    },
+    "FR-019": {
+      "title": "Если сохранённый уровень больше не существует, одобрённый возврат MUST открыть ближайший существующий родительский уровень либо корень исходного терминала.",
+      "tasks": [
+        "T007",
+        "T010",
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "internal/nav/nav_test.go::TestStableFolderLookupAndReturnRestoration",
+        "tests/browser/terminal-navigation.spec.mjs::deleted source folder falls back to root without losing the terminal route"
+      ]
+    },
+    "FR-020": {
+      "title": "Отклонение возврата или закрытие окна решения MUST оставить текущий терминал и маршрут без изменений.",
+      "tasks": [
+        "T022",
+        "T023",
+        "T024",
+        "T025"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestRootBackReturnRejectsWithoutMutationThenApprovesOneLIFOPoint"
+      ]
+    },
+    "FR-021": {
+      "title": "Последовательные переходы MUST образовывать маршрут последнего-вошёл-первого-вышел, чтобы каждый возврат вёл только к непосредственному предыдущему терминалу.",
+      "tasks": [
+        "T008",
+        "T022",
+        "T023",
+        "T024"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestReturnApprovalRequiresUnchangedTopAndUnwindsCyclesOnePointAtATime",
+        "tests/browser/terminal-navigation.spec.mjs::A to B to C returns unwind exactly B then A"
+      ]
+    },
+    "FR-022": {
+      "title": "Только текущий контролирующий игрок MUST иметь право инициировать переход или возврат; действия остальных игроков MUST быть отклонены без изменения общего состояния.",
+      "tasks": [
+        "T012",
+        "T014",
+        "T026",
+        "T028"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestPlayerActionAuthorizationRejectsWithoutTerminalMutationOrRandomness"
+      ]
+    },
+    "FR-023": {
+      "title": "Все подключённые игроки MUST получать одно и то же активное состояние терминала, ожидания решения, маршрута и результата перехода.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T026",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ]
+    },
+    "FR-024": {
+      "title": "Переподключившийся игрок MUST получать актуальный активный терминал и актуальное состояние ожидающего решения без восстановления устаревшего экрана.",
+      "tasks": [
+        "T002",
+        "T011",
+        "T026",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "internal/player/public_stream_test.go::TestFirstPublicSnapshotRestoresTerminalRouteAndPendingWithoutPrivateDecisionIdentity",
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ]
+    },
+    "FR-025": {
+      "title": "Удалённая, устаревшая или изменившая цель команда MUST завершаться безопасным отказом без смены активного терминала и без изменения маршрута.",
+      "tasks": [
+        "T006",
+        "T009",
+        "T012",
+        "T014",
+        "T026",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::stale target approval fails safely and keeps the source terminal active"
+      ]
+    },
+    "FR-026": {
+      "title": "Завершение трансляции, ручная смена активного терминала или закрытие приложения MUST отменять ожидающий межтерминальный переход.",
+      "tasks": [
+        "T026",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestManualAndBroadcastLifecycleClearTerminalNavigationState"
+      ]
+    },
+    "FR-027": {
+      "title": "Завершение трансляции, ручная смена активного терминала или закрытие приложения MUST очищать маршрут межтерминальных переходов этой трансляции.",
+      "tasks": [
+        "T026",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "internal/control/service_test.go::TestManualAndBroadcastLifecycleClearTerminalNavigationState",
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ]
+    },
+    "FR-028": {
+      "title": "Обычные папки, записи, команды и изменяющие состояние команды MUST сохранять существующее поведение, если для них не настроен межтерминальный переход.",
+      "tasks": [
+        "T005",
+        "T012",
+        "T014",
+        "T019",
+        "T021",
+        "T022",
+        "T024",
+        "T025"
+      ],
+      "tests": [
+        "tests/browser/connectrpc-player.spec.mjs::retained request identity reused with a different typed payload is rejected without canonical navigation",
+        "tests/browser/player-sessions-control.spec.mjs::four through seven generated players converge across mixed navigation reconnect replay and sound-safe state",
+        "tests/browser/public-access-fallback.spec.mjs::all public failures leave local gameplay live and a later public generation recovers without restart",
+        "tests/browser/state-changing-command-sync.spec.mjs::controller disconnect keeps one pending request and durable completion survives every shared lifecycle",
+        "tests/browser/state-changing-command-authoring.spec.mjs::bundled read-only demo exposes state-changing and terminal-transition examples in their initial state"
+      ]
+    },
+    "SC-001": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-002": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::one forward request opens one exact master dialog and close rejects it",
+        "tests/browser/terminal-navigation.spec.mjs::root return stays pending on reject",
+        "then restores the nested source menu on approve"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-003": {
+      "tests": [
+        "internal/live/service_test.go::TestTerminalRuntimeReactivationRetainsSolvedUnfinishedAndFailedHackAcrossTenVisits"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-004": {
+      "tests": [
+        "internal/nav/nav_test.go::TestStableFolderLookupAndReturnRestoration",
+        "tests/browser/terminal-navigation.spec.mjs::deleted source folder falls back to root without losing the terminal route"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-005": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::A to B to C returns unwind exactly B then A"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-006": {
+      "tests": [
+        "internal/control/service_test.go::TestLinkedCommandCreatesOneReplaySafePendingAndResolvesAtomically"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-007": {
+      "tests": [
+        "internal/player/public_stream_test.go::TestFirstPublicSnapshotRestoresTerminalRouteAndPendingWithoutPrivateDecisionIdentity",
+        "tests/browser/terminal-navigation.spec.mjs::controller and two observers reconnect during pending and converge before new-broadcast cleanup"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-008": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::stale target approval fails safely and keeps the source terminal active"
+      ],
+      "tasks": [
+        "T036"
+      ]
+    },
+    "SC-009": {
+      "tasks": [
+        "T030",
+        "T031",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "app_test.go::TestDesktopSessionFacadeSavesRealDemoCrossTerminalLinkAndReopensIt",
+        "wails_host_test.go::TestWailsSaveSessionBindingRetainsBothRealDemoTerminals",
+        "native packaged demo persistence smoke"
+      ]
+    },
+    "FR-029": {
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::direct pending replaces every player menu with the inert record surface across reconnect and decisions"
+      ],
+      "title": "Direct pending uses one inert full-screen request surface for every connected or reconnecting player",
+      "tasks": [
+        "T016",
+        "T027",
+        "T030",
+        "T031",
+        "T036",
+        "T037"
+      ]
+    },
+    "FR-030": {
+      "title": "Return pending uses one inert full-screen request surface and preserves the current route until resolution",
+      "tasks": [
+        "T016",
+        "T023",
+        "T027",
+        "T030",
+        "T031",
+        "T036",
+        "T038"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::return pending replaces every player menu with the inert record surface across reconnect and decisions"
+      ]
+    },
+    "SC-010": {
+      "title": "Forward pending presentation converges for controller, observers, and reconnect",
+      "tasks": [
+        "T030",
+        "T031",
+        "T036",
+        "T037"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::direct pending replaces every player menu with the inert record surface across reconnect and decisions",
+        "native packaged controller plus two observers and reconnect smoke"
+      ]
+    },
+    "SC-011": {
+      "title": "Return pending presentation converges and close or reject restores the unchanged current root",
+      "tasks": [
+        "T030",
+        "T031",
+        "T036",
+        "T038"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::return pending replaces every player menu with the inert record surface across reconnect and decisions",
+        "native packaged controller plus two observers and reconnect smoke"
+      ]
+    },
+    "FR-031": {
+      "title": "Persistence CommandContent uses one shared protobuf oneof with unset ordinary mode and stable fields 2/3 plus JSON-v1 names.",
+      "tasks": [
+        "T001",
+        "T004",
+        "T005",
+        "T006",
+        "T008",
+        "T009",
+        "T029",
+        "T030",
+        "T039"
+      ],
+      "tests": [
+        "internal/session/contract_test.go::TestCommandContentUsesOneRealBehaviorOneofWithStableFieldNumbers",
+        "internal/session/contract_test.go::TestSessionContractRoundTripsStateChangeConfigAndFrozenCommandStates",
+        "internal/session/contract_test.go::TestSessionContractRoundTripsTerminalTransitionAndKeepsLegacyAbsent"
+      ]
+    },
+    "FR-032": {
+      "title": "Master command editor exposes one ordinary/state-change/terminal-transition choice and persists exactly one active mode.",
+      "tasks": [
+        "T013",
+        "T015",
+        "T030",
+        "T031",
+        "T040"
+      ],
+      "tests": [
+        "tests/browser/terminal-navigation.spec.mjs::command authoring exposes one exclusive behavior selector",
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring is mutually exclusive validates locally and survives reopen",
+        "tests/browser/state-changing-command-authoring.spec.mjs::state-change mode requires all four authored texts and persists one config",
+        "native packaged command-mode save/reopen smoke"
+      ]
+    },
+    "SC-012": {
+      "title": "All descriptor adapter and master save/reopen checks preserve one behavior mode with stable schema identity.",
+      "tasks": [
+        "T029",
+        "T030",
+        "T031",
+        "T039",
+        "T040"
+      ],
+      "tests": [
+        "internal/session/contract_test.go::TestCommandContentUsesOneRealBehaviorOneofWithStableFieldNumbers",
+        "tests/browser/terminal-navigation.spec.mjs::command authoring exposes one exclusive behavior selector",
+        "tests/browser/terminal-navigation.spec.mjs::transition authoring is mutually exclusive validates locally and survives reopen",
+        "native packaged command-mode save/reopen smoke"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 16,
+    "projectedTasks": 22,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: terminal content authoring and durable session content",
+    "area: broadcast coordination, shared navigation, and terminal runtime lifecycle",
+    "constraint: one game-master approval per forward or back transition",
+    "constraint: retain solved hacking state within the current broadcast"
+  ],
+  "intent": "Allow player-requested, game-master-approved movement between linked terminals with reversible navigation and preserved solved hacking state.",
+  "expectations": [
+    "No cross-session or external-terminal links.",
+    "No persisted route history across application restarts or new broadcasts.",
+    "No redesign of hacking-game rules.",
+    "No terminal-graph visualization."
+  ],
+  "approach": "Persist only an optional same-session terminal target on authored commands while keeping route, pending decisions, and hacking checkpoints in the coordinator's broadcast-scoped runtime. Reuse PlayerService.Navigate for forward and root-return requests, resolve every target again from the current validated session at approval, and publish the resulting active terminal and route in one revisioned stream update.",
+  "decisions": [
+    {
+      "decision": "Store an optional terminalTransition.targetTerminalId on command nodes in session JSON version 1",
+      "why": "Stable IDs survive renames and an additive optional field preserves legacy documents and unknown-field round trips",
+      "rejected": "A session-level link table, target names, or a new JSON version"
+    },
+    {
+      "decision": "Make terminalTransition mutually exclusive with stateChange and validate references in two passes",
+      "why": "The modes require different approval semantics and valid forward references must not depend on terminal array order",
+      "rejected": "Implicit precedence between configs or single-pass validation"
+    },
+    {
+      "decision": "Use a dedicated PendingTerminalNavigation approve/reject lifecycle",
+      "why": "Player transitions must block shared actions and preserve the source checkpoint with one master decision",
+      "rejected": "Reusing PendingTerminalSwitch or PendingCommandExecution"
+    },
+    {
+      "decision": "Reuse NavigateCommand for forward transitions and NavigateBack at root for returns",
+      "why": "Existing unary authorization, replay, revision, and acknowledgement semantics already cover both requests without trusting a browser-supplied target",
+      "rejected": "A new public RPC or target ID in player requests"
+    },
+    {
+      "decision": "Store a broadcast-scoped LIFO route with stable folder IDs and ancestor IDs",
+      "why": "Stable identity supports rename and move while saved ancestors provide deterministic nearest-parent fallback after deletion",
+      "rejected": "A raw old path, command ID alone, or a static terminal graph"
+    },
+    {
+      "decision": "Resolve source and target again through a trusted current-session catalog at approval",
+      "why": "Deleted or retargeted commands must fail safely instead of activating a frozen stale payload",
+      "rejected": "Trusting frontend payloads or retaining an unvalidated target snapshot"
+    },
+    {
+      "decision": "Reuse per-terminal runtime checkpoints but place navigation explicitly on activation",
+      "why": "Existing checkpoints already retain solved, unfinished, and failed hacking state while the feature requires destination root and restored return-folder semantics",
+      "rejected": "Persisting hack state or recreating terminal runtimes on every visit"
+    },
+    {
+      "decision": "Expose only route depth, top return target, and secret-free pending state publicly",
+      "why": "Players can render and reconnect consistently without receiving decision authority or the full private route",
+      "rejected": "Client-local route state or publishing master request metadata"
+    },
+    {
+      "decision": "Run a full idempotent player render after every matching shared-action result",
+      "why": "When the authoritative stream arrives first, the complete surface was rendered while the button was disabled; the later unary result must recompute control properties as well as player context",
+      "rejected": "Only removing the CSS pending class or relying on stream/unary arrival order"
+    },
+    {
+      "decision": "Classify bundled demo commands by stateChange versus terminalTransition in browser assertions",
+      "why": "Transition commands are valid ordinary command nodes whose text may be empty and which must not carry stateChange",
+      "rejected": "Requiring every bundled command to satisfy state-change fields"
+    },
+    {
+      "decision": "Reset fixture hack RNG at the terminal-navigation reset boundary",
+      "why": "Each Playwright case must receive the same deterministic puzzle regardless of earlier suites in the shared fixture process",
+      "rejected": "Assuming the first visible word is always an incorrect password without resetting fixture state"
+    },
+    {
+      "decision": "Snapshot the complete portable session synchronously in desktopAPI before invoking Wails SaveSession",
+      "why": "Prevents later UI or event mutations from changing the target terminal set for an accepted revision",
+      "rejected": "Weakening domain validation or trusting stale or missing terminal targets"
+    },
+    {
+      "decision": "Validate live terminal payloads against the complete active session and use the private protobuf adapter only for tree shape routing",
+      "why": "Cross-terminal references are document-wide; synthetic one-terminal projections falsely reject valid links",
+      "rejected": "Weakening domain.ValidateSession or stripping terminalTransition from native payloads"
+    },
+    {
+      "decision": "Render only direct terminal-navigation pending through the existing record-description surface while keeping TerminalNavigationPresentation separate from CommandExecutionPresentation",
+      "why": "Meets FR-029/SC-010 without merging independent protocol lifecycles or introducing an optimistic terminal switch",
+      "rejected": "Reuse command-execution state or keep the transition-specific notice overlay"
+    },
+    {
+      "decision": "Render every terminal-navigation pending direction through one full-screen record-description surface and suppress notices until the master resolves it",
+      "why": "Forward and return requests share the same authoritative waiting contract and input lock while retaining separate navigation and command-execution protocols",
+      "rejected": "Keep a return-specific overlay over the current terminal screen"
+    },
+    {
+      "decision": "Normalize Wails file filter globs to bare extensions on Darwin while preserving documented glob syntax on other platforms",
+      "why": "Wails v3 beta passes Darwin patterns to UTType as filename extensions, so '*.json' disables the native Open action while 'json' works",
+      "rejected": "Relax the session chooser filter or special-case only one dialog"
+    },
+    {
+      "decision": "Name the shared protobuf oneof behavior and keep ordinary commands unset",
+      "why": "One generated discriminant makes state_change and terminal_transition structurally exclusive while preserving field numbers 2 and 3 and JSON names",
+      "rejected": "Two independent proto3 optional fields with validation-only mutual exclusion"
+    },
+    {
+      "decision": "Keep JSON-v1 command config pointers and expose a domain Behavior discriminant",
+      "why": "The decoder must retain malformed dual-config documents long enough to reject them defensively without changing the durable JSON version or known names",
+      "rejected": "An interface-only domain union that would silently discard or complicate legacy JSON input"
+    },
+    {
+      "decision": "Use one three-option master command mode selector and delete inactive configs on apply",
+      "why": "The UI can represent only ordinary, state-change, or terminal-transition and save/reopen restores exactly one choice",
+      "rejected": "Two checkboxes with JavaScript mutual exclusion"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned additive session-v1 links and an atomic coordinator-owned forward/return lifecycle with retained hacking checkpoints",
+      "key_finding": "Existing per-terminal runtimes solve checkpoint retention, but manual PendingTerminalSwitch cannot satisfy one-decision navigation and moved-folder restoration needs stable-ID path reconstruction"
+    },
+    "tasks": {
+      "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
+    },
+    "implement": {
+      "summary": "Implemented BUG-004 end to end: CommandContent now has one real behavior oneof, domain/session mappings enforce one variant, and master authoring uses one three-mode selector with durable inactive-config cleanup.",
+      "key_finding": "JSON-v1 compatibility is preserved by retaining the two known pointer fields at the JSON boundary while exposing and validating a single semantic behavior discriminant.",
+      "risks": "No open implementation risks; protobuf field numbers and JSON names are unchanged and full automated plus native packaged gates passed."
+    }
+  },
+  "currentTask": "T031",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Changed CommandContent to one real behavior oneof with unset ordinary mode while preserving state_change field 2 and terminal_transition field 3; protobuf formatting passes.",
+      "files": [
+        "proto/fallout/terminal/persistence/v1/session.proto"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added public navigation direction, route, return-target, and pending presentation on LiveTerminal field 9 without adding an RPC",
+      "files": [
+        "proto/fallout/terminal/player/v1/terminal.proto"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added private pending navigation, typed notices, exact decision enum, and resolve request/result contracts with zero UNSPECIFIED values",
+      "files": [
+        "proto/fallout/terminal/private/v1/coordination.proto",
+        "proto/fallout/terminal/private/v1/desktop.proto"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Regenerated pinned protobuf outputs with make proto-generate, updated reviewed schema revision, and confirmed generated CommandContent exposes Behavior with StateChange and TerminalTransition wrappers.",
+      "files": [
+        "internal/gen/fallout/terminal/persistence/v1/session.pb.go",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added fail-first domain coverage for ordinary, state-change, transition, and invalid dual-config behavior discrimination plus malformed dual-config JSON rejection; existing clone/unknown-field/two-pass target tests remain in place.",
+      "files": [
+        "internal/domain/model_test.go",
+        "internal/domain/validate_test.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Updated session contract regressions to assert unset ordinary behavior, exact generated StateChange/TerminalTransition oneof wrappers, stable descriptor fields, round trips, and boundary rejection of malformed dual config; confirmed the pre-adapter code no longer compiles against the oneof API.",
+      "files": [
+        "internal/session/contract_test.go",
+        "internal/session/service_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added fail-first stable-folder lookup and deterministic moved/deleted ancestry restoration tests",
+      "files": [
+        "internal/nav/nav_test.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Introduced a CommandBehavior discriminant for ordinary, state-change, terminal-transition, and defensive invalid states while retaining JSON-v1 pointer fields for lossless malformed-input rejection; validation now branches on the discriminant and domain tests pass.",
+      "files": [
+        "internal/domain/model.go",
+        "internal/domain/validate.go",
+        "internal/domain/model_test.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Mapped exactly one domain command behavior to the generated protobuf oneof wrappers, preserved unset ordinary commands, decoded by generated oneof type, and rejected invalid boundary states; full session package tests pass.",
+      "files": [
+        "internal/session/contract.go",
+        "internal/session/contract_test.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Implemented pure stable-folder path lookup and exact, nearest-ancestor, then root restoration",
+      "files": [
+        "internal/nav/nav.go"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Connected clone-safe public/private protobuf projections and the current-session catalog seam while keeping decision IDs and full route private",
+      "files": [
+        "internal/player/adapter.go",
+        "app_contract.go",
+        "internal/control/service.go",
+        "main.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added fail-first coordinator coverage for controller-linked commands, exact-one pending, 20 replays, conflicts, reject/approve, stale targets, and atomic route activation",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Reworked Playwright authoring coverage around one three-mode selector, including state-change→transition→ordinary switch/save/reopen cycles, inactive-config removal, full-session retention, and completed-state disabling; confirmed it fails before the UI change.",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixtures/desktop-bindings.js"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Intercepted authorized linked commands after replay checks, enforced one pending/conflict semantics, and added fresh-catalog atomic forward approve/reject without manual switch",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Replaced the two command checkboxes with one ordinary/state-change/terminal-transition selector, preserved target and local validation, cleared inactive configs on apply, disabled mode changes for completed commands, and updated selector-dependent browser coverage; focused tests pass.",
+      "files": [
+        "frontend/src/master.js",
+        "frontend/src/master.css",
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Generalized the full-screen terminal-navigation request renderer and input lock to return pending while suppressing notice overlays",
+      "files": [
+        "client/client.js"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Wired exact enum/request-ID terminal navigation resolution through App and the single private desktop method with monotonic coordination publication",
+      "files": [
+        "app.go",
+        "desktop_service.go",
+        "app_contract.go"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Regenerated the 34-method Wails allowlist and completed deterministic browser fixture/server wiring for link authoring and exact approve/reject dialogs",
+      "files": [
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js",
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/fixtures/desktop-bindings.js",
+        "scripts/wails-bindings-check.sh"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added checkpoint tests for ten solved/unfinished/failed reactivations plus forward root placement, source suspension, and absence of a second switch decision",
+      "files": [
+        "internal/live/service_test.go",
+        "internal/control/service_test.go"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added real browser journeys for first-entry hacking and exact unfinished checkpoint restoration after revisiting the destination",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Reused suspended terminal runtimes on approved transitions, reactivated authored content at destination root, and bypassed PendingTerminalSwitch",
+      "files": [
+        "internal/live/service.go",
+        "internal/control/service.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added coordinator and nav tests for root-only return, reject immutability, unchanged-top validation, LIFO unwind, stable moved folder restoration and ancestor fallback",
+      "files": [
+        "internal/control/service_test.go",
+        "internal/nav/nav_test.go"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Updated the root-return journey to assert the full-screen request surface and unchanged return control after rejection before nested restore approval",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Interpreted root NavigateBack as an exact return request and atomically restored the current source folder while popping one unchanged route point",
+      "files": [
+        "internal/control/service.go"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Displayed the authoritative root return target through the existing Back control and kept intra-terminal navigation unchanged",
+      "files": [
+        "client/client.js",
+        "client/client.css"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Added authority, concurrent-request, reconnect snapshot, stale edit, lifecycle clearing, exact private bridge, and public capability-separation coverage",
+      "files": [
+        "internal/control/service_test.go",
+        "internal/player/adapter_test.go",
+        "internal/player/public_stream_test.go",
+        "app_test.go",
+        "app_contract_test.go",
+        "wails_host_test.go"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Proved the return-pending surface and input lock converge for the controller, two observers, and a reconnecting observer across all decisions",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Completed revisioned reconnect projection, typed master notices, safe navigation result normalization, and route/pending/notice clearing at every lifecycle boundary",
+      "files": [
+        "internal/control/service.go",
+        "internal/player/adapter.go",
+        "app.go",
+        "frontend/src/master.js",
+        "frontend/src/desktop-api.js",
+        "client/client.js"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Passed make proto-check proto-breaking bindings-check: schema is formatted/linted/deterministic, generated oneof API is current, breaking fixtures are rejected, and the exact 34-method Wails allowlist remains unchanged.",
+      "files": [
+        "proto/fallout/terminal/persistence/v1/session.proto",
+        "internal/gen/fallout/terminal/persistence/v1/session.pb.go",
+        "proto/schema-revision.txt"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Passed the complete SC-012 validation: focused domain/session/nav tests, control/live/player race tests, go test ./..., frontend and client production builds, all 13 terminal-navigation Playwright tests, and aggregate make check including vet, full race, proto, breaking, and bindings gates.",
+      "files": [
+        "specs/010-terminal-navigation/spec.md",
+        "Makefile",
+        "frontend/package.json",
+        "client/package.json",
+        "tests/browser/package.json",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Built and verified signed arm64 bundle (manifest 95ac50bb16b0371199293633a5a1df62eecd842410797931e2a12ac5b43e55f5), opened the real demo, then used an isolated copy for accepted native ordinary→state-change→terminal-transition save cycles. Durable JSON contained zero configs in ordinary, exactly stateChange in state-change, exactly terminalTransition targeting t_demo2 after the final switch, and restart/reopen restored the transition selector and target. Prior accepted native master/controller/two-observer navigation evidence remains unchanged; sessions/demo.json stayed untouched.",
+      "files": [
+        "build/bin/Fallout Terminal.app",
+        "sessions/demo.json",
+        "specs/010-terminal-navigation/spec.md"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Made shared-action release trigger a full idempotent render so ordinary back navigation recovers regardless of stream/unary ordering, with replay, multi-player, public-fallback, and lifecycle regression assertions",
+      "files": [
+        "client/client.js",
+        "tests/browser/connectrpc-player.spec.mjs",
+        "tests/browser/player-sessions-control.spec.mjs",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Assert exact bundled demo terminal IDs and complete fixture round-trip; full Playwright gate passed 90 with 2 opt-in ngrok skips",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added failing real-demo service/App/Wails and mutable frontend boundary regressions; frontend loses t_demo2 after invocation",
+      "files": [
+        "app_test.go",
+        "wails_host_test.go",
+        "internal/session/service_test.go",
+        "tests/browser/desktop-api.spec.mjs"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Snapshot the complete portable session before the async Wails SaveSession call so later UI mutations cannot drop t_demo2",
+      "files": [
+        "frontend/src/desktop-api.js"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Passed the packaged native acceptance delta for SC-010 and SC-011 across controller, two observers, reconnect, approve and close decisions while retaining the previously accepted full navigation journey and shutdown coverage",
+      "files": [
+        "build/bin/Fallout Terminal.app",
+        "client/client.js",
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Added controller, two-observer, reconnect, input-lock, approve/reject/close regression; confirmed it fails because the record surface stays hidden",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Added a controller, two-observer, reconnect, approve/reject/close regression that reproduces the return-pending overlay defect",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Added a fail-first descriptor regression proving CommandContent must expose one real behavior oneof while preserving field numbers 2 and 3; confirmed the test fails against the pre-fix generated schema.",
+      "files": [
+        "internal/session/contract_test.go"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Added a fail-first Playwright regression for one exclusive command behavior selector and all three modes; confirmed it fails because the selector is absent.",
+      "files": [
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Protobuf and Wails contract governance",
+      "command": "make proto-check proto-breaking bindings-check",
+      "result": "passed; deterministic schema revision, all breaking fixtures rejected, exact 34-method allowlist",
+      "warnings": []
+    },
+    {
+      "what": "Go correctness and race matrix",
+      "command": "go test ./internal/domain ./internal/session ./internal/nav; go test -race ./internal/control ./internal/live ./internal/player; go test ./...",
+      "result": "passed",
+      "warnings": [
+        "macOS linker warned that some objects were built for a newer OS version; tests still linked and passed"
+      ]
+    },
+    {
+      "what": "Frontend and player production builds",
+      "command": "npm run build --prefix frontend; npm run build --prefix client",
+      "result": "passed",
+      "warnings": []
+    },
+    {
+      "what": "Focused terminal-navigation browser journeys",
+      "command": "npm test --prefix tests/browser -- terminal-navigation.spec.mjs",
+      "result": "10 passed",
+      "warnings": []
+    },
+    {
+      "what": "Repository quality gate",
+      "command": "make check",
+      "result": "passed including vet, race, protobuf, breaking, and binding checks",
+      "warnings": []
+    },
+    {
+      "what": "Packaged Wails v3 application",
+      "command": "make package; scripts/verify-macos-app.sh \"build/bin/Fallout Terminal.app\"",
+      "result": "signed arm64 bundle and packaged player endpoint verified",
+      "warnings": [
+        "native master/controller/two-observer journey not passed because the macOS Open panel was inaccessible to UI automation before session selection"
+      ]
+    },
+    {
+      "what": "Convergence shared-navigation regression cases",
+      "command": "npm test --prefix tests/browser -- connectrpc-player.spec.mjs player-sessions-control.spec.mjs public-access-fallback.spec.mjs state-changing-command-sync.spec.mjs --grep ...",
+      "result": "4 passed",
+      "warnings": []
+    },
+    {
+      "what": "Convergence authoring and terminal-navigation focused suites",
+      "command": "npm test --prefix tests/browser -- state-changing-command-authoring.spec.mjs terminal-navigation.spec.mjs; npm test --prefix tests/browser -- terminal-navigation.spec.mjs",
+      "result": "16 passed, then 10 passed after deterministic fixture reset",
+      "warnings": []
+    },
+    {
+      "what": "Convergence complete Playwright gate",
+      "command": "npm test --prefix tests/browser",
+      "result": "89 passed, 2 skipped, 0 failed",
+      "warnings": [
+        "Two real ngrok endpoint tests remained intentionally skipped because they require opt-in external credentials/connectivity"
+      ]
+    },
+    {
+      "what": "Convergence repository quality gate",
+      "command": "make check",
+      "result": "passed: go vet, repository-wide race tests, deterministic protobuf generation, breaking fixtures, exact 34-method Wails allowlist",
+      "warnings": []
+    },
+    {
+      "what": "Convergence production and packaged builds",
+      "command": "npm run build --prefix frontend; npm run build --prefix client; make package; scripts/verify-macos-app.sh \"build/bin/Fallout Terminal.app\"; git diff --check",
+      "result": "passed; signed arm64 bundle verified with manifest 51bc5889976e81fe3d3eb85ab30496e38858c1707cdbb79d8d9703a909b94bb2",
+      "warnings": [
+        "Previously recorded packaged native multi-window manual journey remains a manual gate; this convergence changed only player input release and test determinism"
+      ]
+    },
+    {
+      "what": "BUG-001 Wails save-boundary regression",
+      "command": "npm test --prefix tests/browser -- desktop-api.spec.mjs; focused Go App/session/Wails binding tests",
+      "result": "passed; the asynchronously observed payload retained t_demo1 and t_demo2 and missing/self targets remained rejected",
+      "warnings": []
+    },
+    {
+      "what": "BUG-001 complete Playwright gate",
+      "command": "npm test --prefix tests/browser",
+      "result": "90 passed, 2 skipped, 0 failed",
+      "warnings": [
+        "Two real ngrok endpoint tests remain intentionally opt-in"
+      ]
+    },
+    {
+      "what": "BUG-001 repository and production gates",
+      "command": "go test ./...; make check; npm production builds; make package",
+      "result": "passed; signed packaged application built successfully",
+      "warnings": [
+        "macOS linker emitted benign newer-object-version warnings during Go tests"
+      ]
+    },
+    {
+      "what": "BUG-001 packaged macOS demo persistence smoke",
+      "command": "Open sessions/demo.json in production bundle; Apply t_demo1 to t_demo2; inspect durable JSON; quit and reopen bundle and session",
+      "result": "passed; revision 1 saved both terminal IDs and reopened with terminal transition enabled and the second terminal selected",
+      "warnings": []
+    },
+    {
+      "what": "BUG-001 final artifact audit",
+      "command": "rg unchecked tasks; git diff --check",
+      "result": "all tasks checked and diff check passed",
+      "warnings": []
+    },
+    {
+      "what": "T036 accepted packaged Wails native journey",
+      "command": "production bundle with three-terminal session; native master plus controller and two observers",
+      "result": "passed approve and reject, reconnect while pending, A-B-C LIFO unwind, ten B visits without re-hack, end/new-broadcast cleanup, and shutdown cleanup",
+      "warnings": []
+    },
+    {
+      "what": "Cross-terminal native activation regression",
+      "command": "focused real sessions/demo.json App activation and private-contract routing tests",
+      "result": "passed with t_demo1 to t_demo2 preserved while missing and self targets remain governed by full-session validation",
+      "warnings": []
+    },
+    {
+      "what": "T036 repository-wide quality gates",
+      "command": "go test ./...; make check; make package; git diff --check",
+      "result": "passed including race, protobuf generation and breaking fixtures, exact Wails allowlist, signed package build, and clean diff",
+      "warnings": [
+        "benign macOS newer-object-version linker warnings during Go tests"
+      ]
+    },
+    {
+      "what": "BUG-002 red/green focused regression and complete navigation journey",
+      "command": "npm test -- terminal-navigation.spec.mjs",
+      "result": "11/11 passed after the new regression first failed because #termEntry was hidden",
+      "warnings": []
+    },
+    {
+      "what": "Full automated quality gate",
+      "command": "targeted Go tests; race tests; go test ./...; frontend/client builds; make check",
+      "result": "passed",
+      "warnings": [
+        "macOS linker reported objects built for 26.0 while the test link target was 11.0; tests still passed"
+      ]
+    },
+    {
+      "what": "Accepted packaged Wails BUG-002 journey",
+      "command": "signed bundle with native master plus controller, two observers, and reconnect",
+      "result": "passed exact full-screen pending text and hidden menu/Back, reject/approve, ten solved-terminal revisits, A-B-C LIFO unwind, and shutdown disconnect",
+      "warnings": [
+        "end-broadcast confirmation remained inaccessible to Computer Use; unchanged new-broadcast behavior is retained from the prior accepted T036 pass and automated journey"
+      ]
+    },
+    {
+      "what": "Real demo durable save/reopen",
+      "command": "open sessions/demo.json in packaged app, Apply t_demo1 to t_demo2, inspect file, restart, reopen",
+      "result": "passed with both terminal IDs retained and t_demo2 selected after reopen",
+      "warnings": []
+    },
+    {
+      "what": "BUG-003 fail-first and focused navigation regression",
+      "command": "npm test --prefix tests/browser -- --grep return-pending; npm test --prefix tests/browser -- terminal-navigation.spec.mjs",
+      "result": "new regression failed with hidden #termEntry before the fix, then 12/12 focused navigation tests passed",
+      "warnings": []
+    },
+    {
+      "what": "BUG-003 complete automated gate",
+      "command": "targeted Go and race suites; go test ./...; frontend/client builds; make check; git diff --check",
+      "result": "passed after the final Darwin file-filter fix",
+      "warnings": [
+        "macOS linker warned that some objects were built for macOS 26 while the test link target was 11; tests passed"
+      ]
+    },
+    {
+      "what": "BUG-003 accepted packaged Wails delta",
+      "command": "signed production bundle with native master, controller, two observers, and observer reconnect",
+      "result": "passed forward and return full-screen pending, exact request text, hidden menu/output/back/notice, inert Enter/Backspace, forward approval, return close restore, and return approval",
+      "warnings": [
+        "The unchanged full 10-revisit, A-B-C, reject, new-broadcast, and shutdown paths retain the prior accepted T036 evidence and current automated coverage"
+      ]
+    },
+    {
+      "what": "Final packaged macOS verification",
+      "command": "make package; scripts/verify-macos-app.sh \"build/bin/Fallout Terminal.app\"",
+      "result": "valid signed arm64 bundle; canonical manifest 74a9239a307db6cc5fc49a56a15cd9c244c0f07155b9256af29ca2bb53ab54a0",
+      "warnings": []
+    },
+    {
+      "what": "Darwin native JSON chooser regression",
+      "command": "go test ./internal/platform; open sessions/demo.json in the packaged app",
+      "result": "bare Darwin extension filter keeps Open enabled and the real demo session opens successfully",
+      "warnings": [
+        "The demo session's automatic player-roster reference remained on its loading state; the acceptance journey loaded the same real demo-players.json explicitly into an equivalent two-terminal session"
+      ]
+    },
+    {
+      "what": "BUG-004 fail-first regressions",
+      "command": "focused Go descriptor test and Playwright command-mode test before implementation",
+      "result": "failed for missing real behavior oneof and missing РЕЖИМ КОМАНДЫ selector, then passed after implementation",
+      "warnings": []
+    },
+    {
+      "what": "BUG-004 protobuf and bindings gate",
+      "command": "make proto-check proto-breaking bindings-check",
+      "result": "passed deterministic generation, breaking fixtures, generated shared-oneof API, and exact 34-method Wails allowlist",
+      "warnings": []
+    },
+    {
+      "what": "BUG-004 complete automated gate",
+      "command": "targeted Go tests; race suites; go test ./...; frontend/client builds; 13-test terminal-navigation suite; make check",
+      "result": "passed",
+      "warnings": [
+        "macOS linker emitted benign newer-object-version warnings during Go tests"
+      ]
+    },
+    {
+      "what": "BUG-004 accepted packaged Wails delta",
+      "command": "signed bundle; native ordinary/state-change/terminal-transition save cycles; durable JSON inspection; restart and reopen",
+      "result": "passed zero/one-config cleanup and restored terminal-transition target t_demo2 after reopen; bundle manifest 95ac50bb16b0371199293633a5a1df62eecd842410797931e2a12ac5b43e55f5",
+      "warnings": [
+        "Used an isolated copy for mutations; the real sessions/demo.json was opened and remained unchanged"
+      ]
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Full packaged macOS master + controller + two observers smoke remains a manual gate: Open panel automation could not select the session, so approve/reject, ten revisits, three-terminal unwind, reconnect, and shutdown cleanup were not claimed as native PASS.",
+      "step": "implement",
+      "kind": "manual-gate"
+    },
+    {
+      "note": "The packaged end-broadcast confirmation button was not exposed to Computer Use coordinate/AX activation; current shutdown cleanup and automated new-broadcast coverage passed, while the prior accepted packaged T036 run remains the evidence for the unchanged end/new-broadcast dialog path.",
+      "step": "implement"
+    },
+    {
+      "note": "The packaged app can open sessions/demo.json after the Darwin filter fix, but automatic loading of its playerConfig reference remained stuck on the roster-loading state; explicit selection of the same sessions/demo-players.json succeeds. This is separate from BUG-003 terminal-navigation presentation.",
+      "step": "implement",
+      "kind": "follow-up"
+    }
+  ],
+  "summary": "BUG-004 implemented and verified: shared protobuf behavior oneof, single master command-mode selector, full automated gates, and accepted packaged save/reopen smoke."
+}

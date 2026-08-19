@@ -187,6 +187,110 @@ func (CommandExecutionDecision) EnumDescriptor() ([]byte, []int) {
 	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{2}
 }
 
+type TerminalNavigationDecision int32
+
+const (
+	TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_UNSPECIFIED TerminalNavigationDecision = 0
+	TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_APPROVE     TerminalNavigationDecision = 1
+	TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_REJECT      TerminalNavigationDecision = 2
+)
+
+// Enum value maps for TerminalNavigationDecision.
+var (
+	TerminalNavigationDecision_name = map[int32]string{
+		0: "TERMINAL_NAVIGATION_DECISION_UNSPECIFIED",
+		1: "TERMINAL_NAVIGATION_DECISION_APPROVE",
+		2: "TERMINAL_NAVIGATION_DECISION_REJECT",
+	}
+	TerminalNavigationDecision_value = map[string]int32{
+		"TERMINAL_NAVIGATION_DECISION_UNSPECIFIED": 0,
+		"TERMINAL_NAVIGATION_DECISION_APPROVE":     1,
+		"TERMINAL_NAVIGATION_DECISION_REJECT":      2,
+	}
+)
+
+func (x TerminalNavigationDecision) Enum() *TerminalNavigationDecision {
+	p := new(TerminalNavigationDecision)
+	*p = x
+	return p
+}
+
+func (x TerminalNavigationDecision) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TerminalNavigationDecision) Descriptor() protoreflect.EnumDescriptor {
+	return file_fallout_terminal_private_v1_coordination_proto_enumTypes[3].Descriptor()
+}
+
+func (TerminalNavigationDecision) Type() protoreflect.EnumType {
+	return &file_fallout_terminal_private_v1_coordination_proto_enumTypes[3]
+}
+
+func (x TerminalNavigationDecision) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TerminalNavigationDecision.Descriptor instead.
+func (TerminalNavigationDecision) EnumDescriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{3}
+}
+
+type TerminalNavigationNoticeReason int32
+
+const (
+	TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED    TerminalNavigationNoticeReason = 0
+	TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING TerminalNavigationNoticeReason = 1
+	TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET    TerminalNavigationNoticeReason = 2
+	TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE  TerminalNavigationNoticeReason = 3
+	TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED TerminalNavigationNoticeReason = 4
+)
+
+// Enum value maps for TerminalNavigationNoticeReason.
+var (
+	TerminalNavigationNoticeReason_name = map[int32]string{
+		0: "TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED",
+		1: "TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING",
+		2: "TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET",
+		3: "TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE",
+		4: "TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED",
+	}
+	TerminalNavigationNoticeReason_value = map[string]int32{
+		"TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED":    0,
+		"TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING": 1,
+		"TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET":    2,
+		"TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE":  3,
+		"TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED": 4,
+	}
+)
+
+func (x TerminalNavigationNoticeReason) Enum() *TerminalNavigationNoticeReason {
+	p := new(TerminalNavigationNoticeReason)
+	*p = x
+	return p
+}
+
+func (x TerminalNavigationNoticeReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TerminalNavigationNoticeReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_fallout_terminal_private_v1_coordination_proto_enumTypes[4].Descriptor()
+}
+
+func (TerminalNavigationNoticeReason) Type() protoreflect.EnumType {
+	return &file_fallout_terminal_private_v1_coordination_proto_enumTypes[4]
+}
+
+func (x TerminalNavigationNoticeReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TerminalNavigationNoticeReason.Descriptor instead.
+func (TerminalNavigationNoticeReason) EnumDescriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{4}
+}
+
 type CharacterState struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	CharacterId      string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
@@ -643,22 +747,208 @@ func (x *PendingCommandExecution) GetConfirmationText() string {
 	return ""
 }
 
+type PendingTerminalNavigation struct {
+	state              protoimpl.MessageState         `protogen:"open.v1"`
+	RequestId          string                         `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	BroadcastId        string                         `protobuf:"bytes,2,opt,name=broadcast_id,json=broadcastId,proto3" json:"broadcast_id,omitempty"`
+	Direction          v1.TerminalNavigationDirection `protobuf:"varint,3,opt,name=direction,proto3,enum=fallout.terminal.player.v1.TerminalNavigationDirection" json:"direction,omitempty"`
+	SourceTerminalId   string                         `protobuf:"bytes,4,opt,name=source_terminal_id,json=sourceTerminalId,proto3" json:"source_terminal_id,omitempty"`
+	SourceTerminalName string                         `protobuf:"bytes,5,opt,name=source_terminal_name,json=sourceTerminalName,proto3" json:"source_terminal_name,omitempty"`
+	CommandId          string                         `protobuf:"bytes,6,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	CommandName        string                         `protobuf:"bytes,7,opt,name=command_name,json=commandName,proto3" json:"command_name,omitempty"`
+	TargetTerminalId   string                         `protobuf:"bytes,8,opt,name=target_terminal_id,json=targetTerminalId,proto3" json:"target_terminal_id,omitempty"`
+	TargetTerminalName string                         `protobuf:"bytes,9,opt,name=target_terminal_name,json=targetTerminalName,proto3" json:"target_terminal_name,omitempty"`
+	RouteDepth         uint32                         `protobuf:"varint,10,opt,name=route_depth,json=routeDepth,proto3" json:"route_depth,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *PendingTerminalNavigation) Reset() {
+	*x = PendingTerminalNavigation{}
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingTerminalNavigation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingTerminalNavigation) ProtoMessage() {}
+
+func (x *PendingTerminalNavigation) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingTerminalNavigation.ProtoReflect.Descriptor instead.
+func (*PendingTerminalNavigation) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PendingTerminalNavigation) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetBroadcastId() string {
+	if x != nil {
+		return x.BroadcastId
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetDirection() v1.TerminalNavigationDirection {
+	if x != nil {
+		return x.Direction
+	}
+	return v1.TerminalNavigationDirection(0)
+}
+
+func (x *PendingTerminalNavigation) GetSourceTerminalId() string {
+	if x != nil {
+		return x.SourceTerminalId
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetSourceTerminalName() string {
+	if x != nil {
+		return x.SourceTerminalName
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetCommandName() string {
+	if x != nil {
+		return x.CommandName
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetTargetTerminalId() string {
+	if x != nil {
+		return x.TargetTerminalId
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetTargetTerminalName() string {
+	if x != nil {
+		return x.TargetTerminalName
+	}
+	return ""
+}
+
+func (x *PendingTerminalNavigation) GetRouteDepth() uint32 {
+	if x != nil {
+		return x.RouteDepth
+	}
+	return 0
+}
+
+type TerminalNavigationNotice struct {
+	state            protoimpl.MessageState         `protogen:"open.v1"`
+	Reason           TerminalNavigationNoticeReason `protobuf:"varint,1,opt,name=reason,proto3,enum=fallout.terminal.private.v1.TerminalNavigationNoticeReason" json:"reason,omitempty"`
+	SourceTerminalId string                         `protobuf:"bytes,2,opt,name=source_terminal_id,json=sourceTerminalId,proto3" json:"source_terminal_id,omitempty"`
+	CommandId        string                         `protobuf:"bytes,3,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
+	TargetTerminalId *string                        `protobuf:"bytes,4,opt,name=target_terminal_id,json=targetTerminalId,proto3,oneof" json:"target_terminal_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *TerminalNavigationNotice) Reset() {
+	*x = TerminalNavigationNotice{}
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalNavigationNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalNavigationNotice) ProtoMessage() {}
+
+func (x *TerminalNavigationNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalNavigationNotice.ProtoReflect.Descriptor instead.
+func (*TerminalNavigationNotice) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TerminalNavigationNotice) GetReason() TerminalNavigationNoticeReason {
+	if x != nil {
+		return x.Reason
+	}
+	return TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED
+}
+
+func (x *TerminalNavigationNotice) GetSourceTerminalId() string {
+	if x != nil {
+		return x.SourceTerminalId
+	}
+	return ""
+}
+
+func (x *TerminalNavigationNotice) GetCommandId() string {
+	if x != nil {
+		return x.CommandId
+	}
+	return ""
+}
+
+func (x *TerminalNavigationNotice) GetTargetTerminalId() string {
+	if x != nil && x.TargetTerminalId != nil {
+		return *x.TargetTerminalId
+	}
+	return ""
+}
+
 type CoordinationState struct {
-	state                   protoimpl.MessageState   `protogen:"open.v1"`
-	Roster                  []*CharacterState        `protobuf:"bytes,1,rep,name=roster,proto3" json:"roster,omitempty"`
-	LogicalSessions         []*LogicalSessionState   `protobuf:"bytes,2,rep,name=logical_sessions,json=logicalSessions,proto3" json:"logical_sessions,omitempty"`
-	Broadcast               *BroadcastState          `protobuf:"bytes,3,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
-	PendingTerminalSwitch   *PendingTerminalSwitch   `protobuf:"bytes,4,opt,name=pending_terminal_switch,json=pendingTerminalSwitch,proto3" json:"pending_terminal_switch,omitempty"`
-	Revision                uint64                   `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
-	PlayerConfig            *PlayerConfigMetadata    `protobuf:"bytes,6,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
-	PendingCommandExecution *PendingCommandExecution `protobuf:"bytes,7,opt,name=pending_command_execution,json=pendingCommandExecution,proto3,oneof" json:"pending_command_execution,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state                     protoimpl.MessageState     `protogen:"open.v1"`
+	Roster                    []*CharacterState          `protobuf:"bytes,1,rep,name=roster,proto3" json:"roster,omitempty"`
+	LogicalSessions           []*LogicalSessionState     `protobuf:"bytes,2,rep,name=logical_sessions,json=logicalSessions,proto3" json:"logical_sessions,omitempty"`
+	Broadcast                 *BroadcastState            `protobuf:"bytes,3,opt,name=broadcast,proto3" json:"broadcast,omitempty"`
+	PendingTerminalSwitch     *PendingTerminalSwitch     `protobuf:"bytes,4,opt,name=pending_terminal_switch,json=pendingTerminalSwitch,proto3" json:"pending_terminal_switch,omitempty"`
+	Revision                  uint64                     `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	PlayerConfig              *PlayerConfigMetadata      `protobuf:"bytes,6,opt,name=player_config,json=playerConfig,proto3" json:"player_config,omitempty"`
+	PendingCommandExecution   *PendingCommandExecution   `protobuf:"bytes,7,opt,name=pending_command_execution,json=pendingCommandExecution,proto3,oneof" json:"pending_command_execution,omitempty"`
+	PendingTerminalNavigation *PendingTerminalNavigation `protobuf:"bytes,8,opt,name=pending_terminal_navigation,json=pendingTerminalNavigation,proto3,oneof" json:"pending_terminal_navigation,omitempty"`
+	TerminalNavigationNotice  *TerminalNavigationNotice  `protobuf:"bytes,9,opt,name=terminal_navigation_notice,json=terminalNavigationNotice,proto3,oneof" json:"terminal_navigation_notice,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *CoordinationState) Reset() {
 	*x = CoordinationState{}
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -670,7 +960,7 @@ func (x *CoordinationState) String() string {
 func (*CoordinationState) ProtoMessage() {}
 
 func (x *CoordinationState) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[6]
+	mi := &file_fallout_terminal_private_v1_coordination_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -683,7 +973,7 @@ func (x *CoordinationState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CoordinationState.ProtoReflect.Descriptor instead.
 func (*CoordinationState) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{6}
+	return file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CoordinationState) GetRoster() []*CharacterState {
@@ -731,6 +1021,20 @@ func (x *CoordinationState) GetPlayerConfig() *PlayerConfigMetadata {
 func (x *CoordinationState) GetPendingCommandExecution() *PendingCommandExecution {
 	if x != nil {
 		return x.PendingCommandExecution
+	}
+	return nil
+}
+
+func (x *CoordinationState) GetPendingTerminalNavigation() *PendingTerminalNavigation {
+	if x != nil {
+		return x.PendingTerminalNavigation
+	}
+	return nil
+}
+
+func (x *CoordinationState) GetTerminalNavigationNotice() *TerminalNavigationNotice {
+	if x != nil {
+		return x.TerminalNavigationNotice
 	}
 	return nil
 }
@@ -784,7 +1088,29 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\n" +
 	"command_id\x18\x04 \x01(\tR\tcommandId\x12!\n" +
 	"\fcommand_name\x18\x05 \x01(\tR\vcommandName\x12+\n" +
-	"\x11confirmation_text\x18\x06 \x01(\tR\x10confirmationText\"\xf5\x04\n" +
+	"\x11confirmation_text\x18\x06 \x01(\tR\x10confirmationText\"\xd7\x03\n" +
+	"\x19PendingTerminalNavigation\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
+	"\fbroadcast_id\x18\x02 \x01(\tR\vbroadcastId\x12U\n" +
+	"\tdirection\x18\x03 \x01(\x0e27.fallout.terminal.player.v1.TerminalNavigationDirectionR\tdirection\x12,\n" +
+	"\x12source_terminal_id\x18\x04 \x01(\tR\x10sourceTerminalId\x120\n" +
+	"\x14source_terminal_name\x18\x05 \x01(\tR\x12sourceTerminalName\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x06 \x01(\tR\tcommandId\x12!\n" +
+	"\fcommand_name\x18\a \x01(\tR\vcommandName\x12,\n" +
+	"\x12target_terminal_id\x18\b \x01(\tR\x10targetTerminalId\x120\n" +
+	"\x14target_terminal_name\x18\t \x01(\tR\x12targetTerminalName\x12\x1f\n" +
+	"\vroute_depth\x18\n" +
+	" \x01(\rR\n" +
+	"routeDepth\"\x86\x02\n" +
+	"\x18TerminalNavigationNotice\x12S\n" +
+	"\x06reason\x18\x01 \x01(\x0e2;.fallout.terminal.private.v1.TerminalNavigationNoticeReasonR\x06reason\x12,\n" +
+	"\x12source_terminal_id\x18\x02 \x01(\tR\x10sourceTerminalId\x12\x1d\n" +
+	"\n" +
+	"command_id\x18\x03 \x01(\tR\tcommandId\x121\n" +
+	"\x12target_terminal_id\x18\x04 \x01(\tH\x00R\x10targetTerminalId\x88\x01\x01B\x15\n" +
+	"\x13_target_terminal_id\"\xab\a\n" +
 	"\x11CoordinationState\x12C\n" +
 	"\x06roster\x18\x01 \x03(\v2+.fallout.terminal.private.v1.CharacterStateR\x06roster\x12[\n" +
 	"\x10logical_sessions\x18\x02 \x03(\v20.fallout.terminal.private.v1.LogicalSessionStateR\x0flogicalSessions\x12I\n" +
@@ -792,8 +1118,12 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x17pending_terminal_switch\x18\x04 \x01(\v22.fallout.terminal.private.v1.PendingTerminalSwitchR\x15pendingTerminalSwitch\x12\x1a\n" +
 	"\brevision\x18\x05 \x01(\x04R\brevision\x12V\n" +
 	"\rplayer_config\x18\x06 \x01(\v21.fallout.terminal.private.v1.PlayerConfigMetadataR\fplayerConfig\x12u\n" +
-	"\x19pending_command_execution\x18\a \x01(\v24.fallout.terminal.private.v1.PendingCommandExecutionH\x00R\x17pendingCommandExecution\x88\x01\x01B\x1c\n" +
-	"\x1a_pending_command_execution*\xcb\x02\n" +
+	"\x19pending_command_execution\x18\a \x01(\v24.fallout.terminal.private.v1.PendingCommandExecutionH\x00R\x17pendingCommandExecution\x88\x01\x01\x12{\n" +
+	"\x1bpending_terminal_navigation\x18\b \x01(\v26.fallout.terminal.private.v1.PendingTerminalNavigationH\x01R\x19pendingTerminalNavigation\x88\x01\x01\x12x\n" +
+	"\x1aterminal_navigation_notice\x18\t \x01(\v25.fallout.terminal.private.v1.TerminalNavigationNoticeH\x02R\x18terminalNavigationNotice\x88\x01\x01B\x1c\n" +
+	"\x1a_pending_command_executionB\x1e\n" +
+	"\x1c_pending_terminal_navigationB\x1d\n" +
+	"\x1b_terminal_navigation_notice*\xcb\x02\n" +
 	"\x14TerminalSwitchStatus\x12&\n" +
 	"\"TERMINAL_SWITCH_STATUS_UNSPECIFIED\x10\x00\x12$\n" +
 	" TERMINAL_SWITCH_STATUS_ACTIVATED\x10\x01\x12\"\n" +
@@ -811,7 +1141,17 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x18CommandExecutionDecision\x12*\n" +
 	"&COMMAND_EXECUTION_DECISION_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"COMMAND_EXECUTION_DECISION_APPROVE\x10\x01\x12%\n" +
-	"!COMMAND_EXECUTION_DECISION_REJECT\x10\x02B[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
+	"!COMMAND_EXECUTION_DECISION_REJECT\x10\x02*\x9d\x01\n" +
+	"\x1aTerminalNavigationDecision\x12,\n" +
+	"(TERMINAL_NAVIGATION_DECISION_UNSPECIFIED\x10\x00\x12(\n" +
+	"$TERMINAL_NAVIGATION_DECISION_APPROVE\x10\x01\x12'\n" +
+	"#TERMINAL_NAVIGATION_DECISION_REJECT\x10\x02*\xa7\x02\n" +
+	"\x1eTerminalNavigationNoticeReason\x121\n" +
+	"-TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED\x10\x00\x124\n" +
+	"0TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING\x10\x01\x121\n" +
+	"-TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET\x10\x02\x123\n" +
+	"/TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE\x10\x03\x124\n" +
+	"0TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED\x10\x04B[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
 
 var (
 	file_fallout_terminal_private_v1_coordination_proto_rawDescOnce sync.Once
@@ -825,36 +1165,45 @@ func file_fallout_terminal_private_v1_coordination_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_private_v1_coordination_proto_rawDescData
 }
 
-var file_fallout_terminal_private_v1_coordination_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_fallout_terminal_private_v1_coordination_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_fallout_terminal_private_v1_coordination_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_fallout_terminal_private_v1_coordination_proto_goTypes = []any{
-	(TerminalSwitchStatus)(0),       // 0: fallout.terminal.private.v1.TerminalSwitchStatus
-	(TerminalSwitchChoice)(0),       // 1: fallout.terminal.private.v1.TerminalSwitchChoice
-	(CommandExecutionDecision)(0),   // 2: fallout.terminal.private.v1.CommandExecutionDecision
-	(*CharacterState)(nil),          // 3: fallout.terminal.private.v1.CharacterState
-	(*LogicalSessionState)(nil),     // 4: fallout.terminal.private.v1.LogicalSessionState
-	(*BroadcastState)(nil),          // 5: fallout.terminal.private.v1.BroadcastState
-	(*PendingTerminalSwitch)(nil),   // 6: fallout.terminal.private.v1.PendingTerminalSwitch
-	(*PlayerConfigMetadata)(nil),    // 7: fallout.terminal.private.v1.PlayerConfigMetadata
-	(*PendingCommandExecution)(nil), // 8: fallout.terminal.private.v1.PendingCommandExecution
-	(*CoordinationState)(nil),       // 9: fallout.terminal.private.v1.CoordinationState
-	(v1.PlayerRole)(0),              // 10: fallout.terminal.player.v1.PlayerRole
-	(*v1.LiveTerminal)(nil),         // 11: fallout.terminal.player.v1.LiveTerminal
+	(TerminalSwitchStatus)(0),           // 0: fallout.terminal.private.v1.TerminalSwitchStatus
+	(TerminalSwitchChoice)(0),           // 1: fallout.terminal.private.v1.TerminalSwitchChoice
+	(CommandExecutionDecision)(0),       // 2: fallout.terminal.private.v1.CommandExecutionDecision
+	(TerminalNavigationDecision)(0),     // 3: fallout.terminal.private.v1.TerminalNavigationDecision
+	(TerminalNavigationNoticeReason)(0), // 4: fallout.terminal.private.v1.TerminalNavigationNoticeReason
+	(*CharacterState)(nil),              // 5: fallout.terminal.private.v1.CharacterState
+	(*LogicalSessionState)(nil),         // 6: fallout.terminal.private.v1.LogicalSessionState
+	(*BroadcastState)(nil),              // 7: fallout.terminal.private.v1.BroadcastState
+	(*PendingTerminalSwitch)(nil),       // 8: fallout.terminal.private.v1.PendingTerminalSwitch
+	(*PlayerConfigMetadata)(nil),        // 9: fallout.terminal.private.v1.PlayerConfigMetadata
+	(*PendingCommandExecution)(nil),     // 10: fallout.terminal.private.v1.PendingCommandExecution
+	(*PendingTerminalNavigation)(nil),   // 11: fallout.terminal.private.v1.PendingTerminalNavigation
+	(*TerminalNavigationNotice)(nil),    // 12: fallout.terminal.private.v1.TerminalNavigationNotice
+	(*CoordinationState)(nil),           // 13: fallout.terminal.private.v1.CoordinationState
+	(v1.PlayerRole)(0),                  // 14: fallout.terminal.player.v1.PlayerRole
+	(*v1.LiveTerminal)(nil),             // 15: fallout.terminal.player.v1.LiveTerminal
+	(v1.TerminalNavigationDirection)(0), // 16: fallout.terminal.player.v1.TerminalNavigationDirection
 }
 var file_fallout_terminal_private_v1_coordination_proto_depIdxs = []int32{
-	10, // 0: fallout.terminal.private.v1.LogicalSessionState.role:type_name -> fallout.terminal.player.v1.PlayerRole
-	11, // 1: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
-	3,  // 2: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
-	4,  // 3: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
-	5,  // 4: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
-	6,  // 5: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
-	7,  // 6: fallout.terminal.private.v1.CoordinationState.player_config:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
-	8,  // 7: fallout.terminal.private.v1.CoordinationState.pending_command_execution:type_name -> fallout.terminal.private.v1.PendingCommandExecution
-	8,  // [8:8] is the sub-list for method output_type
-	8,  // [8:8] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	14, // 0: fallout.terminal.private.v1.LogicalSessionState.role:type_name -> fallout.terminal.player.v1.PlayerRole
+	15, // 1: fallout.terminal.private.v1.PendingTerminalSwitch.requested_terminal:type_name -> fallout.terminal.player.v1.LiveTerminal
+	16, // 2: fallout.terminal.private.v1.PendingTerminalNavigation.direction:type_name -> fallout.terminal.player.v1.TerminalNavigationDirection
+	4,  // 3: fallout.terminal.private.v1.TerminalNavigationNotice.reason:type_name -> fallout.terminal.private.v1.TerminalNavigationNoticeReason
+	5,  // 4: fallout.terminal.private.v1.CoordinationState.roster:type_name -> fallout.terminal.private.v1.CharacterState
+	6,  // 5: fallout.terminal.private.v1.CoordinationState.logical_sessions:type_name -> fallout.terminal.private.v1.LogicalSessionState
+	7,  // 6: fallout.terminal.private.v1.CoordinationState.broadcast:type_name -> fallout.terminal.private.v1.BroadcastState
+	8,  // 7: fallout.terminal.private.v1.CoordinationState.pending_terminal_switch:type_name -> fallout.terminal.private.v1.PendingTerminalSwitch
+	9,  // 8: fallout.terminal.private.v1.CoordinationState.player_config:type_name -> fallout.terminal.private.v1.PlayerConfigMetadata
+	10, // 9: fallout.terminal.private.v1.CoordinationState.pending_command_execution:type_name -> fallout.terminal.private.v1.PendingCommandExecution
+	11, // 10: fallout.terminal.private.v1.CoordinationState.pending_terminal_navigation:type_name -> fallout.terminal.private.v1.PendingTerminalNavigation
+	12, // 11: fallout.terminal.private.v1.CoordinationState.terminal_navigation_notice:type_name -> fallout.terminal.private.v1.TerminalNavigationNotice
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_private_v1_coordination_proto_init() }
@@ -866,14 +1215,15 @@ func file_fallout_terminal_private_v1_coordination_proto_init() {
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[1].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[2].OneofWrappers = []any{}
 	file_fallout_terminal_private_v1_coordination_proto_msgTypes[3].OneofWrappers = []any{}
-	file_fallout_terminal_private_v1_coordination_proto_msgTypes[6].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_coordination_proto_msgTypes[7].OneofWrappers = []any{}
+	file_fallout_terminal_private_v1_coordination_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_private_v1_coordination_proto_rawDesc), len(file_fallout_terminal_private_v1_coordination_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   7,
+			NumEnums:      5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

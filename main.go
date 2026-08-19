@@ -96,6 +96,7 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 		TrustedHack:        live,
 		RosterStore:        playerConfigs,
 		CommandStateStore:  &sessionCommandStateStore{service: sessions},
+		TerminalCatalog:    sessions,
 		RequestResultLimit: int(runtimeConfig.Coordination.RequestResultLimit),
 	})
 	playerConfig := playerserver.Config{

@@ -10,14 +10,19 @@ export {
     MasterCoordinationState,
     MasterPendingCommandExecution,
     MasterPendingSwitch,
+    MasterPendingTerminalNavigation,
     MasterRosterEntry,
     MasterSessionEntry,
+    MasterTerminalNavigationNotice,
     PlayerCharacter,
     PlayerConfigMetadata,
     PlayerRole,
     PublicHackPattern,
     PublicHackState,
     ServerInfo,
+    TerminalNavigationDecision,
+    TerminalNavigationDirection,
+    TerminalNavigationNoticeReason,
     TerminalSwitchChoice
 } from "./models.js";
 

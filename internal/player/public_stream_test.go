@@ -101,6 +101,41 @@ func TestFirstPublicSnapshotRestoresPendingRejectedAndCompletedCommandState(t *t
 	}
 }
 
+func TestFirstPublicSnapshotRestoresTerminalRouteAndPendingWithoutPrivateDecisionIdentity(t *testing.T) {
+	t.Parallel()
+	live := commandLifecycleLiveState("", true)
+	live.TerminalNavigation = &domain.TerminalNavigationPresentation{
+		RouteDepth:   2,
+		ReturnTarget: &domain.TerminalReturnTarget{TerminalID: "terminal-a", TerminalName: "Terminal A"},
+		Pending: &domain.PendingTerminalNavigationPresentation{
+			Direction: domain.TerminalNavigationReturn, TargetTerminalID: "terminal-a", TargetTerminalName: "Terminal A",
+		},
+	}
+	domainSnapshot := &domain.PersonalizedSnapshot{
+		RecognitionHandle: "recognition-route", Revision: 70,
+		PlayerState: &domain.PlayerState{
+			SessionID: "session-observer", FallbackName: "PLAYER 2", Role: domain.PlayerRoleObserver,
+			Phase: domain.PlayerPhaseObserving, BroadcastID: "broadcast-1", ActiveTerminalID: "terminal-b",
+		},
+		Terminal: domain.TerminalPresentation{Live: live},
+	}
+	generated, err := SnapshotToProto(domainSnapshot)
+	require.NoError(t, err)
+	stream := NewSubscription(t.Context(), "physical-route-reconnect", "session-observer", &playerv1.SubscriptionMessage{
+		Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: generated},
+	}, 2)
+	t.Cleanup(stream.Close)
+
+	snapshot := stream.Snapshot().GetSnapshot()
+	require.Equal(t, uint64(70), snapshot.GetRevision())
+	navigation := snapshot.GetTerminalPresentation().GetLiveTerminal().GetTerminalNavigation()
+	require.NotNil(t, navigation)
+	require.Equal(t, uint32(2), navigation.GetRouteDepth())
+	require.Equal(t, "terminal-a", navigation.GetReturnTarget().GetTerminalId())
+	require.Equal(t, playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN, navigation.GetPending().GetDirection())
+	require.Nil(t, navigation.ProtoReflect().Descriptor().Fields().ByName("request_id"))
+}
+
 func commandLifecycleLiveState(phase domain.CommandExecutionPhase, completed bool) *domain.PublicLiveState {
 	const commandID = "command-open-doors"
 	name := "Open doors"

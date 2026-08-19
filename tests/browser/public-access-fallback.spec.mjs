@@ -66,6 +66,7 @@ test('all public failures leave local gameplay live and a later public generatio
     if (index % 2 === 0) {
       await player.locator('.term-row', { hasText: 'DOCS' }).click();
       await expect(player.locator('.term-row', { hasText: 'REPORT' })).toBeVisible();
+      await expect(player.locator('#screen')).not.toHaveClass(/shared-input-pending/);
     } else {
       await player.locator('#backBtn').click();
       await expect(player.locator('.term-row', { hasText: 'DOCS' })).toBeVisible();
