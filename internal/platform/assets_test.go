@@ -758,8 +758,8 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 
 	html := read("frontend/client/index.html")
 	for _, fragment := range []string{
-		`class="player-identity" id="playerIdentity" hidden`,
-		`class="role-badge" id="roleBadge"`,
+		`class="player-status-line" id="playerIdentity" hidden`,
+		`class="player-status-role" id="roleBadge"`,
 		`class="character-select" id="characterSelect" hidden`,
 		`class="assigned-waiting" id="assignedWaiting" hidden`,
 		`class="player-notice" id="playerNotice"`,
@@ -2192,8 +2192,8 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 	}
 	for _, fragment := range []string{
 		`option.textContent = entry.name`,
-		`playerCharacterName.textContent = playerState.character.name`,
-		`playerFallbackName.textContent = playerState.fallbackName`,
+		`playerCharacterName.textContent = characterName`,
+		`playerFallbackName.textContent = compactPlayerInputLabel(playerState.fallbackName || '')`,
 	} {
 		assert.Falsef(t, !strings.Contains(playerJS, fragment),
 			"player asset is missing text-only name rendering %q", fragment)
