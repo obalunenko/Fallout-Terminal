@@ -33,12 +33,6 @@
     </div>
 
     <div class="term-body" id="termBody">
-      <section class="player-identity" id="playerIdentity" hidden aria-label="Идентификация игрока">
-        <div class="player-character-name" id="playerCharacterName"></div>
-        <div class="player-fallback-name" id="playerFallbackName"></div>
-        <output class="role-badge" id="roleBadge" aria-live="polite"></output>
-      </section>
-
       <section class="character-select" id="characterSelect" hidden aria-labelledby="characterSelectTitle" aria-describedby="playerNotice">
         <h1 class="character-select-title" id="characterSelectTitle">ВЫБЕРИТЕ ПЕРСОНАЖА</h1>
         <div class="character-options" id="characterOptions" role="list"></div>
@@ -87,6 +81,15 @@
         <button class="page-btn" id="pageNext" type="button" aria-label="Следующая страница" hidden>[ СЛЕД. ]</button>
       </nav>
     </div>
+
+    <section class="player-status-line" id="playerIdentity" hidden aria-label="Идентификация игрока" role="status" aria-live="polite" aria-atomic="true">
+      <span class="player-status-prefix">[СИСТЕМА] ВВОД</span>
+      <span class="player-status-input" id="playerFallbackName"></span>
+      <span class="player-status-separator" id="playerCharacterSeparator" hidden>//</span>
+      <span class="player-status-character" id="playerCharacterName" hidden></span>
+      <span class="player-status-separator">//</span>
+      <output class="player-status-role" id="roleBadge"></output>
+    </section>
 
     <div class="term-prompt" id="termPrompt" hidden>
       <span>&gt; </span><span class="blink">_</span>

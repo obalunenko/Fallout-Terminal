@@ -126,6 +126,7 @@ const connText    = document.getElementById('connText');
 
 const playerIdentity     = document.getElementById('playerIdentity');
 const playerCharacterName = document.getElementById('playerCharacterName');
+const playerCharacterSeparator = document.getElementById('playerCharacterSeparator');
 const playerFallbackName = document.getElementById('playerFallbackName');
 const roleBadge          = document.getElementById('roleBadge');
 const characterSelect    = document.getElementById('characterSelect');
@@ -1130,6 +1131,13 @@ function renderRoster() {
   }
 }
 
+function compactPlayerInputLabel(fallbackName) {
+  const label = fallbackName.trim();
+  const defaultPlayer = /^PLAYER\s+(\d+)$/i.exec(label);
+  if (defaultPlayer) return `P${defaultPlayer[1]}`;
+  return label || 'P?';
+}
+
 function renderPlayerContext() {
   const hasState = sessionReady && playerState !== null;
   playerIdentity.hidden = !hasState;
@@ -1149,15 +1157,13 @@ function renderPlayerContext() {
 
   if (!hasState) return false;
 
-  if (playerState.character) {
-    playerCharacterName.textContent = playerState.character.name;
-    playerFallbackName.textContent = playerState.fallbackName;
-  } else {
-    playerCharacterName.textContent = playerState.fallbackName;
-    playerFallbackName.textContent = '';
-  }
+  const characterName = playerState.character?.name?.trim() || '';
+  playerFallbackName.textContent = compactPlayerInputLabel(playerState.fallbackName || '');
+  playerCharacterName.textContent = characterName;
+  playerCharacterName.hidden = !characterName;
+  playerCharacterSeparator.hidden = !characterName;
   const roleLabels = {
-    active: 'АКТИВНЫЙ КОНТРОЛЛЕР',
+    active: 'АКТИВЕН',
     observer: 'НАБЛЮДАТЕЛЬ',
     unassigned: 'НЕ НАЗНАЧЕН',
   };

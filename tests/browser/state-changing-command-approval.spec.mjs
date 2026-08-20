@@ -43,7 +43,7 @@ async function openApprovalJourney(browser) {
   const character = player.locator('#characterOptions button:not([disabled])').first();
   await expect(character).toBeVisible();
   await character.click();
-  await expect(player.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+  await expect(player.locator('#roleBadge')).toContainText('АКТИВЕН');
   await expect(player.locator('.term-row', { hasText: 'Открыть двери' })).toBeVisible();
 
   return { overseer, overseerContext, player, playerContext };
@@ -68,7 +68,7 @@ async function openApprovalParticipant(browser, token = '') {
   if (await page.locator('#characterSelect').isVisible()) {
     await page.locator('#characterOptions button:not([disabled])').first().click();
   }
-  await expect(page.locator('#roleBadge')).toContainText(/АКТИВНЫЙ|НАБЛЮДАТЕЛЬ/);
+  await expect(page.locator('#roleBadge')).toContainText(/АКТИВЕН|НАБЛЮДАТЕЛЬ/);
   return { context, page };
 }
 

@@ -52,7 +52,7 @@ async function selectFirstAvailable(page) {
 
 async function assignControllerAndObservers(players, expectedMenuTitle = 'Открыть двери') {
   for (const player of players) await selectFirstAvailable(player.page);
-  await expect(players[0].page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+  await expect(players[0].page.locator('#roleBadge')).toContainText('АКТИВЕН');
   await Promise.all(players.slice(1).map(player =>
     expect(player.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ')));
   await Promise.all(players.map(player =>
@@ -225,7 +225,7 @@ test('controller disconnect keeps one pending request and durable completion sur
 
     const reconnected = await openPlayer(browser, controllerToken);
     journey.players[0] = reconnected;
-    await expect(reconnected.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+    await expect(reconnected.page.locator('#roleBadge')).toContainText('АКТИВЕН');
     await expectFullScreenCommandSurface(reconnected.page, 'Доступ в сектор разрешён.');
     await expectMatchingRecordRenderers(journey.players);
     expect(await reconnected.page.evaluate(key => localStorage.getItem(key), TOKEN_KEY)).toBe(controllerToken);

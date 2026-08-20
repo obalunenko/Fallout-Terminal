@@ -24,7 +24,7 @@ async function openPlayer(browser) {
   await page.goto('/');
   await expect(page.locator('#connOverlay')).toBeHidden();
   await page.locator('#characterOptions button:not([disabled])').first().click();
-  await expect(page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+  await expect(page.locator('#roleBadge')).toContainText('АКТИВЕН');
   return { context, page };
 }
 
@@ -43,7 +43,7 @@ async function openParticipant(browser, token = '') {
   if (await page.locator('#characterSelect').isVisible()) {
     await page.locator('#characterOptions button:not([disabled])').first().click();
   }
-  await expect(page.locator('#roleBadge')).toContainText(/АКТИВНЫЙ|НАБЛЮДАТЕЛЬ/);
+  await expect(page.locator('#roleBadge')).toContainText(/АКТИВЕН|НАБЛЮДАТЕЛЬ/);
   return { context, page };
 }
 
@@ -84,6 +84,99 @@ async function expectPendingTransitionSurface(page, timeout = 2000) {
 test.beforeEach(async ({ request }) => {
   const response = await request.post(`${FIXTURE}/reset`);
   expect(response.ok()).toBe(true);
+});
+
+test('active player identity is an immersive lower system line', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  await page.locator('#characterOptions button:not([disabled])').first().click();
+
+  const status = page.locator('#playerIdentity');
+  await expect(status).toBeVisible();
+  await expect(status).toHaveText(/^\s*\[СИСТЕМА\] ВВОД\s+P\d+\s+\/\/\s+Mara\s+\/\/\s+АКТИВЕН\s*$/);
+  await expect(status).not.toContainText('PLAYER');
+  await expect(status).toHaveAttribute('role', 'status');
+  await expect(page.locator('#roleBadge')).toHaveText('АКТИВЕН');
+  await expect(page.locator('.player-identity, .role-badge')).toHaveCount(0);
+
+  const presentation = await status.evaluate(element => {
+    const statusBounds = element.getBoundingClientRect();
+    const promptBounds = document.querySelector('#termPrompt').getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      beforePrompt: statusBounds.bottom <= promptBounds.top,
+      borderStyle: style.borderStyle,
+      backgroundColor: style.backgroundColor,
+      textTransform: style.textTransform,
+    };
+  });
+  expect(presentation).toEqual({
+    beforePrompt: true,
+    borderStyle: 'none',
+    backgroundColor: 'rgba(0, 0, 0, 0)',
+    textTransform: 'uppercase',
+  });
+
+  await context.close();
+});
+
+test('lower status stays contained on narrow, short, and hacking surfaces', async ({ browser }) => {
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
+
+  const playerContext = await browser.newContext({ viewport: { width: 520, height: 640 } });
+  const player = await playerContext.newPage();
+  await player.goto('/');
+  await expect(player.locator('#connOverlay')).toBeHidden();
+  await player.locator('#characterOptions button:not([disabled])').first().click();
+  await expect(player.locator('#roleBadge')).toHaveText('АКТИВЕН');
+
+  const statusGeometry = async contentSelector => player.evaluate(selector => {
+    const screen = document.querySelector('#screen').getBoundingClientRect();
+    const content = document.querySelector(selector).getBoundingClientRect();
+    const status = document.querySelector('#playerIdentity').getBoundingClientRect();
+    const promptElement = document.querySelector('#termPrompt');
+    const prompt = promptElement.hidden ? null : promptElement.getBoundingClientRect();
+    return {
+      insideScreen: status.left >= screen.left && status.right <= screen.right &&
+        status.top >= screen.top && status.bottom <= screen.bottom,
+      afterContent: status.top >= content.bottom,
+      beforePrompt: prompt === null || status.bottom <= prompt.top,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  }, contentSelector);
+
+  await expect(player.locator('#termList')).toBeVisible();
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await player.setViewportSize({ width: 1180, height: 420 });
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await player.setViewportSize({ width: 820, height: 600 });
+  await approveForwardTransition(overseer, player);
+  await expect(player.locator('#termPrompt')).toBeHidden();
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await playerContext.close();
+  await overseerContext.close();
 });
 
 test('command authoring exposes one exclusive behavior selector', async ({ page }) => {
@@ -222,7 +315,7 @@ for (const command of [
       const firstObserver = await openParticipant(browser);
       let secondObserver = await openParticipant(browser);
       try {
-        await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+        await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
         await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
         await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
         const sourceMenu = await controller.page.locator('#termList').textContent();
@@ -309,7 +402,7 @@ test('direct pending replaces every player menu with the inert record surface ac
     const firstObserver = await openParticipant(browser);
     let secondObserver = await openParticipant(browser);
     try {
-      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
       await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       const sourceMenu = await controller.page.locator('#termList').textContent();
@@ -370,7 +463,7 @@ test('return pending replaces every player menu with the inert record surface ac
     const firstObserver = await openParticipant(browser);
     let secondObserver = await openParticipant(browser);
     try {
-      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
       await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
 
@@ -524,7 +617,7 @@ test('controller and two observers reconnect during pending and converge before 
   let observer = await openParticipant(browser);
   const secondObserver = await openParticipant(browser);
   try {
-    await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+    await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
     await expect(observer.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
     await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
     await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();

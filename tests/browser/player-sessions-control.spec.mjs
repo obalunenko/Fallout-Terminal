@@ -150,7 +150,7 @@ test('four through seven generated players converge across mixed navigation, rec
     const characters = [];
     for (const page of pages) characters.push(await selectFirstAvailable(page));
     expect(new Set(characters).size).toBe(playerCount);
-    await expect(pages[0].locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+    await expect(pages[0].locator('#roleBadge')).toContainText('АКТИВЕН');
     await Promise.all(pages.slice(1).map(page => expect(page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ')));
     const observerRequests = typedPlayerRequests(pages[1]);
 
