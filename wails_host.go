@@ -19,6 +19,7 @@ func init() {
 	application.RegisterEvent[int](clientCountEvent)
 	application.RegisterEvent[*domain.PublicHackState](hackStateEvent)
 	application.RegisterEvent[*domain.MasterCoordinationState](coordinationStateEvent)
+	application.RegisterEvent[SessionStateEvent](sessionStateEvent)
 	application.RegisterEvent[PublicAccessSnapshot](publicAccessStatusEvent)
 }
 

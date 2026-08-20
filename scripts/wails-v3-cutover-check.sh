@@ -56,7 +56,7 @@ self_test() {
   mkdir -p "${fixture}/build/darwin" "${fixture}/frontend/src" "${fixture}/frontend/bindings" "${fixture}/frontend/dist" \
     "${fixture}/internal/app" "${fixture}/scripts" "${fixture}/.github/workflows" \
     "${fixture}/specs/001-wails-v2-migration" "${fixture}/docs"
-  printf 'module example.test/app\n\ngo 1.26\n\nrequire github.com/wailsapp/wails/v3 v3.0.0-beta.8\n' >"${fixture}/go.mod"
+  printf 'module example.test/app\n\ngo 1.26\n\nrequire github.com/wailsapp/wails/v3 v3.0.0-beta.10\n' >"${fixture}/go.mod"
   : >"${fixture}/go.sum"
   printf 'package main\nimport _ "github.com/wailsapp/wails/v3/pkg/application"\n' >"${fixture}/main.go"
   printf 'export const ready = true;\n' >"${fixture}/frontend/src/app.js"

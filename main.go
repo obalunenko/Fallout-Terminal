@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -77,6 +79,15 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 	playerConfigs := playerconfigservice.NewService(
 		playerconfigservice.NewStorage(nil), desktop, locations.DocumentsDefault,
 	)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(nil),
+		desktop,
+		sessionservice.Locations{
+			DocumentsDefault:   locations.DocumentsDefault,
+			BundledDemo:        locations.BundledDemo,
+			ApplicationSupport: locations.ApplicationSupport,
+		},
+	)
 	effectRouter := &coordinationEffectRouter{}
 	coordination := controlservice.New(controlservice.Config{
 		Enqueue:            effectRouter.Enqueue,
@@ -84,6 +95,8 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 		Terminals:          live,
 		TrustedHack:        live,
 		RosterStore:        playerConfigs,
+		CommandStateStore:  &sessionCommandStateStore{service: sessions},
+		TerminalCatalog:    sessions,
 		RequestResultLimit: int(runtimeConfig.Coordination.RequestResultLimit),
 	})
 	playerConfig := playerserver.Config{
@@ -108,15 +121,6 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 	if err != nil {
 		return nil, fmt.Errorf("construct player server: %w", err)
 	}
-	sessions := sessionservice.NewService(
-		sessionservice.NewStorage(nil),
-		desktop,
-		sessionservice.Locations{
-			DocumentsDefault:   locations.DocumentsDefault,
-			BundledDemo:        locations.BundledDemo,
-			ApplicationSupport: locations.ApplicationSupport,
-		},
-	)
 	packaged := isPackagedApplication()
 	publicSettings := tunnelservice.NewPublicAccessSettingsStore(publicAccessSettingsPath, nil, nil)
 	publicSecrets := platform.NewPlatformKeychainSecretStore(packaged)
@@ -154,6 +158,51 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 	})
 	effectRouter.Bind(player, app)
 	return app, nil
+}
+
+// sessionCommandStateStore adapts the session owner's context-aware mutation
+// API to the coordinator's callback-free synchronous durability seam.
+type sessionCommandStateStore struct {
+	service *sessionservice.Service
+}
+
+var _ controlservice.CommandStateStore = (*sessionCommandStateStore)(nil)
+
+func (store *sessionCommandStateStore) ExecuteCommandState(terminalID, commandID string) (controlservice.CommandStateMutation, error) {
+	if store == nil || store.service == nil {
+		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
+	}
+	return commandStateMutation(store.service.ExecuteCommandState(context.Background(), terminalID, commandID))
+}
+
+func (store *sessionCommandStateStore) ResetCommandState(terminalID, commandID string) (controlservice.CommandStateMutation, error) {
+	if store == nil || store.service == nil {
+		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
+	}
+	return commandStateMutation(store.service.ResetCommandState(context.Background(), terminalID, commandID))
+}
+
+func (store *sessionCommandStateStore) ResetTerminalCommandStates(terminalID string) (controlservice.CommandStateMutation, error) {
+	if store == nil || store.service == nil {
+		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
+	}
+	return commandStateMutation(store.service.ResetTerminalCommandStates(context.Background(), terminalID))
+}
+
+func commandStateMutation(result sessionservice.CommandStateResult) (controlservice.CommandStateMutation, error) {
+	if !result.OK {
+		message := result.Error
+		if message == "" {
+			message = "session command-state mutation failed"
+		}
+		return controlservice.CommandStateMutation{}, errors.New(message)
+	}
+	if result.Session == nil {
+		return controlservice.CommandStateMutation{}, errors.New("session command-state mutation returned no document")
+	}
+	return controlservice.CommandStateMutation{
+		Changed: result.Changed, Revision: result.Revision, Session: *result.Session,
+	}, nil
 }
 
 func publicAccessStoresForProfile(

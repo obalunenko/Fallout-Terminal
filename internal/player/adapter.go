@@ -299,6 +299,9 @@ func PlayerStateToProto(state *domain.PlayerState) *playerv1.PlayerState {
 			Availability: rosterToProto(entry.Status),
 		})
 	}
+	if state.Role == domain.PlayerRoleActive {
+		result.Notice = playerNoticeToProto(state.Notice)
+	}
 	return result
 }
 
@@ -320,14 +323,82 @@ func LiveToProto(state *domain.PublicLiveState) *playerv1.LiveTerminal {
 		return nil
 	}
 	return &playerv1.LiveTerminal{
-		TerminalId:   state.TerminalID,
-		TerminalName: state.TerminalName,
-		Tree:         ContentNodeToProto(state.Tree),
-		HackLevel:    int32(state.HackLevel),
-		IntroText:    state.IntroText,
-		Navigation:   NavigationToProto(&state.Nav),
-		Hacking:      HackToProto(state.Hack),
+		TerminalId:         state.TerminalID,
+		TerminalName:       state.TerminalName,
+		Tree:               ContentNodeToProto(state.Tree),
+		HackLevel:          int32(state.HackLevel),
+		IntroText:          state.IntroText,
+		Navigation:         NavigationToProto(&state.Nav),
+		Hacking:            HackToProto(state.Hack),
+		CommandExecution:   commandExecutionToProto(state.CommandExecution),
+		TerminalNavigation: terminalNavigationToProto(state.TerminalNavigation),
 	}
+}
+
+func terminalNavigationToProto(presentation *domain.TerminalNavigationPresentation) *playerv1.TerminalNavigationPresentation {
+	if presentation == nil {
+		return nil
+	}
+	result := &playerv1.TerminalNavigationPresentation{RouteDepth: presentation.RouteDepth}
+	if presentation.ReturnTarget != nil {
+		result.ReturnTarget = &playerv1.TerminalReturnTarget{
+			TerminalId: presentation.ReturnTarget.TerminalID, TerminalName: presentation.ReturnTarget.TerminalName,
+		}
+	}
+	if presentation.Pending != nil {
+		result.Pending = &playerv1.PendingTerminalNavigationPresentation{
+			Direction:          terminalNavigationDirectionToProto(presentation.Pending.Direction),
+			TargetTerminalId:   presentation.Pending.TargetTerminalID,
+			TargetTerminalName: presentation.Pending.TargetTerminalName,
+		}
+	}
+	return result
+}
+
+func terminalNavigationDirectionToProto(direction domain.TerminalNavigationDirection) playerv1.TerminalNavigationDirection {
+	switch direction {
+	case domain.TerminalNavigationForward:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD
+	case domain.TerminalNavigationReturn:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN
+	default:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_UNSPECIFIED
+	}
+}
+
+// commandExecutionToProto maps only the shared phase and command identity.
+// The master request identity and authored confirmation text have no public
+// domain field and therefore cannot cross this adapter.
+func commandExecutionToProto(presentation *domain.CommandExecutionPresentation) *playerv1.CommandExecutionPresentation {
+	if presentation == nil {
+		return nil
+	}
+	result := &playerv1.CommandExecutionPresentation{CommandNodeId: presentation.CommandID}
+	switch presentation.Phase {
+	case domain.CommandExecutionPhasePending:
+		result.Phase = playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING
+	case domain.CommandExecutionPhaseRejected:
+		result.Phase = playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED
+	default:
+		result.Phase = playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED
+	}
+	return result
+}
+
+// playerNoticeToProto emits only the stable enum. Diagnostic causes, paths,
+// and master-facing error text are deliberately not representable publicly.
+func playerNoticeToProto(notice *domain.PlayerNotice) *playerv1.PlayerNotice {
+	if notice == nil {
+		return nil
+	}
+	result := &playerv1.PlayerNotice{}
+	switch notice.Kind {
+	case domain.PlayerNoticeCommandPersistenceFailed:
+		result.Kind = playerv1.PlayerNoticeKind_PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED
+	default:
+		result.Kind = playerv1.PlayerNoticeKind_PLAYER_NOTICE_KIND_UNSPECIFIED
+	}
+	return result
 }
 
 // ContentNodeToProto maps the established tagged domain tree to an exclusive

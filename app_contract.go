@@ -265,17 +265,61 @@ func publicAccessStatusFromNative(status PublicAccessStatus) tunnelservice.Publi
 	return tunnelservice.PublicAccessStatus{State: states[status.State], Generation: status.Generation, SettingsRevision: status.SettingsRevision, PublicURL: status.PublicURL, ErrorCategory: publicAccessErrorFromNative(status.ErrorCategory), ErrorMessage: status.ErrorMessage}
 }
 
-func routeAddCharacterRequest(name string) string {
-	return (&privatev1.AddCharacterRequest{DisplayName: name}).GetDisplayName()
+func routeAddCharacterRequest(payload CharacterCreatePayload) CharacterCreatePayload {
+	semantic := &privatev1.AddCharacterRequest{
+		DisplayName:      payload.Name,
+		Intelligence:     int32(payload.Intelligence),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	if payload.HackerPerkAvailable != nil {
+		value := *payload.HackerPerkAvailable
+		semantic.HackerPerkAvailable = &value
+	}
+	routed := CharacterCreatePayload{
+		Name:             semantic.GetDisplayName(),
+		Intelligence:     int(semantic.GetIntelligence()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
+	if semantic.HackerPerkAvailable != nil {
+		value := semantic.GetHackerPerkAvailable()
+		routed.HackerPerkAvailable = &value
+	}
+	return routed
 }
 
-func routeRenameCharacterRequest(payload CharacterRenamePayload) CharacterRenamePayload {
-	semantic := &privatev1.RenameCharacterRequest{CharacterId: string(payload.CharacterID), DisplayName: payload.Name}
-	return CharacterRenamePayload{CharacterID: domain.CharacterID(semantic.GetCharacterId()), Name: semantic.GetDisplayName()}
+func routeUpdateCharacterRequest(payload CharacterUpdatePayload) CharacterUpdatePayload {
+	semantic := &privatev1.RenameCharacterRequest{
+		CharacterId:      string(payload.CharacterID),
+		DisplayName:      payload.Name,
+		Intelligence:     int32(payload.Intelligence),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	if payload.HackerPerkAvailable != nil {
+		value := *payload.HackerPerkAvailable
+		semantic.HackerPerkAvailable = &value
+	}
+	routed := CharacterUpdatePayload{
+		CharacterID:      domain.CharacterID(semantic.GetCharacterId()),
+		Name:             semantic.GetDisplayName(),
+		Intelligence:     int(semantic.GetIntelligence()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
+	if semantic.HackerPerkAvailable != nil {
+		value := semantic.GetHackerPerkAvailable()
+		routed.HackerPerkAvailable = &value
+	}
+	return routed
 }
 
-func routeDeleteCharacterRequest(characterID string) string {
-	return (&privatev1.DeleteCharacterRequest{CharacterId: characterID}).GetCharacterId()
+func routeDeleteCharacterRequest(payload CharacterDeletePayload) CharacterDeletePayload {
+	semantic := &privatev1.DeleteCharacterRequest{
+		CharacterId:      string(payload.CharacterID),
+		ExpectedRevision: payload.ExpectedRevision,
+	}
+	return CharacterDeletePayload{
+		CharacterID:      domain.CharacterID(semantic.GetCharacterId()),
+		ExpectedRevision: semantic.GetExpectedRevision(),
+	}
 }
 
 func routeRenameLogicalSessionRequest(payload LogicalSessionRenamePayload) LogicalSessionRenamePayload {
@@ -312,6 +356,38 @@ func routeTerminalSwitchDecisionRequest(payload TerminalSwitchDecisionPayload) (
 	}
 	semantic := &privatev1.TerminalSwitchDecisionRequest{SwitchId: string(payload.SwitchID), Choice: choice}
 	return TerminalSwitchDecisionPayload{SwitchID: domain.SwitchID(semantic.GetSwitchId()), Decision: terminalSwitchChoiceFromPrivate(semantic.GetChoice())}, nil
+}
+
+func routeCommandExecutionDecisionRequest(payload CommandExecutionDecisionPayload) (CommandExecutionDecisionPayload, error) {
+	decision, err := commandExecutionDecisionToPrivate(payload.Decision)
+	if err != nil {
+		return payload, err
+	}
+	semantic := &privatev1.ResolveCommandExecutionRequest{RequestId: payload.RequestID, Decision: decision}
+	return CommandExecutionDecisionPayload{
+		RequestID: semantic.GetRequestId(), Decision: commandExecutionDecisionFromPrivate(semantic.GetDecision()),
+	}, nil
+}
+
+func routeTerminalNavigationDecisionRequest(payload TerminalNavigationDecisionPayload) (TerminalNavigationDecisionPayload, error) {
+	decision, err := terminalNavigationDecisionToPrivate(payload.Decision)
+	if err != nil {
+		return payload, err
+	}
+	semantic := &privatev1.ResolveTerminalNavigationRequest{RequestId: payload.RequestID, Decision: decision}
+	return TerminalNavigationDecisionPayload{
+		RequestID: semantic.GetRequestId(), Decision: terminalNavigationDecisionFromPrivate(semantic.GetDecision()),
+	}, nil
+}
+
+func routeResetCommandStateRequest(payload ResetCommandStatePayload) ResetCommandStatePayload {
+	semantic := &privatev1.ResetCommandStateRequest{TerminalId: payload.TerminalID, CommandId: payload.CommandID}
+	return ResetCommandStatePayload{TerminalID: semantic.GetTerminalId(), CommandID: semantic.GetCommandId()}
+}
+
+func routeResetTerminalCommandStatesRequest(payload ResetTerminalCommandStatesPayload) ResetTerminalCommandStatesPayload {
+	semantic := &privatev1.ResetTerminalCommandStatesRequest{TerminalId: payload.TerminalID}
+	return ResetTerminalCommandStatesPayload{TerminalID: semantic.GetTerminalId()}
 }
 
 func routeTerminalActivationRequest(payload LiveTerminalPayload, reset bool) (LiveTerminalPayload, error) {
@@ -361,24 +437,14 @@ func liveTerminalFromPrivate(id, name string, tree *persistencev1.ContentNode, l
 
 func contentNodeToPrivate(node domain.ContentNode) (*persistencev1.ContentNode, error) {
 	node = cloneTreeForBridgeValidation(node)
-	semantic, err := sessionservice.SessionToProto(domain.Session{
-		Version: 1, Name: "private bridge", Terminals: []domain.Terminal{{ID: "bridge", Name: "bridge", Root: node}},
-	})
-	if err != nil {
-		return nil, err
-	}
-	return semantic.GetTerminals()[0].GetRoot(), nil
+	return sessionservice.ContentNodeToProto(node)
 }
 
 func contentNodeFromPrivate(node *persistencev1.ContentNode, template domain.ContentNode) (domain.ContentNode, error) {
-	semantic := &persistencev1.Session{Version: 1, Name: "private bridge", Terminals: []*persistencev1.Terminal{{Id: "bridge", Name: "bridge", Root: node}}}
-	routed, err := sessionservice.SessionFromProto(semantic, domain.Session{
-		Version: 1, Name: "private bridge", Terminals: []domain.Terminal{{ID: "bridge", Name: "bridge", Root: template}},
-	})
+	result, err := sessionservice.ContentNodeFromProto(node, template)
 	if err != nil {
 		return domain.ContentNode{}, err
 	}
-	result := routed.Terminals[0].Root
 	restoreContentNodeShape(&result, template)
 	return result, nil
 }
@@ -498,6 +564,28 @@ func routeSaveSessionResult(result sessionservice.SaveResult) sessionservice.Sav
 	}
 }
 
+func routeSessionStateResult(result SessionStateResult) SessionStateResult {
+	semantic := &privatev1.SessionStateResult{Ok: result.OK, Revision: result.Revision}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	if result.Session != nil {
+		semantic.Session, _ = sessionservice.SessionToProto(*result.Session)
+	}
+	routed := SessionStateResult{OK: semantic.GetOk(), Error: semantic.GetError(), Revision: semantic.GetRevision()}
+	if semantic.Session != nil {
+		template := domain.Session{}
+		if result.Session != nil {
+			template = *result.Session
+		}
+		if value, err := sessionservice.SessionFromProto(semantic.Session, template); err == nil {
+			restoreSessionNativeShape(&value, template)
+			routed.Session = &value
+		}
+	}
+	return routed
+}
+
 func routePlayerConfigResult(result PlayerConfigCommandResult) PlayerConfigCommandResult {
 	semantic := &privatev1.PlayerConfigOperationResult{Ok: result.OK, Canceled: result.Canceled, State: coordinationStateToPrivate(result.State)}
 	if result.Error != "" {
@@ -537,6 +625,28 @@ func coordinationResultToPrivate(result CoordinationCommandResult) *privatev1.Co
 func routeCoordinationResult(result CoordinationCommandResult) CoordinationCommandResult {
 	semantic := coordinationResultToPrivate(result)
 	return CoordinationCommandResult{OK: semantic.GetOk(), Error: semantic.GetError(), State: coordinationStateFromPrivate(semantic.GetState())}
+}
+
+func routeResolveCommandExecutionResult(result ResolveCommandExecutionResult) ResolveCommandExecutionResult {
+	semantic := &privatev1.ResolveCommandExecutionResult{
+		Ok: result.OK, State: coordinationStateToPrivate(result.State),
+	}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	return ResolveCommandExecutionResult{
+		OK: semantic.GetOk(), Error: semantic.GetError(), State: coordinationStateFromPrivate(semantic.GetState()),
+	}
+}
+
+func routeResolveTerminalNavigationResult(result ResolveTerminalNavigationResult) ResolveTerminalNavigationResult {
+	semantic := &privatev1.ResolveTerminalNavigationResult{Ok: result.OK, State: coordinationStateToPrivate(result.State)}
+	if result.Error != "" {
+		semantic.Error = &result.Error
+	}
+	return ResolveTerminalNavigationResult{
+		OK: semantic.GetOk(), Error: semantic.GetError(), State: coordinationStateFromPrivate(semantic.GetState()),
+	}
 }
 
 func terminalSwitchResultToPrivate(result TerminalSwitchCommandResult) *privatev1.TerminalSwitchResult {
@@ -579,6 +689,42 @@ func routeCoordinationEvent(state *domain.MasterCoordinationState) *domain.Maste
 	return coordinationStateFromPrivate(semantic.GetCoordinationState())
 }
 
+func routeSessionStateEvent(event SessionStateEvent) SessionStateEvent {
+	semantic := &privatev1.SessionStateEvent{Revision: event.Revision}
+	if event.Session != nil {
+		semantic.Session, _ = sessionservice.SessionToProto(*event.Session)
+	}
+	routed := SessionStateEvent{Revision: semantic.GetRevision()}
+	if semantic.Session != nil {
+		template := domain.Session{}
+		if event.Session != nil {
+			template = *event.Session
+		}
+		if value, err := sessionservice.SessionFromProto(semantic.Session, template); err == nil {
+			restoreSessionNativeShape(&value, template)
+			routed.Session = &value
+		}
+	}
+	return routed
+}
+
+func restoreSessionNativeShape(session *domain.Session, template domain.Session) {
+	if session == nil {
+		return
+	}
+	for index := range session.Terminals {
+		for templateIndex := range template.Terminals {
+			if template.Terminals[templateIndex].ID != session.Terminals[index].ID {
+				continue
+			}
+			if template.Terminals[templateIndex].CommandStates != nil && session.Terminals[index].CommandStates == nil {
+				session.Terminals[index].CommandStates = make(map[string]domain.CommandExecutionState)
+			}
+			break
+		}
+	}
+}
+
 func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev1.CoordinationState {
 	if state == nil {
 		return nil
@@ -590,7 +736,12 @@ func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev
 		PlayerConfig:    playerConfigMetadataToPrivate(state.PlayerConfig),
 	}
 	for _, entry := range state.Roster {
-		mapped := &privatev1.CharacterState{CharacterId: string(entry.ID), DisplayName: entry.Name}
+		mapped := &privatev1.CharacterState{
+			CharacterId:         string(entry.ID),
+			DisplayName:         entry.Name,
+			Intelligence:        int32(entry.Intelligence),
+			HackerPerkAvailable: entry.HackerPerkAvailable,
+		}
 		if entry.ClaimedBySessionID != nil {
 			value := string(*entry.ClaimedBySessionID)
 			mapped.LogicalSessionId = &value
@@ -633,6 +784,35 @@ func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev
 			result.PendingTerminalSwitch.TargetTerminalId = &value
 		}
 	}
+	if state.PendingCommandExecution != nil {
+		pending := state.PendingCommandExecution
+		result.PendingCommandExecution = &privatev1.PendingCommandExecution{
+			RequestId: pending.RequestID, BroadcastId: string(pending.BroadcastID),
+			TerminalId: pending.TerminalID, CommandId: pending.CommandID,
+			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
+		}
+	}
+	if state.PendingTerminalNavigation != nil {
+		pending := state.PendingTerminalNavigation
+		result.PendingTerminalNavigation = &privatev1.PendingTerminalNavigation{
+			RequestId: pending.RequestID, BroadcastId: string(pending.BroadcastID),
+			Direction:        terminalNavigationDirectionToPrivate(pending.Direction),
+			SourceTerminalId: pending.SourceTerminalID, SourceTerminalName: pending.SourceTerminalName,
+			CommandId: pending.CommandID, CommandName: pending.CommandName,
+			TargetTerminalId: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+			RouteDepth: pending.RouteDepth,
+		}
+	}
+	if state.TerminalNavigationNotice != nil {
+		notice := state.TerminalNavigationNotice
+		result.TerminalNavigationNotice = &privatev1.TerminalNavigationNotice{
+			Reason: terminalNavigationNoticeToPrivate(notice.Reason), SourceTerminalId: notice.SourceTerminalID, CommandId: notice.CommandID,
+		}
+		if notice.TargetTerminalID != nil {
+			value := *notice.TargetTerminalID
+			result.TerminalNavigationNotice.TargetTerminalId = &value
+		}
+	}
 	return result
 }
 
@@ -642,7 +822,12 @@ func coordinationStateFromPrivate(state *privatev1.CoordinationState) *domain.Ma
 	}
 	result := &domain.MasterCoordinationState{Revision: state.GetRevision(), PlayerConfig: playerConfigMetadataFromPrivate(state.GetPlayerConfig())}
 	for _, entry := range state.GetRoster() {
-		mapped := domain.MasterRosterEntry{ID: domain.CharacterID(entry.GetCharacterId()), Name: entry.GetDisplayName()}
+		mapped := domain.MasterRosterEntry{
+			ID:                  domain.CharacterID(entry.GetCharacterId()),
+			Name:                entry.GetDisplayName(),
+			Intelligence:        int(entry.GetIntelligence()),
+			HackerPerkAvailable: entry.GetHackerPerkAvailable(),
+		}
 		if entry.LogicalSessionId != nil {
 			value := domain.LogicalSessionID(entry.GetLogicalSessionId())
 			mapped.ClaimedBySessionID = &value
@@ -688,7 +873,88 @@ func coordinationStateFromPrivate(state *privatev1.CoordinationState) *domain.Ma
 			result.PendingSwitch.TargetTerminalID = &value
 		}
 	}
+	if state.PendingCommandExecution != nil {
+		pending := state.PendingCommandExecution
+		result.PendingCommandExecution = &domain.MasterPendingCommandExecution{
+			RequestID: pending.GetRequestId(), BroadcastID: domain.BroadcastID(pending.GetBroadcastId()),
+			TerminalID: pending.GetTerminalId(), CommandID: pending.GetCommandId(),
+			CommandName: pending.GetCommandName(), ConfirmationText: pending.GetConfirmationText(),
+		}
+	}
+	if state.PendingTerminalNavigation != nil {
+		pending := state.PendingTerminalNavigation
+		result.PendingTerminalNavigation = &domain.MasterPendingTerminalNavigation{
+			RequestID: pending.GetRequestId(), BroadcastID: domain.BroadcastID(pending.GetBroadcastId()),
+			Direction:        terminalNavigationDirectionFromPrivate(pending.GetDirection()),
+			SourceTerminalID: pending.GetSourceTerminalId(), SourceTerminalName: pending.GetSourceTerminalName(),
+			CommandID: pending.GetCommandId(), CommandName: pending.GetCommandName(),
+			TargetTerminalID: pending.GetTargetTerminalId(), TargetTerminalName: pending.GetTargetTerminalName(),
+			RouteDepth: pending.GetRouteDepth(),
+		}
+	}
+	if state.TerminalNavigationNotice != nil {
+		notice := state.TerminalNavigationNotice
+		result.TerminalNavigationNotice = &domain.MasterTerminalNavigationNotice{
+			Reason: terminalNavigationNoticeFromPrivate(notice.GetReason()), SourceTerminalID: notice.GetSourceTerminalId(), CommandID: notice.GetCommandId(),
+		}
+		if notice.TargetTerminalId != nil {
+			value := notice.GetTargetTerminalId()
+			result.TerminalNavigationNotice.TargetTerminalID = &value
+		}
+	}
 	return result
+}
+
+func terminalNavigationDirectionToPrivate(direction domain.TerminalNavigationDirection) playerv1.TerminalNavigationDirection {
+	switch direction {
+	case domain.TerminalNavigationForward:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD
+	case domain.TerminalNavigationReturn:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN
+	default:
+		return playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_UNSPECIFIED
+	}
+}
+
+func terminalNavigationDirectionFromPrivate(direction playerv1.TerminalNavigationDirection) domain.TerminalNavigationDirection {
+	switch direction {
+	case playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_FORWARD:
+		return domain.TerminalNavigationForward
+	case playerv1.TerminalNavigationDirection_TERMINAL_NAVIGATION_DIRECTION_RETURN:
+		return domain.TerminalNavigationReturn
+	default:
+		return ""
+	}
+}
+
+func terminalNavigationNoticeToPrivate(reason domain.TerminalNavigationNoticeReason) privatev1.TerminalNavigationNoticeReason {
+	switch reason {
+	case domain.TerminalNavigationNoticeTargetMissing:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING
+	case domain.TerminalNavigationNoticeSelfTarget:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET
+	case domain.TerminalNavigationNoticeCommandStale:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE
+	case domain.TerminalNavigationNoticeTargetChanged:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED
+	default:
+		return privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_UNSPECIFIED
+	}
+}
+
+func terminalNavigationNoticeFromPrivate(reason privatev1.TerminalNavigationNoticeReason) domain.TerminalNavigationNoticeReason {
+	switch reason {
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_MISSING:
+		return domain.TerminalNavigationNoticeTargetMissing
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET:
+		return domain.TerminalNavigationNoticeSelfTarget
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE:
+		return domain.TerminalNavigationNoticeCommandStale
+	case privatev1.TerminalNavigationNoticeReason_TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED:
+		return domain.TerminalNavigationNoticeTargetChanged
+	default:
+		return ""
+	}
 }
 
 func serverInfoToPrivate(info domain.ServerInfo) *privatev1.ServerInformation {
@@ -859,6 +1125,50 @@ func terminalSwitchChoiceFromPrivate(choice privatev1.TerminalSwitchChoice) doma
 		return domain.TerminalSwitchDiscard
 	case privatev1.TerminalSwitchChoice_TERMINAL_SWITCH_CHOICE_CANCEL:
 		return domain.TerminalSwitchCancel
+	default:
+		return ""
+	}
+}
+
+func commandExecutionDecisionToPrivate(decision domain.CommandExecutionDecision) (privatev1.CommandExecutionDecision, error) {
+	switch decision {
+	case domain.CommandExecutionApprove:
+		return privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_APPROVE, nil
+	case domain.CommandExecutionReject:
+		return privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_REJECT, nil
+	default:
+		return privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_UNSPECIFIED, fmt.Errorf("unsupported command execution decision %q", decision)
+	}
+}
+
+func commandExecutionDecisionFromPrivate(decision privatev1.CommandExecutionDecision) domain.CommandExecutionDecision {
+	switch decision {
+	case privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_APPROVE:
+		return domain.CommandExecutionApprove
+	case privatev1.CommandExecutionDecision_COMMAND_EXECUTION_DECISION_REJECT:
+		return domain.CommandExecutionReject
+	default:
+		return ""
+	}
+}
+
+func terminalNavigationDecisionToPrivate(decision domain.TerminalNavigationDecision) (privatev1.TerminalNavigationDecision, error) {
+	switch decision {
+	case domain.TerminalNavigationApprove:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_APPROVE, nil
+	case domain.TerminalNavigationReject:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_REJECT, nil
+	default:
+		return privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_UNSPECIFIED, fmt.Errorf("unsupported terminal navigation decision %q", decision)
+	}
+}
+
+func terminalNavigationDecisionFromPrivate(decision privatev1.TerminalNavigationDecision) domain.TerminalNavigationDecision {
+	switch decision {
+	case privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_APPROVE:
+		return domain.TerminalNavigationApprove
+	case privatev1.TerminalNavigationDecision_TERMINAL_NAVIGATION_DECISION_REJECT:
+		return domain.TerminalNavigationReject
 	default:
 		return ""
 	}

@@ -173,6 +173,7 @@ func TestPackagePlanPreservesCanonicalFrontendAndOfflineResourceOwnership(t *tes
 		"build master frontend",
 		"install application metadata",
 		"install application icon",
+		"install bundled demo player config",
 		"install bundled demo",
 		"compile macOS arm64 application",
 		"sign completed application bundle",
@@ -185,6 +186,11 @@ func TestPackagePlanPreservesCanonicalFrontendAndOfflineResourceOwnership(t *tes
 	assert.Equal(t, filepath.Join("sessions", "demo.json"), demo.Source)
 	assert.Equal(t, filepath.Join("build", "bin", applicationName+".app", "Contents", "Resources", "sessions", "demo.json"), demo.Destination)
 	assert.Equal(t, 0o444, int(demo.Mode.Perm()))
+
+	players := steps[positions["install bundled demo player config"]]
+	assert.Equal(t, filepath.Join("sessions", "demo-players.json"), players.Source)
+	assert.Equal(t, filepath.Join("build", "bin", applicationName+".app", "Contents", "Resources", "sessions", "demo-players.json"), players.Destination)
+	assert.Equal(t, 0o444, int(players.Mode.Perm()))
 }
 
 func TestUnknownActionIsRejected(t *testing.T) {

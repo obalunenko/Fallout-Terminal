@@ -174,6 +174,51 @@ func TestProtobufSchemaRevisionMatchesSources(t *testing.T) {
 
 }
 
+func TestBundledDemoShowcasesEveryCommandBehavior(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "sessions", "demo.json"))
+	require.NoError(t, err)
+	demo, err := domain.DecodeSession(raw)
+	require.NoError(t, err)
+
+	ordinaryCommands := 0
+	stateChangingCommands := 0
+	completedCommandStates := 0
+	terminalTransitions := 0
+	for _, terminal := range demo.Terminals {
+		var visit func(domain.ContentNode)
+		visit = func(node domain.ContentNode) {
+			if node.Type == domain.NodeCommand {
+				switch {
+				case node.StateChange != nil:
+					stateChangingCommands++
+					if _, completed := terminal.CommandStates[node.ID]; completed {
+						completedCommandStates++
+					}
+				case node.TerminalTransition != nil:
+					terminalTransitions++
+				default:
+					ordinaryCommands++
+				}
+			}
+			for _, child := range node.Children {
+				visit(child)
+			}
+		}
+		visit(terminal.Root)
+	}
+	require.GreaterOrEqual(t, ordinaryCommands, 1,
+		"bundled demo must showcase an ordinary command")
+	require.GreaterOrEqual(t, stateChangingCommands, 1,
+		"bundled demo must showcase a state-changing command")
+	require.GreaterOrEqual(t, completedCommandStates, 1,
+		"bundled demo must showcase a completed command that can be reset in its writable copy")
+	require.GreaterOrEqual(t, terminalTransitions, 1,
+		"bundled demo must showcase cross-terminal navigation")
+}
+
 func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 	t.Parallel()
 
@@ -192,8 +237,8 @@ func TestWailsMigrationRuntimeStatusContractIsFrozen(t *testing.T) {
 
 	root := assetRepositoryRoot(t)
 	wantDigests := map[string]string{
-		"proto/fallout/terminal/private/v1/runtime.proto": "41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741",
-		"proto/schema-revision.txt":                       "1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06",
+		"proto/fallout/terminal/private/v1/runtime.proto": "4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9",
+		"proto/schema-revision.txt":                       "311b76a8d320f9c773ad3f93b0339f158bd5665ab0d0fc5aa0b832ce5b0085b9",
 		"proto/compatibility-baseline.binpb":              "50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3",
 	}
 	for relative, want := range wantDigests {
@@ -828,7 +873,8 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"pageNext.hidden = pagedView.index >= pagedView.pages.length - 1",
 		"pageIndicator.value = `${pagedView.index + 1} / ${pagedView.pages.length}`",
 		"activatePagination('entry', viewEntryId",
-		"activatePagination('command', currentCommandNodeId",
+		"function renderCommandRecordSurface({ kind, key, title, text, showBack })",
+		"activatePagination(kind, key, text, entryBody, isNewCommand)",
 		"e.key === 'ArrowLeft' || e.key === 'PageUp'",
 		"e.key === 'ArrowRight' || e.key === 'PageDown'",
 		"window.addEventListener('resize', scheduleRepagination)",
@@ -838,7 +884,7 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		"hackBoard.classList.toggle('hack-stacked'",
 		"hackBoard.classList.toggle('hack-compact'",
 		"function renderHackScreen() {\n  deactivatePagination();",
-		"renderHackInputPreview();\n  scheduleHackFit();",
+		"renderHackInputPreview();\n  renderHackColumns(isNewHack, hackKey);",
 	} {
 		assert.Falsef(t, !strings.Contains(js, fragment),
 			"player script is missing pagination contract %q", fragment)
@@ -912,11 +958,11 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	for _, fragment := range []string{
 		"function regionContains(parent, child)",
-		"hackColumns.querySelectorAll('.hack-row')",
-		"Array.from(hackLog.children)",
+		"columnsContainer.querySelectorAll('.hack-row')",
+		"Array.from(log.children)",
 		"regions.some(regionOverflows)",
 		"containedRegions.some(([parent, child]) => !regionContains(parent, child))",
-		"hackBoard.classList.add('hack-tight')",
+		"board.classList.add('hack-tight')",
 	} {
 		assert.Falsef(t, !strings.Contains(js, fragment),
 			"player script is missing rendered hacking geometry contract %q", fragment)
@@ -1442,18 +1488,18 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 
 	js := read("client/client.js")
 	for _, fragment := range []string{
-		"function hackRowsFitColumns()",
+		"function hackRowsFitColumns(board = hackBoard)",
 		"const tolerance = 0.5",
 		"finalBounds.right <= columnBounds.right + tolerance",
 		"rowBounds.bottom <= columnBounds.bottom + tolerance",
-		"function fitHackRowFont()",
-		"hackBoard.style.removeProperty('--hack-row-font')",
+		"function fitHackRowFont(board = hackBoard)",
+		"board.style.removeProperty('--hack-row-font')",
 		"let low = baseSize",
 		"Math.min(...columns.map(column => column.getBoundingClientRect().width))",
-		"hackRowsFitColumns() && !hackContentOverflows()",
+		"hackRowsFitColumns(board) && !hackContentOverflows(board)",
 		"while (high - low > 0.25)",
-		"hackBoard.style.setProperty('--hack-row-font', `${size}px`)",
-		"fitHackRowFont();",
+		"board.style.setProperty('--hack-row-font', `${size}px`)",
+		"const fontSize = fitHackRowFont(board)",
 		"window.addEventListener('resize', scheduleHackFit)",
 		"hackFitObserver.observe(termBody)",
 		"document.fonts.ready.then(scheduleHackFit)",
@@ -1585,6 +1631,35 @@ func TestPlayerCRTHackingRevealAssetContract(t *testing.T) {
 
 	assert.NotContains(t, js, "hackColumns.innerHTML")
 	assert.NotContains(t, js, "function buildColumnHtml")
+}
+
+func TestPlayerCRTHackingRevealFontStabilityAssetContract(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	require.NoError(t, err)
+	js := string(raw)
+
+	for _, fragment := range []string{
+		"let hackBoardFit = null",
+		"function createHackFitProbe()",
+		"probe.inert = true",
+		"probe.setAttribute('aria-hidden', 'true')",
+		"descriptor.row.cloneNode(true)",
+		"function fitCompleteHackBoard()",
+		"const fit = applyHackLayout(probe)",
+		"hackBoardFit = fit",
+		"applyHackFit(hackBoardFit)",
+		"window.addEventListener('resize', scheduleHackFit)",
+		"document.fonts.ready.then(scheduleHackFit)",
+	} {
+		assert.Contains(t, js, fragment,
+			"player script is missing stable complete-board hacking fit contract %q", fragment)
+	}
+
+	assert.NotContains(t, js, "afterAppend: scheduleHackFit",
+		"progressive row insertion must not refit against the partial interaction DOM")
 }
 
 func TestPlayerCRTDudReconciliationAssetContract(t *testing.T) {
@@ -1733,6 +1808,18 @@ func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 		"bundled demo is not a valid version-1 session: %v", err)
 	require.Falsef(t, session.Version != 1 || len(session.Terminals) == 0,
 		"bundled demo = version %d with %d terminals, want version 1 with content", session.Version, len(session.Terminals))
+	require.Equal(t, "demo-players.json", session.PlayerConfig)
+	playerConfigRaw, err := os.ReadFile(filepath.Join(filepath.Dir(demoPath), session.PlayerConfig))
+	require.NoError(t, err)
+	playerConfig, err := domain.DecodePlayerConfig(playerConfigRaw)
+	require.NoError(t, err)
+	require.Equal(t, 1, playerConfig.Version)
+	require.Equal(t, []domain.CharacterRosterEntry{
+		{ID: "demo_scout", Name: "Пайпер Райт", Intelligence: 7, HackerPerkAvailable: false},
+		{ID: "demo_technician", Name: "Ник Валентайн", Intelligence: 8, HackerPerkAvailable: true},
+		{ID: "demo_medic", Name: "Кюри", Intelligence: 10, HackerPerkAvailable: true},
+		{ID: "demo_guard", Name: "Престон Гарви", Intelligence: 6, HackerPerkAvailable: false},
+	}, playerConfig.Roster, "bundled player profiles must preserve authored IDs, order, and private attributes")
 
 	locations, err := NewSessionLocations(filepath.Join(root, ".manifest-home"), root)
 	if err != nil {
@@ -1971,7 +2058,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 	}
 
 	for _, fragment := range []string{
-		`row.querySelector('.roster-name').textContent = character.name || '—'`,
+		`nameInput.value = character.name || ''`,
 		`row.querySelector('.session-primary-name').textContent = assigned`,
 		`row.querySelector('.session-character-name').textContent = assigned`,
 		`row.querySelector('.session-fallback-label').textContent = `,
@@ -2084,7 +2171,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 
 	}
 	for _, fragment := range []string{
-		`.coord-panel[data-player-config-active="false"] .roster-management`,
+		`.player-management-dialog[aria-readonly="true"] .player-management-mode`,
 		`.player-config-error[hidden]`,
 	} {
 		assert.Falsef(t, !strings.Contains(masterCSS, fragment),

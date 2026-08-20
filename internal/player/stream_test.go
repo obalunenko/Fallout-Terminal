@@ -50,6 +50,103 @@ func TestSubscriptionQueueIsBoundedNonblockingAndRecoversOnlyFromANewSnapshot(t 
 	require.Equal(t, uint64(51), (<-fresh.Updates()).GetUpdate().GetRevision())
 }
 
+func TestCommandExecutionStreamIsMonotonicAndReconnectsFromCompleteStateAfterOverflow(t *testing.T) {
+	t.Parallel()
+
+	stream := NewSubscription(t.Context(), "physical-monotonic", "logical-1", commandExecutionSnapshot(20, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, false), 3)
+	require.True(t, stream.Offer(commandExecutionUpdate(21, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED, false)))
+	require.True(t, stream.Offer(commandExecutionUpdate(22, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED, true)))
+
+	first := stream.Snapshot().GetSnapshot()
+	require.Equal(t, uint64(20), first.GetRevision())
+	require.Equal(t, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING,
+		first.GetTerminalPresentation().GetLiveTerminal().GetCommandExecution().GetPhase())
+	rejected := (<-stream.Updates()).GetUpdate()
+	require.Equal(t, uint64(21), rejected.GetRevision())
+	require.Equal(t, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED,
+		rejected.GetTerminalPresentation().GetLiveTerminal().GetCommandExecution().GetPhase())
+	completed := (<-stream.Updates()).GetUpdate()
+	assertCompletedCommandStreamState(t, 22, completed.GetRevision(), completed.GetTerminalPresentation().GetLiveTerminal())
+	require.True(t, stream.Offer(commandExecutionUpdate(22, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED, true)), "same revision is an idempotent no-op")
+	select {
+	case unexpected := <-stream.Updates():
+		assert.Failf(t, "duplicate revision delivered", "update = %#v", unexpected)
+	default:
+	}
+	require.False(t, stream.Offer(commandExecutionUpdate(21, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED, false)), "older command state must terminate the physical stream")
+	select {
+	case <-stream.Done():
+	case <-time.After(time.Second):
+		assert.FailNow(t, "stream accepted a regressing command revision")
+	}
+
+	overflowed := NewSubscription(t.Context(), "physical-overflow", "logical-1", commandExecutionSnapshot(30, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, false), 1)
+	require.True(t, overflowed.Offer(commandExecutionUpdate(31, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED, false)))
+	require.False(t, overflowed.Offer(commandExecutionUpdate(32, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED, true)))
+	select {
+	case <-overflowed.Done():
+	case <-time.After(time.Second):
+		assert.FailNow(t, "overflowed command stream remained open")
+	}
+
+	// Recovery is entirely server-owned: the new physical stream starts from
+	// the current complete snapshot and never needs the dropped increments.
+	reconnected := NewSubscription(t.Context(), "physical-reconnected", "logical-1", commandExecutionSnapshot(32, playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_UNSPECIFIED, true), 1)
+	reconnectedFirst := reconnected.Snapshot().GetSnapshot()
+	assertCompletedCommandStreamState(t, 32, reconnectedFirst.GetRevision(), reconnectedFirst.GetTerminalPresentation().GetLiveTerminal())
+	require.True(t, reconnected.Offer(subscriptionUpdate(33)))
+	require.Equal(t, uint64(33), (<-reconnected.Updates()).GetUpdate().GetRevision())
+}
+
+func commandExecutionSnapshot(revision uint64, phase playerv1.CommandExecutionPhase, completed bool) *playerv1.SubscriptionMessage {
+	return &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: &playerv1.PersonalizedSnapshot{
+		RecognitionHandle: "recognition-logical-1", Revision: revision,
+		PlayerState: &playerv1.PlayerState{
+			LogicalSessionId: "logical-1", Role: playerv1.PlayerRole_PLAYER_ROLE_ACTIVE,
+			Phase: playerv1.PlayerPhase_PLAYER_PHASE_CONTROLLING,
+		},
+		TerminalPresentation: commandExecutionTerminalPresentation(phase, completed),
+	}}}
+}
+
+func commandExecutionUpdate(revision uint64, phase playerv1.CommandExecutionPhase, completed bool) *playerv1.SubscriptionMessage {
+	return &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Update{Update: &playerv1.CompoundUpdate{
+		Revision: revision, TerminalPresentation: commandExecutionTerminalPresentation(phase, completed),
+	}}}
+}
+
+func commandExecutionTerminalPresentation(phase playerv1.CommandExecutionPhase, completed bool) *playerv1.TerminalPresentation {
+	const commandID = "command-open-doors"
+	name := "Open doors"
+	if completed {
+		name = "Doors open"
+	}
+	live := &playerv1.LiveTerminal{
+		TerminalId: "terminal-1", TerminalName: "Overseer",
+		Tree: &playerv1.ContentNode{Id: "root", Name: "ROOT", Content: &playerv1.ContentNode_Folder{Folder: &playerv1.ContentFolder{Children: []*playerv1.ContentNode{{
+			Id: commandID, Name: name, Content: &playerv1.ContentNode_Command{Command: &playerv1.ContentCommand{Text: "Doors opened"}},
+		}}}}},
+		Navigation: &playerv1.NavigationState{Path: []string{"root"}, Mode: playerv1.NavigationMode_NAVIGATION_MODE_LIST},
+	}
+	if completed {
+		live.Navigation.CommandNodeId = pointerTo(commandID)
+	} else {
+		live.CommandExecution = &playerv1.CommandExecutionPresentation{Phase: phase, CommandNodeId: commandID}
+	}
+	return &playerv1.TerminalPresentation{Presentation: &playerv1.TerminalPresentation_LiveTerminal{LiveTerminal: live}}
+}
+
+func assertCompletedCommandStreamState(t *testing.T, wantRevision, revision uint64, terminal *playerv1.LiveTerminal) {
+	t.Helper()
+	require.Equal(t, wantRevision, revision)
+	require.NotNil(t, terminal)
+	require.Nil(t, terminal.GetCommandExecution())
+	command := terminal.GetTree().GetFolder().GetChildren()[0]
+	require.Equal(t, "Doors open", command.GetName())
+	require.Equal(t, "Doors opened", command.GetCommand().GetText())
+	require.Equal(t, "command-open-doors", terminal.GetNavigation().GetCommandNodeId())
+}
+
 func TestSubscriptionHubIsolatesOverflowingAndCanceledPhysicalSiblings(t *testing.T) {
 	hub := NewSubscriptionHub()
 	blocked := NewSubscription(t.Context(), "blocked", "logical-1", subscriptionSnapshot(1), 1)

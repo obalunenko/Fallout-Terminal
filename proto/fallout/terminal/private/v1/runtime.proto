@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package fallout.terminal.private.v1;
 
+import "fallout/terminal/persistence/v1/session.proto";
 import "fallout/terminal/player/v1/hacking.proto";
 import "fallout/terminal/private/v1/coordination.proto";
 
@@ -42,4 +43,9 @@ message HackStateEvent {
 
 message CoordinationStateEvent {
   CoordinationState coordination_state = 1;
+}
+
+message SessionStateEvent {
+  uint64 revision = 1;
+  fallout.terminal.persistence.v1.Session session = 2;
 }

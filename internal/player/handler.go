@@ -143,7 +143,13 @@ func (service *ConnectService) PublishEffect(effect control.Effect) {
 	if service == nil || effect.Update == nil || effect.SessionID == "" {
 		return
 	}
-	generated, err := CompoundUpdateToProto(effect.Update)
+	update := effect.Update
+	if update.Player != nil && update.Player.Notice != nil &&
+		(update.Player.SessionID != effect.SessionID || update.Player.Role != domain.PlayerRoleActive) {
+		update = domain.CloneCompoundUpdate(update)
+		update.Player.Notice = nil
+	}
+	generated, err := CompoundUpdateToProto(update)
 	if err != nil {
 		return
 	}

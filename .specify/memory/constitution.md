@@ -1,26 +1,12 @@
 <!--
 Sync Impact Report
-- Version change: 4.0.0 -> 5.0.0
+- Version change: 5.0.0 -> 5.0.1
 - Modified principles:
-  - I. Govern the Accepted Desktop Runtime (personal-use provider-endpoint authorization and
-    withdrawal/close lifecycle replace mandatory application Host/source admission)
-  - IV. Separate Public and Private Capabilities (public authentication may be owned by the
-    provider endpoint while the player service stays capability-safe)
+  - Project Identity (accepted Wails runtime pin updated from v3.0.0-beta.8 to v3.0.0-beta.10)
 - Added principles: None
 - Added sections: None
 - Removed sections: None
-- Expanded guidance:
-  - A personal-use public URL MUST be created with its authentication policy before publication;
-    direct local/LAN play remains outside that endpoint and unauthenticated.
-  - A provider endpoint MAY own Basic Auth and routing; the application is not required to infer
-    public ingress from `RemoteAddr`, forwarding headers, or Host.
-  - Stop/reconfigure/failure MUST withdraw the reusable URL and close the endpoint within the
-    existing deadline; a separate deny-before-close mutation is not required when the endpoint is
-    the sole public acceptance boundary.
-  - Player credentials MAY cross transiently into an embedded provider SDK solely to construct the
-    active endpoint policy, while Keychain remains the only application persistence.
-  - Deterministic tests prove policy construction/lifecycle without claiming external reachability;
-    real provider auth/stream checks remain explicit opt-in and honest `NOT RUN` when unavailable.
+- Expanded guidance: None
 - Follow-up TODOs: None
 -->
 # Fallout Terminal Constitution
@@ -34,7 +20,7 @@ state uses the portable version-1 JSON session document; live terminal, navigati
 connection, startup, and tunnel state is owned by the running application.
 
 The production architecture is a Go 1.26 modular monolith whose sole accepted production desktop
-runtime MUST be the repository's exactly pinned Wails v3.0.0-beta.8 implementation. Runtime, CLI,
+runtime MUST be the repository's exactly pinned Wails v3.0.0-beta.10 implementation. Runtime, CLI,
 frontend, and generated-binding versions MUST remain mutually compatible and reproducibly pinned
 in their owning dependency graphs.
 
@@ -235,7 +221,7 @@ accepted.
 ## Dependency Rules
 
 - Root composition and `internal/platform/` adapters MAY depend on the repository's exactly pinned
-  `github.com/wailsapp/wails/v3` v3.0.0-beta.8 runtime because they are the Wails v3 composition and
+  `github.com/wailsapp/wails/v3` v3.0.0-beta.10 runtime because they are the Wails v3 composition and
   platform boundaries. No other `internal/` package MAY import Wails.
 - Protobuf schema modules are upstream contract dependencies. Generated Go and ECMAScript outputs
   MUST depend only on pinned generators and runtimes and MUST be consumed through explicit boundary
@@ -544,4 +530,4 @@ manually edited generated files, schema-breaking field reuse, public capability 
 stored-secret readback, generic bridge dispatchers, Make-owned build graphs, and permanent dual
 protocols without an explicit compatibility requirement.
 
-**Version**: 5.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-15
+**Version**: 5.0.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-20

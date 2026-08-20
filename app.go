@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	controlservice "github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
@@ -22,6 +23,7 @@ const (
 	clientCountEvent        = "client-count"
 	hackStateEvent          = "hack-state"
 	coordinationStateEvent  = "coordination-state"
+	sessionStateEvent       = "session-state"
 	publicAccessStatusEvent = "public-access-status"
 )
 
@@ -44,6 +46,11 @@ type sessionPlayerConfigCommands interface {
 	AssociatePlayerConfig(context.Context, string) sessionservice.SessionResult
 }
 
+type sessionCommandStateCommands interface {
+	ResetCommandState(context.Context, string, string) sessionservice.CommandStateResult
+	ResetTerminalCommandStates(context.Context, string) sessionservice.CommandStateResult
+}
+
 // PlayerConfigService owns trusted native selection and strict durable files.
 type PlayerConfigService interface {
 	Create(context.Context) playerconfigservice.Result
@@ -63,7 +70,7 @@ type LiveService interface {
 // broadcast lifetime, and controller state behind one transaction boundary.
 type CoordinationService interface {
 	Snapshot() *domain.MasterCoordinationState
-	AddCharacter(string) (*domain.MasterCoordinationState, error)
+	AddCharacter(domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error)
 	StartBroadcast() (*domain.MasterCoordinationState, error)
 }
 
@@ -71,8 +78,8 @@ type CoordinationService interface {
 // Keeping it additive lets focused lifecycle fakes provide only the commands
 // they exercise while production control.Service implements the complete set.
 type coordinationCorrectionService interface {
-	RenameCharacter(domain.CharacterID, string) (*domain.MasterCoordinationState, error)
-	DeleteCharacter(domain.CharacterID) (*domain.MasterCoordinationState, error)
+	UpdateCharacter(domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error)
+	DeleteCharacter(domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error)
 	RenameLogicalSession(domain.LogicalSessionID, string) (*domain.MasterCoordinationState, error)
 	AssignCharacter(domain.LogicalSessionID, domain.CharacterID) (*domain.MasterCoordinationState, error)
 	ReleaseCharacter(domain.LogicalSessionID) (*domain.MasterCoordinationState, error)
@@ -93,8 +100,20 @@ type coordinationTerminalService interface {
 	ResetFailedHack(domain.TerminalTarget) (*domain.MasterCoordinationState, error)
 }
 
+type coordinationTerminalCanonicalRefreshService interface {
+	RefreshActiveTerminal(domain.TerminalTarget) (*domain.MasterCoordinationState, error)
+}
+
 type coordinationTerminalDecisionService interface {
 	ResolveTerminalSwitch(domain.SwitchID, domain.TerminalSwitchChoice) (*domain.MasterCoordinationState, error)
+}
+
+type coordinationCommandExecutionService interface {
+	ResolveCommandExecution(string, domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *controlservice.CommandStateMutation, error)
+}
+
+type coordinationTerminalNavigationService interface {
+	ResolveTerminalNavigation(string, domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error)
 }
 
 type coordinationBroadcastLifecycleService interface {
@@ -202,6 +221,22 @@ type CommandResult struct {
 	Error string `json:"error,omitempty"`
 }
 
+// SessionStateResult returns the canonical durable document and its
+// session-owned revision after a trusted command-state mutation.
+type SessionStateResult struct {
+	OK       bool            `json:"ok"`
+	Error    string          `json:"error,omitempty"`
+	Revision uint64          `json:"revision"`
+	Session  *domain.Session `json:"session,omitempty"`
+}
+
+// SessionStateEvent is emitted only after a command-state mutation reaches
+// durability. It intentionally excludes the user-selected file path.
+type SessionStateEvent struct {
+	Revision uint64          `json:"revision"`
+	Session  *domain.Session `json:"session"`
+}
+
 // PublicAccessPreferences is the secret-free native desktop projection.
 type PublicAccessPreferences struct {
 	Version                   uint32 `json:"version"`
@@ -271,6 +306,22 @@ type CoordinationCommandResult struct {
 	State *domain.MasterCoordinationState `json:"state"`
 }
 
+// ResolveCommandExecutionResult is the private master-only response to one
+// exact pending command decision.
+type ResolveCommandExecutionResult struct {
+	OK    bool                            `json:"ok"`
+	Error string                          `json:"error,omitempty"`
+	State *domain.MasterCoordinationState `json:"state"`
+}
+
+// ResolveTerminalNavigationResult is the private response for one exact
+// forward/return decision and its resulting authoritative coordination state.
+type ResolveTerminalNavigationResult struct {
+	OK    bool                            `json:"ok"`
+	Error string                          `json:"error,omitempty"`
+	State *domain.MasterCoordinationState `json:"state"`
+}
+
 // PlayerConfigCommandResult combines durable metadata with authoritative roster state.
 type PlayerConfigCommandResult struct {
 	OK       bool                            `json:"ok"`
@@ -292,11 +343,30 @@ type TerminalSwitchCommandResult struct {
 	State    *domain.MasterCoordinationState `json:"state"`
 }
 
-// CharacterRenamePayload identifies one stable roster entry and its new
-// player-facing display name.
-type CharacterRenamePayload struct {
-	CharacterID domain.CharacterID `json:"characterId"`
-	Name        string             `json:"name"`
+// CharacterCreatePayload carries one complete trusted player profile and the
+// coordination revision it was based on.
+type CharacterCreatePayload struct {
+	Name                string `json:"name"`
+	Intelligence        int    `json:"intelligence"`
+	HackerPerkAvailable *bool  `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64 `json:"expectedRevision"`
+}
+
+// CharacterUpdatePayload carries a complete replacement profile for one
+// stable roster identity and the coordination revision it was based on.
+type CharacterUpdatePayload struct {
+	CharacterID         domain.CharacterID `json:"characterId"`
+	Name                string             `json:"name"`
+	Intelligence        int                `json:"intelligence"`
+	HackerPerkAvailable *bool              `json:"hackerPerkAvailable"`
+	ExpectedRevision    uint64             `json:"expectedRevision"`
+}
+
+// CharacterDeletePayload identifies one stable roster identity and the
+// coordination revision the deletion was based on.
+type CharacterDeletePayload struct {
+	CharacterID      domain.CharacterID `json:"characterId"`
+	ExpectedRevision uint64             `json:"expectedRevision"`
 }
 
 // LogicalSessionRenamePayload changes only a process-local fallback label.
@@ -340,6 +410,31 @@ type TerminalSwitchDecisionPayload struct {
 	Decision domain.TerminalSwitchChoice `json:"decision"`
 }
 
+// CommandExecutionDecisionPayload resolves one exact server-owned pending
+// request. The authored prompt itself is carried only by coordination state.
+type CommandExecutionDecisionPayload struct {
+	RequestID string                          `json:"requestId"`
+	Decision  domain.CommandExecutionDecision `json:"decision"`
+}
+
+type TerminalNavigationDecisionPayload struct {
+	RequestID string                            `json:"requestId"`
+	Decision  domain.TerminalNavigationDecision `json:"decision"`
+}
+
+// ResetCommandStatePayload addresses one authored state-changing command by
+// stable terminal and command IDs.
+type ResetCommandStatePayload struct {
+	TerminalID string `json:"terminalId"`
+	CommandID  string `json:"commandId"`
+}
+
+// ResetTerminalCommandStatesPayload addresses one authored terminal whose
+// durable command snapshots should be cleared atomically.
+type ResetTerminalCommandStatesPayload struct {
+	TerminalID string `json:"terminalId"`
+}
+
 // App is the Wails composition root. Domain behavior remains in internal
 // packages; App owns lifecycle and the narrow desktop facade.
 type App struct {
@@ -351,21 +446,22 @@ type App struct {
 	deps AppDependencies
 	ctx  context.Context
 
-	phase               string
-	serverInfo          *domain.ServerInfo
-	clientCount         int
-	hackState           *domain.PublicHackState
-	coordinationState   *domain.MasterCoordinationState
-	startupError        string
-	saveState           string
-	requestedRevision   uint64
-	savedRevision       uint64
-	playerStarted       bool
-	desktopReady        bool
-	sessionsClosed      bool
-	processStateCleared bool
-	publicAccessClosed  bool
-	stopped             bool
+	phase                    string
+	serverInfo               *domain.ServerInfo
+	clientCount              int
+	hackState                *domain.PublicHackState
+	coordinationState        *domain.MasterCoordinationState
+	startupError             string
+	saveState                string
+	requestedRevision        uint64
+	savedRevision            uint64
+	publishedSessionRevision uint64
+	playerStarted            bool
+	desktopReady             bool
+	sessionsClosed           bool
+	processStateCleared      bool
+	publicAccessClosed       bool
+	stopped                  bool
 
 	publicAccessLoaded      bool
 	publicAccessPreferences tunnelservice.PublicAccessPreferences
@@ -884,8 +980,20 @@ func (app *App) Shutdown(ctx context.Context) error {
 
 // GetRuntimeStatus returns a detached status snapshot.
 func (app *App) GetRuntimeStatus() RuntimeStatus {
-	app.mu.RLock()
-	defer app.mu.RUnlock()
+	// The coordinator is the canonical owner of transient request state. Read it
+	// before the app lock so a frontend reload can recover a request even when
+	// its original bridge event was published before the new listener existed.
+	var canonicalCoordination *domain.MasterCoordinationState
+	if app.deps.Coordination != nil {
+		canonicalCoordination = domain.CloneMasterCoordinationState(app.deps.Coordination.Snapshot())
+	}
+
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if canonicalCoordination != nil &&
+		(app.coordinationState == nil || canonicalCoordination.Revision >= app.coordinationState.Revision) {
+		app.coordinationState = canonicalCoordination
+	}
 	status := RuntimeStatus{
 		ServerInfo:        cloneServerInfoPointer(app.serverInfo),
 		ClientCount:       app.clientCount,
@@ -902,36 +1010,54 @@ func (app *App) GetRuntimeStatus() RuntimeStatus {
 // NewSession opens the native destination dialog and creates a validated
 // starter session.
 func (app *App) NewSession() sessionservice.SessionResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
 	commands, ok := app.deps.Sessions.(sessionCommands)
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
 	result := commands.Create(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	if result.OK {
+		app.resetSessionStateOrdering()
+	}
 	app.resetPlayerConfigForSession(result)
 	return routeSessionOperationResult(result)
 }
 
 // OpenSession opens and validates an existing version-1 session.
 func (app *App) OpenSession() sessionservice.SessionResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
 	commands, ok := app.deps.Sessions.(sessionCommands)
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
 	result := commands.Open(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	if result.OK {
+		app.resetSessionStateOrdering()
+	}
 	app.resetPlayerConfigForSession(result)
 	return routeSessionOperationResult(result)
 }
 
 // CopyDemo creates an explicit writable copy of the bundled demo.
 func (app *App) CopyDemo() sessionservice.SessionResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
 	commands, ok := app.deps.Sessions.(sessionCommands)
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
 	result := commands.CopyDemo(app.contextSnapshot())
 	app.captureSessionStatus(commands)
+	if result.OK {
+		app.resetSessionStateOrdering()
+	}
 	app.resetPlayerConfigForSession(result)
 	return routeSessionOperationResult(result)
 }
@@ -1064,7 +1190,12 @@ func (app *App) installPlayerConfig(result playerconfigservice.Result, associate
 	} else if sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands); ok {
 		associatedSession = sessions.Snapshot().Session
 	}
-	handle := domain.PlayerConfigHandle{Path: result.FilePath, Version: result.Config.Version, Name: result.Config.Name}
+	handle := domain.PlayerConfigHandle{
+		Path:          result.FilePath,
+		Version:       result.Config.Version,
+		Name:          result.Config.Name,
+		ContentDigest: result.ContentDigest,
+	}
 	state, err := coordination.InstallPlayerConfig(handle, result.Config.Roster)
 	if err != nil {
 		return app.playerConfigFailure(err.Error(), false)
@@ -1099,35 +1230,42 @@ func (app *App) resetPlayerConfigForSession(result sessionservice.SessionResult)
 	}
 }
 
-// AddCharacter validates the game-master display name before entering the
-// coordinator and publishes only its detached authoritative projection.
-func (app *App) AddCharacter(name string) CoordinationCommandResult {
-	name = routeAddCharacterRequest(name)
-	name = strings.TrimSpace(name)
-	if name == "" {
+// AddCharacter validates the complete trusted player profile before entering
+// the coordinator and publishes only its detached authoritative projection.
+func (app *App) AddCharacter(payload CharacterCreatePayload) CoordinationCommandResult {
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return app.coordinationFailure("character intelligence must be between 1 and 10")
+	}
+	payload = routeAddCharacterRequest(payload)
+	payload.Name = strings.TrimSpace(payload.Name)
+	if payload.Name == "" {
 		return app.coordinationFailure("character name must not be blank")
 	}
-	if len([]rune(name)) > 80 {
+	if len([]rune(payload.Name)) > 80 {
 		return app.coordinationFailure("character name must be at most 80 characters")
+	}
+	if payload.HackerPerkAvailable == nil {
+		return app.coordinationFailure("character Hacker perk availability is required")
 	}
 	if app.deps.Coordination == nil {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, err := app.deps.Coordination.AddCharacter(name)
-	if err != nil {
-		return app.coordinationFailure(err.Error())
-	}
-	if state == nil {
-		return app.coordinationFailure("character could not be added")
-	}
-	app.publishCoordinationState(state)
-	return routeCoordinationResult(CoordinationCommandResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
+	state, err := app.deps.Coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name:                payload.Name,
+		Intelligence:        payload.Intelligence,
+		HackerPerkAvailable: *payload.HackerPerkAvailable,
+		ExpectedRevision:    payload.ExpectedRevision,
+	})
+	return app.completeCoordinationCommand(state, err, "character could not be added")
 }
 
-// RenameCharacter validates the stable roster ID and display name before
-// entering the coordinator transaction.
-func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
-	payload = routeRenameCharacterRequest(payload)
+// UpdateCharacter validates a complete trusted player profile before entering
+// the coordinator transaction.
+func (app *App) UpdateCharacter(payload CharacterUpdatePayload) CoordinationCommandResult {
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return app.coordinationFailure("character intelligence must be between 1 and 10")
+	}
+	payload = routeUpdateCharacterRequest(payload)
 	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
@@ -1135,25 +1273,37 @@ func (app *App) RenameCharacter(payload CharacterRenamePayload) CoordinationComm
 	if err != nil {
 		return app.coordinationFailure(err.Error())
 	}
+	if payload.HackerPerkAvailable == nil {
+		return app.coordinationFailure("character Hacker perk availability is required")
+	}
 	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, commandErr := coordination.RenameCharacter(payload.CharacterID, name)
-	return app.completeCoordinationCommand(state, commandErr, "character could not be renamed")
+	state, commandErr := coordination.UpdateCharacter(domain.CharacterUpdatePayload{
+		CharacterID:         payload.CharacterID,
+		Name:                name,
+		Intelligence:        payload.Intelligence,
+		HackerPerkAvailable: *payload.HackerPerkAvailable,
+		ExpectedRevision:    payload.ExpectedRevision,
+	})
+	return app.completeCoordinationCommand(state, commandErr, "character could not be updated")
 }
 
 // DeleteCharacter removes only an existing unclaimed roster identity.
-func (app *App) DeleteCharacter(characterID string) CoordinationCommandResult {
-	characterID = routeDeleteCharacterRequest(characterID)
-	if strings.TrimSpace(characterID) == "" {
+func (app *App) DeleteCharacter(payload CharacterDeletePayload) CoordinationCommandResult {
+	payload = routeDeleteCharacterRequest(payload)
+	if strings.TrimSpace(string(payload.CharacterID)) == "" {
 		return app.coordinationFailure("character ID must not be blank")
 	}
 	coordination, ok := app.deps.Coordination.(coordinationCorrectionService)
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, err := coordination.DeleteCharacter(domain.CharacterID(characterID))
+	state, err := coordination.DeleteCharacter(domain.CharacterDeletePayload{
+		CharacterID:      payload.CharacterID,
+		ExpectedRevision: payload.ExpectedRevision,
+	})
 	return app.completeCoordinationCommand(state, err, "character could not be deleted")
 }
 
@@ -1276,7 +1426,7 @@ func (app *App) EndBroadcast() CoordinationCommandResult {
 func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalSwitchCommandResult {
 	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
 	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
-	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+	if err := app.validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.terminalSwitchFailure(err.Error(), nil)
 	}
 	payload, err := routeTerminalActivationRequest(payload, false)
@@ -1287,10 +1437,12 @@ func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalS
 	if !ok {
 		return app.terminalSwitchFailure("coordination service is unavailable", nil)
 	}
-	state, err := coordination.RequestTerminalActivation(domain.TerminalTarget{
+	target := domain.TerminalTarget{
 		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
 		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
-	})
+	}
+	target.CommandStates = app.canonicalCommandStates(payload.TerminalID)
+	state, err := coordination.RequestTerminalActivation(target)
 	return app.completeTerminalSwitchRequest(state, err, "activated", "terminal could not be activated")
 }
 
@@ -1335,15 +1487,140 @@ func (app *App) ResolveTerminalSwitch(payload TerminalSwitchDecisionPayload) Ter
 	return app.completeTerminalSwitchCommand(state, err, status, "terminal switch could not be resolved")
 }
 
+// ResolveCommandExecution approves or rejects the exact current private
+// request. A durable session event is emitted only after approve has reached
+// the session store and returned a changed canonical document.
+func (app *App) ResolveCommandExecution(payload CommandExecutionDecisionPayload) ResolveCommandExecutionResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
+	payload.RequestID = strings.TrimSpace(payload.RequestID)
+	if payload.RequestID == "" {
+		return app.commandExecutionFailure("command execution request ID must not be blank", nil)
+	}
+	if payload.Decision != domain.CommandExecutionApprove && payload.Decision != domain.CommandExecutionReject {
+		return app.commandExecutionFailure("command execution decision must be approve or reject", nil)
+	}
+	routed, err := routeCommandExecutionDecisionRequest(payload)
+	if err != nil {
+		return app.commandExecutionFailure("command execution decision could not be represented by the private contract", nil)
+	}
+	coordination, ok := app.deps.Coordination.(coordinationCommandExecutionService)
+	if !ok {
+		return app.commandExecutionFailure("coordination service is unavailable", nil)
+	}
+
+	state, mutation, err := coordination.ResolveCommandExecution(routed.RequestID, routed.Decision)
+	if state != nil {
+		app.publishCoordinationStateIfNewer(state)
+	}
+	if err != nil {
+		return app.commandExecutionFailure(commandExecutionMasterError(err), state)
+	}
+	if state == nil {
+		return app.commandExecutionFailure("command execution could not be resolved", nil)
+	}
+
+	if mutation != nil {
+		app.acceptSessionStateRevision(mutation.Revision)
+		if mutation.Changed {
+			session := mutation.Session
+			app.publishSessionState(SessionStateEvent{Revision: mutation.Revision, Session: &session})
+		}
+	}
+	return routeResolveCommandExecutionResult(ResolveCommandExecutionResult{
+		OK: true, State: domain.CloneMasterCoordinationState(state),
+	})
+}
+
+// ResolveTerminalNavigation validates and routes an exact private enum/request
+// pair, then accepts only a newer coordination revision from the coordinator.
+func (app *App) ResolveTerminalNavigation(payload TerminalNavigationDecisionPayload) ResolveTerminalNavigationResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
+	payload.RequestID = strings.TrimSpace(payload.RequestID)
+	if payload.RequestID == "" {
+		return app.terminalNavigationFailure("terminal navigation request ID must not be blank", nil)
+	}
+	if payload.Decision != domain.TerminalNavigationApprove && payload.Decision != domain.TerminalNavigationReject {
+		return app.terminalNavigationFailure("terminal navigation decision must be approve or reject", nil)
+	}
+	routed, err := routeTerminalNavigationDecisionRequest(payload)
+	if err != nil {
+		return app.terminalNavigationFailure("terminal navigation decision could not be represented by the private contract", nil)
+	}
+	coordination, ok := app.deps.Coordination.(coordinationTerminalNavigationService)
+	if !ok {
+		return app.terminalNavigationFailure("coordination service is unavailable", nil)
+	}
+	state, err := coordination.ResolveTerminalNavigation(routed.RequestID, routed.Decision)
+	if state != nil {
+		app.publishCoordinationStateIfNewer(state)
+	}
+	if err != nil {
+		return app.terminalNavigationFailure("terminal navigation request is no longer valid", state)
+	}
+	if state == nil {
+		return app.terminalNavigationFailure("terminal navigation could not be resolved", nil)
+	}
+	return routeResolveTerminalNavigationResult(ResolveTerminalNavigationResult{OK: true, State: domain.CloneMasterCoordinationState(state)})
+}
+
+func (app *App) terminalNavigationFailure(message string, state *domain.MasterCoordinationState) ResolveTerminalNavigationResult {
+	if state == nil {
+		app.mu.RLock()
+		state = domain.CloneMasterCoordinationState(app.coordinationState)
+		app.mu.RUnlock()
+	}
+	return routeResolveTerminalNavigationResult(ResolveTerminalNavigationResult{Error: message, State: domain.CloneMasterCoordinationState(state)})
+}
+
+func (app *App) publishCoordinationStateIfNewer(state *domain.MasterCoordinationState) {
+	if state == nil {
+		return
+	}
+	clone := domain.CloneMasterCoordinationState(state)
+	app.mu.Lock()
+	if app.coordinationState != nil && clone.Revision <= app.coordinationState.Revision {
+		app.mu.Unlock()
+		return
+	}
+	app.coordinationState = clone
+	app.mu.Unlock()
+	if app.deps.Events != nil {
+		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
+	}
+}
+
+func (app *App) commandExecutionFailure(message string, state *domain.MasterCoordinationState) ResolveCommandExecutionResult {
+	if state == nil {
+		app.mu.RLock()
+		state = domain.CloneMasterCoordinationState(app.coordinationState)
+		app.mu.RUnlock()
+	}
+	return routeResolveCommandExecutionResult(ResolveCommandExecutionResult{
+		Error: message, State: domain.CloneMasterCoordinationState(state),
+	})
+}
+
+func commandExecutionMasterError(err error) string {
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "stale"):
+		return "command execution request is no longer pending"
+	case strings.Contains(message, "persist"), strings.Contains(message, "durable state"):
+		return "command execution could not be persisted"
+	default:
+		return "command execution could not be resolved"
+	}
+}
+
 // UpdateLiveTerminal validates replacement content and preserves the current
 // puzzle through the ordered coordinator boundary. The legacy fallback keeps
 // older focused hosts compatible while production always provides coordination.
 func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationCommandResult {
-	intro := ""
-	if payload.IntroText != nil {
-		intro = *payload.IntroText
-	}
-	if err := validateLiveTerminal("live-terminal", "Live Terminal", payload.Tree, 0, intro); err != nil {
+	if err := app.validateLiveTerminalUpdate(payload.Tree, payload.IntroText); err != nil {
 		return app.coordinationFailure(err.Error())
 	}
 	payload, err := routeLiveTerminalUpdateRequest(payload)
@@ -1377,7 +1654,7 @@ func (app *App) UpdateLiveTerminal(payload LiveUpdatePayload) CoordinationComman
 func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommandResult {
 	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
 	payload.TerminalName = strings.TrimSpace(payload.TerminalName)
-	if err := validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
+	if err := app.validateLiveTerminal(payload.TerminalID, payload.TerminalName, payload.Tree, payload.HackLevel, payload.IntroText); err != nil {
 		return app.coordinationFailure(err.Error())
 	}
 	payload, err := routeTerminalActivationRequest(payload, true)
@@ -1388,11 +1665,190 @@ func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommand
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
 	}
-	state, err := coordination.ResetFailedHack(domain.TerminalTarget{
+	target := domain.TerminalTarget{
 		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
 		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
-	})
+	}
+	target.CommandStates = app.canonicalCommandStates(payload.TerminalID)
+	state, err := coordination.ResetFailedHack(target)
 	return app.completeCoordinationCommand(state, err, "failed hacking puzzle could not be reset")
+}
+
+// ResetCommandState removes one durable execution snapshot. Successful
+// no-ops return the canonical document without publishing a new revision.
+func (app *App) ResetCommandState(payload ResetCommandStatePayload) SessionStateResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
+	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
+	payload.CommandID = strings.TrimSpace(payload.CommandID)
+	if payload.TerminalID == "" {
+		return routeSessionStateResult(SessionStateResult{Error: "terminal ID must not be blank"})
+	}
+	if payload.CommandID == "" {
+		return routeSessionStateResult(SessionStateResult{Error: "command ID must not be blank"})
+	}
+	payload = routeResetCommandStateRequest(payload)
+	commands, ok := app.deps.Sessions.(sessionCommandStateCommands)
+	if !ok {
+		return routeSessionStateResult(SessionStateResult{Error: "session service is unavailable"})
+	}
+	result := commands.ResetCommandState(app.contextSnapshot(), payload.TerminalID, payload.CommandID)
+	return app.completeCommandStateReset(payload.TerminalID, result)
+}
+
+// ResetTerminalCommandStates removes all durable execution snapshots for one
+// stable terminal ID in one session-service mutation.
+func (app *App) ResetTerminalCommandStates(payload ResetTerminalCommandStatesPayload) SessionStateResult {
+	app.coordinationCommandMu.Lock()
+	defer app.coordinationCommandMu.Unlock()
+
+	payload.TerminalID = strings.TrimSpace(payload.TerminalID)
+	if payload.TerminalID == "" {
+		return routeSessionStateResult(SessionStateResult{Error: "terminal ID must not be blank"})
+	}
+	payload = routeResetTerminalCommandStatesRequest(payload)
+	commands, ok := app.deps.Sessions.(sessionCommandStateCommands)
+	if !ok {
+		return routeSessionStateResult(SessionStateResult{Error: "session service is unavailable"})
+	}
+	result := commands.ResetTerminalCommandStates(app.contextSnapshot(), payload.TerminalID)
+	return app.completeCommandStateReset(payload.TerminalID, result)
+}
+
+func (app *App) completeCommandStateReset(terminalID string, result sessionservice.CommandStateResult) SessionStateResult {
+	if !result.OK {
+		message := result.Error
+		if message == "" {
+			message = "command state could not be reset"
+		}
+		return routeSessionStateResult(SessionStateResult{Error: message, Revision: result.Revision})
+	}
+	if result.Session == nil {
+		return routeSessionStateResult(SessionStateResult{Error: "command state reset returned no session", Revision: result.Revision})
+	}
+
+	native := SessionStateResult{OK: true, Revision: result.Revision, Session: result.Session}
+	app.acceptSessionStateRevision(result.Revision)
+	if !result.Changed {
+		return routeSessionStateResult(native)
+	}
+
+	refreshError := ""
+	terminal := terminalForSessionState(result.Session, terminalID)
+	if terminal == nil {
+		refreshError = "reset terminal is missing from the canonical session"
+	} else if app.isActiveTerminal(terminalID) {
+		if coordination, ok := app.deps.Coordination.(coordinationTerminalCanonicalRefreshService); ok {
+			state, err := coordination.RefreshActiveTerminal(domain.TerminalTarget{
+				TerminalID: terminal.ID, TerminalName: terminal.Name, Tree: terminal.Root,
+				CommandStates: cloneCommandExecutionStates(terminal.CommandStates),
+				HackLevel:     terminal.HackLevel, IntroText: terminal.IntroText,
+			})
+			if err != nil || state == nil {
+				refreshError = "active terminal could not be refreshed"
+			} else {
+				app.publishCoordinationState(state)
+			}
+		} else if coordination, ok := app.deps.Coordination.(coordinationTerminalService); ok {
+			// Focused legacy fakes implement only the authored refresh seam. The
+			// production coordinator always takes the canonical target path above.
+			intro := terminal.IntroText
+			state, err := coordination.UpdateLiveTerminal(terminal.Root, &intro)
+			if err != nil || state == nil {
+				refreshError = "active terminal could not be refreshed"
+			} else {
+				app.publishCoordinationState(state)
+			}
+		} else {
+			refreshError = "coordination service is unavailable"
+		}
+	}
+
+	routed := routeSessionStateResult(native)
+	app.publishSessionState(SessionStateEvent{Revision: routed.Revision, Session: routed.Session})
+	if refreshError != "" {
+		return routeSessionStateResult(SessionStateResult{Error: refreshError, Revision: routed.Revision, Session: routed.Session})
+	}
+	return routed
+}
+
+func (app *App) canonicalCommandStates(terminalID string) map[string]domain.CommandExecutionState {
+	sessions, ok := app.deps.Sessions.(sessionCommands)
+	if !ok {
+		return nil
+	}
+	terminal := terminalForSessionState(sessions.Snapshot().Session, terminalID)
+	if terminal == nil {
+		return nil
+	}
+	return cloneCommandExecutionStates(terminal.CommandStates)
+}
+
+func cloneCommandExecutionStates(states map[string]domain.CommandExecutionState) map[string]domain.CommandExecutionState {
+	if len(states) == 0 {
+		return nil
+	}
+	clone := make(map[string]domain.CommandExecutionState, len(states))
+	for commandID, state := range states {
+		clone[commandID] = state
+	}
+	return clone
+}
+
+func terminalForSessionState(session *domain.Session, terminalID string) *domain.Terminal {
+	if session == nil {
+		return nil
+	}
+	for index := range session.Terminals {
+		if session.Terminals[index].ID == terminalID {
+			return &session.Terminals[index]
+		}
+	}
+	return nil
+}
+
+func (app *App) isActiveTerminal(terminalID string) bool {
+	app.mu.RLock()
+	defer app.mu.RUnlock()
+	return app.coordinationState != nil &&
+		app.coordinationState.Broadcast != nil &&
+		app.coordinationState.Broadcast.ActiveTerminalID != nil &&
+		*app.coordinationState.Broadcast.ActiveTerminalID == terminalID
+}
+
+func (app *App) acceptSessionStateRevision(revision uint64) {
+	app.mu.Lock()
+	if revision > app.requestedRevision {
+		app.requestedRevision = revision
+	}
+	if revision > app.savedRevision {
+		app.savedRevision = revision
+	}
+	app.saveState = string(sessionservice.SaveStateSaved)
+	app.mu.Unlock()
+}
+
+func (app *App) resetSessionStateOrdering() {
+	app.mu.Lock()
+	app.publishedSessionRevision = 0
+	app.mu.Unlock()
+}
+
+func (app *App) publishSessionState(event SessionStateEvent) {
+	if event.Revision == 0 || event.Session == nil {
+		return
+	}
+	app.mu.Lock()
+	if event.Revision <= app.publishedSessionRevision {
+		app.mu.Unlock()
+		return
+	}
+	app.publishedSessionRevision = event.Revision
+	app.mu.Unlock()
+	if app.deps.Events != nil {
+		_ = app.deps.Events.Emit(sessionStateEvent, routeSessionStateEvent(event))
+	}
 }
 
 // ForceHackSuccess completes an eligible puzzle and publishes the sanitized
@@ -1613,6 +2069,10 @@ func (app *App) updateClientCount(count int) {
 func (app *App) publishCoordinationState(state *domain.MasterCoordinationState) {
 	clone := domain.CloneMasterCoordinationState(state)
 	app.mu.Lock()
+	if clone != nil && app.coordinationState != nil && clone.Revision < app.coordinationState.Revision {
+		app.mu.Unlock()
+		return
+	}
 	app.coordinationState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
@@ -1694,10 +2154,63 @@ func validatedCoordinationDisplayName(value string, label string) (string, error
 	return value, nil
 }
 
-func validateLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
+func (app *App) validateLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
 	validationTree := cloneTreeForBridgeValidation(tree)
+	if sessions, ok := app.deps.Sessions.(sessionCommands); ok {
+		active := sessions.Snapshot()
+		if active.Session != nil {
+			for index := range active.Session.Terminals {
+				if active.Session.Terminals[index].ID != id {
+					continue
+				}
+				terminal := active.Session.Terminals[index]
+				terminal.Name = name
+				terminal.HackLevel = hackLevel
+				terminal.IntroText = intro
+				terminal.Root = validationTree
+				active.Session.Terminals[index] = terminal
+				return domain.ValidateSession(*active.Session)
+			}
+			return fmt.Errorf("terminal %q is not part of the active session", id)
+		}
+	}
+	return validateIsolatedLiveTerminal(id, name, validationTree, hackLevel, intro)
+}
+
+func (app *App) validateLiveTerminalUpdate(tree domain.ContentNode, intro *string) error {
+	validationTree := cloneTreeForBridgeValidation(tree)
+	if sessions, ok := app.deps.Sessions.(sessionCommands); ok {
+		active := sessions.Snapshot()
+		var state *domain.MasterCoordinationState
+		if app.deps.Coordination != nil {
+			state = app.deps.Coordination.Snapshot()
+		}
+		if active.Session != nil && state != nil && state.Broadcast != nil && state.Broadcast.ActiveTerminalID != nil {
+			for index := range active.Session.Terminals {
+				if active.Session.Terminals[index].ID != *state.Broadcast.ActiveTerminalID {
+					continue
+				}
+				terminal := active.Session.Terminals[index]
+				terminal.Root = validationTree
+				if intro != nil {
+					terminal.IntroText = *intro
+				}
+				active.Session.Terminals[index] = terminal
+				return domain.ValidateSession(*active.Session)
+			}
+			return fmt.Errorf("terminal %q is not part of the active session", *state.Broadcast.ActiveTerminalID)
+		}
+	}
+	value := ""
+	if intro != nil {
+		value = *intro
+	}
+	return validateIsolatedLiveTerminal("live-terminal", "Live Terminal", validationTree, 0, value)
+}
+
+func validateIsolatedLiveTerminal(id, name string, tree domain.ContentNode, hackLevel int, intro string) error {
 	terminal := domain.Terminal{
-		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: validationTree,
+		ID: id, Name: name, HackLevel: hackLevel, IntroText: intro, Root: tree,
 	}
 	return domain.ValidateSession(domain.Session{
 		Version:   1,

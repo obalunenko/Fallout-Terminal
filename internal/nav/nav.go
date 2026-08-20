@@ -41,6 +41,8 @@ func ApplyAction(state domain.NavState, tree domain.ContentNode, action, nodeID 
 		} else if len(next.Path) > 1 {
 			next.Path = next.Path[:len(next.Path)-1]
 			next.CommandNodeID = nil
+		} else if next.CommandNodeID != nil {
+			next.CommandNodeID = nil
 		}
 
 	case "entry":
@@ -93,6 +95,43 @@ func Revalidate(state domain.NavState, tree domain.ContentNode) domain.NavState 
 	}
 
 	return next
+}
+
+// FindFolderPath resolves a stable folder ID to its current ancestry.
+func FindFolderPath(tree domain.ContentNode, folderID string) ([]string, bool) {
+	if tree.ID != "root" || tree.Type != domain.NodeFolder || folderID == "" {
+		return nil, false
+	}
+	var visit func(domain.ContentNode, []string) ([]string, bool)
+	visit = func(folder domain.ContentNode, path []string) ([]string, bool) {
+		if folder.ID == folderID {
+			return append([]string(nil), path...), true
+		}
+		for _, child := range folder.Children {
+			if child.Type != domain.NodeFolder {
+				continue
+			}
+			if found, ok := visit(child, append(path, child.ID)); ok {
+				return found, true
+			}
+		}
+		return nil, false
+	}
+	return visit(tree, []string{"root"})
+}
+
+// RestoreFolder follows an exact stable folder to its current location, then
+// falls back through the saved nearest-to-root ancestry and finally root.
+func RestoreFolder(tree domain.ContentNode, folderID string, ancestorFolderIDs []string) domain.NavState {
+	if path, ok := FindFolderPath(tree, folderID); ok {
+		return domain.NavState{Path: path, Mode: modeList}
+	}
+	for index := len(ancestorFolderIDs) - 1; index >= 0; index-- {
+		if path, ok := FindFolderPath(tree, ancestorFolderIDs[index]); ok {
+			return domain.NavState{Path: path, Mode: modeList}
+		}
+	}
+	return Default()
 }
 
 func revalidatedPath(tree domain.ContentNode, path []string) ([]string, domain.ContentNode) {

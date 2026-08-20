@@ -10,6 +10,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Updated from bugfix patch
 
+**Bugfix**: 2026-08-19 — BUG-003 Updated from bugfix patch
+
 ## Phase 1: Setup
 
 Create the shared browser-test harness used by every story.
@@ -138,6 +140,8 @@ Phase 1 Setup
                       → Phase 7 Convergence
                           → Phase 8 BUG-001 hacking-code reveal
                               → Phase 9 BUG-002 dud-removal reconciliation
+                                  → Phase 10 BUG-003 stable hacking typography
+                                      → Phase 11 Convergence
 ```
 
 - **Phase 1**: T001 establishes the shared browser harness.
@@ -149,6 +153,8 @@ Phase 1 Setup
 - **Phase 7**: T017 and T018 establish the completed convergence baseline.
 - **Phase 8**: T019 establishes the fixture; T020 and T021 are the failing-test wave; T022 implements the fix; T023 updates the guide; T024 owns final validation.
 - **Phase 9**: T025 establishes deterministic dud removal; T026 and T027 are the failing-test wave; T028 implements reconciliation; T029 updates the guide; T030 owns final validation.
+- **Phase 10**: T031 and T032 are the failing-test wave; T033 implements complete-board pre-fit and removes append-driven partial fitting; T034 updates the guide; T035 owns final validation.
+- **Phase 11**: T036 resolves the remaining bundled-demo browser-contract mismatch after T035 and closes the complete browser regression gate without changing the CRT persistence contract.
 
 ### Story delivery order
 
@@ -157,6 +163,7 @@ Phase 1 Setup
 - **US3** builds on the reveal controller and proves consumed-key completion, safety, and continued usability.
 - **BUG-001 / US2** extends the completed reveal controller to a new hacking-generation identity after the convergence baseline.
 - **BUG-002 / US2** preserves the completed BUG-001 reveal across same-generation dud-removal mutations.
+- **BUG-003 / US2** preserves one complete-board fitted row size throughout the completed BUG-001 reveal while retaining the responsive hacking-layout contract.
 - Within `[P]` waves, tasks touch different files and may be executed in any order; every join must complete before the next wave begins.
 
 ## Phase 7: Convergence
@@ -263,3 +270,50 @@ T025 fixture
 - No completed task is a false completion under the pre-BUG-002 specification, so T001–T024 remain closed.
 - T026 and T027 may run in parallel after T025 because they touch different verification files; both must fail for the intended missing behavior before T028 begins.
 - T030 is the sole validation owner for the added BUG-002 requirement and success criterion.
+
+## Phase 10: BUG-003 — Stable Hacking Typography During Reveal
+
+**Goal**: A new hacking generation is fitted from its complete board before the first row is painted, and ordinary progressive row insertion retains that one size without a grow, shrink, or zoom effect.
+
+**Independent Test**: Enter a deterministic new hacking generation at normal, compact/stacked, 200%-zoom, bundled-font, and fallback-font layouts; sample the computed row size from the first visible row through uninterrupted and skipped completion; then trigger genuine viewport, orientation, and font-readiness changes and verify every fit uses the complete board without restarting reveal.
+
+### Tests
+
+**Wave 1 — independent (different files):**
+
+- [x] **T031** [P] [US2] Add failing player-asset contract assertions for generation-local complete-board fit state, pre-reveal measurement, reuse across ordinary append and skip completion, absence of append-driven partial-DOM fitting, and retention of the responsive font-floor, containment, and maximal-fit boundaries · `internal/platform/assets_test.go`
+- [x] **T032** [P] [US2] Add failing Playwright checks that sample one computed hacking-row font size from the first painted row through uninterrupted and skipped completion at normal, compact/stacked, 200%-zoom, bundled-font, and fallback-font layouts, then prove genuine viewport, orientation, and font-readiness refits include all revealed and queued rows and restart zero reveals · `tests/browser/crt-rendering.spec.mjs`
+
+### Implementation
+
+**⟶ Wait for T031 and T032 to fail for the intended BUG-003 behavior, then Wave 2:**
+
+- [x] **T033** [US2] Precompute and retain one generation-local hacking-row font fit from the complete board snapshot before the first row is painted; remove reveal-append fitting against partial DOM while preserving complete-board refits for genuine viewport, orientation, and active-font changes, synchronous skip completion, same-generation reconciliation, and all responsive-layout constraints · `client/client.js`
+
+### Validation
+
+**⟶ Wait for T033, then Wave 3:**
+
+- [x] **T034** [US2] Update the CRT verification guide with computed-font sampling throughout hacking reveal, compact/stacked and 200%-zoom cases, fallback-font coverage, legitimate refit observation, and the no-zoom interactive runtime journey · `specs/008-crt-rendering/quickstart.md`
+
+**⟶ Wait for T034, then Wave 4:**
+
+- [x] **T035** [US2] Validate FR-023 and SC-012 together with inherited responsive-layout FR-015 through FR-017 and SC-010 by running focused asset/browser checks, the full Go and browser regressions, player build, generated-binding drift check, interactive first-entry/skip/refit journey, and unsigned application build · `specs/008-crt-rendering/quickstart.md`
+
+### BUG-003 dependency DAG
+
+```text
+T031 asset contract ─┐
+T032 browser tests ──┴─→ T033 implementation
+                           → T034 guide
+                               → T035 validation
+```
+
+- Phase 10 starts after the completed BUG-002 reconciliation baseline in Phase 9.
+- No completed task is a false completion under the pre-BUG-003 specification, so T001–T030 remain closed.
+- T031 and T032 may run in parallel because they touch different verification files; both must fail for the intended missing behavior before T033 begins.
+- T035 owns focused validation of FR-023 and SC-012. T036 owns only the convergence follow-up required to restore the complete browser regression gate.
+
+## Phase 11: Convergence
+
+- [x] **T036** Resolve the tracked bundled-demo initial-state mismatch between `sessions/demo.json` and `tests/browser/state-changing-command-authoring.spec.mjs`, preserve the CRT feature's persistence non-goal, and rerun `npm test --prefix tests/browser` until the required complete browser regression gate passes per plan: Full browser regression gate and T035 (partial)

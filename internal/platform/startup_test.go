@@ -26,7 +26,7 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			name:          "Wails CLI",
 			directory:     "wails",
 			tool:          "github.com/wailsapp/wails/v3/cmd/wails3",
-			parentRequire: "github.com/wailsapp/wails/v3 v3.0.0-beta.8",
+			parentRequire: "github.com/wailsapp/wails/v3 v3.0.0-beta.10",
 		},
 		{
 			name:          "Buf CLI",
@@ -55,7 +55,7 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			module := readAcceptanceDocument(t, filepath.Join(root, "tools", test.directory, "go.mod"))
 			assert.Equal(t, 1, strings.Count(module, "\ntool "))
 			assert.Contains(t, module, "\ntool "+test.tool+"\n")
-			assert.Contains(t, module, "\nrequire "+test.parentRequire+"\n")
+			assert.Contains(t, module, "\nrequire "+test.parentRequire)
 			assert.Contains(t, module, "\ngo 1.26\n")
 
 			sum, err := os.ReadFile(filepath.Join(root, "tools", test.directory, "go.sum"))
@@ -77,7 +77,7 @@ func TestWailsV3PinsAndGoBuildToolAreOwnedAndExact(t *testing.T) {
 
 	root := repositoryRoot(t)
 	applicationModule := readAcceptanceDocument(t, filepath.Join(root, "go.mod"))
-	assert.Equal(t, 1, strings.Count(applicationModule, "github.com/wailsapp/wails/v3 v3.0.0-beta.8"))
+	assert.Equal(t, 1, strings.Count(applicationModule, "github.com/wailsapp/wails/v3 v3.0.0-beta.10"))
 
 	packageRaw, err := os.ReadFile(filepath.Join(root, "frontend", "package.json"))
 	require.NoError(t, err)
@@ -85,11 +85,11 @@ func TestWailsV3PinsAndGoBuildToolAreOwnedAndExact(t *testing.T) {
 		Dependencies map[string]string `json:"dependencies"`
 	}
 	require.NoError(t, json.Unmarshal(packageRaw, &packageConfig))
-	assert.Equal(t, "3.0.0-beta.8", packageConfig.Dependencies["@wailsio/runtime"])
+	assert.Equal(t, "3.0.0-beta.10", packageConfig.Dependencies["@wailsio/runtime"])
 
 	lock := readAcceptanceDocument(t, filepath.Join(root, "frontend", "package-lock.json"))
-	assert.Contains(t, lock, `"@wailsio/runtime": "3.0.0-beta.8"`)
-	assert.Contains(t, lock, `runtime-3.0.0-beta.8.tgz`)
+	assert.Contains(t, lock, `"@wailsio/runtime": "3.0.0-beta.10"`)
+	assert.Contains(t, lock, `runtime-3.0.0-beta.10.tgz`)
 
 	files := []struct {
 		path   string

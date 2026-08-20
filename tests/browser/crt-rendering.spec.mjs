@@ -6,6 +6,12 @@ const CRT_VIEWPORTS = [
   { name: 'large', width: 1440, height: 900 },
 ];
 
+const HACK_FONT_LAYOUTS = [
+  { name: 'normal', width: 1440, height: 900 },
+  { name: 'compact-stacked', width: 360, height: 640 },
+  { name: '200-percent-zoom-fallback', width: 512, height: 300, fallbackFont: true },
+];
+
 async function resetAndOpen({ page, request }) {
   const reset = await request.post('/__fixture/reset');
   expect(reset.status()).toBe(204);
@@ -43,6 +49,32 @@ async function visibleHackPatternCell(page) {
   return page.locator(
     `#hackColumns .hcell.filler[data-row="${coordinates.row}"][data-offset="${coordinates.offset}"]`,
   );
+}
+
+async function observeHackRevealFonts(page) {
+  await page.evaluate(() => {
+    window.__hackRevealFontSamples = [];
+    window.__hackRevealFontObserver?.disconnect();
+    const sample = () => {
+      const rows = document.querySelectorAll('#hackColumns .hack-row');
+      if (!rows.length) return;
+      window.__hackRevealFontSamples.push({
+        count: rows.length,
+        font: Number.parseFloat(getComputedStyle(rows[0]).fontSize),
+      });
+    };
+    window.__hackRevealFontObserver = new MutationObserver(records => {
+      if (records.some(record => Array.from(record.addedNodes)
+        .some(node => node.nodeType === Node.ELEMENT_NODE &&
+          (node.matches?.('.hack-row') || node.querySelector?.('.hack-row'))))) {
+        requestAnimationFrame(sample);
+      }
+    });
+    window.__hackRevealFontObserver.observe(document.querySelector('#hackColumns'), {
+      childList: true,
+      subtree: true,
+    });
+  });
 }
 
 function observePlayerMutations(page) {
@@ -251,10 +283,11 @@ test.describe('CRT visual shell', () => {
       const command = page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' });
       await expect(command).toBeVisible();
       await command.click();
-      await expect(page.locator('#termOutput')).toBeVisible();
+      await expect(page.locator('#termEntry')).toBeVisible();
+      await expect(page.locator('#termOutput')).toBeHidden();
       await page.keyboard.press('Shift');
-      await expectStateContained(page, '#termOutput');
-      await expect(page.locator('#termOutput')).toContainText('DIAGNOSTIC OUTPUT');
+      await expectStateContained(page, '#termEntry');
+      await expect(page.locator('#entryBody')).toContainText('DIAGNOSTIC OUTPUT');
       await expectControlReachable(page, '#pageNext');
 
       await activateCRTFixture(request, 'hacking');
@@ -438,6 +471,80 @@ test.describe('CRT motion and reveal lifecycle', () => {
 
 test.describe('CRT hacking code reveal', () => {
   const hackRowCount = 32;
+
+  for (const layout of HACK_FONT_LAYOUTS) {
+    test(`${layout.name} reveal keeps one complete-board row font from first paint to completion`, async ({ page, request }) => {
+      await page.setViewportSize({ width: layout.width, height: layout.height });
+      await resetAndOpen({ page, request });
+      await assignPlayer(page);
+      if (layout.fallbackFont) {
+        await page.evaluate(() => { document.body.style.fontFamily = "'Courier New', monospace"; });
+      }
+      await page.evaluate(() => document.fonts.ready);
+      await observeHackRevealFonts(page);
+
+      await activateCRTFixture(request, 'hacking');
+      await expect(page.locator('#hackBoard')).toBeVisible();
+      await expect(page.locator('.hack-row')).toHaveCount(hackRowCount, { timeout: 2000 });
+      await page.waitForTimeout(80);
+
+      const samples = await page.evaluate(() => window.__hackRevealFontSamples);
+      expect(samples.length).toBeGreaterThanOrEqual(4);
+      expect(samples[0].count).toBeLessThan(hackRowCount);
+      expect(new Set(samples.map(sample => sample.font.toFixed(3))).size).toBe(1);
+    });
+  }
+
+  test('skip completion retains the precomputed hacking row font', async ({ page, request }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await resetAndOpen({ page, request });
+    await assignPlayer(page);
+    await activateCRTFixture(request, 'hacking');
+    await expect.poll(() => page.locator('.hack-row').count()).toBeGreaterThan(1);
+
+    const initialFont = await page.locator('.hack-row').first().evaluate(row =>
+      Number.parseFloat(getComputedStyle(row).fontSize));
+    await page.keyboard.press('Shift');
+    await expect(page.locator('.hack-row')).toHaveCount(hackRowCount);
+    await page.waitForTimeout(80);
+    const completedFont = await page.locator('.hack-row').first().evaluate(row =>
+      Number.parseFloat(getComputedStyle(row).fontSize));
+
+    expect(completedFont).toBeCloseTo(initialFont, 3);
+  });
+
+  test('viewport, orientation, and active-font refits use queued rows without replay', async ({ page, request }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await resetAndOpen({ page, request });
+    await assignPlayer(page);
+    await activateCRTFixture(request, 'hacking');
+    await expect.poll(() => page.locator('.hack-row').count()).toBeGreaterThan(1);
+    expect(await page.locator('.hack-row').count()).toBeLessThan(hackRowCount);
+    await page.evaluate(() => {
+      window.__hackRefitFirstRow = document.querySelector('#hackColumns .hack-row');
+    });
+
+    await page.setViewportSize({ width: 640, height: 720 });
+    await page.evaluate(async () => {
+      document.body.style.fontFamily = "'Courier New', monospace";
+      await document.fonts.ready;
+      window.dispatchEvent(new Event('resize'));
+    });
+    await page.waitForTimeout(100);
+    expect(await page.locator('.hack-row').count()).toBeLessThan(hackRowCount);
+    const partialFont = await page.locator('.hack-row').first().evaluate(row =>
+      Number.parseFloat(getComputedStyle(row).fontSize));
+
+    await page.keyboard.press('Shift');
+    await expect(page.locator('.hack-row')).toHaveCount(hackRowCount);
+    await page.waitForTimeout(80);
+    const completed = await page.evaluate(() => ({
+      font: Number.parseFloat(getComputedStyle(document.querySelector('#hackColumns .hack-row')).fontSize),
+      sameFirstRow: document.querySelector('#hackColumns .hack-row') === window.__hackRefitFirstRow,
+    }));
+    expect(completed.font).toBeCloseTo(partialFont, 3);
+    expect(completed.sameFirstRow).toBe(true);
+  });
 
   test('new hacking generations reveal complete rows in deterministic 40ms order', async ({ page, request }) => {
     await resetAndOpen({ page, request });
@@ -696,6 +803,7 @@ test.describe('CRT hacking code reveal', () => {
     await activateCRTFixture(request, 'hacking');
     await expect.poll(() => page.locator('.hack-row').count()).toBeGreaterThan(1);
     expect(await page.locator('.hack-row').count()).toBeLessThan(hackRowCount);
+    await page.locator('#hackHeader').hover();
     await expect(page.locator('#hackInputPreview')).toHaveText('');
 
     const started = Date.now();
@@ -777,11 +885,13 @@ test.describe('CRT reveal skip', () => {
     await expect(page.locator('#termList')).toBeVisible();
 
     await page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' }).click();
-    await expect.poll(() => page.locator('#termOutput > div').count()).toBeGreaterThan(1);
+    await expect(page.locator('#termEntry')).toBeVisible();
+    await expect(page.locator('#termOutput')).toBeHidden();
+    await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(1);
     const indicatorBefore = await page.locator('#pageIndicator').textContent();
     await page.keyboard.press('PageDown');
     await expect(page.locator('#pageIndicator')).toHaveText(indicatorBefore);
-    await expect.poll(() => page.locator('#termOutput > div').count()).toBeGreaterThan(2);
+    await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(2);
     await page.keyboard.press('PageDown');
     await expect(page.locator('#pageIndicator')).not.toHaveText(indicatorBefore);
 

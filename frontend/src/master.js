@@ -50,15 +50,14 @@ const btnResetFailedHack = document.getElementById('btnResetFailedHack');
 const hackLevelSelect   = document.getElementById('hackLevelSelect');
 const introTextArea     = document.getElementById('introTextArea');
 const btnApplySettings  = document.getElementById('btnApplySettings');
+const termSettings      = document.getElementById('termSettings');
 const broadcastSummary = document.getElementById('broadcastSummary');
 const coordinationPanel = document.getElementById('coordinationPanel');
 const playerConfigStatus = document.getElementById('playerConfigStatus');
 const playerConfigError = document.getElementById('playerConfigError');
 const btnOpenPlayerConfig = document.getElementById('btnOpenPlayerConfig');
 const btnNewPlayerConfig = document.getElementById('btnNewPlayerConfig');
-const characterRoster = document.getElementById('characterRoster');
-const characterNameInput = document.getElementById('characterNameInput');
-const btnAddCharacter = document.getElementById('btnAddCharacter');
+const btnManagePlayers = document.getElementById('btnManagePlayers');
 const btnStartBroadcast = document.getElementById('btnStartBroadcast');
 const btnEndBroadcast = document.getElementById('btnEndBroadcast');
 const endBroadcastDialog = document.getElementById('endBroadcastDialog');
@@ -67,8 +66,24 @@ const btnConfirmEndBroadcast = document.getElementById('btnConfirmEndBroadcast')
 const coordinationStatus = document.getElementById('coordinationStatus');
 const coordinationError = document.getElementById('coordinationError');
 const logicalSessionList = document.getElementById('logicalSessionList');
-const characterRosterRowTemplate = document.getElementById('characterRosterRowTemplate');
 const logicalSessionRowTemplate = document.getElementById('logicalSessionRowTemplate');
+const playerManagementDialog = document.getElementById('playerManagementDialog');
+const playerManagementMode = document.getElementById('playerManagementMode');
+const playerManagementRoster = document.getElementById('playerManagementRoster');
+const playerManagementEmpty = document.getElementById('playerManagementEmpty');
+const playerManagementAddForm = document.getElementById('playerManagementAddForm');
+const playerNameInput = document.getElementById('playerNameInput');
+const playerIntelligenceInput = document.getElementById('playerIntelligenceInput');
+const playerHackerPerkAvailability = document.getElementById('playerHackerPerkAvailability');
+const btnAddPlayer = document.getElementById('btnAddPlayer');
+const playerManagementStatus = document.getElementById('playerManagementStatus');
+const playerManagementError = document.getElementById('playerManagementError');
+const btnClosePlayerManagement = document.getElementById('btnClosePlayerManagement');
+const playerManagementRowTemplate = document.getElementById('playerManagementRowTemplate');
+const playerDeleteDialog = document.getElementById('playerDeleteDialog');
+const playerDeleteDialogDescription = document.getElementById('playerDeleteDialogDescription');
+const btnConfirmPlayerDelete = document.getElementById('btnConfirmPlayerDelete');
+const btnCancelPlayerDelete = document.getElementById('btnCancelPlayerDelete');
 const terminalSwitchDialog = document.getElementById('terminalSwitchDialog');
 const terminalSwitchStatus = document.getElementById('terminalSwitchStatus');
 const terminalSwitchError = document.getElementById('terminalSwitchError');
@@ -111,6 +126,122 @@ let pendingTerminalSwitch = null;
 let startupStatus = null;
 let publicAccessSnapshot = null;
 let publicAccessCommandPending = false;
+let sessionStateCommandPending = false;
+let commandExecutionDialogRequestID = null;
+let commandExecutionDecisionRequestID = null;
+let commandExecutionDialogEpoch = 0;
+const resolvedCommandExecutionRequestIDs = new Set();
+let terminalNavigationDialogRequestID = null;
+let terminalNavigationDecisionRequestID = null;
+let terminalNavigationDialogEpoch = 0;
+const resolvedTerminalNavigationRequestIDs = new Set();
+let playerManagementOpener = null;
+let pendingPlayerDelete = null;
+
+const commandStateActions = document.createElement('div');
+commandStateActions.className = 'settings-row command-state-terminal-actions';
+commandStateActions.hidden = true;
+commandStateActions.innerHTML = `
+  <button class="btn btn-mini btn-danger" id="btnResetTerminalCommandStates" type="button">
+    СБРОСИТЬ ВСЕ СОСТОЯНИЯ
+  </button>`;
+termSettings.appendChild(commandStateActions);
+const btnResetTerminalCommandStates = document.getElementById('btnResetTerminalCommandStates');
+
+const commandExecutionDialog = document.createElement('dialog');
+commandExecutionDialog.className = 'terminal-switch-dialog command-execution-dialog';
+commandExecutionDialog.id = 'commandExecutionDialog';
+commandExecutionDialog.hidden = true;
+commandExecutionDialog.setAttribute('aria-modal', 'true');
+commandExecutionDialog.setAttribute('aria-labelledby', 'commandExecutionDialogTitle');
+commandExecutionDialog.setAttribute('aria-describedby', 'commandExecutionDialogDescription commandExecutionDialogStatus commandExecutionDialogError');
+commandExecutionDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="commandExecutionDialogTitle">ПОДТВЕРЖДЕНИЕ КОМАНДЫ</h2>
+    <p class="terminal-switch-dialog-description" id="commandExecutionDialogDescription"></p>
+    <div class="terminal-switch-actions" role="group" aria-label="Решение мастера по выполнению команды" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-primary" id="btnApproveCommandExecution" type="button">ОДОБРИТЬ</button>
+      <button class="btn btn-danger" id="btnRejectCommandExecution" type="button">ОТКЛОНИТЬ</button>
+    </div>
+    <div class="terminal-switch-status" id="commandExecutionDialogStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div class="terminal-switch-error" id="commandExecutionDialogError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+  </div>`;
+document.body.appendChild(commandExecutionDialog);
+const commandExecutionDialogDescription = document.getElementById('commandExecutionDialogDescription');
+const commandExecutionDialogStatus = document.getElementById('commandExecutionDialogStatus');
+const commandExecutionDialogError = document.getElementById('commandExecutionDialogError');
+const btnApproveCommandExecution = document.getElementById('btnApproveCommandExecution');
+const btnRejectCommandExecution = document.getElementById('btnRejectCommandExecution');
+
+const terminalNavigationDialog = document.createElement('dialog');
+terminalNavigationDialog.className = 'terminal-switch-dialog terminal-navigation-dialog';
+terminalNavigationDialog.id = 'terminalNavigationDialog';
+terminalNavigationDialog.hidden = true;
+terminalNavigationDialog.setAttribute('aria-modal', 'true');
+terminalNavigationDialog.setAttribute('aria-labelledby', 'terminalNavigationDialogTitle');
+terminalNavigationDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="terminalNavigationDialogTitle">ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ</h2>
+    <div class="terminal-navigation-summary" id="terminalNavigationSummary"></div>
+    <div class="terminal-switch-actions" role="group" aria-label="Решение мастера по переходу" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-primary" id="btnApproveTerminalNavigation" type="button">ОДОБРИТЬ</button>
+      <button class="btn btn-danger" id="btnRejectTerminalNavigation" type="button">ОТКЛОНИТЬ</button>
+    </div>
+    <div class="terminal-switch-status" id="terminalNavigationStatus" role="status" aria-live="polite"></div>
+    <div class="terminal-switch-error" id="terminalNavigationError" role="alert" hidden></div>
+  </div>`;
+document.body.appendChild(terminalNavigationDialog);
+const terminalNavigationSummary = document.getElementById('terminalNavigationSummary');
+const terminalNavigationStatus = document.getElementById('terminalNavigationStatus');
+const terminalNavigationError = document.getElementById('terminalNavigationError');
+const btnApproveTerminalNavigation = document.getElementById('btnApproveTerminalNavigation');
+const btnRejectTerminalNavigation = document.getElementById('btnRejectTerminalNavigation');
+
+let resetConfirmationResolve = null;
+const resetConfirmationDialog = document.createElement('dialog');
+resetConfirmationDialog.className = 'terminal-switch-dialog command-state-reset-dialog';
+resetConfirmationDialog.id = 'resetConfirmationDialog';
+resetConfirmationDialog.hidden = true;
+resetConfirmationDialog.setAttribute('aria-modal', 'true');
+resetConfirmationDialog.setAttribute('aria-labelledby', 'resetConfirmationDialogTitle');
+resetConfirmationDialog.setAttribute('aria-describedby', 'resetConfirmationDialogDescription');
+resetConfirmationDialog.innerHTML = `
+  <div class="terminal-switch-dialog-panel">
+    <h2 class="terminal-switch-dialog-title" id="resetConfirmationDialogTitle">ПОДТВЕРЖДЕНИЕ СБРОСА</h2>
+    <p class="terminal-switch-dialog-description" id="resetConfirmationDialogDescription"></p>
+    <div class="terminal-switch-actions" role="group" aria-label="Подтверждение сброса состояния команды" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button class="btn btn-danger" id="btnConfirmCommandStateReset" type="button">ПОДТВЕРДИТЬ</button>
+      <button class="btn" id="btnCancelCommandStateReset" type="button">ОТМЕНИТЬ</button>
+    </div>
+  </div>`;
+document.body.appendChild(resetConfirmationDialog);
+const resetConfirmationDialogDescription = document.getElementById('resetConfirmationDialogDescription');
+const btnConfirmCommandStateReset = document.getElementById('btnConfirmCommandStateReset');
+const btnCancelCommandStateReset = document.getElementById('btnCancelCommandStateReset');
+
+function finishResetConfirmation(confirmed) {
+  const resolve = resetConfirmationResolve;
+  resetConfirmationResolve = null;
+  if (resetConfirmationDialog.open) resetConfirmationDialog.close();
+  resetConfirmationDialog.hidden = true;
+  if (resolve) resolve(confirmed);
+}
+
+function confirmCommandStateReset(message) {
+  if (resetConfirmationResolve) return Promise.resolve(false);
+  resetConfirmationDialogDescription.textContent = message;
+  resetConfirmationDialog.hidden = false;
+  resetConfirmationDialog.showModal();
+  btnCancelCommandStateReset.focus();
+  return new Promise(resolve => { resetConfirmationResolve = resolve; });
+}
+
+btnConfirmCommandStateReset.addEventListener('click', () => finishResetConfirmation(true));
+btnCancelCommandStateReset.addEventListener('click', () => finishResetConfirmation(false));
+resetConfirmationDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  finishResetConfirmation(false);
+});
 
 function renderStartupPresentation(status) {
   startupStatus = status && typeof status === 'object' ? status : {};
@@ -190,6 +321,21 @@ desktopAPI.onCoordinationState((coordination) => {
     renderHackStatus();
   }
 });
+if (typeof desktopAPI.onSessionState === 'function') {
+  desktopAPI.onSessionState((event) => {
+    const revision = Number(event?.revision);
+    if (!event?.session || !Number.isSafeInteger(revision)) return;
+    saveStatus.dataset.sessionStateRevision = String(revision);
+    updateSessionStateEvidenceDescription();
+    if (!state.session || revision <= newestDurableRevision) return;
+    state.session = event.session;
+    newestDurableRevision = revision;
+    saveStatus.textContent = `СОСТОЯНИЕ СЕССИИ ОБНОВЛЕНО · ревизия ${revision}`;
+    saveStatus.dataset.savedRevision = String(revision);
+    saveStatus.classList.remove('err');
+    renderAll();
+  });
+}
 void desktopAPI.getRuntimeStatus().then(renderStartupPresentation);
 serverUrlEl.addEventListener('click', async () => {
   const requestedUrl = serverUrl;
@@ -503,6 +649,80 @@ function locateNode(root, id) {
   return walk(root, null);
 }
 
+function commandExecutionState(term, commandID) {
+  const commandStates = term?.commandStates;
+  if (!commandStates || typeof commandStates !== 'object') return null;
+  const snapshot = commandStates[commandID];
+  return snapshot && typeof snapshot === 'object' ? snapshot : null;
+}
+
+function effectiveNodeName(term, node) {
+  if (node?.type !== 'command') return node?.name || '';
+  const completedName = commandExecutionState(term, node.id)?.completedName;
+  return typeof completedName === 'string' && completedName ? completedName : node.name;
+}
+
+function renderSessionStateResult(result, successMessage, acceptsCanonicalResult = null) {
+  if (!result?.ok || !result.session) {
+    saveStatus.textContent = 'Ошибка изменения состояния: ' + (result?.error || 'сессия не обновлена');
+    saveStatus.classList.add('err');
+    return false;
+  }
+  if (typeof acceptsCanonicalResult === 'function' && !acceptsCanonicalResult(result)) {
+    saveStatus.textContent = 'Ошибка изменения состояния: backend не подтвердил канонический сброс';
+    saveStatus.classList.add('err');
+    return false;
+  }
+
+  state.session = result.session;
+  const revision = Number(result.revision || result.savedRevision || 0);
+  newestDurableRevision = Math.max(newestDurableRevision, revision);
+  saveStatus.textContent = successMessage + (revision > 0 ? ` · ревизия ${revision}` : '');
+  saveStatus.dataset.savedRevision = String(newestDurableRevision);
+  saveStatus.classList.remove('err');
+  renderAll();
+  return true;
+}
+
+function updateSessionStateEvidenceDescription() {
+  const evidence = [];
+  if (saveStatus.dataset.wailsCommand) {
+    evidence.push(`Wails command ${saveStatus.dataset.wailsCommand} ${saveStatus.dataset.wailsResult || 'unknown'}`);
+  }
+  if (saveStatus.dataset.wailsTerminalId) evidence.push(`terminal ${saveStatus.dataset.wailsTerminalId}`);
+  if (saveStatus.dataset.wailsRevision) evidence.push(`document revision ${saveStatus.dataset.wailsRevision}`);
+  if (saveStatus.dataset.sessionStateRevision) {
+    evidence.push(`session-state revision ${saveStatus.dataset.sessionStateRevision}`);
+  }
+  if (evidence.length) {
+    const accessibleEvidence = evidence.join('; ');
+    saveStatus.setAttribute('aria-label', accessibleEvidence);
+    saveStatus.setAttribute('aria-description', accessibleEvidence);
+  } else {
+    saveStatus.removeAttribute('aria-label');
+    saveStatus.removeAttribute('aria-description');
+  }
+}
+
+async function runSessionStateCommand(command, successMessage, acceptsCanonicalResult = null) {
+  if (sessionStateCommandPending) return;
+  sessionStateCommandPending = true;
+  renderSettingsPanel();
+  renderNodeForm();
+  try {
+    const result = await command();
+    renderSessionStateResult(result, successMessage, acceptsCanonicalResult);
+  } catch (error) {
+    saveStatus.textContent = 'Ошибка изменения состояния: '
+      + (error instanceof Error ? error.message : String(error));
+    saveStatus.classList.add('err');
+  } finally {
+    sessionStateCommandPending = false;
+    renderSettingsPanel();
+    renderNodeForm();
+  }
+}
+
 function currentAddTarget() {
   const term = getEditTerminal();
   if (!term) return null;
@@ -548,66 +768,12 @@ function renderCoordination() {
     : 'НЕ ВЫБРАНА · СОЗДАЙТЕ ИЛИ ВЫБЕРИТЕ ФАЙЛ';
   btnOpenPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
   btnNewPlayerConfig.disabled = coordinationCommandPending || Boolean(broadcast);
+  btnManagePlayers.disabled = !playerConfig;
   btnStartBroadcast.disabled = coordinationCommandPending || Boolean(broadcast) || !playerConfig;
   btnEndBroadcast.hidden = !broadcast;
   btnEndBroadcast.disabled = coordinationCommandPending || !broadcast;
-  btnAddCharacter.disabled = coordinationCommandPending || !playerConfig;
-  characterNameInput.disabled = coordinationCommandPending || !playerConfig;
 
-  characterRoster.replaceChildren();
-  if (!roster.length) {
-    const empty = document.createElement('div');
-    empty.className = 'roster-empty';
-    empty.textContent = 'ПЕРСОНАЖИ НЕ ЗАДАНЫ';
-    characterRoster.appendChild(empty);
-  } else {
-    for (const character of roster) {
-      const fragment = characterRosterRowTemplate.content.cloneNode(true);
-      const row = fragment.querySelector('.roster-row');
-      const claimed = Boolean(character.claimedBySessionId);
-      row.dataset.characterId = character.id;
-      row.dataset.claimed = String(claimed);
-      row.querySelector('.roster-name').textContent = character.name || '—';
-      const claimStatus = row.querySelector('.roster-claim-status');
-      claimStatus.dataset.claimState = claimed ? 'claimed' : 'available';
-      claimStatus.textContent = claimed ? 'ЗАНЯТ' : 'СВОБОДЕН';
-
-      const nameInput = row.querySelector('.roster-name-input');
-      nameInput.value = character.name || '';
-      const renameButton = row.querySelector('.roster-rename');
-      const deleteButton = row.querySelector('.roster-delete');
-      const moveControls = row.querySelector('.roster-move-controls');
-      const moveSelect = row.querySelector('.roster-move-session-select');
-      const moveButton = row.querySelector('.roster-move');
-      for (const control of row.querySelectorAll('input, select, button')) {
-        control.disabled = coordinationCommandPending || !playerConfig;
-      }
-      renameButton.addEventListener('click', () => {
-        const name = nameInput.value.trim();
-        if (!name) return setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
-        runCoordinationCommand(
-          () => desktopAPI.renameCharacter({ characterId: character.id, name }),
-          'ПЕРСОНАЖ ПЕРЕИМЕНОВАН',
-          'ПЕРЕИМЕНОВАНИЕ ПЕРСОНАЖА...'
-        );
-      });
-      deleteButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.deleteCharacter(character.id),
-        'ПЕРСОНАЖ УДАЛЁН',
-        claimed ? 'ПРОВЕРКА АКТИВНОГО НАЗНАЧЕНИЯ...' : 'УДАЛЕНИЕ ПЕРСОНАЖА...'
-      ));
-
-      moveControls.hidden = !claimed;
-      fillSelect(moveSelect, unassignedSessions, session => session.id, session => sessionLabel(session), 'НЕТ СВОБОДНЫХ СЕССИЙ');
-      moveButton.disabled = coordinationCommandPending || !claimed || !moveSelect.value;
-      moveButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.moveCharacter({ characterId: character.id, toSessionId: moveSelect.value }),
-        'НАЗНАЧЕНИЕ ПЕРЕМЕЩЕНО',
-        'ПЕРЕМЕЩЕНИЕ НАЗНАЧЕНИЯ...'
-      ));
-      characterRoster.appendChild(fragment);
-    }
-  }
+  renderPlayerManagementRoster(roster, Boolean(broadcast), Boolean(playerConfig));
 
   logicalSessionList.replaceChildren();
   if (!sessions.length) {
@@ -652,10 +818,14 @@ function renderCoordination() {
     const claimedControls = row.querySelector('.session-claimed-controls');
     const releaseButton = row.querySelector('.session-release');
     const controllerButton = row.querySelector('.session-controller');
+    const moveSelect = row.querySelector('.session-move-session-select');
+    const moveButton = row.querySelector('.session-move');
     for (const control of row.querySelectorAll('input, select, button')) {
       control.disabled = coordinationCommandPending;
     }
     renameButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      if (coordinationCommandPending || !currentSession) return;
       const fallbackName = nameInput.value.trim();
       if (!fallbackName) return setCoordinationStatus('УКАЖИТЕ МЕТКУ СЕССИИ', true);
       runCoordinationCommand(
@@ -668,31 +838,271 @@ function renderCoordination() {
     assignmentControls.hidden = assigned || !broadcast;
     fillSelect(characterSelect, availableCharacters, character => character.id, character => character.name, 'НЕТ ДОСТУПНЫХ ПЕРСОНАЖЕЙ');
     assignButton.disabled = coordinationCommandPending || assigned || !broadcast || !characterSelect.value;
-    assignButton.addEventListener('click', () => runCoordinationCommand(
-      () => desktopAPI.assignCharacter({ sessionId: session.id, characterId: characterSelect.value }),
-      'ПЕРСОНАЖ НАЗНАЧЕН',
-      'НАЗНАЧЕНИЕ ПЕРСОНАЖА...'
-    ));
+    assignButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      const currentCharacter = findRosterCharacter(characterSelect.value);
+      if (coordinationCommandPending || !state.coordination?.broadcast || currentSession?.character ||
+          !currentCharacter || currentCharacter.claimedBySessionId) return;
+      runCoordinationCommand(
+        () => desktopAPI.assignCharacter({ sessionId: session.id, characterId: characterSelect.value }),
+        'ПЕРСОНАЖ НАЗНАЧЕН',
+        'НАЗНАЧЕНИЕ ПЕРСОНАЖА...'
+      );
+    });
 
     claimedControls.hidden = !assigned;
     releaseButton.disabled = coordinationCommandPending || !assigned;
-    releaseButton.addEventListener('click', () => runCoordinationCommand(
-      () => desktopAPI.releaseCharacter(session.id),
-      'ПЕРСОНАЖ ОСВОБОЖДЁН',
-      'ОСВОБОЖДЕНИЕ ПЕРСОНАЖА...'
-    ));
+    releaseButton.addEventListener('click', () => {
+      if (coordinationCommandPending || !findLogicalSession(session.id)?.character) return;
+      runCoordinationCommand(
+        () => desktopAPI.releaseCharacter(session.id),
+        'ПЕРСОНАЖ ОСВОБОЖДЁН',
+        'ОСВОБОЖДЕНИЕ ПЕРСОНАЖА...'
+      );
+    });
     controllerButton.disabled = true;
     controllerButton.hidden = role === 'active';
     if (assigned && session.connected && role !== 'active') {
       controllerButton.disabled = coordinationCommandPending;
-      controllerButton.addEventListener('click', () => runCoordinationCommand(
-        () => desktopAPI.setActiveController(session.id),
-        'УПРАВЛЕНИЕ ПЕРЕДАНО',
-        'ПЕРЕДАЧА УПРАВЛЕНИЯ...'
-      ));
+      controllerButton.addEventListener('click', () => {
+        const currentSession = findLogicalSession(session.id);
+        if (coordinationCommandPending || !currentSession?.character || !currentSession.connected ||
+            currentSession.role === 'active') return;
+        runCoordinationCommand(
+          () => desktopAPI.setActiveController(session.id),
+          'УПРАВЛЕНИЕ ПЕРЕДАНО',
+          'ПЕРЕДАЧА УПРАВЛЕНИЯ...'
+        );
+      });
     }
+
+    fillSelect(moveSelect, unassignedSessions, candidate => candidate.id, candidate => sessionLabel(candidate), 'НЕТ СВОБОДНЫХ СЕССИЙ');
+    moveSelect.disabled = coordinationCommandPending || !assigned || !playerConfig || !moveSelect.value;
+    moveButton.disabled = coordinationCommandPending || !assigned || !playerConfig || !moveSelect.value;
+    moveButton.addEventListener('click', () => {
+      const currentSession = findLogicalSession(session.id);
+      const destination = findLogicalSession(moveSelect.value);
+      if (coordinationCommandPending || !state.coordination?.playerConfig ||
+          !currentSession?.character || destination?.character || !destination) return;
+      runCoordinationCommand(
+        () => desktopAPI.moveCharacter({
+          characterId: currentSession.character.id,
+          toSessionId: destination.id,
+        }),
+        'НАЗНАЧЕНИЕ ПЕРЕМЕЩЕНО',
+        'ПЕРЕМЕЩЕНИЕ НАЗНАЧЕНИЯ...'
+      );
+    });
     logicalSessionList.appendChild(fragment);
   }
+}
+
+function findLogicalSession(sessionId) {
+  const sessions = Array.isArray(state.coordination?.sessions) ? state.coordination.sessions : [];
+  return sessions.find(session => session.id === sessionId) || null;
+}
+
+function findRosterCharacter(characterId) {
+  const roster = Array.isArray(state.coordination?.roster) ? state.coordination.roster : [];
+  return roster.find(character => character.id === characterId) || null;
+}
+
+function renderPlayerManagementRoster(roster, broadcastActive, playerConfigActive) {
+  const readOnly = broadcastActive || !playerConfigActive;
+  playerManagementDialog.setAttribute('aria-readonly', String(readOnly));
+  playerManagementMode.textContent = broadcastActive
+    ? 'ТРАНСЛЯЦИЯ АКТИВНА · ПРОСМОТР БЕЗ РЕДАКТИРОВАНИЯ'
+    : playerConfigActive ? 'РЕДАКТИРОВАНИЕ ДОСТУПНО' : 'КОНФИГУРАЦИЯ ИГРОКОВ НЕ ВЫБРАНА';
+
+  const addDisabled = coordinationCommandPending || readOnly;
+  for (const control of playerManagementAddForm.elements) control.disabled = addDisabled;
+  syncPlayerDeleteDialogControls();
+  playerManagementRoster.replaceChildren();
+  playerManagementEmpty.hidden = roster.length > 0;
+
+  for (const character of roster) {
+    const fragment = playerManagementRowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('.player-management-row');
+    const nameInput = row.querySelector('.player-name-input');
+    const intelligenceInput = row.querySelector('.player-intelligence-input');
+    const hackerInput = row.querySelector('.player-hacker-perk-availability');
+    row.dataset.characterId = character.id;
+    nameInput.value = character.name || '';
+    intelligenceInput.value = String(Number.isInteger(character.intelligence) ? character.intelligence : 1);
+    hackerInput.value = character.hackerPerkAvailable === true ? 'true' : 'false';
+    const saveButton = row.querySelector('.player-save');
+    const deleteButton = row.querySelector('.player-delete');
+    for (const control of row.querySelectorAll('input, select, button')) {
+      control.disabled = coordinationCommandPending || readOnly;
+    }
+    saveButton.addEventListener('click', async () => {
+      if (!playerMutationAllowed()) return;
+      const name = nameInput.value.trim();
+      const intelligence = intelligenceInput.valueAsNumber;
+      const hackerChoice = hackerInput.value;
+      if (!name) {
+        setPlayerManagementFeedback('УКАЖИТЕ ИМЯ ИГРОКА', true);
+        nameInput.focus();
+        return;
+      }
+      if (!Number.isInteger(intelligence) || intelligence < 1 || intelligence > 10) {
+        setPlayerManagementFeedback('ИНТЕЛЛЕКТ ДОЛЖЕН БЫТЬ ЦЕЛЫМ ЧИСЛОМ ОТ 1 ДО 10', true);
+        intelligenceInput.focus();
+        return;
+      }
+      if (hackerChoice !== 'true' && hackerChoice !== 'false') {
+        setPlayerManagementFeedback('ВЫБЕРИТЕ ДОСТУПНОСТЬ ПЕРКА «ХАКЕР»', true);
+        hackerInput.focus();
+        return;
+      }
+      await runPlayerManagementMutation(
+        () => desktopAPI.updateCharacter({
+          characterId: character.id,
+          name,
+          intelligence,
+          hackerPerkAvailable: hackerChoice === 'true',
+          expectedRevision: coordinationRevision(state.coordination),
+        }),
+        'ПРОФИЛЬ ИГРОКА СОХРАНЁН',
+        'СОХРАНЕНИЕ ПРОФИЛЯ ИГРОКА...'
+      );
+    });
+    deleteButton.addEventListener('click', () => {
+      if (!playerMutationAllowed()) return;
+      showPlayerDeleteConfirmation(character.id, character.name || '', deleteButton);
+    });
+    playerManagementRoster.appendChild(fragment);
+  }
+}
+
+function playerMutationAllowed() {
+  return !coordinationCommandPending &&
+    !state.coordination?.broadcast &&
+    Boolean(state.coordination?.playerConfig);
+}
+
+function syncPlayerDeleteDialogControls() {
+  if (!pendingPlayerDelete) return;
+  const active = Boolean(state.coordination?.broadcast);
+  const configMissing = !state.coordination?.playerConfig;
+  btnConfirmPlayerDelete.disabled = coordinationCommandPending || active || configMissing;
+  btnCancelPlayerDelete.disabled = coordinationCommandPending;
+}
+
+function showPlayerDeleteConfirmation(characterId, name, opener) {
+  if (!playerMutationAllowed()) return;
+  pendingPlayerDelete = { characterId, opener };
+  playerDeleteDialogDescription.textContent = `Удалить игрока «${name}»? Это действие нельзя отменить.`;
+  playerDeleteDialog.hidden = false;
+  syncPlayerDeleteDialogControls();
+  if (!playerDeleteDialog.open) playerDeleteDialog.showModal();
+  btnCancelPlayerDelete.focus();
+}
+
+function hidePlayerDeleteConfirmation(restoreFocus = true) {
+  const pending = pendingPlayerDelete;
+  pendingPlayerDelete = null;
+  if (playerDeleteDialog.open) playerDeleteDialog.close();
+  playerDeleteDialog.hidden = true;
+  btnConfirmPlayerDelete.disabled = false;
+  btnCancelPlayerDelete.disabled = false;
+  if (!restoreFocus) return;
+  const currentDelete = pending?.characterId
+    ? playerManagementRoster.querySelector(`[data-character-id="${CSS.escape(pending.characterId)}"] .player-delete`)
+    : null;
+  if (currentDelete instanceof HTMLElement) currentDelete.focus();
+  else if (pending?.opener?.isConnected) pending.opener.focus();
+}
+
+async function runPlayerManagementMutation(command, successMessage, pendingMessage) {
+  if (!playerMutationAllowed()) return null;
+  coordinationCommandPending = true;
+  setPlayerManagementFeedback(pendingMessage);
+  setCoordinationStatus(pendingMessage);
+  renderCoordination();
+
+  let result;
+  try {
+    result = await command();
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  if (result?.state) applyCoordinationState(result.state);
+  renderCoordination();
+
+  if (!result?.ok) {
+    const message = result?.error || 'ОПЕРАЦИЯ СО СПИСКОМ ИГРОКОВ ОТКЛОНЕНА';
+    setPlayerManagementFeedback(message, true);
+    setCoordinationStatus(message, true);
+    return result;
+  }
+
+  setPlayerManagementFeedback(successMessage);
+  setCoordinationStatus(successMessage);
+  return result;
+}
+
+function setPlayerManagementFeedback(message = '', isError = false) {
+  playerManagementStatus.textContent = isError ? '' : message;
+  playerManagementError.textContent = isError ? message : '';
+  playerManagementError.hidden = !isError || !message;
+}
+
+function showPlayerManagement() {
+  if (!state.coordination?.playerConfig || btnManagePlayers.disabled) return;
+  playerManagementOpener = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : btnManagePlayers;
+  setPlayerManagementFeedback('');
+  playerManagementDialog.hidden = false;
+  if (!playerManagementDialog.open) playerManagementDialog.showModal();
+  queueMicrotask(() => btnClosePlayerManagement.focus());
+}
+
+function hidePlayerManagement() {
+  if (pendingPlayerDelete) hidePlayerDeleteConfirmation(false);
+  if (playerManagementDialog.open) playerManagementDialog.close();
+  playerManagementDialog.hidden = true;
+  const opener = playerManagementOpener;
+  playerManagementOpener = null;
+  if (opener?.isConnected) opener.focus();
+}
+
+async function addPlayerProfile({ name, intelligence, hackerPerkAvailable }) {
+  if (coordinationCommandPending || state.coordination?.broadcast || !state.coordination?.playerConfig) return null;
+  coordinationCommandPending = true;
+  setPlayerManagementFeedback('ДОБАВЛЕНИЕ ИГРОКА...');
+  setCoordinationStatus('ДОБАВЛЕНИЕ ПЕРСОНАЖА...');
+  renderCoordination();
+
+  let result;
+  try {
+    result = await desktopAPI.addCharacter({
+      name,
+      intelligence,
+      hackerPerkAvailable,
+      expectedRevision: coordinationRevision(state.coordination),
+    });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  coordinationCommandPending = false;
+  applyCoordinationState(result?.state || state.coordination);
+
+  if (!result?.ok) {
+    const message = result?.error || 'НЕ УДАЛОСЬ ДОБАВИТЬ ИГРОКА';
+    setPlayerManagementFeedback(message, true);
+    setCoordinationStatus(message, true);
+    renderCoordination();
+    return result;
+  }
+
+  playerManagementAddForm.reset();
+  setPlayerManagementFeedback('ИГРОК ДОБАВЛЕН');
+  setCoordinationStatus('ПЕРСОНАЖ ДОБАВЛЕН');
+  renderCoordination();
+  return result;
 }
 
 function setPlayerConfigError(message = '') {
@@ -744,10 +1154,254 @@ btnNewPlayerConfig.addEventListener('click', () => runPlayerConfigCommand(
   'КОНФИГУРАЦИЯ ИГРОКОВ СОЗДАНА'
 ));
 
+function coordinationRevision(coordination) {
+  const revision = Number(coordination?.revision || 0);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
+}
+
+function rememberResolvedCommandExecution(requestID) {
+  resolvedCommandExecutionRequestIDs.add(requestID);
+  if (resolvedCommandExecutionRequestIDs.size <= 128) return;
+  const oldest = resolvedCommandExecutionRequestIDs.values().next().value;
+  resolvedCommandExecutionRequestIDs.delete(oldest);
+}
+
+function hideCommandExecutionDialog() {
+  // Any authoritative close invalidates the promise currently resolving this
+  // dialog. Its eventual callback must not overwrite a newer lifecycle state
+  // or dismiss a different request shown in the meantime.
+  commandExecutionDialogEpoch += 1;
+  commandExecutionDecisionRequestID = null;
+  commandExecutionDialogRequestID = null;
+  commandExecutionDialog.hidden = true;
+  if (typeof commandExecutionDialog.close === 'function' && commandExecutionDialog.open) {
+    commandExecutionDialog.close();
+  } else {
+    commandExecutionDialog.removeAttribute('open');
+  }
+  btnApproveCommandExecution.disabled = false;
+  btnRejectCommandExecution.disabled = false;
+  commandExecutionDialogStatus.textContent = '';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+}
+
+function showCommandExecutionDialog(pending) {
+  commandExecutionDialogEpoch += 1;
+  commandExecutionDecisionRequestID = null;
+  commandExecutionDialogRequestID = pending.requestId;
+  commandExecutionDialogDescription.textContent = pending.confirmationText;
+  commandExecutionDialogStatus.textContent = pending.commandName
+    ? `КОМАНДА: ${pending.commandName}`
+    : 'КОМАНДА ОЖИДАЕТ РЕШЕНИЯ';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+  btnApproveCommandExecution.disabled = false;
+  btnRejectCommandExecution.disabled = false;
+  commandExecutionDialog.hidden = false;
+  if (typeof commandExecutionDialog.showModal === 'function' && !commandExecutionDialog.open) {
+    commandExecutionDialog.showModal();
+  } else {
+    commandExecutionDialog.setAttribute('open', '');
+  }
+  btnApproveCommandExecution.focus();
+}
+
+function syncCommandExecutionDialog(coordination) {
+  const pending = coordination?.pendingCommandExecution;
+  const requestID = typeof pending?.requestId === 'string' ? pending.requestId : '';
+  if (!requestID) {
+    if (commandExecutionDialogRequestID) hideCommandExecutionDialog();
+    return;
+  }
+  if (requestID === commandExecutionDecisionRequestID || resolvedCommandExecutionRequestIDs.has(requestID)) {
+    return;
+  }
+  if (requestID === commandExecutionDialogRequestID) return;
+  if (commandExecutionDialogRequestID) hideCommandExecutionDialog();
+  showCommandExecutionDialog(pending);
+}
+
+function rememberResolvedTerminalNavigation(requestID) {
+  resolvedTerminalNavigationRequestIDs.add(requestID);
+  if (resolvedTerminalNavigationRequestIDs.size > 128) {
+    resolvedTerminalNavigationRequestIDs.delete(resolvedTerminalNavigationRequestIDs.values().next().value);
+  }
+}
+
+function hideTerminalNavigationDialog() {
+  terminalNavigationDialogEpoch += 1;
+  terminalNavigationDecisionRequestID = null;
+  terminalNavigationDialogRequestID = null;
+  terminalNavigationDialog.hidden = true;
+  if (terminalNavigationDialog.open) terminalNavigationDialog.close();
+  else terminalNavigationDialog.removeAttribute('open');
+  btnApproveTerminalNavigation.disabled = false;
+  btnRejectTerminalNavigation.disabled = false;
+  terminalNavigationStatus.textContent = '';
+  terminalNavigationError.hidden = true;
+}
+
+function showTerminalNavigationDialog(pending) {
+  terminalNavigationDialogEpoch += 1;
+  terminalNavigationDecisionRequestID = null;
+  terminalNavigationDialogRequestID = pending.requestId;
+  const direction = pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД';
+  terminalNavigationSummary.innerHTML = `
+    <div class="terminal-navigation-direction">${direction}</div>
+    <div>ИЗ: ${escHtml(pending.sourceTerminalName || pending.sourceTerminalId || '—')}</div>
+    <div>КОМАНДА: ${escHtml(pending.commandName || pending.commandId || '—')}</div>
+    <div>В: ${escHtml(pending.targetTerminalName || pending.targetTerminalId || '—')}</div>`;
+  terminalNavigationError.hidden = true;
+  terminalNavigationStatus.textContent = 'ИСХОДНЫЙ ТЕРМИНАЛ ОСТАЁТСЯ АКТИВНЫМ ДО РЕШЕНИЯ';
+  terminalNavigationDialog.hidden = false;
+  if (!terminalNavigationDialog.open) terminalNavigationDialog.showModal();
+  btnApproveTerminalNavigation.focus();
+}
+
+function syncTerminalNavigationDialog(coordination) {
+  const pending = coordination?.pendingTerminalNavigation;
+  const requestID = typeof pending?.requestId === 'string' ? pending.requestId : '';
+  if (!requestID) {
+    if (terminalNavigationDialogRequestID) hideTerminalNavigationDialog();
+    return;
+  }
+  if (requestID === terminalNavigationDecisionRequestID || resolvedTerminalNavigationRequestIDs.has(requestID)) return;
+  if (requestID === terminalNavigationDialogRequestID) return;
+  if (terminalNavigationDialogRequestID) hideTerminalNavigationDialog();
+  showTerminalNavigationDialog(pending);
+}
+
 function applyCoordinationState(coordination) {
+  if (coordination && state.coordination &&
+      coordinationRevision(coordination) <= coordinationRevision(state.coordination)) {
+    return false;
+  }
   state.coordination = coordination || null;
   state.liveTerminalId = coordination?.broadcast?.activeTerminalId || null;
+  syncCommandExecutionDialog(coordination);
+  syncTerminalNavigationDialog(coordination);
+  syncTerminalNavigationNotice(coordination);
+  return true;
 }
+
+function syncTerminalNavigationNotice(coordination) {
+  const notice = coordination?.terminalNavigationNotice;
+  if (!notice) {
+    if (coordinationError.dataset.kind === 'terminal-navigation') {
+      coordinationError.dataset.kind = '';
+      setCoordinationStatus('');
+    }
+    return;
+  }
+  const labels = {
+    'target-missing': 'ЦЕЛЕВОЙ ТЕРМИНАЛ ПЕРЕХОДА БОЛЬШЕ НЕ СУЩЕСТВУЕТ',
+    'self-target': 'КОМАНДА ПЕРЕХОДА НЕ МОЖЕТ ССЫЛАТЬСЯ НА ТЕКУЩИЙ ТЕРМИНАЛ',
+    'command-stale': 'КОМАНДА ПЕРЕХОДА БЫЛА ИЗМЕНЕНА ИЛИ УДАЛЕНА',
+    'target-changed': 'ЦЕЛЬ КОМАНДЫ ПЕРЕХОДА ИЗМЕНИЛАСЬ',
+  };
+  const detail = [notice.sourceTerminalId, notice.commandId, notice.targetTerminalId].filter(Boolean).join(' · ');
+  coordinationError.dataset.kind = 'terminal-navigation';
+  setCoordinationStatus(`${labels[notice.reason] || 'ПЕРЕХОД БОЛЬШЕ НЕ ДЕЙСТВИТЕЛЕН'}${detail ? ` · ${detail}` : ''}`, true);
+}
+
+async function resolveTerminalNavigation(decision) {
+  const requestID = terminalNavigationDialogRequestID;
+  if (!requestID || terminalNavigationDecisionRequestID) return null;
+  terminalNavigationDecisionRequestID = requestID;
+  const epoch = terminalNavigationDialogEpoch;
+  btnApproveTerminalNavigation.disabled = true;
+  btnRejectTerminalNavigation.disabled = true;
+  terminalNavigationStatus.textContent = decision === 'approve' ? 'ВЫПОЛНЕНИЕ ПЕРЕХОДА...' : 'ОТКЛОНЕНИЕ ПЕРЕХОДА...';
+  let result;
+  try {
+    result = await desktopAPI.resolveTerminalNavigation({ requestId: requestID, decision });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+  if (epoch !== terminalNavigationDialogEpoch || terminalNavigationDecisionRequestID !== requestID) return result;
+  terminalNavigationDecisionRequestID = null;
+  rememberResolvedTerminalNavigation(requestID);
+  if (result?.state) applyCoordinationState(result.state);
+  if (terminalNavigationDialogRequestID === requestID) hideTerminalNavigationDialog();
+  if (result?.ok) {
+    setCoordinationStatus(decision === 'approve' ? 'ПЕРЕХОД ВЫПОЛНЕН' : 'ПЕРЕХОД ОТКЛОНЁН');
+  } else if (result?.state?.terminalNavigationNotice) {
+    syncTerminalNavigationNotice(result.state);
+  } else {
+    setCoordinationStatus(result?.error || 'ПЕРЕХОД НЕ ВЫПОЛНЕН', true);
+  }
+  renderCoordination();
+  return result;
+}
+
+btnApproveTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('approve'); });
+btnRejectTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('reject'); });
+terminalNavigationDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  void resolveTerminalNavigation('reject');
+});
+
+async function resolveCommandExecution(decision) {
+  const requestID = commandExecutionDialogRequestID;
+  if (!requestID || commandExecutionDecisionRequestID) return null;
+
+  commandExecutionDecisionRequestID = requestID;
+  const epoch = commandExecutionDialogEpoch;
+  const startingRevision = coordinationRevision(state.coordination);
+  btnApproveCommandExecution.disabled = true;
+  btnRejectCommandExecution.disabled = true;
+  commandExecutionDialogStatus.textContent = decision === 'approve'
+    ? 'СОХРАНЕНИЕ И ВЫПОЛНЕНИЕ...'
+    : 'ОТКЛОНЕНИЕ ЗАПРОСА...';
+  commandExecutionDialogError.textContent = '';
+  commandExecutionDialogError.hidden = true;
+
+  let result;
+  try {
+    result = await desktopAPI.resolveCommandExecution({ requestId: requestID, decision });
+  } catch (error) {
+    result = { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  if (epoch !== commandExecutionDialogEpoch || commandExecutionDecisionRequestID !== requestID) {
+    return result;
+  }
+  commandExecutionDecisionRequestID = null;
+  const resultRevision = coordinationRevision(result?.state);
+  if (resultRevision > 0 && resultRevision < coordinationRevision(state.coordination)) {
+    return result;
+  }
+  if (!result?.state && coordinationRevision(state.coordination) > startingRevision &&
+      state.coordination?.pendingCommandExecution?.requestId !== requestID) {
+    return result;
+  }
+
+  rememberResolvedCommandExecution(requestID);
+  if (result?.state) applyCoordinationState(result.state);
+  if (commandExecutionDialogRequestID === requestID) hideCommandExecutionDialog();
+
+  if (!result?.ok) {
+    setCoordinationStatus(result?.error || 'СОСТОЯНИЕ КОМАНДЫ НЕ УДАЛОСЬ СОХРАНИТЬ', true);
+  } else if (decision === 'approve') {
+    setCoordinationStatus('КОМАНДА ВЫПОЛНЕНА И СОХРАНЕНА');
+  } else {
+    setCoordinationStatus('ЗАПРОС ОТКЛОНЁН');
+  }
+  renderCoordination();
+  return result;
+}
+
+btnApproveCommandExecution.addEventListener('click', () => {
+  void resolveCommandExecution('approve');
+});
+btnRejectCommandExecution.addEventListener('click', () => {
+  void resolveCommandExecution('reject');
+});
+commandExecutionDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  void resolveCommandExecution('reject');
+});
 
 function setCoordinationStatus(message, isError = false) {
   coordinationStatus.textContent = isError ? '' : (message || '');
@@ -859,6 +1513,18 @@ async function runTerminalSwitchRequest(command, completedMessage, pendingMessag
 }
 
 // ── Render: terminal list ────────────────────────────────────
+function inboundTerminalTransitions(targetTerminalID) {
+  const inbound = [];
+  const visit = (source, node) => {
+    if (node?.terminalTransition?.targetTerminalId === targetTerminalID) {
+      inbound.push(`${source.name}: ${node.name}`);
+    }
+    for (const child of node?.children ?? []) visit(source, child);
+  };
+  for (const source of state.session?.terminals ?? []) visit(source, source.root);
+  return inbound;
+}
+
 function renderTermList() {
   termList.innerHTML = '';
   if (!state.session.terminals.length) {
@@ -905,6 +1571,11 @@ function renderTermList() {
         setCoordinationStatus('АКТИВНЫЙ ИЛИ СОХРАНЁННЫЙ ТЕРМИНАЛ НЕЛЬЗЯ УДАЛИТЬ', true);
         return;
       }
+    const inbound = inboundTerminalTransitions(term.id);
+    if (inbound.length) {
+    setCoordinationStatus(`ТЕРМИНАЛ ИСПОЛЬЗУЕТСЯ КОМАНДАМИ ПЕРЕХОДА: ${inbound.join(', ')}`, true);
+    return;
+    }
       if (!window.confirm(`Удалить терминал "${term.name}" целиком?`)) return;
       const idx = state.session.terminals.findIndex(t => t.id === term.id);
       if (idx >= 0) state.session.terminals.splice(idx, 1);
@@ -980,7 +1651,37 @@ function renderSettingsPanel() {
   btnApplySettings.disabled = !term;
   hackLevelSelect.value = term ? String(term.hackLevel || 0) : '0';
   introTextArea.value   = term ? (term.introText || '') : '';
+  const completedCount = term?.commandStates && typeof term.commandStates === 'object'
+    ? Object.keys(term.commandStates).length
+    : 0;
+  commandStateActions.hidden = !term;
+  btnResetTerminalCommandStates.disabled = !term || completedCount === 0 || sessionStateCommandPending;
 }
+
+btnResetTerminalCommandStates.addEventListener('click', async () => {
+  const term = getEditTerminal();
+  if (!term || sessionStateCommandPending) return;
+  if (!await confirmCommandStateReset(`Сбросить все выполненные состояния команд терминала "${term.name}"?`)) return;
+  const revisionBeforeReset = newestDurableRevision;
+  runSessionStateCommand(
+    async () => {
+      const result = await desktopAPI.resetTerminalCommandStates({ terminalId: term.id });
+      saveStatus.dataset.wailsCommand = 'ResetTerminalCommandStates';
+      saveStatus.dataset.wailsResult = result?.ok ? 'ok' : 'error';
+      saveStatus.dataset.wailsTerminalId = term.id;
+      saveStatus.dataset.wailsRevision = String(Number(result?.revision || 0));
+      updateSessionStateEvidenceDescription();
+      return result;
+    },
+    'СОСТОЯНИЯ КОМАНД ТЕРМИНАЛА СБРОШЕНЫ',
+    (result) => {
+      const revision = Number(result?.revision || 0);
+      const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+      return revision > revisionBeforeReset && canonicalTerminal &&
+        Object.keys(canonicalTerminal.commandStates ?? {}).length === 0;
+    }
+  );
+});
 
 // ── Render: live hack status (term panel footer) ──────────────
 function renderHackStatus() {
@@ -1034,11 +1735,15 @@ function renderTree() {
 }
 
 function renderNode(node, isRoot) {
+  const term = getEditTerminal();
   const wrap = document.createElement('div');
   wrap.className = 'tree-node';
 
   const row = document.createElement('div');
-  row.className = 'tree-row' + (state.selectedNodeId === node.id ? ' selected' : '');
+  const completed = commandExecutionState(term, node.id);
+  row.className = 'tree-row'
+    + (state.selectedNodeId === node.id ? ' selected' : '')
+    + (completed ? ' command-completed' : '');
 
   const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
   const isExpanded   = state.expanded.has(node.id);
@@ -1063,7 +1768,7 @@ function renderNode(node, isRoot) {
 
   const label = document.createElement('span');
   label.className = 'tree-label';
-  label.textContent = isRoot ? 'ROOT' : node.name;
+  label.textContent = isRoot ? 'ROOT' : effectiveNodeName(term, node);
   row.appendChild(label);
 
   row.addEventListener('click', () => {
@@ -1115,40 +1820,169 @@ function renderNodeForm() {
   }
 
   const typeLabel = node.type === 'folder' ? 'ПАПКА' : node.type === 'command' ? 'КОМАНДА' : 'ЗАПИСЬ';
+  const snapshot = commandExecutionState(term, node.id);
   let html = `<div class="node-type-label">${typeLabel}</div>
-    <div class="field-label">НАЗВАНИЕ</div>
+    <label class="field-label" for="fldName">${node.type === 'command' ? 'ИСХОДНОЕ НАЗВАНИЕ' : 'НАЗВАНИЕ'}</label>
     <input class="field-input" id="fldName" value="${escAttr(node.name)}">`;
 
   if (node.type === 'command') {
-    html += `<div class="field-label">ТЕКСТ КОМАНДЫ (появится у игрока внизу экрана)</div>
+    const commandMode = node.stateChange
+      ? 'state-change'
+      : node.terminalTransition
+        ? 'terminal-transition'
+        : 'ordinary';
+    const transitionOptions = state.session.terminals
+      .filter(candidate => candidate.id !== term.id)
+      .map(candidate => `<option value="${escAttr(candidate.id)}"${node.terminalTransition?.targetTerminalId === candidate.id ? ' selected' : ''}>${escHtml(candidate.name)}</option>`)
+      .join('');
+    html += `
+      <label class="field-label" for="fldCommandMode">РЕЖИМ КОМАНДЫ</label>
+      <select class="field-input command-mode-select" id="fldCommandMode"${snapshot ? ' disabled' : ''}>
+        <option value="ordinary"${commandMode === 'ordinary' ? ' selected' : ''}>ОБЫЧНАЯ КОМАНДА</option>
+        <option value="state-change"${commandMode === 'state-change' ? ' selected' : ''}>ИЗМЕНЯЕТ СОСТОЯНИЕ</option>
+        <option value="terminal-transition"${commandMode === 'terminal-transition' ? ' selected' : ''}>ПЕРЕХОД В ДРУГОЙ ТЕРМИНАЛ</option>
+      </select>
+      ${snapshot ? '<div class="command-mode-hint">Сначала сбросьте выполненное состояние команды, чтобы изменить режим.</div>' : ''}
+      <div class="state-change-fields" id="stateChangeFields"${commandMode === 'state-change' ? '' : ' hidden'}>
+        <label class="field-label" for="fldCompletedName">НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ</label>
+        <input class="field-input" id="fldCompletedName" value="${escAttr(node.stateChange?.completedName || '')}">
+        <label class="field-label" for="fldConfirmationText">ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ</label>
+        <textarea class="field-textarea state-change-textarea" id="fldConfirmationText">${escHtml(node.stateChange?.confirmationText || '')}</textarea>
+      </div>
+      <div class="state-change-fields terminal-transition-fields" id="terminalTransitionFields"${commandMode === 'terminal-transition' ? '' : ' hidden'}>
+        <label class="field-label" for="fldTerminalTransitionTarget">ЦЕЛЕВОЙ ТЕРМИНАЛ</label>
+        <select class="field-input" id="fldTerminalTransitionTarget">
+          <option value="">ВЫБЕРИТЕ ТЕРМИНАЛ</option>${transitionOptions}
+        </select>
+      </div>
+      <label class="field-label" for="fldText">ТЕКСТ УСПЕШНОГО ВЫПОЛНЕНИЯ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.text || '')}</textarea>`;
+    if (snapshot) {
+      html += `
+        <div class="command-execution-snapshot" role="status" aria-label="СОХРАНЁННОЕ СОСТОЯНИЕ КОМАНДЫ">
+          <div class="command-execution-heading">ВЫПОЛНЕНО</div>
+          <div class="command-execution-label">ЗАФИКСИРОВАННОЕ НАЗВАНИЕ</div>
+          <div class="command-execution-value">${escHtml(snapshot.completedName || '')}</div>
+          <div class="command-execution-label">ЗАФИКСИРОВАННЫЙ РЕЗУЛЬТАТ</div>
+          <div class="command-execution-value command-execution-result">${escHtml(snapshot.resultText || '')}</div>
+        </div>`;
+    }
   } else if (node.type === 'entry') {
-    html += `<div class="field-label">ОПИСАНИЕ ЗАПИСИ</div>
+    html += `<label class="field-label" for="fldText">ОПИСАНИЕ ЗАПИСИ</label>
       <textarea class="field-textarea" id="fldText">${escHtml(node.description || '')}</textarea>`;
   } else if (node.type === 'folder') {
     const count = node.children ? node.children.length : 0;
     html += `<div class="field-label">СОДЕРЖИМОЕ</div><div class="node-empty">${count} элемент(ов)</div>`;
   }
 
+  html += '<div class="node-validation-error" id="nodeValidationError" role="alert" hidden></div>';
   html += `<div class="node-actions">
       <button class="btn btn-primary" id="btnApplyNode">ПРИМЕНИТЬ</button>
+      ${snapshot ? '<button class="btn btn-secondary" id="btnResetCommandState" type="button">СБРОСИТЬ СОСТОЯНИЕ</button>' : ''}
       <button class="btn btn-danger" id="btnDeleteNode">УДАЛИТЬ</button>
     </div>`;
 
   nodeForm.innerHTML = html;
 
+  const validationError = document.getElementById('nodeValidationError');
+  const showValidationError = (message, field) => {
+    validationError.textContent = message;
+    validationError.hidden = false;
+    field?.focus();
+  };
+
+  if (node.type === 'command') {
+    const mode = document.getElementById('fldCommandMode');
+    const fields = document.getElementById('stateChangeFields');
+    const transitionFields = document.getElementById('terminalTransitionFields');
+    mode.addEventListener('change', () => {
+      fields.hidden = mode.value !== 'state-change';
+      transitionFields.hidden = mode.value !== 'terminal-transition';
+      validationError.hidden = true;
+      validationError.textContent = '';
+    });
+  }
+
   document.getElementById('btnApplyNode').addEventListener('click', () => {
     const nameEl = document.getElementById('fldName');
     const name = nameEl.value.trim();
-    if (!name) { nameEl.focus(); return; }
+    if (!name) {
+      showValidationError(
+        node.type === 'command' ? 'УКАЖИТЕ ИСХОДНОЕ НАЗВАНИЕ КОМАНДЫ' : 'УКАЖИТЕ НАЗВАНИЕ',
+        nameEl
+      );
+      return;
+    }
+
+    if (node.type === 'command') {
+      const commandMode = document.getElementById('fldCommandMode').value;
+      const textEl = document.getElementById('fldText');
+      let nextStateChange = null;
+      let nextTerminalTransition = null;
+      if (commandMode === 'state-change') {
+        const completedNameEl = document.getElementById('fldCompletedName');
+        const confirmationTextEl = document.getElementById('fldConfirmationText');
+        if (!completedNameEl.value.trim()) {
+          showValidationError('УКАЖИТЕ НАЗВАНИЕ ПОСЛЕ ВЫПОЛНЕНИЯ', completedNameEl);
+          return;
+        }
+        if (!confirmationTextEl.value.trim()) {
+          showValidationError('УКАЖИТЕ ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ', confirmationTextEl);
+          return;
+        }
+        if (!textEl.value.trim()) {
+          showValidationError('УКАЖИТЕ ТЕКСТ УСПЕШНОГО РЕЗУЛЬТАТА', textEl);
+          return;
+        }
+        nextStateChange = {
+          completedName: completedNameEl.value,
+          confirmationText: confirmationTextEl.value,
+        };
+      }
+      if (commandMode === 'terminal-transition') {
+        const targetEl = document.getElementById('fldTerminalTransitionTarget');
+        const targetID = targetEl.value;
+        if (!targetID || targetID === term.id || !state.session.terminals.some(candidate => candidate.id === targetID)) {
+          showValidationError('ВЫБЕРИТЕ ДРУГОЙ СУЩЕСТВУЮЩИЙ ТЕРМИНАЛ', targetEl);
+          return;
+        }
+        nextTerminalTransition = { targetTerminalId: targetID };
+      }
+      if (nextStateChange) node.stateChange = nextStateChange;
+      else delete node.stateChange;
+      if (nextTerminalTransition) node.terminalTransition = nextTerminalTransition;
+      else delete node.terminalTransition;
+      node.text = textEl.value;
+    }
+
     node.name = name;
-    if (node.type === 'command') node.text = document.getElementById('fldText').value;
     if (node.type === 'entry')   node.description = document.getElementById('fldText').value;
     autosave();
     renderTree();
     renderNodeForm();
     renderToolbarHint();
   });
+
+  const btnResetCommandState = document.getElementById('btnResetCommandState');
+  if (btnResetCommandState) {
+    btnResetCommandState.disabled = sessionStateCommandPending;
+    btnResetCommandState.addEventListener('click', async () => {
+      if (sessionStateCommandPending) return;
+      const displayedName = snapshot?.completedName || node.name;
+      if (!await confirmCommandStateReset(`Сбросить выполненное состояние команды "${displayedName}"?`)) return;
+      const revisionBeforeReset = newestDurableRevision;
+      runSessionStateCommand(
+        () => desktopAPI.resetCommandState({ terminalId: term.id, commandId: node.id }),
+        'СОСТОЯНИЕ КОМАНДЫ СБРОШЕНО',
+        (result) => {
+          const revision = Number(result?.revision || 0);
+          const canonicalTerminal = result?.session?.terminals?.find(candidate => candidate.id === term.id);
+          return revision > revisionBeforeReset && canonicalTerminal &&
+            !Object.hasOwn(canonicalTerminal.commandStates ?? {}, node.id);
+        }
+      );
+    });
+  }
 
   document.getElementById('btnDeleteNode').addEventListener('click', () => {
     const childCount = (node.type === 'folder' && node.children) ? node.children.length : 0;
@@ -1197,36 +2031,62 @@ btnAddCommand.addEventListener('click', () => addNode('command'));
 btnAddEntry.addEventListener('click', () => addNode('entry'));
 
 // ── Player roster and broadcast management ──────────────────
-btnAddCharacter.addEventListener('click', async () => {
-  if (coordinationCommandPending || !state.coordination?.playerConfig) return;
-  const name = characterNameInput.value.trim();
-  if (!name) {
-    setCoordinationStatus('УКАЖИТЕ ИМЯ ПЕРСОНАЖА', true);
-    return;
-  }
-
-  coordinationCommandPending = true;
-  setCoordinationStatus('ДОБАВЛЕНИЕ ПЕРСОНАЖА...');
-  renderCoordination();
-  const result = await desktopAPI.addCharacter(name);
-  coordinationCommandPending = false;
-  if (!result?.ok) {
-    setCoordinationStatus(result?.error || 'НЕ УДАЛОСЬ ДОБАВИТЬ ПЕРСОНАЖА', true);
-    renderCoordination();
-    return;
-  }
-
-  state.coordination = result.state || state.coordination;
-  characterNameInput.value = '';
-  setCoordinationStatus('ПЕРСОНАЖ ДОБАВЛЕН');
-  renderCoordination();
+btnManagePlayers.addEventListener('click', showPlayerManagement);
+btnClosePlayerManagement.addEventListener('click', hidePlayerManagement);
+playerManagementDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  hidePlayerManagement();
+});
+btnCancelPlayerDelete.addEventListener('click', () => hidePlayerDeleteConfirmation(true));
+playerDeleteDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!coordinationCommandPending) hidePlayerDeleteConfirmation(true);
+});
+btnConfirmPlayerDelete.addEventListener('click', async () => {
+  const characterId = pendingPlayerDelete?.characterId || '';
+  if (!characterId || !playerMutationAllowed()) return;
+  const result = await runPlayerManagementMutation(
+    () => desktopAPI.deleteCharacter({
+      characterId,
+      expectedRevision: coordinationRevision(state.coordination),
+    }),
+    'ИГРОК УДАЛЁН',
+    'УДАЛЕНИЕ ИГРОКА...'
+  );
+  hidePlayerDeleteConfirmation(!result?.ok);
 });
 
-characterNameInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    btnAddCharacter.click();
+playerManagementAddForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!playerManagementAddForm.checkValidity()) {
+    playerManagementAddForm.reportValidity();
+    return;
   }
+
+  const name = playerNameInput.value.trim();
+  const intelligence = playerIntelligenceInput.valueAsNumber;
+  const hackerChoice = playerHackerPerkAvailability.value;
+  if (!name) {
+    setPlayerManagementFeedback('УКАЖИТЕ ИМЯ ИГРОКА', true);
+    playerNameInput.focus();
+    return;
+  }
+  if (!Number.isInteger(intelligence) || intelligence < 1 || intelligence > 10) {
+    setPlayerManagementFeedback('ИНТЕЛЛЕКТ ДОЛЖЕН БЫТЬ ЦЕЛЫМ ЧИСЛОМ ОТ 1 ДО 10', true);
+    playerIntelligenceInput.focus();
+    return;
+  }
+  if (hackerChoice !== 'true' && hackerChoice !== 'false') {
+    setPlayerManagementFeedback('ВЫБЕРИТЕ ДОСТУПНОСТЬ ПЕРКА «ХАКЕР»', true);
+    playerHackerPerkAvailability.focus();
+    return;
+  }
+
+  await addPlayerProfile({
+    name,
+    intelligence,
+    hackerPerkAvailable: hackerChoice === 'true',
+  });
 });
 
 btnStartBroadcast.addEventListener('click', async () => {

@@ -4,6 +4,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Added same-generation dud-removal reconciliation without board replay.
 
+**Bugfix**: 2026-08-19 — BUG-003 Added complete-board pre-fit and stable hacking-row typography during reveal.
+
 ## Scope
 
 This contract governs observable player-browser presentation. It does not alter the player RPC, authoritative state, session JSON, player configuration, Wails bridge, static routes, public-access boundary, or private capabilities.
@@ -63,6 +65,8 @@ The player has one CRT motion mode. It MUST NOT expose or honor an application o
 - A newly opened folder, record, or command identity reveals rows or lines in source order.
 - ~~A new authoritative hacking-generation-plus-board identity reveals complete address-and-code rows at the same cadence in deterministic DOM source order.~~ Under BUG-002, a new authoritative hacking generation reveals complete address-and-code rows at that cadence in deterministic DOM source order; a row and its targets enter the interaction surface atomically.
 - The first element may appear immediately; each following element is scheduled at the historical `REVEAL_DELAY_MS` value of 40ms.
+- Before the first hacking row is painted, one shared row font size MUST be calculated from the complete generation, including queued rows, under the current viewport, orientation, activity-log allocation, and active font metrics.
+- Ordinary hacking row appends and uninterrupted or skipped completion MUST reuse that size with zero visible grow, shrink, or zoom; a genuine viewport, orientation, or active-font change may recalculate it only from the complete generation and MUST retain the responsive font floor, containment, and maximal-fit tolerance.
 - An uninterrupted 25-row list MUST be complete within 1.2 seconds.
 - An unchanged identity renders immediately and MUST NOT replay because of an unrelated authoritative update.
 - Replacement content cancels and invalidates the prior sequence before clearing the container; stale callbacks append nothing.
@@ -107,6 +111,7 @@ At 360×640, 768×720, and 1440×900:
 - essential text and controls remain visible and reachable;
 - connection status remains readable above the screen;
 - pagination and same-generation hacking fitting may adjust layout but do not replay already-opened content or code rows.
+- progressive hacking row insertion does not itself trigger fitting from the partial interaction DOM; any legitimate refit includes both revealed and queued rows.
 
 ## Content, Capability, and Audio Contract
 
@@ -120,4 +125,4 @@ At 360×640, 768×720, and 1440×900:
 
 Tests may code against these existing identifiers: `#screen`, `.scanlines`, `.vignette`, `.blink`, `#termList`, `.term-row`, `.term-row.sel`, `#termEntry`, `#entryBody`, `#termOutput`, `#backBtn`, `#pagePrev`, `#pageNext`, `#hackBoard`, `#hackColumns`, `.hack-row`, `.hcell.hi`, `#hackBlocked`, and `#connOverlay`.
 
-Implementation-only timer, controller, registry, board-snapshot, and consumed-key fields remain private and MUST be verified through visible content, row-node identity, mutation records, event outcomes, and cancellation behavior rather than a new public browser API.
+Implementation-only timer, controller, registry, board-snapshot, board-fit, and consumed-key fields remain private and MUST be verified through visible content, computed row styles, row-node identity, mutation records, event outcomes, geometry, and cancellation behavior rather than a new public browser API.

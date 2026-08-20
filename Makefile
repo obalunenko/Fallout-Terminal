@@ -12,9 +12,25 @@ CGO_LDFLAGS ?= -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
 export MACOSX_DEPLOYMENT_TARGET CGO_CFLAGS CGO_LDFLAGS
 
 BUILD_TOOL := $(GO) run ./cmd/build
+SPECKIT_INSTALL := scripts/install-speckit.sh
+SPECKIT_UPDATE_CHECK := scripts/check-speckit-updates.py
+
+SPECKIT_VERSION := 0.16.5
+SPECKIT_COMPANION_VERSION := 0.20.1
+SPECKIT_BROWNFIELD_VERSION := 1.0.0
+SPECKIT_BUGFIX_VERSION := 1.1.0
+SPECKIT_FEATURE_NUMBERING_VERSION := 1.0.0
+
+SPECKIT_VERSION_ENV = \
+	SPECKIT_VERSION="$(SPECKIT_VERSION)" \
+	SPECKIT_COMPANION_VERSION="$(SPECKIT_COMPANION_VERSION)" \
+	SPECKIT_BROWNFIELD_VERSION="$(SPECKIT_BROWNFIELD_VERSION)" \
+	SPECKIT_BUGFIX_VERSION="$(SPECKIT_BUGFIX_VERSION)" \
+	SPECKIT_FEATURE_NUMBERING_VERSION="$(SPECKIT_FEATURE_NUMBERING_VERSION)"
 
 .PHONY: help dev run prepare build package \
 	deps deps-client deps-frontend deps-browser \
+	speckit-install speckit-update-check \
 	fmt fmt-check vet test test-race check \
 	proto-generate proto-check proto-breaking bindings-check browser-test \
 	release-preflight release
@@ -47,6 +63,12 @@ deps-frontend: ## Install locked master frontend dependencies.
 
 deps-browser: ## Install locked browser-test dependencies.
 	$(NPM) ci --prefix tests/browser
+
+speckit-install: ## Install pinned Spec Kit and all project extensions.
+	$(SPECKIT_VERSION_ENV) $(SPECKIT_INSTALL)
+
+speckit-update-check: ## Check for Spec Kit and extension updates without installing them.
+	$(SPECKIT_VERSION_ENV) $(SPECKIT_UPDATE_CHECK)
 
 fmt: ## Format all Go sources.
 	gofmt -w .

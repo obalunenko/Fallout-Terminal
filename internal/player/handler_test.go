@@ -15,6 +15,7 @@ import (
 	playerv1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	"github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1/playerv1connect"
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -246,6 +247,90 @@ func TestTypedHandlersClassifyStructuralDomainAndBoundaryErrorsSafely(t *testing
 	require.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(publicConnectError(ErrResourceExhausted)))
 }
 
+func TestConnectPublishesPersistenceFailureNoticeOnlyToControllerAndClearsIt(t *testing.T) {
+	service, err := NewConnectService(ConnectServiceConfig{Coordinator: newConnectTestCoordinator(t)})
+	require.NoError(t, err)
+
+	controller := NewSubscription(t.Context(), "controller-stream", "controller-session", subscriptionSnapshot(1), 4)
+	observer := NewSubscription(t.Context(), "observer-stream", "observer-session", subscriptionSnapshot(1), 4)
+	service.hub.Register(controller)
+	service.hub.Register(observer)
+	t.Cleanup(service.CloseSubscriptions)
+
+	controllerState := &domain.PlayerState{
+		SessionID: "controller-session", FallbackName: "Игрок 1",
+		Role: domain.PlayerRoleActive, Phase: domain.PlayerPhaseControlling,
+	}
+	setDomainPlayerNotice(t, controllerState, "command-persistence-failed")
+	service.PublishEffect(control.Effect{
+		SessionID: "controller-session",
+		Update:    &domain.CompoundUpdate{Revision: 2, Player: controllerState},
+	})
+
+	controllerUpdate := (<-controller.Updates()).GetUpdate()
+	require.NotNil(t, controllerUpdate)
+	require.Equal(t,
+		playerv1.PlayerNoticeKind_PLAYER_NOTICE_KIND_COMMAND_PERSISTENCE_FAILED,
+		controllerUpdate.GetPlayerState().GetNotice().GetKind(),
+	)
+	select {
+	case unexpected := <-observer.Updates():
+		assert.Failf(t, "controller notice leaked", "observer received %#v", unexpected)
+	default:
+	}
+
+	observerState := &domain.PlayerState{
+		SessionID: "observer-session", FallbackName: "Игрок 2",
+		Role: domain.PlayerRoleObserver, Phase: domain.PlayerPhaseObserving,
+	}
+	service.PublishEffect(control.Effect{
+		SessionID: "observer-session",
+		Update:    &domain.CompoundUpdate{Revision: 2, Player: observerState},
+	})
+	observerUpdate := (<-observer.Updates()).GetUpdate()
+	require.NotNil(t, observerUpdate)
+	require.Nil(t, observerUpdate.GetPlayerState().GetNotice())
+
+	clearDomainOptionalField(t, controllerState, "Notice")
+	service.PublishEffect(control.Effect{
+		SessionID: "controller-session",
+		Update:    &domain.CompoundUpdate{Revision: 3, Player: controllerState},
+	})
+	cleared := (<-controller.Updates()).GetUpdate()
+	require.NotNil(t, cleared)
+	require.Nil(t, cleared.GetPlayerState().GetNotice())
+}
+
+func TestNavigateHandlerKeepsOrdinaryCommandOnExistingTypedPath(t *testing.T) {
+	base := newConnectTestCoordinator(t)
+	coordinator := &recordingActionCoordinator{ConnectCoordinator: base}
+	service, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator})
+	require.NoError(t, err)
+
+	request := &playerv1.NavigateRequest{
+		RecognitionHandle: "recognition-ordinary", RequestId: "ordinary-request",
+		BroadcastId: "broadcast-ordinary", TerminalId: "terminal-ordinary",
+		Action: &playerv1.NavigateRequest_Command{Command: &playerv1.NavigateCommand{NodeId: "diagnostic"}},
+	}
+	response, err := service.Navigate(t.Context(), connect.NewRequest(request))
+	require.NoError(t, err)
+	require.True(t, response.Msg.GetAccepted())
+	require.Equal(t, playerv1.ActionReason_ACTION_REASON_ACCEPTED, response.Msg.GetReason())
+	require.Equal(t, domain.RecognitionHandle("recognition-ordinary"), coordinator.handle)
+	require.Equal(t, domain.RuntimeCommandNavigate, coordinator.command.Kind)
+	require.Equal(t, "command", coordinator.command.Action)
+	require.Equal(t, "diagnostic", coordinator.command.NodeID)
+	require.NotEmpty(t, coordinator.command.PayloadFingerprint)
+
+	firstFingerprint := coordinator.command.PayloadFingerprint
+	replayed, err := service.Navigate(t.Context(), connect.NewRequest(request))
+	require.NoError(t, err)
+	require.Equal(t, response.Msg, replayed.Msg)
+	require.Equal(t, 2, coordinator.calls)
+	require.Equal(t, firstFingerprint, coordinator.command.PayloadFingerprint,
+		"the generated ordinary request must retain exact replay identity")
+}
+
 func TestPublicDescriptorAndProceduresExcludeEveryPrivateDesktopCapability(t *testing.T) {
 	var symbols []string
 	var collectMessages func(protoreflect.MessageDescriptors)
@@ -253,16 +338,31 @@ func TestPublicDescriptorAndProceduresExcludeEveryPrivateDesktopCapability(t *te
 		for index := 0; index < messages.Len(); index++ {
 			message := messages.Get(index)
 			symbols = append(symbols, string(message.FullName()))
+			for fieldIndex := 0; fieldIndex < message.Fields().Len(); fieldIndex++ {
+				symbols = append(symbols, string(message.Fields().Get(fieldIndex).FullName()))
+			}
 			collectMessages(message.Messages())
 		}
 	}
-	file := playerv1.File_fallout_terminal_player_v1_player_proto
-	collectMessages(file.Messages())
-	for index := 0; index < file.Services().Len(); index++ {
-		service := file.Services().Get(index)
-		symbols = append(symbols, string(service.FullName()))
-		for methodIndex := 0; methodIndex < service.Methods().Len(); methodIndex++ {
-			symbols = append(symbols, string(service.Methods().Get(methodIndex).FullName()))
+	for _, file := range []protoreflect.FileDescriptor{
+		playerv1.File_fallout_terminal_player_v1_player_proto,
+		playerv1.File_fallout_terminal_player_v1_terminal_proto,
+		playerv1.File_fallout_terminal_player_v1_navigation_proto,
+	} {
+		collectMessages(file.Messages())
+		for enumIndex := 0; enumIndex < file.Enums().Len(); enumIndex++ {
+			enum := file.Enums().Get(enumIndex)
+			symbols = append(symbols, string(enum.FullName()))
+			for valueIndex := 0; valueIndex < enum.Values().Len(); valueIndex++ {
+				symbols = append(symbols, string(enum.Values().Get(valueIndex).FullName()))
+			}
+		}
+		for serviceIndex := 0; serviceIndex < file.Services().Len(); serviceIndex++ {
+			service := file.Services().Get(serviceIndex)
+			symbols = append(symbols, string(service.FullName()))
+			for methodIndex := 0; methodIndex < service.Methods().Len(); methodIndex++ {
+				symbols = append(symbols, string(service.Methods().Get(methodIndex).FullName()))
+			}
 		}
 	}
 	publicSurface := strings.ToLower(strings.Join(symbols, "\n") + playerv1connect.PlayerServiceName +
@@ -272,8 +372,28 @@ func TestPublicDescriptorAndProceduresExcludeEveryPrivateDesktopCapability(t *te
 	for _, forbidden := range []string{
 		"desktop", "dialog", "openurl", "forcehacksuccess", "resetfailedhack", "runtimestatus",
 		"serverinformation", "credential", "secretword", "logicalsessionstate", "coordinationstate",
+		"pendingcommandexecution", "resolvecommandexecution", "commandexecutiondecision", "confirmationtext",
+		"commandstates", "resetcommandstate", "resetterminalcommandstates", "sessionstateevent",
+		"sessionstateresult", "filepath", "approve",
 	} {
 		require.NotContains(t, publicSurface, forbidden)
+	}
+}
+
+type recordingActionCoordinator struct {
+	ConnectCoordinator
+	handle  domain.RecognitionHandle
+	command domain.RuntimeCommand
+	calls   int
+}
+
+func (coordinator *recordingActionCoordinator) DispatchPlayerActionForRecognition(handle domain.RecognitionHandle, command domain.RuntimeCommand) domain.ActionResult {
+	coordinator.calls++
+	coordinator.handle = handle
+	coordinator.command = command
+	return domain.ActionResult{
+		RequestID: command.RequestID, Accepted: true,
+		Reason: domain.ActionReasonAccepted, Revision: 42,
 	}
 }
 
@@ -285,7 +405,7 @@ func newConnectTestCoordinator(t *testing.T, publish ...func(control.Effect)) *c
 		enqueue = publish[0]
 	}
 	coordinator := control.New(control.Config{IDs: ids, Enqueue: enqueue})
-	_, err := coordinator.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/player.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy"}})
+	_, err := coordinator.InstallPlayerConfig(domain.PlayerConfigHandle{Path: "/private/player.json", Version: 1, Name: "Vault 33"}, []domain.CharacterRosterEntry{{ID: "character-1", Name: "Lucy", Intelligence: 1}})
 	require.NoError(t, err)
 	_, err = coordinator.StartBroadcast()
 	require.NoError(t, err)

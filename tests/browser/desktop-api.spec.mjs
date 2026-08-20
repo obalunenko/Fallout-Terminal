@@ -27,6 +27,95 @@ test('generated desktop service calls remain explicit and normalized behind the 
   expect(calls).not.toContain('Call');
 });
 
+test('addCharacter forwards one complete profile with explicit false and expected revision', async ({ page }) => {
+  const request = {
+    name: 'Mara',
+    intelligence: 8,
+    hackerPerkAvailable: false,
+    expectedRevision: 42,
+  };
+
+  await page.evaluate(candidate => desktopAPI.addCharacter(candidate), request);
+
+  const call = await page.evaluate(() => __desktopFixture.calls
+    .filter(candidate => candidate.method === 'AddCharacter').at(-1));
+  expect(call).toEqual({ method: 'AddCharacter', args: [request] });
+});
+
+test('updateCharacter and deleteCharacter forward complete revisioned payloads without a rename facade', async ({ page }) => {
+  const update = {
+    characterId: 'character-mara',
+    name: 'Mara',
+    intelligence: 8,
+    hackerPerkAvailable: false,
+    expectedRevision: 42,
+  };
+  const deletion = {
+    characterId: 'character-boone',
+    expectedRevision: 43,
+  };
+
+  const facade = await page.evaluate(async ({ updateRequest, deleteRequest }) => {
+    const bindings = await import('/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js');
+    await desktopAPI.updateCharacter(updateRequest);
+    await desktopAPI.deleteCharacter(deleteRequest);
+    return {
+      updateType: typeof desktopAPI.updateCharacter,
+      renameType: typeof desktopAPI.renameCharacter,
+      deleteType: typeof desktopAPI.deleteCharacter,
+      bindingUpdateType: typeof bindings.UpdateCharacter,
+      bindingRenameType: typeof bindings.RenameCharacter,
+      bindingDeleteType: typeof bindings.DeleteCharacter,
+      calls: __desktopFixture.calls.filter(call => [
+        'UpdateCharacter', 'RenameCharacter', 'DeleteCharacter',
+      ].includes(call.method)),
+    };
+  }, { updateRequest: update, deleteRequest: deletion });
+
+  expect(facade.updateType).toBe('function');
+  expect(facade.renameType).toBe('undefined');
+  expect(facade.deleteType).toBe('function');
+  expect(facade.bindingUpdateType).toBe('function');
+  expect(facade.bindingRenameType).toBe('undefined');
+  expect(facade.bindingDeleteType).toBe('function');
+  expect(facade.calls).toEqual([
+    { method: 'UpdateCharacter', args: [update] },
+    { method: 'DeleteCharacter', args: [deletion] },
+  ]);
+});
+
+test('saveSession snapshots the complete cross-terminal document at the Wails boundary', async ({ page }) => {
+  const retained = await page.evaluate(async () => {
+    const candidate = {
+      version: 1,
+      name: 'demo boundary candidate',
+      terminals: [
+        {
+          id: 't_demo1', name: 'Source', hackLevel: 0, introText: '',
+          root: {
+            id: 'root', type: 'folder', name: 'ROOT',
+            children: [{
+              id: 'go', type: 'command', name: 'GO',
+              terminalTransition: { targetTerminalId: 't_demo2' },
+            }],
+          },
+        },
+        {
+          id: 't_demo2', name: 'Target', hackLevel: 0, introText: '',
+          root: { id: 'root', type: 'folder', name: 'ROOT', children: [] },
+        },
+      ],
+    };
+    const pending = desktopAPI.saveSession(candidate);
+    candidate.terminals.splice(1, 1);
+    await pending;
+    return __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1).args[0];
+  });
+
+  expect(retained.terminals.map(terminal => terminal.id)).toEqual(['t_demo1', 't_demo2']);
+  expect(retained.terminals[0].root.children[0].terminalTransition.targetTerminalId).toBe('t_demo2');
+});
+
 test('all four listeners precede the snapshot and newer wrapped events win per field', async ({ page }) => {
   const result = await page.evaluate(async () => {
     __desktopFixture.deferStatus();

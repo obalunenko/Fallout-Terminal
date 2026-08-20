@@ -2,7 +2,7 @@
 // @generated from file fallout/terminal/player/v1/terminal.proto (package fallout.terminal.player.v1, syntax proto3)
 /* eslint-disable */
 
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, tsEnum } from "@bufbuild/protobuf/codegenv2";
 import { file_fallout_terminal_player_v1_hacking } from "./hacking_pb.js";
 import { file_fallout_terminal_player_v1_navigation } from "./navigation_pb.js";
 
@@ -10,54 +10,106 @@ import { file_fallout_terminal_player_v1_navigation } from "./navigation_pb.js";
  * Describes the file fallout/terminal/player/v1/terminal.proto.
  */
 export const file_fallout_terminal_player_v1_terminal = /*@__PURE__*/
-  fileDesc("CilmYWxsb3V0L3Rlcm1pbmFsL3BsYXllci92MS90ZXJtaW5hbC5wcm90bxIaZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEiSgoNQ29udGVudEZvbGRlchI5CghjaGlsZHJlbhgBIAMoCzInLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkNvbnRlbnROb2RlIh4KDkNvbnRlbnRDb21tYW5kEgwKBHRleHQYASABKAkiIwoMQ29udGVudEVudHJ5EhMKC2Rlc2NyaXB0aW9uGAEgASgJIukBCgtDb250ZW50Tm9kZRIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEjsKBmZvbGRlchgDIAEoCzIpLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkNvbnRlbnRGb2xkZXJIABI9Cgdjb21tYW5kGAQgASgLMiouZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuQ29udGVudENvbW1hbmRIABI5CgVlbnRyeRgFIAEoCzIoLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkNvbnRlbnRFbnRyeUgAQgkKB2NvbnRlbnQimAIKDExpdmVUZXJtaW5hbBITCgt0ZXJtaW5hbF9pZBgBIAEoCRIVCg10ZXJtaW5hbF9uYW1lGAIgASgJEjUKBHRyZWUYAyABKAsyJy5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5Db250ZW50Tm9kZRISCgpoYWNrX2xldmVsGAQgASgFEhIKCmludHJvX3RleHQYBSABKAkSPwoKbmF2aWdhdGlvbhgGIAEoCzIrLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLk5hdmlnYXRpb25TdGF0ZRI8CgdoYWNraW5nGAcgASgLMisuZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuUHVibGljSGFja1N0YXRlIhAKDk5vTGl2ZVRlcm1pbmFsIrEBChRUZXJtaW5hbFByZXNlbnRhdGlvbhJBCg1saXZlX3Rlcm1pbmFsGAEgASgLMiguZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuTGl2ZVRlcm1pbmFsSAASRgoQbm9fbGl2ZV90ZXJtaW5hbBgCIAEoCzIqLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLk5vTGl2ZVRlcm1pbmFsSABCDgoMcHJlc2VudGF0aW9uQllaV2dpdGh1Yi5jb20vb2JhbHVuZW5rby9GYWxsb3V0LVRlcm1pbmFsL2ludGVybmFsL2dlbi9mYWxsb3V0L3Rlcm1pbmFsL3BsYXllci92MTtwbGF5ZXJ2MWIGcHJvdG8z", [file_fallout_terminal_player_v1_hacking, file_fallout_terminal_player_v1_navigation]);
+  fileDesc("CilmYWxsb3V0L3Rlcm1pbmFsL3BsYXllci92MS90ZXJtaW5hbC5wcm90bxIaZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEieQocQ29tbWFuZEV4ZWN1dGlvblByZXNlbnRhdGlvbhJACgVwaGFzZRgBIAEoDjIxLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkNvbW1hbmRFeGVjdXRpb25QaGFzZRIXCg9jb21tYW5kX25vZGVfaWQYAiABKAkiQgoUVGVybWluYWxSZXR1cm5UYXJnZXQSEwoLdGVybWluYWxfaWQYASABKAkSFQoNdGVybWluYWxfbmFtZRgCIAEoCSKtAQolUGVuZGluZ1Rlcm1pbmFsTmF2aWdhdGlvblByZXNlbnRhdGlvbhJKCglkaXJlY3Rpb24YASABKA4yNy5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5UZXJtaW5hbE5hdmlnYXRpb25EaXJlY3Rpb24SGgoSdGFyZ2V0X3Rlcm1pbmFsX2lkGAIgASgJEhwKFHRhcmdldF90ZXJtaW5hbF9uYW1lGAMgASgJIvoBCh5UZXJtaW5hbE5hdmlnYXRpb25QcmVzZW50YXRpb24SEwoLcm91dGVfZGVwdGgYASABKA0STAoNcmV0dXJuX3RhcmdldBgCIAEoCzIwLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLlRlcm1pbmFsUmV0dXJuVGFyZ2V0SACIAQESVwoHcGVuZGluZxgDIAEoCzJBLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLlBlbmRpbmdUZXJtaW5hbE5hdmlnYXRpb25QcmVzZW50YXRpb25IAYgBAUIQCg5fcmV0dXJuX3RhcmdldEIKCghfcGVuZGluZyJKCg1Db250ZW50Rm9sZGVyEjkKCGNoaWxkcmVuGAEgAygLMicuZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuQ29udGVudE5vZGUiHgoOQ29udGVudENvbW1hbmQSDAoEdGV4dBgBIAEoCSIjCgxDb250ZW50RW50cnkSEwoLZGVzY3JpcHRpb24YASABKAki6QEKC0NvbnRlbnROb2RlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSOwoGZm9sZGVyGAMgASgLMikuZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuQ29udGVudEZvbGRlckgAEj0KB2NvbW1hbmQYBCABKAsyKi5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5Db250ZW50Q29tbWFuZEgAEjkKBWVudHJ5GAUgASgLMiguZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuQ29udGVudEVudHJ5SABCCQoHY29udGVudCL+AwoMTGl2ZVRlcm1pbmFsEhMKC3Rlcm1pbmFsX2lkGAEgASgJEhUKDXRlcm1pbmFsX25hbWUYAiABKAkSNQoEdHJlZRgDIAEoCzInLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkNvbnRlbnROb2RlEhIKCmhhY2tfbGV2ZWwYBCABKAUSEgoKaW50cm9fdGV4dBgFIAEoCRI/CgpuYXZpZ2F0aW9uGAYgASgLMisuZmFsbG91dC50ZXJtaW5hbC5wbGF5ZXIudjEuTmF2aWdhdGlvblN0YXRlEjwKB2hhY2tpbmcYByABKAsyKy5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5QdWJsaWNIYWNrU3RhdGUSWAoRY29tbWFuZF9leGVjdXRpb24YCCABKAsyOC5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5Db21tYW5kRXhlY3V0aW9uUHJlc2VudGF0aW9uSACIAQESXAoTdGVybWluYWxfbmF2aWdhdGlvbhgJIAEoCzI6LmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLlRlcm1pbmFsTmF2aWdhdGlvblByZXNlbnRhdGlvbkgBiAEBQhQKEl9jb21tYW5kX2V4ZWN1dGlvbkIWChRfdGVybWluYWxfbmF2aWdhdGlvbiIQCg5Ob0xpdmVUZXJtaW5hbCKxAQoUVGVybWluYWxQcmVzZW50YXRpb24SQQoNbGl2ZV90ZXJtaW5hbBgBIAEoCzIoLmZhbGxvdXQudGVybWluYWwucGxheWVyLnYxLkxpdmVUZXJtaW5hbEgAEkYKEG5vX2xpdmVfdGVybWluYWwYAiABKAsyKi5mYWxsb3V0LnRlcm1pbmFsLnBsYXllci52MS5Ob0xpdmVUZXJtaW5hbEgAQg4KDHByZXNlbnRhdGlvbiqLAQoVQ29tbWFuZEV4ZWN1dGlvblBoYXNlEicKI0NPTU1BTkRfRVhFQ1VUSU9OX1BIQVNFX1VOU1BFQ0lGSUVEEAASIwofQ09NTUFORF9FWEVDVVRJT05fUEhBU0VfUEVORElORxABEiQKIENPTU1BTkRfRVhFQ1VUSU9OX1BIQVNFX1JFSkVDVEVEEAIqoQEKG1Rlcm1pbmFsTmF2aWdhdGlvbkRpcmVjdGlvbhItCilURVJNSU5BTF9OQVZJR0FUSU9OX0RJUkVDVElPTl9VTlNQRUNJRklFRBAAEikKJVRFUk1JTkFMX05BVklHQVRJT05fRElSRUNUSU9OX0ZPUldBUkQQARIoCiRURVJNSU5BTF9OQVZJR0FUSU9OX0RJUkVDVElPTl9SRVRVUk4QAkJZWldnaXRodWIuY29tL29iYWx1bmVua28vRmFsbG91dC1UZXJtaW5hbC9pbnRlcm5hbC9nZW4vZmFsbG91dC90ZXJtaW5hbC9wbGF5ZXIvdjE7cGxheWVydjFiBnByb3RvMw", [file_fallout_terminal_player_v1_hacking, file_fallout_terminal_player_v1_navigation]);
+
+/**
+ * Describes the message fallout.terminal.player.v1.CommandExecutionPresentation.
+ * Use `create(CommandExecutionPresentationSchema)` to create a new message.
+ */
+export const CommandExecutionPresentationSchema = /*@__PURE__*/
+  messageDesc(file_fallout_terminal_player_v1_terminal, 0);
+
+/**
+ * Describes the message fallout.terminal.player.v1.TerminalReturnTarget.
+ * Use `create(TerminalReturnTargetSchema)` to create a new message.
+ */
+export const TerminalReturnTargetSchema = /*@__PURE__*/
+  messageDesc(file_fallout_terminal_player_v1_terminal, 1);
+
+/**
+ * Describes the message fallout.terminal.player.v1.PendingTerminalNavigationPresentation.
+ * Use `create(PendingTerminalNavigationPresentationSchema)` to create a new message.
+ */
+export const PendingTerminalNavigationPresentationSchema = /*@__PURE__*/
+  messageDesc(file_fallout_terminal_player_v1_terminal, 2);
+
+/**
+ * Describes the message fallout.terminal.player.v1.TerminalNavigationPresentation.
+ * Use `create(TerminalNavigationPresentationSchema)` to create a new message.
+ */
+export const TerminalNavigationPresentationSchema = /*@__PURE__*/
+  messageDesc(file_fallout_terminal_player_v1_terminal, 3);
 
 /**
  * Describes the message fallout.terminal.player.v1.ContentFolder.
  * Use `create(ContentFolderSchema)` to create a new message.
  */
 export const ContentFolderSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 0);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 4);
 
 /**
  * Describes the message fallout.terminal.player.v1.ContentCommand.
  * Use `create(ContentCommandSchema)` to create a new message.
  */
 export const ContentCommandSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 1);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 5);
 
 /**
  * Describes the message fallout.terminal.player.v1.ContentEntry.
  * Use `create(ContentEntrySchema)` to create a new message.
  */
 export const ContentEntrySchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 2);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 6);
 
 /**
  * Describes the message fallout.terminal.player.v1.ContentNode.
  * Use `create(ContentNodeSchema)` to create a new message.
  */
 export const ContentNodeSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 3);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 7);
 
 /**
  * Describes the message fallout.terminal.player.v1.LiveTerminal.
  * Use `create(LiveTerminalSchema)` to create a new message.
  */
 export const LiveTerminalSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 4);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 8);
 
 /**
  * Describes the message fallout.terminal.player.v1.NoLiveTerminal.
  * Use `create(NoLiveTerminalSchema)` to create a new message.
  */
 export const NoLiveTerminalSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 5);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 9);
 
 /**
  * Describes the message fallout.terminal.player.v1.TerminalPresentation.
  * Use `create(TerminalPresentationSchema)` to create a new message.
  */
 export const TerminalPresentationSchema = /*@__PURE__*/
-  messageDesc(file_fallout_terminal_player_v1_terminal, 6);
+  messageDesc(file_fallout_terminal_player_v1_terminal, 10);
+
+/**
+ * Describes the enum fallout.terminal.player.v1.CommandExecutionPhase.
+ */
+export const CommandExecutionPhaseSchema = /*@__PURE__*/
+  enumDesc(file_fallout_terminal_player_v1_terminal, 0);
+
+/**
+ * @generated from enum fallout.terminal.player.v1.CommandExecutionPhase
+ */
+export const CommandExecutionPhase = /*@__PURE__*/
+  tsEnum(CommandExecutionPhaseSchema);
+
+/**
+ * Describes the enum fallout.terminal.player.v1.TerminalNavigationDirection.
+ */
+export const TerminalNavigationDirectionSchema = /*@__PURE__*/
+  enumDesc(file_fallout_terminal_player_v1_terminal, 1);
+
+/**
+ * @generated from enum fallout.terminal.player.v1.TerminalNavigationDirection
+ */
+export const TerminalNavigationDirection = /*@__PURE__*/
+  tsEnum(TerminalNavigationDirectionSchema);
 

@@ -65,16 +65,169 @@ func (x *FolderContent) GetChildren() []*ContentNode {
 	return nil
 }
 
-type CommandContent struct {
+type StateChangeConfig struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	CompletedName    string                 `protobuf:"bytes,1,opt,name=completed_name,json=completedName,proto3" json:"completed_name,omitempty"`
+	ConfirmationText string                 `protobuf:"bytes,2,opt,name=confirmation_text,json=confirmationText,proto3" json:"confirmation_text,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *StateChangeConfig) Reset() {
+	*x = StateChangeConfig{}
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StateChangeConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StateChangeConfig) ProtoMessage() {}
+
+func (x *StateChangeConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StateChangeConfig.ProtoReflect.Descriptor instead.
+func (*StateChangeConfig) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *StateChangeConfig) GetCompletedName() string {
+	if x != nil {
+		return x.CompletedName
+	}
+	return ""
+}
+
+func (x *StateChangeConfig) GetConfirmationText() string {
+	if x != nil {
+		return x.ConfirmationText
+	}
+	return ""
+}
+
+type CommandExecutionState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	CompletedName string                 `protobuf:"bytes,1,opt,name=completed_name,json=completedName,proto3" json:"completed_name,omitempty"`
+	ResultText    string                 `protobuf:"bytes,2,opt,name=result_text,json=resultText,proto3" json:"result_text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandExecutionState) Reset() {
+	*x = CommandExecutionState{}
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandExecutionState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandExecutionState) ProtoMessage() {}
+
+func (x *CommandExecutionState) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandExecutionState.ProtoReflect.Descriptor instead.
+func (*CommandExecutionState) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CommandExecutionState) GetCompletedName() string {
+	if x != nil {
+		return x.CompletedName
+	}
+	return ""
+}
+
+func (x *CommandExecutionState) GetResultText() string {
+	if x != nil {
+		return x.ResultText
+	}
+	return ""
+}
+
+type TerminalTransitionConfig struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	TargetTerminalId string                 `protobuf:"bytes,1,opt,name=target_terminal_id,json=targetTerminalId,proto3" json:"target_terminal_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *TerminalTransitionConfig) Reset() {
+	*x = TerminalTransitionConfig{}
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TerminalTransitionConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TerminalTransitionConfig) ProtoMessage() {}
+
+func (x *TerminalTransitionConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TerminalTransitionConfig.ProtoReflect.Descriptor instead.
+func (*TerminalTransitionConfig) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TerminalTransitionConfig) GetTargetTerminalId() string {
+	if x != nil {
+		return x.TargetTerminalId
+	}
+	return ""
+}
+
+type CommandContent struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// Types that are valid to be assigned to Behavior:
+	//
+	//	*CommandContent_StateChange
+	//	*CommandContent_TerminalTransition
+	Behavior      isCommandContent_Behavior `protobuf_oneof:"behavior"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CommandContent) Reset() {
 	*x = CommandContent{}
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[1]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +239,7 @@ func (x *CommandContent) String() string {
 func (*CommandContent) ProtoMessage() {}
 
 func (x *CommandContent) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[1]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -99,7 +252,7 @@ func (x *CommandContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandContent.ProtoReflect.Descriptor instead.
 func (*CommandContent) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{1}
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CommandContent) GetText() string {
@@ -108,6 +261,47 @@ func (x *CommandContent) GetText() string {
 	}
 	return ""
 }
+
+func (x *CommandContent) GetBehavior() isCommandContent_Behavior {
+	if x != nil {
+		return x.Behavior
+	}
+	return nil
+}
+
+func (x *CommandContent) GetStateChange() *StateChangeConfig {
+	if x != nil {
+		if x, ok := x.Behavior.(*CommandContent_StateChange); ok {
+			return x.StateChange
+		}
+	}
+	return nil
+}
+
+func (x *CommandContent) GetTerminalTransition() *TerminalTransitionConfig {
+	if x != nil {
+		if x, ok := x.Behavior.(*CommandContent_TerminalTransition); ok {
+			return x.TerminalTransition
+		}
+	}
+	return nil
+}
+
+type isCommandContent_Behavior interface {
+	isCommandContent_Behavior()
+}
+
+type CommandContent_StateChange struct {
+	StateChange *StateChangeConfig `protobuf:"bytes,2,opt,name=state_change,json=stateChange,proto3,oneof"`
+}
+
+type CommandContent_TerminalTransition struct {
+	TerminalTransition *TerminalTransitionConfig `protobuf:"bytes,3,opt,name=terminal_transition,json=terminalTransition,proto3,oneof"`
+}
+
+func (*CommandContent_StateChange) isCommandContent_Behavior() {}
+
+func (*CommandContent_TerminalTransition) isCommandContent_Behavior() {}
 
 type EntryContent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -118,7 +312,7 @@ type EntryContent struct {
 
 func (x *EntryContent) Reset() {
 	*x = EntryContent{}
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[2]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -130,7 +324,7 @@ func (x *EntryContent) String() string {
 func (*EntryContent) ProtoMessage() {}
 
 func (x *EntryContent) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[2]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -143,7 +337,7 @@ func (x *EntryContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EntryContent.ProtoReflect.Descriptor instead.
 func (*EntryContent) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{2}
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EntryContent) GetDescription() string {
@@ -169,7 +363,7 @@ type ContentNode struct {
 
 func (x *ContentNode) Reset() {
 	*x = ContentNode{}
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[3]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -181,7 +375,7 @@ func (x *ContentNode) String() string {
 func (*ContentNode) ProtoMessage() {}
 
 func (x *ContentNode) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[3]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -194,7 +388,7 @@ func (x *ContentNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContentNode.ProtoReflect.Descriptor instead.
 func (*ContentNode) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{3}
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ContentNode) GetId() string {
@@ -268,19 +462,20 @@ func (*ContentNode_Command) isContentNode_Content() {}
 func (*ContentNode_Entry) isContentNode_Content() {}
 
 type Terminal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	HackLevel     int32                  `protobuf:"varint,3,opt,name=hack_level,json=hackLevel,proto3" json:"hack_level,omitempty"`
-	IntroText     string                 `protobuf:"bytes,4,opt,name=intro_text,json=introText,proto3" json:"intro_text,omitempty"`
-	Root          *ContentNode           `protobuf:"bytes,5,opt,name=root,proto3" json:"root,omitempty"`
+	state         protoimpl.MessageState            `protogen:"open.v1"`
+	Id            string                            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                            `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	HackLevel     int32                             `protobuf:"varint,3,opt,name=hack_level,json=hackLevel,proto3" json:"hack_level,omitempty"`
+	IntroText     string                            `protobuf:"bytes,4,opt,name=intro_text,json=introText,proto3" json:"intro_text,omitempty"`
+	Root          *ContentNode                      `protobuf:"bytes,5,opt,name=root,proto3" json:"root,omitempty"`
+	CommandStates map[string]*CommandExecutionState `protobuf:"bytes,6,rep,name=command_states,json=commandStates,proto3" json:"command_states,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Terminal) Reset() {
 	*x = Terminal{}
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[4]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -292,7 +487,7 @@ func (x *Terminal) String() string {
 func (*Terminal) ProtoMessage() {}
 
 func (x *Terminal) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[4]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -305,7 +500,7 @@ func (x *Terminal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Terminal.ProtoReflect.Descriptor instead.
 func (*Terminal) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{4}
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Terminal) GetId() string {
@@ -343,6 +538,13 @@ func (x *Terminal) GetRoot() *ContentNode {
 	return nil
 }
 
+func (x *Terminal) GetCommandStates() map[string]*CommandExecutionState {
+	if x != nil {
+		return x.CommandStates
+	}
+	return nil
+}
+
 type Session struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       int32                  `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
@@ -355,7 +557,7 @@ type Session struct {
 
 func (x *Session) Reset() {
 	*x = Session{}
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[5]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +569,7 @@ func (x *Session) String() string {
 func (*Session) ProtoMessage() {}
 
 func (x *Session) ProtoReflect() protoreflect.Message {
-	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[5]
+	mi := &file_fallout_terminal_persistence_v1_session_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +582,7 @@ func (x *Session) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Session.ProtoReflect.Descriptor instead.
 func (*Session) Descriptor() ([]byte, []int) {
-	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{5}
+	return file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Session) GetVersion() int32 {
@@ -417,9 +619,22 @@ const file_fallout_terminal_persistence_v1_session_proto_rawDesc = "" +
 	"\n" +
 	"-fallout/terminal/persistence/v1/session.proto\x12\x1ffallout.terminal.persistence.v1\"Y\n" +
 	"\rFolderContent\x12H\n" +
-	"\bchildren\x18\x01 \x03(\v2,.fallout.terminal.persistence.v1.ContentNodeR\bchildren\"$\n" +
+	"\bchildren\x18\x01 \x03(\v2,.fallout.terminal.persistence.v1.ContentNodeR\bchildren\"g\n" +
+	"\x11StateChangeConfig\x12%\n" +
+	"\x0ecompleted_name\x18\x01 \x01(\tR\rcompletedName\x12+\n" +
+	"\x11confirmation_text\x18\x02 \x01(\tR\x10confirmationText\"_\n" +
+	"\x15CommandExecutionState\x12%\n" +
+	"\x0ecompleted_name\x18\x01 \x01(\tR\rcompletedName\x12\x1f\n" +
+	"\vresult_text\x18\x02 \x01(\tR\n" +
+	"resultText\"H\n" +
+	"\x18TerminalTransitionConfig\x12,\n" +
+	"\x12target_terminal_id\x18\x01 \x01(\tR\x10targetTerminalId\"\xf7\x01\n" +
 	"\x0eCommandContent\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"0\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12W\n" +
+	"\fstate_change\x18\x02 \x01(\v22.fallout.terminal.persistence.v1.StateChangeConfigH\x00R\vstateChange\x12l\n" +
+	"\x13terminal_transition\x18\x03 \x01(\v29.fallout.terminal.persistence.v1.TerminalTransitionConfigH\x00R\x12terminalTransitionB\n" +
+	"\n" +
+	"\bbehavior\"0\n" +
 	"\fEntryContent\x12 \n" +
 	"\vdescription\x18\x01 \x01(\tR\vdescription\"\x9a\x02\n" +
 	"\vContentNode\x12\x0e\n" +
@@ -428,7 +643,7 @@ const file_fallout_terminal_persistence_v1_session_proto_rawDesc = "" +
 	"\x06folder\x18\x03 \x01(\v2..fallout.terminal.persistence.v1.FolderContentH\x00R\x06folder\x12K\n" +
 	"\acommand\x18\x04 \x01(\v2/.fallout.terminal.persistence.v1.CommandContentH\x00R\acommand\x12E\n" +
 	"\x05entry\x18\x05 \x01(\v2-.fallout.terminal.persistence.v1.EntryContentH\x00R\x05entryB\t\n" +
-	"\acontent\"\xae\x01\n" +
+	"\acontent\"\x8d\x03\n" +
 	"\bTerminal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -436,7 +651,11 @@ const file_fallout_terminal_persistence_v1_session_proto_rawDesc = "" +
 	"hack_level\x18\x03 \x01(\x05R\thackLevel\x12\x1d\n" +
 	"\n" +
 	"intro_text\x18\x04 \x01(\tR\tintroText\x12@\n" +
-	"\x04root\x18\x05 \x01(\v2,.fallout.terminal.persistence.v1.ContentNodeR\x04root\"\xbc\x01\n" +
+	"\x04root\x18\x05 \x01(\v2,.fallout.terminal.persistence.v1.ContentNodeR\x04root\x12c\n" +
+	"\x0ecommand_states\x18\x06 \x03(\v2<.fallout.terminal.persistence.v1.Terminal.CommandStatesEntryR\rcommandStates\x1ax\n" +
+	"\x12CommandStatesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12L\n" +
+	"\x05value\x18\x02 \x01(\v26.fallout.terminal.persistence.v1.CommandExecutionStateR\x05value:\x028\x01\"\xbc\x01\n" +
 	"\aSession\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12(\n" +
@@ -456,27 +675,35 @@ func file_fallout_terminal_persistence_v1_session_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_persistence_v1_session_proto_rawDescData
 }
 
-var file_fallout_terminal_persistence_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_fallout_terminal_persistence_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_fallout_terminal_persistence_v1_session_proto_goTypes = []any{
-	(*FolderContent)(nil),  // 0: fallout.terminal.persistence.v1.FolderContent
-	(*CommandContent)(nil), // 1: fallout.terminal.persistence.v1.CommandContent
-	(*EntryContent)(nil),   // 2: fallout.terminal.persistence.v1.EntryContent
-	(*ContentNode)(nil),    // 3: fallout.terminal.persistence.v1.ContentNode
-	(*Terminal)(nil),       // 4: fallout.terminal.persistence.v1.Terminal
-	(*Session)(nil),        // 5: fallout.terminal.persistence.v1.Session
+	(*FolderContent)(nil),            // 0: fallout.terminal.persistence.v1.FolderContent
+	(*StateChangeConfig)(nil),        // 1: fallout.terminal.persistence.v1.StateChangeConfig
+	(*CommandExecutionState)(nil),    // 2: fallout.terminal.persistence.v1.CommandExecutionState
+	(*TerminalTransitionConfig)(nil), // 3: fallout.terminal.persistence.v1.TerminalTransitionConfig
+	(*CommandContent)(nil),           // 4: fallout.terminal.persistence.v1.CommandContent
+	(*EntryContent)(nil),             // 5: fallout.terminal.persistence.v1.EntryContent
+	(*ContentNode)(nil),              // 6: fallout.terminal.persistence.v1.ContentNode
+	(*Terminal)(nil),                 // 7: fallout.terminal.persistence.v1.Terminal
+	(*Session)(nil),                  // 8: fallout.terminal.persistence.v1.Session
+	nil,                              // 9: fallout.terminal.persistence.v1.Terminal.CommandStatesEntry
 }
 var file_fallout_terminal_persistence_v1_session_proto_depIdxs = []int32{
-	3, // 0: fallout.terminal.persistence.v1.FolderContent.children:type_name -> fallout.terminal.persistence.v1.ContentNode
-	0, // 1: fallout.terminal.persistence.v1.ContentNode.folder:type_name -> fallout.terminal.persistence.v1.FolderContent
-	1, // 2: fallout.terminal.persistence.v1.ContentNode.command:type_name -> fallout.terminal.persistence.v1.CommandContent
-	2, // 3: fallout.terminal.persistence.v1.ContentNode.entry:type_name -> fallout.terminal.persistence.v1.EntryContent
-	3, // 4: fallout.terminal.persistence.v1.Terminal.root:type_name -> fallout.terminal.persistence.v1.ContentNode
-	4, // 5: fallout.terminal.persistence.v1.Session.terminals:type_name -> fallout.terminal.persistence.v1.Terminal
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	6,  // 0: fallout.terminal.persistence.v1.FolderContent.children:type_name -> fallout.terminal.persistence.v1.ContentNode
+	1,  // 1: fallout.terminal.persistence.v1.CommandContent.state_change:type_name -> fallout.terminal.persistence.v1.StateChangeConfig
+	3,  // 2: fallout.terminal.persistence.v1.CommandContent.terminal_transition:type_name -> fallout.terminal.persistence.v1.TerminalTransitionConfig
+	0,  // 3: fallout.terminal.persistence.v1.ContentNode.folder:type_name -> fallout.terminal.persistence.v1.FolderContent
+	4,  // 4: fallout.terminal.persistence.v1.ContentNode.command:type_name -> fallout.terminal.persistence.v1.CommandContent
+	5,  // 5: fallout.terminal.persistence.v1.ContentNode.entry:type_name -> fallout.terminal.persistence.v1.EntryContent
+	6,  // 6: fallout.terminal.persistence.v1.Terminal.root:type_name -> fallout.terminal.persistence.v1.ContentNode
+	9,  // 7: fallout.terminal.persistence.v1.Terminal.command_states:type_name -> fallout.terminal.persistence.v1.Terminal.CommandStatesEntry
+	7,  // 8: fallout.terminal.persistence.v1.Session.terminals:type_name -> fallout.terminal.persistence.v1.Terminal
+	2,  // 9: fallout.terminal.persistence.v1.Terminal.CommandStatesEntry.value:type_name -> fallout.terminal.persistence.v1.CommandExecutionState
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_persistence_v1_session_proto_init() }
@@ -484,19 +711,23 @@ func file_fallout_terminal_persistence_v1_session_proto_init() {
 	if File_fallout_terminal_persistence_v1_session_proto != nil {
 		return
 	}
-	file_fallout_terminal_persistence_v1_session_proto_msgTypes[3].OneofWrappers = []any{
+	file_fallout_terminal_persistence_v1_session_proto_msgTypes[4].OneofWrappers = []any{
+		(*CommandContent_StateChange)(nil),
+		(*CommandContent_TerminalTransition)(nil),
+	}
+	file_fallout_terminal_persistence_v1_session_proto_msgTypes[6].OneofWrappers = []any{
 		(*ContentNode_Folder)(nil),
 		(*ContentNode_Command)(nil),
 		(*ContentNode_Entry)(nil),
 	}
-	file_fallout_terminal_persistence_v1_session_proto_msgTypes[5].OneofWrappers = []any{}
+	file_fallout_terminal_persistence_v1_session_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_persistence_v1_session_proto_rawDesc), len(file_fallout_terminal_persistence_v1_session_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -145,6 +145,10 @@ func ValidateSession(session Session) error {
 	}
 
 	terminalIDs := make(map[string]struct{}, len(session.Terminals))
+	type transitionReference struct {
+		path, sourceTerminalID, targetTerminalID string
+	}
+	var transitionReferences []transitionReference
 	for index := range session.Terminals {
 		terminal := session.Terminals[index]
 		path := fmt.Sprintf("terminals[%d]", index)
@@ -170,8 +174,38 @@ func ValidateSession(session Session) error {
 		if err := validateExtras(path, terminal.Extra, terminalFields); err != nil {
 			return err
 		}
-		if err := validateTree(path+".root", terminal.Root); err != nil {
+		nodesByID, references, err := validateTree(path+".root", terminal.Root)
+		if err != nil {
 			return err
+		}
+		for _, reference := range references {
+			transitionReferences = append(transitionReferences, transitionReference{
+				path: reference.path, sourceTerminalID: terminal.ID, targetTerminalID: reference.targetTerminalID,
+			})
+		}
+		for commandID, state := range terminal.CommandStates {
+			statePath := fmt.Sprintf("%s.commandStates[%q]", path, commandID)
+			node, exists := nodesByID[commandID]
+			if !exists {
+				return fmt.Errorf("%s references an unknown command", statePath)
+			}
+			if node.Type != NodeCommand || node.StateChange == nil {
+				return fmt.Errorf("%s must reference a state-changing command", statePath)
+			}
+			if err := validateRequiredString(statePath+".completedName", state.CompletedName, maxNameBytes); err != nil {
+				return err
+			}
+			if err := validateRequiredString(statePath+".resultText", state.ResultText, maxBodyBytes); err != nil {
+				return err
+			}
+		}
+	}
+	for _, reference := range transitionReferences {
+		if reference.targetTerminalID == reference.sourceTerminalID {
+			return fmt.Errorf("%s.targetTerminalId must reference another terminal", reference.path)
+		}
+		if _, exists := terminalIDs[reference.targetTerminalID]; !exists {
+			return fmt.Errorf("%s.targetTerminalId references unknown terminal %q", reference.path, reference.targetTerminalID)
 		}
 	}
 	return nil
@@ -207,12 +241,21 @@ func ValidatePlayerConfig(config PlayerConfig) error {
 		if utf8.RuneCountInString(entry.Name) > MaxCharacterNameRunes {
 			return fmt.Errorf("%s.name exceeds %d characters", path, MaxCharacterNameRunes)
 		}
+		if entry.Intelligence < 1 || entry.Intelligence > 10 {
+			return fmt.Errorf("%s.intelligence must be between 1 and 10", path)
+		}
 	}
 	return nil
 }
 
-func validateTree(path string, root ContentNode) error {
-	ids := make(map[string]struct{})
+type treeTransitionReference struct {
+	path             string
+	targetTerminalID string
+}
+
+func validateTree(path string, root ContentNode) (map[string]ContentNode, []treeTransitionReference, error) {
+	nodesByID := make(map[string]ContentNode)
+	var transitionReferences []treeTransitionReference
 	count := 0
 	var visit func(string, ContentNode, int) error
 	visit = func(nodePath string, node ContentNode, depth int) error {
@@ -226,10 +269,10 @@ func validateTree(path string, root ContentNode) error {
 		if err := validateRequiredString(nodePath+".id", node.ID, maxNameBytes); err != nil {
 			return err
 		}
-		if _, exists := ids[node.ID]; exists {
+		if _, exists := nodesByID[node.ID]; exists {
 			return fmt.Errorf("%s.id duplicates %q", nodePath, node.ID)
 		}
-		ids[node.ID] = struct{}{}
+		nodesByID[node.ID] = node
 		if err := validateRequiredString(nodePath+".name", node.Name, maxNameBytes); err != nil {
 			return err
 		}
@@ -239,6 +282,9 @@ func validateTree(path string, root ContentNode) error {
 
 		switch node.Type {
 		case NodeFolder:
+			if node.StateChange != nil || node.TerminalTransition != nil {
+				return fmt.Errorf("%s folder cannot contain command configuration", nodePath)
+			}
 			if node.Children == nil {
 				return fmt.Errorf("%s.children must be an array", nodePath)
 			}
@@ -257,7 +303,35 @@ func validateTree(path string, root ContentNode) error {
 			if len([]byte(node.Text)) > maxBodyBytes {
 				return fmt.Errorf("%s.text exceeds %d bytes", nodePath, maxBodyBytes)
 			}
+			switch node.Behavior() {
+			case CommandBehaviorInvalid:
+				return fmt.Errorf("%s command cannot contain both stateChange and terminalTransition", nodePath)
+			case CommandBehaviorStateChange:
+				if err := validateRequiredString(nodePath+".text", node.Text, maxBodyBytes); err != nil {
+					return err
+				}
+				if err := validateRequiredString(nodePath+".stateChange.completedName", node.StateChange.CompletedName, maxNameBytes); err != nil {
+					return err
+				}
+				if err := validateRequiredString(nodePath+".stateChange.confirmationText", node.StateChange.ConfirmationText, maxBodyBytes); err != nil {
+					return err
+				}
+			case CommandBehaviorTerminalTransition:
+				if err := validateRequiredString(nodePath+".terminalTransition.targetTerminalId", node.TerminalTransition.TargetTerminalID, MaxTerminalIDBytes); err != nil {
+					return err
+				}
+				transitionReferences = append(transitionReferences, treeTransitionReference{
+					path: nodePath + ".terminalTransition", targetTerminalID: node.TerminalTransition.TargetTerminalID,
+				})
+			case CommandBehaviorOrdinary:
+				// No optional command behavior is configured.
+			default:
+				return fmt.Errorf("%s command has unsupported behavior %q", nodePath, node.Behavior())
+			}
 		case NodeEntry:
+			if node.StateChange != nil || node.TerminalTransition != nil {
+				return fmt.Errorf("%s entry cannot contain command configuration", nodePath)
+			}
 			if len(node.Children) != 0 || node.Text != "" {
 				return fmt.Errorf("%s entry must be a leaf", nodePath)
 			}
@@ -269,7 +343,10 @@ func validateTree(path string, root ContentNode) error {
 		}
 		return nil
 	}
-	return visit(path, root, 1)
+	if err := visit(path, root, 1); err != nil {
+		return nil, nil, err
+	}
+	return nodesByID, transitionReferences, nil
 }
 
 func validateRequiredString(path, value string, maxBytes int) error {

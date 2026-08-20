@@ -50,13 +50,105 @@ export class AssignmentPayload {
 }
 
 /**
- * CharacterRenamePayload identifies one stable roster entry and its new
- * player-facing display name.
+ * CharacterCreatePayload carries one complete trusted player profile and the
+ * coordination revision it was based on.
  */
-export class CharacterRenamePayload {
+export class CharacterCreatePayload {
     /**
-     * Creates a new CharacterRenamePayload instance.
-     * @param {Partial<CharacterRenamePayload>} [$$source = {}] - The source object to create the CharacterRenamePayload.
+     * Creates a new CharacterCreatePayload instance.
+     * @param {Partial<CharacterCreatePayload>} [$$source = {}] - The source object to create the CharacterCreatePayload.
+     */
+    constructor($$source = {}) {
+        if (!("name" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["name"] = "";
+        }
+        if (!("intelligence" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["intelligence"] = 0;
+        }
+        if (!("hackerPerkAvailable" in $$source)) {
+            /**
+             * @member
+             * @type {boolean | null}
+             */
+            this["hackerPerkAvailable"] = null;
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CharacterCreatePayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CharacterCreatePayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CharacterCreatePayload(/** @type {Partial<CharacterCreatePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * CharacterDeletePayload identifies one stable roster identity and the
+ * coordination revision the deletion was based on.
+ */
+export class CharacterDeletePayload {
+    /**
+     * Creates a new CharacterDeletePayload instance.
+     * @param {Partial<CharacterDeletePayload>} [$$source = {}] - The source object to create the CharacterDeletePayload.
+     */
+    constructor($$source = {}) {
+        if (!("characterId" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.CharacterID}
+             */
+            this["characterId"] = "";
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CharacterDeletePayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CharacterDeletePayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CharacterDeletePayload(/** @type {Partial<CharacterDeletePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * CharacterUpdatePayload carries a complete replacement profile for one
+ * stable roster identity and the coordination revision it was based on.
+ */
+export class CharacterUpdatePayload {
+    /**
+     * Creates a new CharacterUpdatePayload instance.
+     * @param {Partial<CharacterUpdatePayload>} [$$source = {}] - The source object to create the CharacterUpdatePayload.
      */
     constructor($$source = {}) {
         if (!("characterId" in $$source)) {
@@ -73,18 +165,78 @@ export class CharacterRenamePayload {
              */
             this["name"] = "";
         }
+        if (!("intelligence" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["intelligence"] = 0;
+        }
+        if (!("hackerPerkAvailable" in $$source)) {
+            /**
+             * @member
+             * @type {boolean | null}
+             */
+            this["hackerPerkAvailable"] = null;
+        }
+        if (!("expectedRevision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["expectedRevision"] = 0;
+        }
 
         Object.assign(this, $$source);
     }
 
     /**
-     * Creates a new CharacterRenamePayload instance from a string or object.
+     * Creates a new CharacterUpdatePayload instance from a string or object.
      * @param {any} [$$source = {}]
-     * @returns {CharacterRenamePayload}
+     * @returns {CharacterUpdatePayload}
      */
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
-        return new CharacterRenamePayload(/** @type {Partial<CharacterRenamePayload>} */($$parsedSource));
+        return new CharacterUpdatePayload(/** @type {Partial<CharacterUpdatePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * CommandExecutionDecisionPayload resolves one exact server-owned pending
+ * request. The authored prompt itself is carried only by coordination state.
+ */
+export class CommandExecutionDecisionPayload {
+    /**
+     * Creates a new CommandExecutionDecisionPayload instance.
+     * @param {Partial<CommandExecutionDecisionPayload>} [$$source = {}] - The source object to create the CommandExecutionDecisionPayload.
+     */
+    constructor($$source = {}) {
+        if (!("requestId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["requestId"] = "";
+        }
+        if (!("decision" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.CommandExecutionDecision}
+             */
+            this["decision"] = domain$0.CommandExecutionDecision.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new CommandExecutionDecisionPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {CommandExecutionDecisionPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new CommandExecutionDecisionPayload(/** @type {Partial<CommandExecutionDecisionPayload>} */($$parsedSource));
     }
 }
 
@@ -745,6 +897,177 @@ export class PublicAccessStatus {
 }
 
 /**
+ * ResetCommandStatePayload addresses one authored state-changing command by
+ * stable terminal and command IDs.
+ */
+export class ResetCommandStatePayload {
+    /**
+     * Creates a new ResetCommandStatePayload instance.
+     * @param {Partial<ResetCommandStatePayload>} [$$source = {}] - The source object to create the ResetCommandStatePayload.
+     */
+    constructor($$source = {}) {
+        if (!("terminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["terminalId"] = "";
+        }
+        if (!("commandId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["commandId"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResetCommandStatePayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResetCommandStatePayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ResetCommandStatePayload(/** @type {Partial<ResetCommandStatePayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * ResetTerminalCommandStatesPayload addresses one authored terminal whose
+ * durable command snapshots should be cleared atomically.
+ */
+export class ResetTerminalCommandStatesPayload {
+    /**
+     * Creates a new ResetTerminalCommandStatesPayload instance.
+     * @param {Partial<ResetTerminalCommandStatesPayload>} [$$source = {}] - The source object to create the ResetTerminalCommandStatesPayload.
+     */
+    constructor($$source = {}) {
+        if (!("terminalId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["terminalId"] = "";
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResetTerminalCommandStatesPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResetTerminalCommandStatesPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new ResetTerminalCommandStatesPayload(/** @type {Partial<ResetTerminalCommandStatesPayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * ResolveCommandExecutionResult is the private master-only response to one
+ * exact pending command decision.
+ */
+export class ResolveCommandExecutionResult {
+    /**
+     * Creates a new ResolveCommandExecutionResult instance.
+     * @param {Partial<ResolveCommandExecutionResult>} [$$source = {}] - The source object to create the ResolveCommandExecutionResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (!("state" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.MasterCoordinationState | null}
+             */
+            this["state"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResolveCommandExecutionResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResolveCommandExecutionResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("state" in $$parsedSource) {
+            $$parsedSource["state"] = $$createField2_0($$parsedSource["state"]);
+        }
+        return new ResolveCommandExecutionResult(/** @type {Partial<ResolveCommandExecutionResult>} */($$parsedSource));
+    }
+}
+
+/**
+ * ResolveTerminalNavigationResult is the private response for one exact
+ * forward/return decision and its resulting authoritative coordination state.
+ */
+export class ResolveTerminalNavigationResult {
+    /**
+     * Creates a new ResolveTerminalNavigationResult instance.
+     * @param {Partial<ResolveTerminalNavigationResult>} [$$source = {}] - The source object to create the ResolveTerminalNavigationResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (!("state" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.MasterCoordinationState | null}
+             */
+            this["state"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new ResolveTerminalNavigationResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {ResolveTerminalNavigationResult}
+     */
+    static createFrom($$source = {}) {
+        const $$createField2_0 = $$createType1;
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        if ("state" in $$parsedSource) {
+            $$parsedSource["state"] = $$createField2_0($$parsedSource["state"]);
+        }
+        return new ResolveTerminalNavigationResult(/** @type {Partial<ResolveTerminalNavigationResult>} */($$parsedSource));
+    }
+}
+
+/**
  * RuntimeStatus is the synchronous startup/status snapshot used to avoid
  * losing events emitted before the frontend subscribes.
  */
@@ -916,6 +1239,133 @@ export class SavePublicAccessSettingsPayload {
     static createFrom($$source = {}) {
         let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
         return new SavePublicAccessSettingsPayload(/** @type {Partial<SavePublicAccessSettingsPayload>} */($$parsedSource));
+    }
+}
+
+/**
+ * SessionStateEvent is emitted only after a command-state mutation reaches
+ * durability. It intentionally excludes the user-selected file path.
+ */
+export class SessionStateEvent {
+    /**
+     * Creates a new SessionStateEvent instance.
+     * @param {Partial<SessionStateEvent>} [$$source = {}] - The source object to create the SessionStateEvent.
+     */
+    constructor($$source = {}) {
+        if (!("revision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["revision"] = 0;
+        }
+        if (!("session" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.Session | null}
+             */
+            this["session"] = null;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SessionStateEvent instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {SessionStateEvent}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SessionStateEvent(/** @type {Partial<SessionStateEvent>} */($$parsedSource));
+    }
+}
+
+/**
+ * SessionStateResult returns the canonical durable document and its
+ * session-owned revision after a trusted command-state mutation.
+ */
+export class SessionStateResult {
+    /**
+     * Creates a new SessionStateResult instance.
+     * @param {Partial<SessionStateResult>} [$$source = {}] - The source object to create the SessionStateResult.
+     */
+    constructor($$source = {}) {
+        if (!("ok" in $$source)) {
+            /**
+             * @member
+             * @type {boolean}
+             */
+            this["ok"] = false;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {string | undefined}
+             */
+            this["error"] = undefined;
+        }
+        if (!("revision" in $$source)) {
+            /**
+             * @member
+             * @type {number}
+             */
+            this["revision"] = 0;
+        }
+        if (/** @type {any} */(false)) {
+            /**
+             * @member
+             * @type {domain$0.Session | null | undefined}
+             */
+            this["session"] = undefined;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new SessionStateResult instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {SessionStateResult}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new SessionStateResult(/** @type {Partial<SessionStateResult>} */($$parsedSource));
+    }
+}
+
+export class TerminalNavigationDecisionPayload {
+    /**
+     * Creates a new TerminalNavigationDecisionPayload instance.
+     * @param {Partial<TerminalNavigationDecisionPayload>} [$$source = {}] - The source object to create the TerminalNavigationDecisionPayload.
+     */
+    constructor($$source = {}) {
+        if (!("requestId" in $$source)) {
+            /**
+             * @member
+             * @type {string}
+             */
+            this["requestId"] = "";
+        }
+        if (!("decision" in $$source)) {
+            /**
+             * @member
+             * @type {domain$0.TerminalNavigationDecision}
+             */
+            this["decision"] = domain$0.TerminalNavigationDecision.$zero;
+        }
+
+        Object.assign(this, $$source);
+    }
+
+    /**
+     * Creates a new TerminalNavigationDecisionPayload instance from a string or object.
+     * @param {any} [$$source = {}]
+     * @returns {TerminalNavigationDecisionPayload}
+     */
+    static createFrom($$source = {}) {
+        let $$parsedSource = typeof $$source === 'string' ? JSON.parse($$source) : $$source;
+        return new TerminalNavigationDecisionPayload(/** @type {Partial<TerminalNavigationDecisionPayload>} */($$parsedSource));
     }
 }
 

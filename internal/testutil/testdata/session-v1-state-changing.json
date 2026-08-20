@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "name": "state-changing commands",
+  "terminals": [
+    {
+      "id": "t_security",
+      "name": "Терминал охраны",
+      "hackLevel": 0,
+      "introText": "СИСТЕМА УПРАВЛЕНИЯ ДОСТУПОМ",
+      "root": {
+        "id": "root",
+        "type": "folder",
+        "name": "ROOT",
+        "children": [
+          {
+            "id": "n_access",
+            "type": "folder",
+            "name": "УПРАВЛЕНИЕ ДОСТУПОМ",
+            "children": [
+              {
+                "id": "n_doors",
+                "type": "command",
+                "name": "Открыть двери",
+                "text": "Двери открыты. Доступ в сектор разрешён.",
+                "stateChange": {
+                  "completedName": "Двери открыты",
+                  "confirmationText": "Открыть двери?"
+                }
+              },
+              {
+                "id": "n_alarm",
+                "type": "command",
+                "name": "Отключить тревогу",
+                "text": "Сигнал тревоги отключён.",
+                "stateChange": {
+                  "completedName": "Тревога отключена",
+                  "confirmationText": "Отключить сигнал тревоги?"
+                }
+              }
+            ]
+          },
+          {
+            "id": "n_status",
+            "type": "entry",
+            "name": "СОСТОЯНИЕ",
+            "description": "Подсистема дверей работает в штатном режиме."
+          }
+        ]
+      },
+      "commandStates": {
+        "n_doors": {
+          "completedName": "Гермодвери открыты",
+          "resultText": "Гермодвери были открыты при первом подтверждённом выполнении."
+        },
+        "n_alarm": {
+          "completedName": "Тревога отключена",
+          "resultText": "Сигнал тревоги отключён."
+        }
+      }
+    },
+    {
+      "id": "t_power",
+      "name": "Терминал энергосистемы",
+      "hackLevel": 2,
+      "introText": "АВАРИЙНОЕ УПРАВЛЕНИЕ ЭНЕРГОСЕТЬЮ",
+      "root": {
+        "id": "root",
+        "type": "folder",
+        "name": "ROOT",
+        "children": [
+          {
+            "id": "n_backup_power",
+            "type": "command",
+            "name": "Запустить резервное питание",
+            "text": "Резервное питание запущено.",
+            "stateChange": {
+              "completedName": "Резервное питание работает",
+              "confirmationText": "Запустить резервное питание?"
+            }
+          }
+        ]
+      },
+      "commandStates": {
+        "n_backup_power": {
+          "completedName": "Резервное питание работает",
+          "resultText": "Резервное питание запущено."
+        }
+      }
+    }
+  ]
+}

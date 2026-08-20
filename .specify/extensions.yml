@@ -2,6 +2,7 @@ installed:
 - brownfield
 - bugfix
 - companion
+- feature-numbering
 settings:
   auto_execute_hooks: true
 hooks:
@@ -60,4 +61,13 @@ hooks:
     priority: 10
     prompt: Scan this existing project to customize spec-kit configuration?
     description: Auto-scan project after spec-kit init to detect tech stack and conventions
+    condition: null
+  before_specify:
+  - extension: feature-numbering
+    command: speckit.feature-numbering.before-specify
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: Execute speckit.feature-numbering.before-specify?
+    description: Bind specify to the next NNN-feature-name directory
     condition: null

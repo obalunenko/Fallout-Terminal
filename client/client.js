@@ -3,10 +3,12 @@ import { createConnectTransport } from '@connectrpc/connect-web';
 import {
   ActionReason,
   PlayerPhase,
+  PlayerNoticeKind,
   PlayerRole,
   PlayerService,
   RosterAvailability,
 } from './gen/fallout/terminal/player/v1/player_pb.js';
+import { CommandExecutionPhase, TerminalNavigationDirection } from './gen/fallout/terminal/player/v1/terminal_pb.js';
 import {
   playCharScroll,
   playEnter,
@@ -45,6 +47,8 @@ let mode          = MODE.LIST;
 let viewEntryId   = null;
 let commandOutput = null;
 let currentCommandNodeId = null;
+let commandExecution = null;
+let terminalNavigation = null;
 
 // Typewriter reveal: only replay when the shown content actually changed.
 let lastRenderedFolderKey  = null;
@@ -52,6 +56,7 @@ let lastRenderedEntryId    = null;
 let lastRenderedCommandKey = null;
 let lastRenderedHackKey    = null;
 let lastRenderedHackRows = new Map();
+let hackBoardFit = null;
 const activeRevealControllers = new Set();
 let consumedRevealKey = null;
 
@@ -84,6 +89,7 @@ let playerState = null;
 let pendingSelection = null;
 let pendingSharedAction = null;
 let appliedSharedRevision = 0;
+let transientPlayerNotice = '';
 
 // ── DOM refs ──────────────────────────────────────────────
 const normalHeader = document.getElementById('normalHeader');
@@ -417,6 +423,14 @@ function applySubscriptionMessage(message, first) {
 }
 
 function applyGeneratedSnapshot(snapshot) {
+  // The first value of a new physical stream is a complete authoritative
+  // baseline. Never let revision or transient command UI retained from the
+  // previous stream suppress pending/rejected/completed recovery.
+  appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
+  terminalLiveBaselinePending = true;
+  commandExecution = null;
+  terminalNavigation = null;
   applyRecognitionSnapshot(snapshot.recognitionHandle, generatedPlayerState(snapshot.playerState, snapshot.revision));
   applyGeneratedTerminal(snapshot.terminalPresentation, snapshot.revision);
 }
@@ -451,7 +465,25 @@ function applyGeneratedTerminal(presentation, revision) {
     introText: live.introText,
     nav: generatedNavigation(live.navigation),
     hack: generatedHack(live.hacking),
+    commandExecution: generatedCommandExecution(live.commandExecution),
+  terminalNavigation: generatedTerminalNavigation(live.terminalNavigation),
   });
+}
+
+function generatedTerminalNavigation(navigation) {
+  if (!navigation) return null;
+  return {
+    routeDepth: Number(navigation.routeDepth || 0),
+    returnTarget: navigation.returnTarget ? {
+      terminalId: navigation.returnTarget.terminalId,
+      terminalName: navigation.returnTarget.terminalName,
+    } : null,
+    pending: navigation.pending ? {
+      direction: navigation.pending.direction === TerminalNavigationDirection.RETURN ? 'return' : 'forward',
+      targetTerminalId: navigation.pending.targetTerminalId,
+      targetTerminalName: navigation.pending.targetTerminalName,
+    } : null,
+  };
 }
 
 function generatedPlayerState(state, revision) {
@@ -478,12 +510,25 @@ function generatedPlayerState(state, revision) {
     })[state.phase] || 'no-broadcast',
     broadcastId: state.broadcastId || null,
     activeTerminalId: state.activeTerminalId || null,
+    notice: state.notice?.kind === PlayerNoticeKind.COMMAND_PERSISTENCE_FAILED
+      ? 'command-persistence-failed'
+      : null,
     roster: (state.roster || []).map(entry => ({
       id: entry.characterId,
       name: entry.displayName,
       status: entry.availability === RosterAvailability.AVAILABLE ? 'available' : 'claimed',
     })),
   };
+}
+
+function generatedCommandExecution(presentation) {
+  if (!presentation) return null;
+  const phase = ({
+    [CommandExecutionPhase.PENDING]: 'pending',
+    [CommandExecutionPhase.REJECTED]: 'rejected',
+  })[presentation.phase];
+  if (!phase || !presentation.commandNodeId) return null;
+  return { phase, commandNodeId: presentation.commandNodeId };
 }
 
 function generatedContentNode(node) {
@@ -608,6 +653,7 @@ function acceptSharedSnapshot(message) {
   if (Number.isFinite(playerRevision) && revision < playerRevision) return false;
   if (revision < appliedSharedRevision) return false;
   appliedSharedRevision = revision;
+  screen.dataset.runtimeRevision = String(revision);
   completeAcceptedSharedAction();
   return true;
 }
@@ -656,11 +702,14 @@ function clearBroadcastMirrors() {
   viewEntryId = null;
   commandOutput = null;
   currentCommandNodeId = null;
+  commandExecution = null;
+  terminalNavigation = null;
   lastRenderedFolderKey = null;
   lastRenderedEntryId = null;
   lastRenderedCommandKey = null;
   lastRenderedHackKey = null;
   lastRenderedHackRows = new Map();
+  hackBoardFit = null;
   hackLevel = 0;
   hack = null;
   hackTyped = '';
@@ -671,6 +720,7 @@ function clearBroadcastMirrors() {
   lastAttemptsLeft = null;
   terminalLiveBaselinePending = true;
   appliedSharedRevision = 0;
+  screen.dataset.runtimeRevision = '0';
   consumedRevealKey = null;
 
   clearTimeout(hackSolvedTimer);
@@ -686,6 +736,8 @@ function clearBroadcastMirrors() {
   cancelReveal(hackColumns);
   hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
+  hackBoard.style.removeProperty('--hack-row-font');
+  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
   hackLog.replaceChildren();
   introTextEl.textContent = '';
   entryTitle.textContent = '';
@@ -749,6 +801,8 @@ function applyLiveTerminal(msg) {
     tree          = msg.tree;
     hackLevel     = msg.hackLevel || 0;
     hack          = msg.hack || null;
+    commandExecution = msg.commandExecution || null;
+  terminalNavigation = msg.terminalNavigation || null;
     serverNum     = 1 + Math.floor(Math.random() * 9);
     if (!isContinuousTerminalUpdate) {
       hackTyped     = '';
@@ -818,6 +872,8 @@ function applyNoLiveTerminal(revision) {
     terminalBroadcastID = '';
     tree = null;
     hack = null;
+    commandExecution = null;
+  terminalNavigation = null;
     clearTimeout(hackSolvedTimer);
     hackSolvedTimer = null;
     setAmbientActive(false);
@@ -869,9 +925,13 @@ function applyPlayerState(nextState, { authoritativeWelcome = false } = {}) {
     phase: String(nextState.phase || 'no-broadcast'),
     broadcastId: nextState.broadcastId == null ? null : String(nextState.broadcastId),
     activeTerminalId: nextState.activeTerminalId == null ? null : String(nextState.activeTerminalId),
+    notice: nextState.notice === 'command-persistence-failed'
+      ? 'command-persistence-failed'
+      : null,
     roster,
   };
   playerState = nextPlayerState;
+  if (nextPlayerState.notice !== null) transientPlayerNotice = '';
 
   const broadcastChanged = previousState !== null &&
     previousState.broadcastId !== nextPlayerState.broadcastId;
@@ -921,7 +981,10 @@ function applyActionResult(result) {
       pendingSharedAction.acceptedRevision = Number(result.revision) || 0;
       completeAcceptedSharedAction();
     }
-    renderPlayerContext();
+    // The authoritative stream may render the accepted navigation before the
+    // unary result arrives. Re-render the complete surface after clearing the
+    // request so controls disabled during that earlier render are restored.
+    render();
     return;
   }
 
@@ -954,14 +1017,22 @@ function createRequestID() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
-function canControlSharedTerminal() {
+function canControlSharedTerminalAction(action) {
+  const executionAllowsAction = commandExecution === null ||
+    (commandExecution.phase === 'rejected' && action === 'back');
   return sessionReady && playerState !== null && hasCurrentTerminalMirror() &&
+    executionAllowsAction &&
+  terminalNavigation?.pending == null &&
     playerState.role === 'active' &&
     playerState.phase === 'controlling' &&
     playerState.broadcastId !== null &&
     playerState.activeTerminalId !== null &&
     playerState.activeTerminalId === terminalID &&
     pendingSharedAction === null;
+}
+
+function canControlSharedTerminal() {
+  return canControlSharedTerminalAction('');
 }
 
 function beginSharedMutation(procedure, invoke) {
@@ -975,9 +1046,24 @@ function beginSharedMutation(procedure, invoke) {
   return true;
 }
 
+function beginSharedMutationForAction(procedure, invoke, action) {
+  if (!canControlSharedTerminalAction(action)) return false;
+
+  const requestId = createRequestID();
+  pendingSharedAction = { requestId, procedure, acceptedRevision: null };
+  showPlayerNotice('');
+  renderPlayerContext();
+  void invoke(requestId, playerState.broadcastId, playerState.activeTerminalId);
+  return true;
+}
+
 function beginNavigation(action, nodeId = '') {
-  return beginSharedMutation('navigate', (requestId, broadcastId, terminalId) =>
-    navigateRPC(requestId, broadcastId, terminalId, action, nodeId));
+  const invoke = (requestId, broadcastId, terminalId) =>
+    navigateRPC(requestId, broadcastId, terminalId, action, nodeId);
+  if (action === 'back' && commandExecution?.phase === 'rejected') {
+    return beginSharedMutationForAction('navigate', invoke, action);
+  }
+  return beginSharedMutation('navigate', invoke);
 }
 
 function beginGuess(targetId) {
@@ -1007,8 +1093,25 @@ function selectCharacter(characterID) {
 }
 
 function showPlayerNotice(message) {
+  transientPlayerNotice = message;
+  renderPlayerNotice();
+}
+
+function isTerminalNavigationPending() {
+  return terminalNavigation?.pending != null;
+}
+
+function renderPlayerNotice() {
+  const authoritativeMessage = playerState?.role === 'active' &&
+    playerState.notice === 'command-persistence-failed'
+    ? 'НЕ УДАЛОСЬ СОХРАНИТЬ СОСТОЯНИЕ КОМАНДЫ. СОСТОЯНИЕ КОМАНДЫ НЕ ИЗМЕНЕНО.'
+    : '';
+  const message = isTerminalNavigationPending()
+    ? ''
+    : authoritativeMessage || transientPlayerNotice;
   playerNotice.textContent = message;
   playerNotice.hidden = !message;
+  playerNotice.dataset.kind = authoritativeMessage ? 'error' : '';
 }
 
 function renderRoster() {
@@ -1034,10 +1137,15 @@ function renderPlayerContext() {
   assignedWaiting.hidden = !hasState || playerState.phase !== 'waiting';
 
   const observerReadOnly = hasState && playerState.role === 'observer';
+  const commandRequestPending = commandExecution?.phase === 'pending';
+  const terminalNavigationPending = terminalNavigation?.pending != null;
+  const commandRequestRejected = commandExecution?.phase === 'rejected';
   roleBadge.dataset.role = hasState ? playerState.role : '';
   screen.classList.toggle('observer-read-only', observerReadOnly);
-  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null);
+  screen.classList.toggle('shared-input-pending', pendingSharedAction !== null || commandRequestPending || terminalNavigationPending);
+  screen.classList.toggle('shared-command-rejected', commandRequestRejected);
   screen.setAttribute('aria-readonly', String(observerReadOnly));
+  renderPlayerNotice();
 
   if (!hasState) return false;
 
@@ -1076,6 +1184,7 @@ function hideTerminalSurface() {
   hackBoard.hidden = true;
   hackBlocked.hidden = true;
   termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden = true;
   backBtn.hidden = true;
   pageNav.hidden = true;
@@ -1289,6 +1398,11 @@ function consumeKeyboardEvent(event) {
 }
 
 function consumeRevealKeydown(event) {
+  const acknowledgesCommandScreen = commandExecution?.phase === 'rejected' || commandOutput !== null;
+  if (acknowledgesCommandScreen &&
+      (event.key === 'Enter' || event.key === 'Escape' || event.key === 'Backspace')) {
+    return;
+  }
   const key = revealPhysicalKey(event);
   if (consumedRevealKey !== null && event.repeat && key === consumedRevealKey) {
     consumeKeyboardEvent(event);
@@ -1328,6 +1442,20 @@ document.addEventListener('keydown', (e) => {
       renderHackInputPreview();
       e.preventDefault();
     }
+    return;
+  }
+
+  if (commandExecution?.phase === 'pending' || isTerminalNavigationPending()) {
+    if (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if ((commandExecution?.phase === 'rejected' || commandOutput !== null) &&
+      (e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace')) {
+    goBack();
+    e.preventDefault();
     return;
   }
 
@@ -1666,30 +1794,39 @@ function regionContains(parent, child) {
     childBounds.bottom <= parentBounds.bottom + tolerance;
 }
 
-function hackContentOverflows() {
-  const columns = Array.from(hackColumns.children);
-  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
-  const logLines = Array.from(hackLog.children);
-  const regions = [hackBoard, hackColumns, hackLogPanel, hackLog, hackInputLine, ...columns, ...rows, ...logLines];
+function hackLayoutParts(board = hackBoard) {
+  const columnsContainer = board.querySelector('.hack-columns');
+  const log = board.querySelector('.hack-log');
+  const logPanel = board.querySelector('.hack-log-panel');
+  const inputLine = board.querySelector('.hack-input-line');
+  return { columnsContainer, log, logPanel, inputLine };
+}
+
+function hackContentOverflows(board = hackBoard) {
+  const { columnsContainer, log, logPanel, inputLine } = hackLayoutParts(board);
+  const columns = Array.from(columnsContainer.children);
+  const rows = Array.from(columnsContainer.querySelectorAll('.hack-row'));
+  const logLines = Array.from(log.children);
+  const regions = [board, columnsContainer, logPanel, log, inputLine, ...columns, ...rows, ...logLines];
   if (regions.some(regionOverflows)) return true;
 
   const containedRegions = [
-    [screen, hackHeader],
-    [screen, hackBoard],
-    [hackBoard, hackColumns],
-    [hackBoard, hackLogPanel],
-    [hackLogPanel, hackLog],
-    [hackLogPanel, hackInputLine],
-    ...columns.map(column => [hackColumns, column]),
-    ...rows.map(row => [hackColumns, row]),
-    ...logLines.map(line => [hackLog, line]),
+    [board, columnsContainer],
+    [board, logPanel],
+    [logPanel, log],
+    [logPanel, inputLine],
+    ...columns.map(column => [columnsContainer, column]),
+    ...rows.map(row => [columnsContainer, row]),
+    ...logLines.map(line => [log, line]),
   ];
+  if (board === hackBoard) containedRegions.push([screen, hackHeader], [screen, hackBoard]);
   return containedRegions.some(([parent, child]) => !regionContains(parent, child));
 }
 
-function hackRowsFitColumns() {
+function hackRowsFitColumns(board = hackBoard) {
+  const { columnsContainer } = hackLayoutParts(board);
   const tolerance = 0.5;
-  return Array.from(hackColumns.children).every(column => {
+  return Array.from(columnsContainer.children).every(column => {
     const columnBounds = column.getBoundingClientRect();
     return Array.from(column.querySelectorAll('.hack-row')).every(row => {
       const addressBounds = row.querySelector('.hack-addr').getBoundingClientRect();
@@ -1706,24 +1843,25 @@ function hackRowsFitColumns() {
   });
 }
 
-function fitHackRowFont() {
-  hackBoard.style.removeProperty('--hack-row-font');
-  const rows = Array.from(hackColumns.querySelectorAll('.hack-row'));
-  const columns = Array.from(hackColumns.children);
-  if (!rows.length || !columns.length) return;
+function fitHackRowFont(board = hackBoard) {
+  board.style.removeProperty('--hack-row-font');
+  const { columnsContainer } = hackLayoutParts(board);
+  const rows = Array.from(columnsContainer.querySelectorAll('.hack-row'));
+  const columns = Array.from(columnsContainer.children);
+  if (!rows.length || !columns.length) return null;
 
-  const baseSize = Number.parseFloat(getComputedStyle(hackBoard).fontSize);
-  if (!Number.isFinite(baseSize) || baseSize <= 0) return;
+  const baseSize = Number.parseFloat(getComputedStyle(board).fontSize);
+  if (!Number.isFinite(baseSize) || baseSize <= 0) return null;
 
-  const applySize = size => hackBoard.style.setProperty('--hack-row-font', `${size}px`);
+  const applySize = size => board.style.setProperty('--hack-row-font', `${size}px`);
   const fitsAt = size => {
     applySize(size);
-    return hackRowsFitColumns() && !hackContentOverflows();
+    return hackRowsFitColumns(board) && !hackContentOverflows(board);
   };
 
   if (!fitsAt(baseSize)) {
     applySize(baseSize);
-    return;
+    return baseSize;
   }
 
   let low = baseSize;
@@ -1740,29 +1878,103 @@ function fitHackRowFont() {
     else high = candidate;
   }
   applySize(low);
+  return low;
+}
+
+function applyHackLayout(board) {
+  board.style.removeProperty('--hack-row-font');
+  board.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+  const preferStacked = board.clientWidth <= 700 || board.clientHeight <= 300;
+  board.classList.toggle('hack-stacked', preferStacked);
+  board.classList.toggle('hack-compact', preferStacked || hackContentOverflows(board));
+
+  if (!preferStacked && hackContentOverflows(board)) {
+    board.classList.add('hack-compact', 'hack-stacked');
+  }
+  if (hackContentOverflows(board)) {
+    board.classList.add('hack-tight');
+  }
+  const fontSize = fitHackRowFont(board);
+  return {
+    fontSize,
+    compact: board.classList.contains('hack-compact'),
+    stacked: board.classList.contains('hack-stacked'),
+    tight: board.classList.contains('hack-tight'),
+  };
+}
+
+function applyHackFit(fit) {
+  hackBoard.classList.toggle('hack-compact', Boolean(fit?.compact));
+  hackBoard.classList.toggle('hack-stacked', Boolean(fit?.stacked));
+  hackBoard.classList.toggle('hack-tight', Boolean(fit?.tight));
+  if (Number.isFinite(fit?.fontSize)) {
+    hackBoard.style.setProperty('--hack-row-font', `${fit.fontSize}px`);
+  } else {
+    hackBoard.style.removeProperty('--hack-row-font');
+  }
+}
+
+function createHackFitProbe() {
+  if (lastRenderedHackRows.size === 0) return null;
+  const bounds = hackBoard.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) return null;
+
+  const probe = hackBoard.cloneNode(true);
+  probe.hidden = false;
+  probe.inert = true;
+  probe.setAttribute('aria-hidden', 'true');
+  probe.removeAttribute('id');
+  probe.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+  const probeColumns = probe.querySelector('.hack-columns');
+  probeColumns.replaceChildren();
+
+  const clonedColumns = new Map();
+  for (const descriptor of lastRenderedHackRows.values()) {
+    let probeColumn = clonedColumns.get(descriptor.parent);
+    if (!probeColumn) {
+      probeColumn = descriptor.parent.cloneNode(false);
+      clonedColumns.set(descriptor.parent, probeColumn);
+      probeColumns.appendChild(probeColumn);
+    }
+    probeColumn.appendChild(descriptor.row.cloneNode(true));
+  }
+
+  Object.assign(probe.style, {
+    position: 'fixed',
+    left: '-10000px',
+    top: '0',
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+    margin: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    zIndex: '-1',
+  });
+  document.body.appendChild(probe);
+  return probe;
+}
+
+function fitCompleteHackBoard() {
+  const probe = createHackFitProbe();
+  if (!probe) return null;
+  try {
+    const fit = applyHackLayout(probe);
+    hackBoardFit = fit;
+    applyHackFit(hackBoardFit);
+    return fit;
+  } finally {
+    probe.remove();
+  }
 }
 
 function fitHackLayout() {
   hackFitFrame = null;
   if (mode !== MODE.HACK || hackBoard.hidden) {
-    hackBoard.style.removeProperty('--hack-row-font');
-    hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
+    hackBoardFit = null;
+    applyHackFit(null);
     return;
   }
-
-  hackBoard.style.removeProperty('--hack-row-font');
-  hackBoard.classList.remove('hack-compact', 'hack-stacked', 'hack-tight');
-  const preferStacked = hackBoard.clientWidth <= 700 || hackBoard.clientHeight <= 300;
-  hackBoard.classList.toggle('hack-stacked', preferStacked);
-  hackBoard.classList.toggle('hack-compact', preferStacked || hackContentOverflows());
-
-  if (!preferStacked && hackContentOverflows()) {
-    hackBoard.classList.add('hack-compact', 'hack-stacked');
-  }
-  if (hackContentOverflows()) {
-    hackBoard.classList.add('hack-tight');
-  }
-  fitHackRowFont();
+  fitCompleteHackBoard();
 }
 
 function scheduleHackFit() {
@@ -1794,14 +2006,87 @@ function render() {
 
   termIdle.hidden = true;
 
-  if (mode === MODE.HACK) {
+  if (commandExecution !== null) {
+    renderCommandExecutionScreen();
+  } else if (isTerminalNavigationPending()) {
+    renderTerminalNavigationPendingScreen();
+  } else if (mode === MODE.HACK) {
     renderHackScreen();
   } else {
     renderNormalScreen();
   }
 }
 
+function renderCommandExecutionScreen() {
+  hackHeader.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  normalHeader.hidden = false;
+  serverLine.textContent = `-Server ${serverNum}-`;
+  introTextEl.textContent = introText;
+  const commandID = commandExecution.commandNodeId;
+  const command = findNodeById(tree, commandID);
+  const phase = commandExecution.phase;
+  const text = phase === 'pending'
+    ? 'Выполняется запрос'
+    : 'Ошибка доступа';
+  renderCommandRecordSurface({
+    kind: `command-${phase}`,
+    key: `${phase}:${commandID}`,
+    title: command ? command.name : '',
+    text,
+    showBack: phase === 'rejected' &&
+      playerState?.role === 'active' && playerState?.phase === 'controlling',
+  });
+}
+
+function renderTerminalNavigationPendingScreen() {
+  hackHeader.hidden = true;
+  hackBoard.hidden = true;
+  hackBlocked.hidden = true;
+  normalHeader.hidden = false;
+  serverLine.textContent = `-Server ${serverNum}-`;
+  introTextEl.textContent = introText;
+  const pending = terminalNavigation.pending;
+  const target = pending.targetTerminalName || pending.targetTerminalId;
+  renderCommandRecordSurface({
+    kind: 'terminal-navigation-pending',
+    key: `${pending.direction}:${pending.targetTerminalId}`,
+    title: `${pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД'} В ${target}`,
+    text: 'Выполняется запрос',
+    showBack: false,
+  });
+}
+
+function renderCommandRecordSurface({ kind, key, title, text, showBack }) {
+  cancelReveal(termList);
+  cancelReveal(termOutput);
+  termList.hidden = true;
+  termEntry.hidden = false;
+  termOutput.hidden = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  termPrompt.hidden = false;
+  backBtn.hidden = false;
+  backBtn.classList.toggle('layout-placeholder', !showBack);
+  backBtn.disabled = !showBack;
+  backBtn.setAttribute('aria-hidden', String(!showBack));
+  entryTitle.textContent = title;
+  lastRenderedEntryId = null;
+  lastRenderedFolderKey = null;
+  lastMenuHoverIdx = null;
+
+  const commandKey = revealContentIdentity(kind, key, text);
+  const isNewCommand = commandKey !== lastRenderedCommandKey;
+  lastRenderedCommandKey = commandKey;
+  activatePagination(kind, key, text, entryBody, isNewCommand);
+}
+
 function renderNormalScreen() {
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
+  backBtn.classList.remove('layout-placeholder', 'terminal-return');
+  backBtn.textContent = '[ НАЗАД ]';
+  backBtn.disabled = false;
+  backBtn.removeAttribute('aria-hidden');
   cancelReveal(hackColumns);
   hackColumns._revealedContentIdentity = null;
   hackColumns.replaceChildren();
@@ -1836,11 +2121,33 @@ function renderNormalScreen() {
     return;
   }
 
+  if (commandOutput !== null) {
+    const command = findNodeById(tree, currentCommandNodeId);
+    renderCommandRecordSurface({
+      kind: 'command',
+      key: currentCommandNodeId,
+      title: command ? command.name : '',
+      text: commandOutput,
+      showBack: playerState?.role === 'active' && playerState?.phase === 'controlling',
+    });
+    return;
+  }
+
   // MODE.LIST
   cancelReveal(entryBody);
   termEntry.hidden = true;
   termList.hidden  = false;
-  backBtn.hidden   = navStack.length <= 1;
+  const atRoot = navStack.length === 1 && navStack[0] === 'root';
+  const returnTarget = atRoot ? terminalNavigation?.returnTarget : null;
+  backBtn.hidden = atRoot && !returnTarget;
+  backBtn.disabled = pendingSharedAction !== null || terminalNavigation?.pending != null;
+  if (returnTarget) {
+    backBtn.classList.add('terminal-return');
+    backBtn.textContent = `[ НАЗАД В ${returnTarget.terminalName || returnTarget.terminalId} ]`;
+    backBtn.setAttribute('aria-label', `НАЗАД В ${returnTarget.terminalName || returnTarget.terminalId}`);
+  } else {
+    backBtn.removeAttribute('aria-label');
+  }
   lastRenderedEntryId = null;
   lastMenuHoverIdx = null;
 
@@ -1874,17 +2181,9 @@ function renderNormalScreen() {
   }
   revealInto(termList, rows, isNewFolder, `${folderKey}:selection:${selIndex}`);
 
-  if (commandOutput !== null) {
-    termOutput.hidden = false;
-    const commandKey = revealContentIdentity('command', currentCommandNodeId, commandOutput);
-    const isNewCommand = commandKey !== lastRenderedCommandKey;
-    lastRenderedCommandKey = commandKey;
-    activatePagination('command', currentCommandNodeId, commandOutput, termOutput, isNewCommand);
-  } else {
-    termOutput.hidden = true;
-    lastRenderedCommandKey = null;
-    deactivatePagination();
-  }
+  termOutput.hidden = true;
+  lastRenderedCommandKey = null;
+  deactivatePagination();
 }
 
 // ── Hacking screen ─────────────────────────────────────────
@@ -1909,6 +2208,7 @@ function renderHackScreen() {
   termList.hidden     = true;
   termEntry.hidden    = true;
   termOutput.hidden   = true;
+  termOutput.classList.remove('command-screen', 'command-execution-status', 'command-result-screen');
   termPrompt.hidden   = true;
   backBtn.hidden      = true;
   hackHeader.hidden   = false;
@@ -1917,6 +2217,8 @@ function renderHackScreen() {
     cancelReveal(hackColumns);
     lastRenderedHackKey = null;
     lastRenderedHackRows = new Map();
+    hackBoardFit = null;
+    applyHackFit(null);
     hackBoard.hidden   = true;
     hackBlocked.hidden = true;
     return;
@@ -1926,6 +2228,8 @@ function renderHackScreen() {
 
   if (hack.failed) {
     cancelReveal(hackColumns);
+    hackBoardFit = null;
+    applyHackFit(null);
     hackBoard.hidden   = true;
     hackBlocked.hidden = false;
     return;
@@ -1935,11 +2239,11 @@ function renderHackScreen() {
   hackBoard.hidden   = false;
   const hackKey = hackRevealIdentity(hack);
   const isNewHack = hackKey !== lastRenderedHackKey;
+  if (isNewHack) hackBoardFit = null;
   lastRenderedHackKey = hackKey;
-  renderHackColumns(isNewHack, hackKey);
   renderHackLog();
   renderHackInputPreview();
-  scheduleHackFit();
+  renderHackColumns(isNewHack, hackKey);
 }
 
 function hackRevealIdentity(hackState) {
@@ -2060,7 +2364,6 @@ function reconcileHackColumns(hackState) {
       current.signature = replacement.signature;
     }
   }
-  scheduleHackFit();
 }
 
 function renderHackColumns(animate, hackKey) {
@@ -2069,12 +2372,14 @@ function renderHackColumns(animate, hackKey) {
   } else {
     const built = hackBoardSnapshot(hack);
     lastRenderedHackRows = new Map(built.rows.map(descriptor => [descriptor.key, descriptor]));
+    fitCompleteHackBoard();
     revealInto(hackColumns, built.rows, animate, hackKey, {
       prepareContainer: container => built.columns.forEach(column => container.appendChild(column)),
       appendElement: descriptor => descriptor.parent.appendChild(descriptor.row),
-      afterAppend: scheduleHackFit,
     });
   }
+
+  if (!hackBoardFit) fitCompleteHackBoard();
 
   if (hackHoverKey === null) return;
   const hoveredPattern = (hack.patterns || []).find(pattern =>

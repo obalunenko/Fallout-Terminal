@@ -196,25 +196,9 @@ button {
   color: #ff9a7a;
 }
 .player-config-error[hidden] { display: none; }
-.coord-panel[data-player-config-active="false"] .roster-management {
-  opacity: .55;
-}
-.coord-panel[data-player-config-active="false"] .roster-management :is(input, button),
 .coord-panel[data-player-config-active="false"] #btnStartBroadcast {
   cursor: not-allowed;
 }
-.roster-list {
-  min-height: 42px;
-  padding: 6px 8px;
-}
-.roster-row {
-  padding: 7px 6px;
-  border: 1px solid transparent;
-  border-bottom-color: #1d2617;
-}
-.roster-row:last-child { border-bottom: 0; }
-.roster-row:focus-within { background: #10150c; border-color: #3a4a30; }
-.roster-summary,
 .session-summary,
 .session-identity {
   display: flex;
@@ -223,13 +207,6 @@ button {
   align-items: baseline;
   justify-content: space-between;
 }
-.roster-name { min-width: 0; color: #d8ffb8; overflow-wrap: anywhere; }
-.roster-state { color: #6f9a5f; font-size: 10px; }
-.roster-state.claimed,
-.roster-state[data-claim-state="claimed"],
-.roster-row[data-claimed="true"] .roster-claim-status { color: #d0a63a; }
-.roster-empty { padding: 6px; color: #4a5a3a; font-size: 11px; font-style: italic; }
-.roster-controls,
 .session-controls {
   display: grid;
   gap: 5px;
@@ -237,40 +214,33 @@ button {
   padding-left: 7px;
   border-left: 1px dashed #253018;
 }
-.roster-action-row,
-.roster-move-controls,
 .session-assignment-controls,
-.session-claimed-controls {
+.session-claimed-controls,
+.session-move-controls {
   display: flex;
   min-width: 0;
   gap: 5px;
   align-items: end;
   flex-wrap: wrap;
 }
-.roster-name-field,
 .session-name-field,
-.roster-move-controls .field-label-inline,
-.session-assignment-controls .field-label-inline {
+.session-assignment-controls .field-label-inline,
+.session-move-controls .field-label-inline {
   min-width: 0;
   flex: 1 1 112px;
 }
-.roster-controls .field-input,
 .session-controls .field-input {
   min-width: 0;
   padding: 4px 6px;
   font-size: 11px;
 }
-.roster-controls .btn,
 .session-controls .btn {
   min-width: 0;
   padding: 4px 6px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.roster-row[data-claimed="true"] .roster-delete { opacity: .45; }
-.roster-create { padding: 6px 8px 8px; border-top: 1px dashed #253018; }
-.roster-create-row { display: flex; gap: 5px; }
-.roster-create-row .field-input { min-width: 0; }
+.session-move-controls { flex: 1 1 100%; }
 .session-list { padding: 2px 8px 7px; }
 .session-row {
   padding: 7px 6px;
@@ -362,6 +332,12 @@ button {
 }
 .tree-row:hover { background: #14180f; }
 .tree-row.selected { background: #1c2712; border-color: #6fae55; }
+.tree-row.command-completed .tree-label { color: #ffe08a; }
+.tree-row.command-completed .tree-label::after {
+  content: ' · ВЫПОЛНЕНО';
+  color: #6f9a5f;
+  font-size: 9px;
+}
 .tree-caret { width: 12px; display: inline-block; color: #6f9a5f; font-size: 10px; }
 .tree-icon { color: #d0a63a; font-size: 12px; width: 46px; display: inline-block; }
 .tree-icon.folder { color: #7fc0ff; }
@@ -396,6 +372,50 @@ button {
 .field-textarea { resize: vertical; min-height: 100px; }
 .node-type-label { color: #ffe08a; font-size: 12px; margin-bottom: 4px; }
 .node-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+.command-mode-select { cursor: pointer; }
+.command-mode-select:disabled { cursor: not-allowed; opacity: .65; }
+.command-mode-hint {
+  margin-top: 5px;
+  color: #6f9a5f;
+  font-size: 9px;
+  line-height: 1.35;
+}
+.state-change-fields[hidden] { display: none; }
+.state-change-textarea { min-height: 72px; }
+.node-validation-error {
+  margin-top: 10px;
+  padding: 7px;
+  border: 1px solid #8a3a2a;
+  background: #1d0e0a;
+  color: #ff9a7a;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.node-validation-error[hidden] { display: none; }
+.command-execution-snapshot {
+  margin-top: 12px;
+  padding: 9px;
+  border: 1px solid #6f9a5f;
+  background: #11170d;
+}
+.command-execution-heading {
+  margin-bottom: 8px;
+  color: #ffe08a;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.command-execution-label {
+  margin-top: 6px;
+  color: #6f9a5f;
+  font-size: 9px;
+}
+.command-execution-value {
+  margin-top: 2px;
+  color: #d8ffb8;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.command-execution-result { white-space: pre-wrap; }
 
 /* ── Public access ─────────────────────────────────────── */
 .public-access {
@@ -530,6 +550,11 @@ button {
   margin-right: 8px;
 }
 .settings-textarea { min-height: 56px; width: 100%; }
+.command-state-terminal-actions {
+  padding-top: 8px;
+  border-top: 1px dashed #253018;
+}
+.command-state-terminal-actions[hidden] { display: none; }
 
 /* ── Hack status (term panel footer) ──────────────────── */
 .hack-status {
@@ -545,6 +570,143 @@ button {
 }
 .hack-retry[hidden] { display: none; }
 .hack-retry:disabled { opacity: .55; cursor: wait; }
+
+/* ── Player management ─────────────────────────────────── */
+.player-management-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid #6fae55;
+  background: #0d0f09;
+  color: #b9ffb0;
+  box-shadow: 0 0 0 1px #253018, 0 0 36px rgba(111, 174, 85, .3);
+}
+.player-management-dialog[hidden] { display: none; }
+.player-management-dialog::backdrop { background: rgba(2, 4, 2, .84); }
+.player-management-dialog-panel { padding: clamp(18px, 3vw, 28px); }
+.player-management-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a3520;
+}
+.player-management-dialog-title {
+  margin: 0;
+  color: #ffe08a;
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: normal;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(208, 166, 58, .3);
+}
+.player-management-mode {
+  margin: 7px 0 0;
+  color: #9fe89a;
+  font-size: 11px;
+  letter-spacing: .8px;
+}
+.player-management-dialog[aria-readonly="true"] .player-management-mode { color: #d0a63a; }
+.player-management-roster-section,
+.player-management-add-form { margin-top: 18px; }
+.player-management-section-title {
+  margin: 0 0 9px;
+  color: #6f9a5f;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+.player-management-roster {
+  display: grid;
+  gap: 8px;
+}
+.player-management-empty {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed #253018;
+  color: #566b49;
+  text-align: center;
+  font-size: 11px;
+  font-style: italic;
+}
+.player-management-empty[hidden] { display: none; }
+.player-management-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid #253018;
+  background: #0a0d08;
+}
+.player-management-row:focus-within {
+  border-color: #6fae55;
+  background: #10150c;
+}
+.player-management-row-fields,
+.player-management-field-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(120px, .7fr) minmax(170px, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+.player-management-row-fields .field-label-inline,
+.player-management-field-grid .field-label-inline { margin: 0; }
+.player-management-row-actions {
+  display: flex;
+  gap: 7px;
+}
+.player-management-row-actions .btn { min-width: 96px; }
+.player-management-dialog[aria-readonly="true"] .player-management-row {
+  border-color: #20291a;
+  background: #080b07;
+}
+.player-management-dialog[aria-readonly="true"] .player-management-row :is(input, select) {
+  color: #8fb786;
+  opacity: 1;
+}
+.player-management-add-form {
+  padding: 14px;
+  border: 1px solid #3a4a30;
+  background: #10140c;
+}
+.player-management-add-form > .btn { margin-top: 11px; }
+.player-management-feedback { margin-top: 12px; }
+.player-management-status {
+  min-height: 17px;
+  color: #6f9a5f;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.player-management-error {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border: 1px solid #8a3a2a;
+  background: #1d0e0a;
+  color: #ff9a7a;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.player-management-error[hidden] { display: none; }
+.player-management-dialog :is(input, select, button):focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+.player-delete-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.player-delete-actions .btn {
+  min-width: 0;
+  min-height: 48px;
+  white-space: normal;
+}
 
 /* ── Unfinished-puzzle terminal switch ───────────────────── */
 .terminal-switch-dialog {
@@ -639,13 +801,27 @@ button {
   overflow-wrap: anywhere;
 }
 .terminal-switch-error[hidden] { display: none; }
+.terminal-navigation-summary {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 20px;
+  padding: 12px;
+  border: 1px solid rgba(159, 232, 154, .35);
+  background: rgba(12, 32, 15, .6);
+  color: #9fe89a;
+  line-height: 1.4;
+}
+.terminal-navigation-direction {
+  color: #ffe08a;
+  letter-spacing: 1.5px;
+}
+.terminal-transition-fields select { width: 100%; }
 
 @media (max-width: 1050px) {
   .term-panel { width: 230px; }
   .node-panel { width: 270px; }
   .tree-hdr-actions { gap: 5px; }
   .tree-hdr-actions .btn { padding-inline: 8px; }
-  .roster-action-row .btn,
   .session-claimed-controls .btn { flex: 1 1 92px; }
 }
 
@@ -659,6 +835,8 @@ button {
   .tree-hdr-actions { flex-wrap: wrap; }
   .public-access-actions,
   .public-access-runtime-actions { grid-template-columns: 1fr; }
+  .player-management-row { grid-template-columns: 1fr; }
+  .player-management-row-actions { justify-content: flex-end; }
 }
 
 @media (max-width: 620px), (max-height: 560px) {
@@ -671,13 +849,21 @@ button {
   .terminal-switch-actions { grid-template-columns: 1fr; }
   .terminal-switch-actions .btn { min-height: 40px; }
   .generated-password-actions { grid-template-columns: 1fr; }
+  .player-management-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .player-management-dialog-panel { padding: 16px; }
+  .player-management-dialog-header { align-items: stretch; flex-direction: column; }
+  .player-management-field-grid,
+  .player-management-row-fields { grid-template-columns: 1fr; }
+  .player-management-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .player-management-row-actions .btn { min-width: 0; }
 }
 
 @media (max-height: 720px) {
   .coord-panel { flex-basis: 56%; min-height: 150px; }
   .coord-group-title { padding-block: 4px 2px; }
-  .roster-row,
   .session-row { padding-block: 5px; }
-  .roster-controls,
   .session-controls { gap: 3px; margin-top: 4px; }
 }

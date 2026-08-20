@@ -1,14 +1,14 @@
 package session
 
 import (
-	"bytes"
 	"errors"
 	"io/fs"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStorageWriteAtomicUsesPrivateSameDirectoryTemporaryFile(t *testing.T) {
@@ -19,37 +19,24 @@ func TestStorageWriteAtomicUsesPrivateSameDirectoryTemporaryFile(t *testing.T) {
 	target := "/Users/test/Documents/Fallout Terminal/Sessions/campaign.json"
 	want := []byte("{\n  \"version\": 1\n}\n")
 
-	if err := storage.WriteAtomic(target, want); err != nil {
-		t.Fatalf("WriteAtomic() error = %v", err)
-	}
+	require.NoError(t, storage.WriteAtomic(target, want))
 
 	mkdirs := fileSystem.MkdirCalls()
-	if len(mkdirs) != 1 || mkdirs[0].Path != filepath.Dir(target) {
-		t.Fatalf("MkdirAll calls = %#v, want target parent", mkdirs)
-	}
+	require.Len(t, mkdirs, 1)
+	assert.Equal(t, filepath.Dir(target), mkdirs[0].Path)
 	writes := fileSystem.WriteCalls()
-	if len(writes) != 1 {
-		t.Fatalf("WriteFile calls = %#v, want one temporary write", writes)
-	}
+	require.Len(t, writes, 1)
 	temporary := writes[0].Path
-	if temporary == target || filepath.Dir(temporary) != filepath.Dir(target) {
-		t.Fatalf("temporary path = %q, want a distinct path in %q", temporary, filepath.Dir(target))
-	}
-	if writes[0].Perm != fs.FileMode(0o600) {
-		t.Fatalf("temporary permissions = %#o, want 0600", writes[0].Perm)
-	}
-	if !bytes.Equal(writes[0].Data, want) {
-		t.Fatalf("temporary data = %q, want %q", writes[0].Data, want)
-	}
-	if got, wantRenames := fileSystem.RenameCalls(), []testutil.FileRename{{OldPath: temporary, NewPath: target}}; !reflect.DeepEqual(got, wantRenames) {
-		t.Fatalf("Rename calls = %#v, want %#v", got, wantRenames)
-	}
-	if got, ok := fileSystem.File(target); !ok || !bytes.Equal(got, want) {
-		t.Fatalf("target = %q, %t; want complete replacement", got, ok)
-	}
-	if _, ok := fileSystem.File(temporary); ok {
-		t.Fatalf("temporary file %q remains after replacement", temporary)
-	}
+	assert.NotEqual(t, target, temporary)
+	assert.Equal(t, filepath.Dir(target), filepath.Dir(temporary))
+	assert.Equal(t, fs.FileMode(0o600), writes[0].Perm)
+	assert.Equal(t, want, writes[0].Data)
+	assert.Equal(t, []testutil.FileRename{{OldPath: temporary, NewPath: target}}, fileSystem.RenameCalls())
+	got, ok := fileSystem.File(target)
+	require.True(t, ok)
+	assert.Equal(t, want, got)
+	_, temporaryExists := fileSystem.File(temporary)
+	assert.False(t, temporaryExists)
 }
 
 func TestStorageWriteAtomicKeepsOldTargetAndCleansTemporaryOnRenameFailure(t *testing.T) {
@@ -63,22 +50,38 @@ func TestStorageWriteAtomicKeepsOldTargetAndCleansTemporaryOnRenameFailure(t *te
 	base.SeedFile(target, oldData)
 
 	err := storage.WriteAtomic(target, []byte("new document\n"))
-	if err == nil {
-		t.Fatal("WriteAtomic() error = nil, want rename failure")
-	}
-	if got, ok := base.File(target); !ok || !bytes.Equal(got, oldData) {
-		t.Fatalf("failed replacement changed target: %q, %t", got, ok)
-	}
+	require.Error(t, err)
+	got, ok := base.File(target)
+	require.True(t, ok)
+	assert.Equal(t, oldData, got)
 	writes := base.WriteCalls()
-	if len(writes) != 1 {
-		t.Fatalf("WriteFile calls = %#v, want one temporary write", writes)
-	}
-	if _, ok := base.File(writes[0].Path); ok {
-		t.Fatalf("temporary file %q remains after rename failure", writes[0].Path)
-	}
-	if got := base.RemoveCalls(); !reflect.DeepEqual(got, []string{writes[0].Path}) {
-		t.Fatalf("Remove calls = %#v, want temporary cleanup", got)
-	}
+	require.Len(t, writes, 1)
+	_, temporaryExists := base.File(writes[0].Path)
+	assert.False(t, temporaryExists)
+	assert.Equal(t, []string{writes[0].Path}, base.RemoveCalls())
+}
+
+func TestStorageWriteAtomicKeepsOldTargetAndSkipsRenameOnTemporaryWriteFailure(t *testing.T) {
+	t.Parallel()
+
+	base := testutil.NewFakeFileSystem()
+	fileSystem := &writeFailingFileSystem{FakeFileSystem: base, err: errors.New("disk full")}
+	storage := NewStorage(fileSystem)
+	target := "/Users/test/Documents/Fallout Terminal/Sessions/campaign.json"
+	oldData := []byte("old complete document\n")
+	base.SeedFile(target, oldData)
+
+	err := storage.WriteAtomic(target, []byte("new document\n"))
+	require.Error(t, err)
+	got, ok := base.File(target)
+	require.True(t, ok)
+	assert.Equal(t, oldData, got)
+	writes := base.WriteCalls()
+	require.Len(t, writes, 1)
+	assert.Empty(t, base.RenameCalls())
+	_, temporaryExists := base.File(writes[0].Path)
+	assert.False(t, temporaryExists)
+	assert.Equal(t, []string{writes[0].Path}, base.RemoveCalls())
 }
 
 func TestStorageCopyAtomicLeavesBundledDemoUnchanged(t *testing.T) {
@@ -91,21 +94,17 @@ func TestStorageCopyAtomicLeavesBundledDemoUnchanged(t *testing.T) {
 	demo := []byte("{\n  \"version\": 1,\n  \"name\": \"demo\",\n  \"terminals\": []\n}\n")
 	fileSystem.SeedFile(source, demo)
 
-	if err := storage.CopyAtomic(source, destination); err != nil {
-		t.Fatalf("CopyAtomic() error = %v", err)
-	}
-	if got, ok := fileSystem.File(source); !ok || !bytes.Equal(got, demo) {
-		t.Fatalf("bundled source changed: %q, %t", got, ok)
-	}
-	if got, ok := fileSystem.File(destination); !ok || !bytes.Equal(got, demo) {
-		t.Fatalf("copied demo = %q, %t; want %q", got, ok, demo)
-	}
-	if got := fileSystem.ReadCalls(); !reflect.DeepEqual(got, []string{source}) {
-		t.Fatalf("ReadFile calls = %v, want bundled demo only", got)
-	}
-	if renames := fileSystem.RenameCalls(); len(renames) != 1 || renames[0].NewPath != destination {
-		t.Fatalf("Rename calls = %#v, want atomic destination replacement", renames)
-	}
+	require.NoError(t, storage.CopyAtomic(source, destination))
+	got, ok := fileSystem.File(source)
+	require.True(t, ok)
+	assert.Equal(t, demo, got)
+	got, ok = fileSystem.File(destination)
+	require.True(t, ok)
+	assert.Equal(t, demo, got)
+	assert.Equal(t, []string{source}, fileSystem.ReadCalls())
+	renames := fileSystem.RenameCalls()
+	require.Len(t, renames, 1)
+	assert.Equal(t, destination, renames[0].NewPath)
 }
 
 type renameFailingFileSystem struct {
@@ -116,4 +115,14 @@ type renameFailingFileSystem struct {
 func (fileSystem *renameFailingFileSystem) Rename(oldPath, newPath string) error {
 	fileSystem.RenameErrors[oldPath] = fileSystem.err
 	return fileSystem.FakeFileSystem.Rename(oldPath, newPath)
+}
+
+type writeFailingFileSystem struct {
+	*testutil.FakeFileSystem
+	err error
+}
+
+func (fileSystem *writeFailingFileSystem) WriteFile(path string, data []byte, perm fs.FileMode) error {
+	fileSystem.WriteErrors[path] = fileSystem.err
+	return fileSystem.FakeFileSystem.WriteFile(path, data, perm)
 }

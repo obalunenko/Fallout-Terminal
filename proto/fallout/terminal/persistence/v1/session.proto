@@ -8,8 +8,26 @@ message FolderContent {
   repeated ContentNode children = 1;
 }
 
+message StateChangeConfig {
+  string completed_name = 1;
+  string confirmation_text = 2;
+}
+
+message CommandExecutionState {
+  string completed_name = 1;
+  string result_text = 2;
+}
+
+message TerminalTransitionConfig {
+  string target_terminal_id = 1;
+}
+
 message CommandContent {
   string text = 1;
+  oneof behavior {
+    StateChangeConfig state_change = 2;
+    TerminalTransitionConfig terminal_transition = 3;
+  }
 }
 
 message EntryContent {
@@ -32,6 +50,7 @@ message Terminal {
   int32 hack_level = 3;
   string intro_text = 4;
   ContentNode root = 5;
+  map<string, CommandExecutionState> command_states = 6;
 }
 
 message Session {

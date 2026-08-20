@@ -12,7 +12,8 @@
     "dev:all": "npm run proto:generate && vite",
     "build:all": "npm run proto:generate && npm run build --prefix ../client && vite build",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "npm test --prefix ../tests/browser -- state-changing-command-authoring.spec.mjs state-changing-command-approval.spec.mjs desktop-api.spec.mjs"
   },
   "devDependencies": {
     "vite": "8.1.5"
@@ -21,6 +22,6 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
-    "@wailsio/runtime": "3.0.0-beta.8"
+    "@wailsio/runtime": "3.0.0-beta.10"
   }
 }

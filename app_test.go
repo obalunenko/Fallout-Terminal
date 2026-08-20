@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -181,8 +182,12 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	require.Falsef(t, created.Config.FilePath != target || created.Session.PlayerConfig == "" || created.State.PlayerConfig == nil || len(created.State.Roster) != 0,
 		"new empty player config was not associated and installed: %#v", created)
 
-	added := app.AddCharacter("Mara")
-	require.Falsef(t, !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara",
+	hackerUnavailable := false
+	added := app.AddCharacter(CharacterCreatePayload{
+		Name: "Mara", Intelligence: 10, HackerPerkAvailable: &hackerUnavailable,
+		ExpectedRevision: created.State.Revision,
+	})
+	require.Falsef(t, !added.OK || added.State == nil || len(added.State.Roster) != 1 || added.State.Roster[0].Name != "Mara" || added.State.Roster[0].Intelligence != 10 || added.State.Roster[0].HackerPerkAvailable,
 		"AddCharacter() after empty config = %#v", added)
 
 	stored, ok := fileSystem.File(target)
@@ -192,9 +197,121 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 	persisted, err := domain.DecodePlayerConfig(stored)
 	require.Falsef(t, err != nil,
 		"DecodePlayerConfig() after first add: %v", err)
-	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara",
+	require.Falsef(t, len(persisted.Roster) != 1 || persisted.Roster[0].Name != "Mara" || persisted.Roster[0].Intelligence != 10 || persisted.Roster[0].HackerPerkAvailable,
 		"persisted roster after first add = %#v", persisted.Roster)
 
+	reopened := playerconfigservice.NewService(
+		playerconfigservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		"/Campaigns",
+	).Open(t.Context())
+	require.True(t, reopened.OK, "Open() after add = %#v", reopened)
+	require.NotNil(t, reopened.Config)
+	require.Equal(t, persisted, *reopened.Config)
+	require.NotEmpty(t, reopened.ContentDigest)
+
+}
+
+func TestRosterMutationConflictReturnsAuthoritativeReselectionGuidance(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		mutate func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, replacement []byte)
+		check  func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, original, replacement []byte)
+	}{
+		{
+			name: "missing",
+			mutate: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _ []byte) {
+				t.Helper()
+				require.NoError(t, fileSystem.Remove(target))
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _, _ []byte) {
+				t.Helper()
+				_, exists := fileSystem.File(target)
+				require.False(t, exists)
+			},
+		},
+		{
+			name: "unreadable",
+			mutate: func(_ *testing.T, fileSystem *testutil.FakeFileSystem, target string, _ []byte) {
+				fileSystem.ReadErrors[target] = errors.New("permission denied: private path detail")
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, original, _ []byte) {
+				t.Helper()
+				stored, exists := fileSystem.File(target)
+				require.True(t, exists)
+				require.Equal(t, original, stored)
+			},
+		},
+		{
+			name: "replaced",
+			mutate: func(_ *testing.T, fileSystem *testutil.FakeFileSystem, target string, replacement []byte) {
+				fileSystem.SeedFile(target, replacement)
+			},
+			check: func(t *testing.T, fileSystem *testutil.FakeFileSystem, target string, _, replacement []byte) {
+				t.Helper()
+				stored, exists := fileSystem.File(target)
+				require.True(t, exists)
+				require.Equal(t, replacement, stored)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			fileSystem := testutil.NewFakeFileSystem()
+			target := "/Campaigns/players/conflict-" + test.name + ".json"
+			configs := playerconfigservice.NewService(
+				playerconfigservice.NewStorage(fileSystem),
+				&testutil.FakeDialog{SaveResult: target},
+				"/Campaigns",
+			)
+			coordination := controlservice.New(controlservice.Config{RosterStore: configs})
+			app := NewAppWithDependencies(AppDependencies{
+				Sessions: &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{
+					Path: "/Campaigns/game.json",
+					Session: &domain.Session{
+						Version: 1, Name: "Game", Terminals: []domain.Terminal{},
+					},
+				}},
+				PlayerConfigs: configs,
+				Coordination:  coordination,
+			})
+
+			created := app.NewPlayerConfig()
+			require.True(t, created.OK, "NewPlayerConfig() = %#v", created)
+			hackerUnavailable := false
+			added := app.AddCharacter(CharacterCreatePayload{
+				Name: "Mara", Intelligence: 8, HackerPerkAvailable: &hackerUnavailable,
+				ExpectedRevision: created.State.Revision,
+			})
+			require.True(t, added.OK, "AddCharacter() = %#v", added)
+			require.Len(t, added.State.Roster, 1)
+			original, exists := fileSystem.File(target)
+			require.True(t, exists)
+			replacement := []byte("{\n  \"version\": 1,\n  \"name\": \"External\",\n  \"roster\": []\n}\n")
+			beforeWrites := len(fileSystem.WriteCalls())
+			beforeRenames := len(fileSystem.RenameCalls())
+			test.mutate(t, fileSystem, target, replacement)
+
+			hackerAvailable := true
+			failed := app.UpdateCharacter(CharacterUpdatePayload{
+				CharacterID: added.State.Roster[0].ID,
+				Name:        "Changed Draft", Intelligence: 10, HackerPerkAvailable: &hackerAvailable,
+				ExpectedRevision: added.State.Revision,
+			})
+			require.False(t, failed.OK)
+			require.Contains(t, failed.Error, "reopen or reselect it")
+			require.NotContains(t, failed.Error, "private path detail")
+			require.Equal(t, added.State, failed.State, "failure must return the last authoritative roster")
+			require.Equal(t, beforeWrites, len(fileSystem.WriteCalls()))
+			require.Equal(t, beforeRenames, len(fileSystem.RenameCalls()))
+			test.check(t, fileSystem, target, original, replacement)
+		})
+	}
 }
 
 func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision(t *testing.T) {
@@ -250,6 +367,78 @@ func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision
 	status := app.GetRuntimeStatus()
 	require.Equal(t, uint64(3), status.RequestedRevision)
 	require.Equal(t, uint64(3), status.SavedRevision)
+}
+
+func TestDesktopSessionFacadeSavesRealDemoCrossTerminalLinkAndReopensIt(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Campaigns/demo-boundary.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Campaigns",
+			BundledDemo:      "/Applications/Fallout Terminal.app/Contents/Resources/sessions/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	app := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+
+	opened := app.OpenSession()
+	require.True(t, opened.OK, "OpenSession() = %#v", opened)
+	require.NotNil(t, opened.Session)
+	require.Equal(t, []string{"t_demo1", "t_demo2"}, []string{
+		opened.Session.Terminals[0].ID,
+		opened.Session.Terminals[1].ID,
+	})
+	require.Equal(t, "t_demo2", opened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+
+	saved := app.SaveSession(*opened.Session)
+	require.True(t, saved.OK, "SaveSession() = %#v", saved)
+	require.Equal(t, uint64(1), saved.SavedRevision)
+	reopened := app.OpenSession()
+	require.True(t, reopened.OK, "reopen = %#v", reopened)
+	require.Len(t, reopened.Session.Terminals, 2)
+	require.Equal(t, "t_demo2", reopened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
+}
+
+func TestTerminalActivationValidatesRealDemoLinkAgainstCompleteActiveSession(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("sessions/demo.json")
+	require.NoError(t, err)
+	target := "/Campaigns/demo-activation.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	fileSystem.SeedFile(target, raw)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{DocumentsDefault: "/Campaigns"},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision:  1,
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-demo-activation"},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{Sessions: sessions, Coordination: coordination})
+
+	opened := app.OpenSession()
+	require.True(t, opened.OK, "OpenSession() = %#v", opened)
+	require.Len(t, opened.Session.Terminals, 2)
+	source := opened.Session.Terminals[0]
+	result := app.RequestTerminalActivation(LiveTerminalPayload{
+		TerminalID: source.ID, TerminalName: source.Name, Tree: source.Root,
+		HackLevel: source.HackLevel, IntroText: source.IntroText,
+	})
+	require.True(t, result.OK, "RequestTerminalActivation() = %#v", result)
+	require.Len(t, coordination.targets, 1)
+	require.Equal(t, "t_demo2", coordination.targets[0].Tree.Children[4].TerminalTransition.TargetTerminalID)
 }
 
 func TestApplicationUnwindsPartialStartup(t *testing.T) {
@@ -413,7 +602,9 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 		state: &domain.MasterCoordinationState{Revision: 4},
 		addState: &domain.MasterCoordinationState{
 			Revision: 5,
-			Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara"}},
+			Roster: []domain.MasterRosterEntry{{
+				ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: false,
+			}},
 		},
 		startState: &domain.MasterCoordinationState{
 			Revision: 6,
@@ -429,12 +620,17 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 	require.Falsef(t, initial.CoordinationState == nil || initial.CoordinationState.Revision != 4,
 		"initial coordination status = %#v, want replayable revision 4", initial.CoordinationState)
 
-	added := app.AddCharacter("  Mara  ")
-	require.Falsef(t, !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5,
+	hackerUnavailable := false
+	added := app.AddCharacter(CharacterCreatePayload{
+		Name: "  Mara  ", Intelligence: 8, HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 4,
+	})
+	require.Falsef(t, !added.OK || added.Error != "" || added.State == nil || added.State.Revision != 5 || added.State.Roster[0].Intelligence != 8 || added.State.Roster[0].HackerPerkAvailable,
 		"AddCharacter() = %#v, want accepted revision 5", added)
 	{
 
-		got, want := service.addNames, []string{"Mara"}
+		got, want := service.addPayloads, []domain.CharacterCreatePayload{{
+			Name: "Mara", Intelligence: 8, HackerPerkAvailable: false, ExpectedRevision: 4,
+		}}
 		require.Falsef(t, !cmp.Equal(got, want),
 			"coordinator AddCharacter calls = %v, want %v", got, want)
 	}
@@ -480,11 +676,23 @@ func TestCoordinationBridgeRejectsInvalidOrFailedCommandsWithoutPartialState(t *
 		Events:       &recordingEventSink{recorder: recorder},
 	})
 
-	invalid := app.AddCharacter("   ")
-	require.Falsef(t, invalid.OK || invalid.Error == "" || len(service.addNames) != 0,
-		"AddCharacter(blank) = %#v, calls = %v", invalid, service.addNames)
+	hackerAvailable := true
+	invalidPayloads := []CharacterCreatePayload{
+		{Name: "   ", Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: strings.Repeat("x", 81), Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 0, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 11, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9},
+		{Name: "Boone", Intelligence: 5, HackerPerkAvailable: nil, ExpectedRevision: 9},
+	}
+	for index, payload := range invalidPayloads {
+		invalid := app.AddCharacter(payload)
+		require.Falsef(t, invalid.OK || invalid.Error == "" || len(service.addPayloads) != 0,
+			"AddCharacter(invalid %d) = %#v, calls = %v", index, invalid, service.addPayloads)
+	}
 
-	failedAdd := app.AddCharacter("Boone")
+	failedAdd := app.AddCharacter(CharacterCreatePayload{
+		Name: "Boone", Intelligence: 5, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 9,
+	})
 	require.Falsef(t, failedAdd.OK || !strings.Contains(failedAdd.Error, "roster"),
 		"AddCharacter(failed) = %#v", failedAdd)
 
@@ -551,7 +759,7 @@ func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMut
 
 }
 
-func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *testing.T) {
+func TestCoordinationBridgeValidatesSessionAndAssignmentCorrections(t *testing.T) {
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
 		Revision: 20,
@@ -579,10 +787,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 		name string
 		run  func() CoordinationCommandResult
 	}{
-		{"rename-character", func() CoordinationCommandResult {
-			return app.RenameCharacter(CharacterRenamePayload{CharacterID: "character-1", Name: "  Mara Voss  "})
-		}},
-		{"delete-character", func() CoordinationCommandResult { return app.DeleteCharacter("character-2") }},
 		{"rename-session", func() CoordinationCommandResult {
 			return app.RenameLogicalSession(LogicalSessionRenamePayload{SessionID: "session-1", FallbackName: "  TABLET LEFT  "})
 		}},
@@ -610,8 +814,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 	}
 
 	wantCalls := []string{
-		"rename-character:character-1:Mara Voss",
-		"delete-character:character-2",
 		"rename-session:session-1:TABLET LEFT",
 		"assign-character:session-1:character-1",
 		"release-character:session-1",
@@ -654,7 +856,6 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 
 	invalidCalls := len(service.calls)
 	invalid := []CoordinationCommandResult{
-		app.RenameCharacter(CharacterRenamePayload{CharacterID: "", Name: "Mara"}),
 		app.RenameLogicalSession(LogicalSessionRenamePayload{SessionID: "session-1", FallbackName: "  "}),
 		app.AssignCharacter(AssignmentPayload{SessionID: "", CharacterID: "character-1"}),
 		app.ReleaseCharacter("   "),
@@ -668,6 +869,112 @@ func TestCoordinationBridgeValidatesRosterSessionAndAssignmentCorrections(t *tes
 	require.Falsef(t, len(service.calls) != invalidCalls,
 		"invalid payloads reached coordinator: %v", service.calls[invalidCalls:])
 
+}
+
+func TestCoordinationBridgeRoutesCompleteUpdateAndDeletePayloads(t *testing.T) {
+	recorder := &callRecorder{}
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 20,
+			Roster: []domain.MasterRosterEntry{
+				{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
+				{ID: "character-2", Name: "Boone", Intelligence: 3},
+			},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		Coordination: service,
+		Events:       &recordingEventSink{recorder: recorder},
+	})
+
+	hackerUnavailable := false
+	service.nextRevision = 1
+	updated := app.UpdateCharacter(CharacterUpdatePayload{
+		CharacterID: "character-1", Name: "  Mara Voss  ", Intelligence: 10,
+		HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 20,
+	})
+	require.True(t, updated.OK)
+	require.Empty(t, updated.Error)
+	require.NotNil(t, updated.State)
+	require.Equal(t, uint64(21), updated.State.Revision)
+	require.Equal(t, []domain.CharacterUpdatePayload{{
+		CharacterID: "character-1", Name: "Mara Voss", Intelligence: 10,
+		HackerPerkAvailable: false, ExpectedRevision: 20,
+	}}, service.updatePayloads)
+
+	service.nextRevision = 2
+	deleted := app.DeleteCharacter(CharacterDeletePayload{
+		CharacterID: "character-2", ExpectedRevision: 21,
+	})
+	require.True(t, deleted.OK)
+	require.Empty(t, deleted.Error)
+	require.NotNil(t, deleted.State)
+	require.Equal(t, uint64(22), deleted.State.Revision)
+	require.Equal(t, []domain.CharacterDeletePayload{{
+		CharacterID: "character-2", ExpectedRevision: 21,
+	}}, service.deletePayloads)
+	require.Equal(t, []string{
+		"update-character:character-1:Mara Voss:10:false:20",
+		"delete-character:character-2:21",
+	}, service.calls)
+	require.Equal(t, []string{"event:coordination-state", "event:coordination-state"}, recorder.Calls())
+}
+
+func TestCoordinationBridgeRejectsInvalidCompleteRosterMutationsBeforeCoordinator(t *testing.T) {
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 20,
+			Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
+		}},
+	}
+	app := NewAppWithDependencies(AppDependencies{Coordination: service})
+	hackerAvailable := true
+
+	invalid := []CoordinationCommandResult{
+		app.UpdateCharacter(CharacterUpdatePayload{Name: "Mara", Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "   ", Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: strings.Repeat("x", 81), Intelligence: 8, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 0, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 11, HackerPerkAvailable: &hackerAvailable, ExpectedRevision: 20}),
+		app.UpdateCharacter(CharacterUpdatePayload{CharacterID: "character-1", Name: "Mara", Intelligence: 8, ExpectedRevision: 20}),
+		app.DeleteCharacter(CharacterDeletePayload{ExpectedRevision: 20}),
+	}
+	for index, result := range invalid {
+		require.Falsef(t, result.OK || result.Error == "", "invalid roster mutation %d = %#v", index, result)
+		require.NotNil(t, result.State, "validation failure must return authoritative state")
+		require.Equal(t, uint64(20), result.State.Revision)
+	}
+	require.Empty(t, service.updatePayloads)
+	require.Empty(t, service.deletePayloads)
+	require.Empty(t, service.calls)
+}
+
+func TestCoordinationBridgeRosterMutationFailureReturnsAuthoritativeState(t *testing.T) {
+	recorder := &callRecorder{}
+	canonical := &domain.MasterCoordinationState{
+		Revision: 32,
+		Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
+	}
+	service := &recordingCorrectionCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: canonical},
+		failCommand:                  "update-character",
+		commandErr:                   errors.New("player config changed on disk"),
+	}
+	app := NewAppWithDependencies(AppDependencies{
+		Coordination: service,
+		Events:       &recordingEventSink{recorder: recorder},
+	})
+	hackerUnavailable := false
+
+	result := app.UpdateCharacter(CharacterUpdatePayload{
+		CharacterID: "character-1", Name: "Mara Voss", Intelligence: 10,
+		HackerPerkAvailable: &hackerUnavailable, ExpectedRevision: 32,
+	})
+	require.False(t, result.OK)
+	require.ErrorContains(t, errors.New(result.Error), "changed on disk")
+	require.Equal(t, canonical, result.State)
+	require.Equal(t, canonical, app.GetRuntimeStatus().CoordinationState)
+	require.Empty(t, recorder.Calls(), "failed mutation must not publish")
 }
 
 func TestCoordinationBridgeValidatesAndPublishesActiveControllerReassignment(t *testing.T) {
@@ -957,6 +1264,382 @@ func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *t
 
 }
 
+func TestCommandStateResetRejectsBlankStableIDsBeforeMutation(t *testing.T) {
+	recorder := &callRecorder{}
+	sessions := &recordingCommandStateSession{recordingSessionService: recordingSessionService{recorder: recorder}}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Events:   &recordingEventSink{recorder: recorder},
+		Player:   &recordingPlayerServer{recorder: recorder},
+	})
+
+	for _, payload := range []ResetCommandStatePayload{
+		{TerminalID: " ", CommandID: "command-stable-1"},
+		{TerminalID: "terminal-stable-1", CommandID: "\t"},
+	} {
+		result := app.ResetCommandState(payload)
+		require.False(t, result.OK)
+		require.NotEmpty(t, result.Error)
+		require.Zero(t, result.Revision)
+		require.Nil(t, result.Session)
+	}
+
+	terminalResult := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: "\n"})
+	require.False(t, terminalResult.OK)
+	require.NotEmpty(t, terminalResult.Error)
+	require.Empty(t, sessions.resetOneCalls)
+	require.Empty(t, sessions.resetTerminalCalls)
+	require.Empty(t, recorder.Calls())
+}
+
+func TestResetCommandStatePublishesCanonicalSessionAfterDurabilityAndRefreshesActiveTerminalOnce(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	delete(session.Terminals[0].CommandStates, "command-stable-1")
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 41, Session: &session,
+		},
+	}
+	activeTerminalID := "terminal-stable-1"
+	coordination := &recordingTerminalCoordinationService{
+		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Revision: 9,
+			Broadcast: &domain.MasterBroadcastState{
+				ID: "broadcast-1", ActiveTerminalID: &activeTerminalID,
+			},
+		}},
+		order: recorder,
+	}
+	events := &recordingEventSink{recorder: recorder}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination, Events: events,
+		Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{
+		TerminalID: " terminal-stable-1 ", CommandID: " command-stable-1 ",
+	})
+	require.True(t, result.OK)
+	require.Empty(t, result.Error)
+	require.Equal(t, uint64(41), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, [][2]string{{"terminal-stable-1", "command-stable-1"}}, sessions.resetOneCalls)
+	require.Equal(t, 1, coordination.updateCalls)
+	require.Equal(t, session.Terminals[0].Root, coordination.updateTree)
+	calls := recorder.Calls()
+	require.NotEmpty(t, calls)
+	require.Equal(t, "session:reset-command-state:terminal-stable-1:command-stable-1", calls[0])
+	require.Equal(t, "coordinator:update-live-terminal:terminal-stable-1", calls[1])
+	require.ElementsMatch(t, []string{"event:coordination-state", "event:session-state"}, calls[2:])
+
+	records := events.Records()
+	require.Len(t, records, 2)
+	require.Equal(t, coordinationStateEvent, records[0].Name)
+	require.Equal(t, sessionStateEvent, records[1].Name)
+	event, ok := records[1].Payload.(SessionStateEvent)
+	require.True(t, ok, "session-state payload = %#v", records[1].Payload)
+	require.Equal(t, uint64(41), event.Revision)
+	require.Equal(t, &session, event.Session)
+}
+
+func TestResetCommandStateNoOpReturnsCanonicalRevisionWithoutPublication(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	delete(session.Terminals[0].CommandStates, "command-stable-1")
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult: sessionservice.CommandStateResult{
+			OK: true, Changed: false, Revision: 19, Session: &session,
+		},
+	}
+	activeTerminalID := "terminal-stable-1"
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: &recordingEventSink{recorder: recorder}, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{TerminalID: "terminal-stable-1", CommandID: "command-stable-1"})
+	require.True(t, result.OK)
+	require.Equal(t, uint64(19), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, []string{"session:reset-command-state:terminal-stable-1:command-stable-1"}, recorder.Calls())
+}
+
+func TestResetTerminalCommandStatesUsesOneMutationAndDoesNotRefreshInactiveTerminal(t *testing.T) {
+	recorder := &callRecorder{}
+	session := commandStateResetSessionFixture()
+	session.Terminals[0].CommandStates = nil
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetTerminalResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 52, Session: &session,
+		},
+	}
+	activeTerminalID := "another-terminal"
+	events := &recordingEventSink{recorder: recorder}
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: events, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: " terminal-stable-1 "})
+	require.True(t, result.OK)
+	require.Equal(t, uint64(52), result.Revision)
+	require.Equal(t, &session, result.Session)
+	require.Equal(t, []string{"terminal-stable-1"}, sessions.resetTerminalCalls)
+	require.Equal(t, []string{
+		"session:reset-terminal-command-states:terminal-stable-1",
+		"event:session-state",
+	}, recorder.Calls())
+	require.Len(t, events.Records(), 1)
+}
+
+func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T) {
+	live := liveservice.New(nil, nil)
+	var effects []controlservice.Effect
+	coordination := controlservice.New(controlservice.Config{
+		Runtime: live, Terminals: live, TrustedHack: live,
+		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
+	})
+	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Mara", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
+	require.NoError(t, err)
+	characterID := master.Roster[0].ID
+	master, err = coordination.StartBroadcast()
+	require.NoError(t, err)
+	require.NotNil(t, master.Broadcast)
+	connectionID := domain.ConnectionID("reset-terminal-controller")
+	controller := coordination.CreateSession(connectionID)
+	selected := coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: connectionID,
+		SessionID:    controller.SessionID,
+		RequestID:    "reset-terminal-select-controller",
+		BroadcastID:  master.Broadcast.ID,
+		CharacterID:  characterID,
+	})
+	require.True(t, selected.Accepted)
+
+	session := commandStateResetSessionFixture()
+	terminal := session.Terminals[0]
+	_, err = coordination.RequestTerminalActivation(domain.TerminalTarget{
+		TerminalID: terminal.ID, TerminalName: terminal.Name, Tree: terminal.Root,
+		CommandStates: cloneCommandExecutionStates(terminal.CommandStates),
+		HackLevel:     terminal.HackLevel, IntroText: terminal.IntroText,
+	})
+	require.NoError(t, err)
+	shown := coordination.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+		RequestID:   "show-completed-command",
+		BroadcastID: master.Broadcast.ID,
+		TerminalID:  terminal.ID,
+		Kind:        domain.RuntimeCommandNavigate,
+		Action:      "command",
+		NodeID:      "command-stable-1",
+	})
+	require.True(t, shown.Accepted)
+	require.NotEmpty(t, effects)
+	var beforeReset *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			beforeReset = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, beforeReset)
+	require.NotNil(t, beforeReset.Nav.CommandNodeID)
+
+	terminal.CommandStates = nil
+	session.Terminals[0] = terminal
+	sessions := &recordingCommandStateSession{
+		resetTerminalResult: sessionservice.CommandStateResult{
+			OK: true, Changed: true, Revision: 52, Session: &session,
+		},
+	}
+	effects = nil
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination,
+		Events: &recordingEventSink{recorder: &callRecorder{}},
+	})
+
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: terminal.ID})
+	require.True(t, result.OK, "ResetTerminalCommandStates() = %#v", result)
+	require.Equal(t, uint64(52), result.Revision)
+	require.Empty(t, result.Session.Terminals[0].CommandStates)
+	require.NotEmpty(t, effects)
+	var afterReset *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			afterReset = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, afterReset)
+	require.Equal(t, "Open doors", afterReset.Tree.Children[0].Name)
+	require.Nil(t, afterReset.Nav.CommandNodeID, "reset terminal retained the completed command result view")
+}
+
+func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTerminal(t *testing.T) {
+	target := "/Campaigns/reset-terminal-production.json"
+	fileSystem := testutil.NewFakeFileSystem()
+	seed := commandStateResetSessionFixture()
+	seed.Terminals[0].Root.Children = append(seed.Terminals[0].Root.Children, domain.ContentNode{
+		ID: "command-stable-2", Type: domain.NodeCommand, Name: "Enable alarm", Text: "Alarm enabled",
+		StateChange: &domain.StateChangeConfig{CompletedName: "Alarm enabled", ConfirmationText: "Enable the alarm?"},
+	})
+	seed.Terminals[0].CommandStates["command-stable-2"] = domain.CommandExecutionState{
+		CompletedName: "Alarm enabled", ResultText: "Alarm enabled",
+	}
+	seed.Terminals = append(seed.Terminals, domain.Terminal{
+		ID: "terminal-stable-2", Name: "Reserve terminal",
+		Root: domain.ContentNode{
+			ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+			Children: []domain.ContentNode{{
+				ID: "reserve-command", Type: domain.NodeCommand, Name: "Unlock reserve", Text: "Reserve unlocked",
+				StateChange: &domain.StateChangeConfig{CompletedName: "Reserve unlocked", ConfirmationText: "Unlock reserve?"},
+			}},
+		},
+		CommandStates: map[string]domain.CommandExecutionState{
+			"reserve-command": {CompletedName: "Reserve unlocked", ResultText: "Reserve unlocked"},
+		},
+	})
+	encoded, err := domain.EncodeSession(seed)
+	require.NoError(t, err)
+	fileSystem.SeedFile(target, encoded)
+	sessions := sessionservice.NewService(
+		sessionservice.NewStorage(fileSystem),
+		&testutil.FakeDialog{OpenResult: target},
+		sessionservice.Locations{
+			DocumentsDefault: "/Campaigns", BundledDemo: "/Applications/Fallout/demo.json",
+		},
+	)
+	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
+	opened := sessions.Open(t.Context())
+	require.True(t, opened.OK, "Open() = %#v", opened)
+	require.NotNil(t, opened.Session)
+
+	live := liveservice.New(nil, nil)
+	var effects []controlservice.Effect
+	coordination := controlservice.New(controlservice.Config{
+		Runtime: live, Terminals: live, TrustedHack: live,
+		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
+	})
+	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Mara", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
+	require.NoError(t, err)
+	master, err = coordination.AddCharacter(domain.CharacterCreatePayload{
+		Name: "Boone", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
+	})
+	require.NoError(t, err)
+	controllerCharacterID := master.Roster[0].ID
+	observerCharacterID := master.Roster[1].ID
+	master, err = coordination.StartBroadcast()
+	require.NoError(t, err)
+	connectionID := domain.ConnectionID("production-reset-controller")
+	controller := coordination.CreateSession(connectionID)
+	selected := coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: connectionID, SessionID: controller.SessionID,
+		RequestID: "production-reset-select", BroadcastID: master.Broadcast.ID,
+		CharacterID: controllerCharacterID,
+	})
+	require.True(t, selected.Accepted)
+	observerConnectionID := domain.ConnectionID("production-reset-observer")
+	observer := coordination.CreateSession(observerConnectionID)
+	selected = coordination.SelectCharacter(controlservice.CharacterSelection{
+		ConnectionID: observerConnectionID, SessionID: observer.SessionID,
+		RequestID: "production-reset-select-observer", BroadcastID: master.Broadcast.ID,
+		CharacterID: observerCharacterID,
+	})
+	require.True(t, selected.Accepted)
+	terminal := opened.Session.Terminals[0]
+	_, err = coordination.RequestTerminalActivation(domain.TerminalTarget{
+		TerminalID: terminal.ID, TerminalName: terminal.Name, Tree: terminal.Root,
+		CommandStates: cloneCommandExecutionStates(terminal.CommandStates),
+		HackLevel:     terminal.HackLevel, IntroText: terminal.IntroText,
+	})
+	require.NoError(t, err)
+	shown := coordination.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
+		RequestID: "production-show-completed", BroadcastID: master.Broadcast.ID,
+		TerminalID: terminal.ID, Kind: domain.RuntimeCommandNavigate,
+		Action: "command", NodeID: "command-stable-1",
+	})
+	require.True(t, shown.Accepted)
+
+	effects = nil
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions, Coordination: coordination,
+		Events: &recordingEventSink{recorder: &callRecorder{}},
+	})
+	resetStarted := time.Now()
+	result := app.ResetTerminalCommandStates(ResetTerminalCommandStatesPayload{TerminalID: terminal.ID})
+	require.Less(t, time.Since(resetStarted), time.Second)
+	require.True(t, result.OK, "ResetTerminalCommandStates() = %#v", result)
+	require.Equal(t, uint64(1), result.Revision)
+	require.Empty(t, result.Session.Terminals[0].CommandStates)
+	require.Contains(t, result.Session.Terminals[1].CommandStates, "reserve-command")
+
+	durableBytes, ok := fileSystem.File(target)
+	require.True(t, ok)
+	durable, err := domain.DecodeSession(durableBytes)
+	require.NoError(t, err)
+	require.Empty(t, durable.Terminals[0].CommandStates)
+	require.Contains(t, durable.Terminals[1].CommandStates, "reserve-command")
+	require.Equal(t, uint64(1), sessions.Snapshot().SavedRevision)
+
+	var projection *domain.PublicLiveState
+	for index := len(effects) - 1; index >= 0; index-- {
+		if effects[index].Live != nil {
+			projection = effects[index].Live
+			break
+		}
+	}
+	require.NotNil(t, projection)
+	require.Equal(t, "Open doors", projection.Tree.Children[0].Name)
+	require.Equal(t, "Enable alarm", projection.Tree.Children[1].Name)
+	require.Nil(t, projection.Nav.CommandNodeID, "production reset retained the completed command result view")
+	masterAfterReset := coordination.Snapshot()
+	require.Len(t, masterAfterReset.Sessions, 2)
+	require.ElementsMatch(t, []domain.PlayerRole{domain.PlayerRoleActive, domain.PlayerRoleObserver}, []domain.PlayerRole{
+		masterAfterReset.Sessions[0].Role, masterAfterReset.Sessions[1].Role,
+	})
+
+	reopened := sessions.Open(t.Context())
+	require.True(t, reopened.OK, "reopen reset session = %#v", reopened)
+	require.Empty(t, reopened.Session.Terminals[0].CommandStates)
+	require.Contains(t, reopened.Session.Terminals[1].CommandStates, "reserve-command")
+}
+
+func TestCommandStateResetFailureDoesNotPublishSessionOrPlayerState(t *testing.T) {
+	recorder := &callRecorder{}
+	sessions := &recordingCommandStateSession{
+		recordingSessionService: recordingSessionService{recorder: recorder},
+		resetOneResult:          sessionservice.CommandStateResult{Error: "could not persist command state"},
+	}
+	activeTerminalID := "terminal-stable-1"
+	app := NewAppWithDependencies(AppDependencies{
+		Sessions: sessions,
+		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
+			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
+		}},
+		Events: &recordingEventSink{recorder: recorder}, Player: &recordingPlayerServer{recorder: recorder},
+	})
+
+	result := app.ResetCommandState(ResetCommandStatePayload{TerminalID: "terminal-stable-1", CommandID: "command-stable-1"})
+	require.False(t, result.OK)
+	require.NotEmpty(t, result.Error)
+	require.Zero(t, result.Revision)
+	require.Nil(t, result.Session)
+	require.Equal(t, []string{"session:reset-command-state:terminal-stable-1:command-stable-1"}, recorder.Calls())
+}
+
 func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *testing.T) {
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
@@ -1163,6 +1846,33 @@ func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 	require.Falsef(t, live.clearCalls != 1,
 		"live Clear calls after shutdown = %d, want 1", live.clearCalls)
 
+}
+
+func TestResolveTerminalNavigationUsesOnlyExactPrivateDecisionAndPublishesOneNewRevision(t *testing.T) {
+	controller := domain.LogicalSessionID("controller-1")
+	coordination := &recordingCoordinationService{state: &domain.MasterCoordinationState{
+		Revision:  8,
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &controller, ActiveTerminalID: appStringPointer("terminal-a")},
+		PendingTerminalNavigation: &domain.MasterPendingTerminalNavigation{
+			RequestID: "navigation-1", BroadcastID: "broadcast-1", Direction: domain.TerminalNavigationForward,
+			SourceTerminalID: "terminal-a", TargetTerminalID: "terminal-b",
+		},
+	}}
+	events := &recordingEventSink{recorder: &callRecorder{}}
+	app := NewAppWithDependencies(AppDependencies{Coordination: coordination, Events: events})
+
+	result := app.ResolveTerminalNavigation(TerminalNavigationDecisionPayload{RequestID: " navigation-1 ", Decision: domain.TerminalNavigationApprove})
+	require.True(t, result.OK)
+	require.Empty(t, result.Error)
+	require.Equal(t, uint64(9), result.State.Revision)
+	require.Nil(t, result.State.PendingTerminalNavigation)
+	require.Equal(t, []recordedTerminalNavigationDecision{{RequestID: "navigation-1", Decision: domain.TerminalNavigationApprove}}, coordination.navigationDecisions)
+	require.Len(t, events.Records(), 1)
+	require.Equal(t, coordinationStateEvent, events.Records()[0].Name)
+
+	invalid := app.ResolveTerminalNavigation(TerminalNavigationDecisionPayload{RequestID: "navigation-2", Decision: "discard"})
+	require.False(t, invalid.OK)
+	require.Len(t, coordination.navigationDecisions, 1, "invalid private enums must not reach the coordinator")
 }
 
 func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T) {
@@ -1441,6 +2151,52 @@ type recordingSessionService struct {
 	shutdownCalls int
 }
 
+type recordingCommandStateSession struct {
+	recordingSessionService
+	resetOneResult      sessionservice.CommandStateResult
+	resetTerminalResult sessionservice.CommandStateResult
+	resetOneCalls       [][2]string
+	resetTerminalCalls  []string
+}
+
+func (service *recordingCommandStateSession) ResetCommandState(_ context.Context, terminalID, commandID string) sessionservice.CommandStateResult {
+	service.resetOneCalls = append(service.resetOneCalls, [2]string{terminalID, commandID})
+	if service.recorder != nil {
+		service.recorder.Add("session:reset-command-state:" + terminalID + ":" + commandID)
+	}
+	return service.resetOneResult
+}
+
+func (service *recordingCommandStateSession) ResetTerminalCommandStates(_ context.Context, terminalID string) sessionservice.CommandStateResult {
+	service.resetTerminalCalls = append(service.resetTerminalCalls, terminalID)
+	if service.recorder != nil {
+		service.recorder.Add("session:reset-terminal-command-states:" + terminalID)
+	}
+	return service.resetTerminalResult
+}
+
+func commandStateResetSessionFixture() domain.Session {
+	return domain.Session{
+		Version: 1,
+		Name:    "Stable ID reset fixture",
+		Terminals: []domain.Terminal{{
+			ID:        "terminal-stable-1",
+			Name:      "Overseer terminal",
+			HackLevel: 0,
+			Root: domain.ContentNode{
+				ID: "root", Type: domain.NodeFolder, Name: "ROOT",
+				Children: []domain.ContentNode{{
+					ID: "command-stable-1", Type: domain.NodeCommand, Name: "Open doors", Text: "Doors opened",
+					StateChange: &domain.StateChangeConfig{CompletedName: "Doors open", ConfirmationText: "Open the doors?"},
+				}},
+			},
+			CommandStates: map[string]domain.CommandExecutionState{
+				"command-stable-1": {CompletedName: "Doors open", ResultText: "Doors opened"},
+			},
+		}},
+	}
+}
+
 type recordingPlayerConfigSession struct {
 	recordingSessionService
 	snapshot     sessionservice.ActiveSession
@@ -1524,13 +2280,19 @@ type recordingLiveService struct {
 }
 
 type recordingCoordinationService struct {
-	state      *domain.MasterCoordinationState
-	addState   *domain.MasterCoordinationState
-	startState *domain.MasterCoordinationState
-	addErr     error
-	startErr   error
-	addNames   []string
-	startCalls int
+	state               *domain.MasterCoordinationState
+	addState            *domain.MasterCoordinationState
+	startState          *domain.MasterCoordinationState
+	addErr              error
+	startErr            error
+	addPayloads         []domain.CharacterCreatePayload
+	startCalls          int
+	navigationDecisions []recordedTerminalNavigationDecision
+}
+
+type recordedTerminalNavigationDecision struct {
+	RequestID string
+	Decision  domain.TerminalNavigationDecision
 }
 
 type recordingCoordinatedHackService struct {
@@ -1694,11 +2456,13 @@ func (service *recordingTerminalCoordinationService) UpdateLiveTerminal(tree dom
 
 type recordingCorrectionCoordinationService struct {
 	recordingCoordinationService
-	calls        []string
-	nextRevision int
-	failCommand  string
-	commandErr   error
-	order        *callRecorder
+	calls          []string
+	updatePayloads []domain.CharacterUpdatePayload
+	deletePayloads []domain.CharacterDeletePayload
+	nextRevision   int
+	failCommand    string
+	commandErr     error
+	order          *callRecorder
 }
 
 func (service *recordingCorrectionCoordinationService) correction(command string) (*domain.MasterCoordinationState, error) {
@@ -1711,13 +2475,15 @@ func (service *recordingCorrectionCoordinationService) correction(command string
 	return domain.CloneMasterCoordinationState(state), nil
 }
 
-func (service *recordingCorrectionCoordinationService) RenameCharacter(characterID domain.CharacterID, name string) (*domain.MasterCoordinationState, error) {
-	service.calls = append(service.calls, fmt.Sprintf("rename-character:%s:%s", characterID, name))
-	return service.correction("rename-character")
+func (service *recordingCorrectionCoordinationService) UpdateCharacter(payload domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error) {
+	service.updatePayloads = append(service.updatePayloads, payload)
+	service.calls = append(service.calls, fmt.Sprintf("update-character:%s:%s:%d:%t:%d", payload.CharacterID, payload.Name, payload.Intelligence, payload.HackerPerkAvailable, payload.ExpectedRevision))
+	return service.correction("update-character")
 }
 
-func (service *recordingCorrectionCoordinationService) DeleteCharacter(characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
-	service.calls = append(service.calls, "delete-character:"+string(characterID))
+func (service *recordingCorrectionCoordinationService) DeleteCharacter(payload domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error) {
+	service.deletePayloads = append(service.deletePayloads, payload)
+	service.calls = append(service.calls, fmt.Sprintf("delete-character:%s:%d", payload.CharacterID, payload.ExpectedRevision))
 	return service.correction("delete-character")
 }
 
@@ -1782,8 +2548,8 @@ func (service *recordingCoordinationService) Snapshot() *domain.MasterCoordinati
 	return domain.CloneMasterCoordinationState(service.state)
 }
 
-func (service *recordingCoordinationService) AddCharacter(name string) (*domain.MasterCoordinationState, error) {
-	service.addNames = append(service.addNames, name)
+func (service *recordingCoordinationService) AddCharacter(payload domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error) {
+	service.addPayloads = append(service.addPayloads, payload)
 	if service.addErr != nil {
 		return domain.CloneMasterCoordinationState(service.state), service.addErr
 	}
@@ -1798,6 +2564,15 @@ func (service *recordingCoordinationService) StartBroadcast() (*domain.MasterCoo
 	}
 	service.state = domain.CloneMasterCoordinationState(service.startState)
 	return domain.CloneMasterCoordinationState(service.state), nil
+}
+
+func (service *recordingCoordinationService) ResolveTerminalNavigation(requestID string, decision domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error) {
+	service.navigationDecisions = append(service.navigationDecisions, recordedTerminalNavigationDecision{RequestID: requestID, Decision: decision})
+	state := domain.CloneMasterCoordinationState(service.state)
+	state.Revision++
+	state.PendingTerminalNavigation = nil
+	service.state = state
+	return domain.CloneMasterCoordinationState(state), nil
 }
 
 func (service *recordingLiveService) Set(string, string, domain.ContentNode, int, string) *domain.PublicLiveState {

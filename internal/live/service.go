@@ -133,6 +133,7 @@ func (service *Service) createRuntimeLocked(target domain.TerminalTarget) (*doma
 		TerminalID: target.TerminalID, TerminalName: target.TerminalName,
 		Tree: cloneNode(target.Tree), HackLevel: target.HackLevel, IntroText: target.IntroText,
 		Nav: nav.Default(), Lifecycle: domain.TerminalLifecycleActive,
+		CommandStates: cloneCommandStates(target.CommandStates),
 	}
 	if target.HackLevel > 0 {
 		state.Hack = hack.GenerateBoard(service.generationIDs.Next(), target.HackLevel, service.random, service.words)
@@ -162,6 +163,7 @@ func (service *Service) UpdateRuntime(state *domain.TerminalRuntime, target doma
 	defer service.mu.Unlock()
 	state.TerminalName = target.TerminalName
 	state.Tree = cloneNode(target.Tree)
+	state.CommandStates = cloneCommandStates(target.CommandStates)
 	state.IntroText = target.IntroText
 	if state.Hack == nil {
 		state.HackLevel = target.HackLevel
@@ -202,6 +204,7 @@ func (service *Service) ReactivateRuntime(state *domain.TerminalRuntime, target 
 	defer service.mu.Unlock()
 	state.TerminalName = target.TerminalName
 	state.Tree = cloneNode(target.Tree)
+	state.CommandStates = cloneCommandStates(target.CommandStates)
 	state.IntroText = target.IntroText
 	if state.Hack == nil {
 		state.HackLevel = target.HackLevel
@@ -312,6 +315,19 @@ func (service *Service) applyRuntimeLocked(state *domain.TerminalRuntime, comman
 	if state == nil {
 		return nil, false
 	}
+	if state.CommandExecution != nil {
+		switch state.CommandExecution.Phase {
+		case domain.CommandExecutionPhasePending:
+			return nil, false
+		case domain.CommandExecutionPhaseRejected:
+			if command.Kind != domain.RuntimeCommandNavigate || command.Action != "back" {
+				return nil, false
+			}
+			state.CommandExecution = nil
+			state.Nav = nav.ApplyAction(state.Nav, state.Tree, command.Action, command.NodeID)
+			return publicTerminalRuntime(state), true
+		}
+	}
 
 	switch command.Kind {
 	case domain.RuntimeCommandNavigate:
@@ -355,8 +371,9 @@ func publicTerminalRuntime(state *domain.TerminalRuntime) *domain.PublicLiveStat
 	}
 	return &domain.PublicLiveState{
 		TerminalID: state.TerminalID, TerminalName: state.TerminalName,
-		Tree: cloneNode(state.Tree), HackLevel: state.HackLevel, IntroText: state.IntroText,
+		Tree: effectiveTree(state.Tree, state.CommandStates), HackLevel: state.HackLevel, IntroText: state.IntroText,
 		Nav: cloneNav(state.Nav), Hack: hack.PublicState(state.Hack),
+		CommandExecution: cloneCommandExecution(state.CommandExecution),
 	}
 }
 
@@ -399,12 +416,54 @@ func cloneNav(state domain.NavState) domain.NavState {
 
 func cloneNode(node domain.ContentNode) domain.ContentNode {
 	clone := node
+	if node.StateChange != nil {
+		stateChange := *node.StateChange
+		clone.StateChange = &stateChange
+	}
 	clone.Children = make([]domain.ContentNode, len(node.Children))
 	for index := range node.Children {
 		clone.Children[index] = cloneNode(node.Children[index])
 	}
 	clone.Extra = cloneRawMap(node.Extra)
 	return clone
+}
+
+func effectiveTree(node domain.ContentNode, states map[string]domain.CommandExecutionState) domain.ContentNode {
+	clone := cloneNode(node)
+	applyEffectiveCommandStates(&clone, states)
+	return clone
+}
+
+func applyEffectiveCommandStates(node *domain.ContentNode, states map[string]domain.CommandExecutionState) {
+	if node == nil {
+		return
+	}
+	if state, ok := states[node.ID]; ok && node.Type == domain.NodeCommand {
+		node.Name = state.CompletedName
+		node.Text = state.ResultText
+	}
+	for index := range node.Children {
+		applyEffectiveCommandStates(&node.Children[index], states)
+	}
+}
+
+func cloneCommandStates(states map[string]domain.CommandExecutionState) map[string]domain.CommandExecutionState {
+	if states == nil {
+		return nil
+	}
+	clone := make(map[string]domain.CommandExecutionState, len(states))
+	for commandID, state := range states {
+		clone[commandID] = state
+	}
+	return clone
+}
+
+func cloneCommandExecution(presentation *domain.CommandExecutionPresentation) *domain.CommandExecutionPresentation {
+	if presentation == nil {
+		return nil
+	}
+	clone := *presentation
+	return &clone
 }
 
 func cloneRawMap(values map[string]json.RawMessage) map[string]json.RawMessage {

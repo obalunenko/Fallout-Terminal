@@ -7,44 +7,61 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDecodeEncodeSessionV1Fixture(t *testing.T) {
 	t.Parallel()
 
 	raw, err := os.ReadFile("../testutil/testdata/session-v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	session, err := DecodeSession(raw)
-	if err != nil {
-		t.Fatalf("DecodeSession() error = %v", err)
-	}
-	if session.Version != 1 || len(session.Terminals) == 0 {
-		t.Fatalf("decoded fixture = %#v", session)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 1, session.Version)
+	assert.NotEmpty(t, session.Terminals)
 
 	encoded, err := EncodeSession(session)
-	if err != nil {
-		t.Fatalf("EncodeSession() error = %v", err)
-	}
-	if !bytes.HasSuffix(encoded, []byte("\n")) {
-		t.Fatal("EncodeSession() must include a final newline")
-	}
+	require.NoError(t, err)
+	assert.True(t, bytes.HasSuffix(encoded, []byte("\n")))
 
 	var got, want any
-	if err := json.Unmarshal(encoded, &got); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(raw, &want); err != nil {
-		t.Fatal(err)
-	}
-	if !deepJSONEqual(got, want) {
-		t.Fatalf("semantic round trip changed fixture\ngot:  %s\nwant: %s", encoded, raw)
-	}
+	require.NoError(t, json.Unmarshal(encoded, &got))
+	require.NoError(t, json.Unmarshal(raw, &want))
+	assert.True(t, deepJSONEqual(got, want), "semantic round trip changed fixture\ngot:  %s\nwant: %s", encoded, raw)
+}
+
+func TestDecodeStateChangingSessionV1Fixture(t *testing.T) {
+	t.Parallel()
+
+	raw, err := os.ReadFile("../testutil/testdata/session-v1-state-changing.json")
+	require.NoError(t, err)
+	session, err := DecodeSession(raw)
+	require.NoError(t, err)
+	assert.Equal(t, 1, session.Version)
+	require.Len(t, session.Terminals, 2)
+	security := session.Terminals[0]
+	require.Len(t, security.CommandStates, 2)
+	snapshot, ok := security.CommandStates["n_doors"]
+	require.True(t, ok)
+	assert.Equal(t, "Гермодвери открыты", snapshot.CompletedName)
+	assert.NotEmpty(t, snapshot.ResultText)
+	stateChange := security.Root.Children[0].Children[1].StateChange
+	require.NotNil(t, stateChange)
+	assert.Equal(t, "Тревога отключена", stateChange.CompletedName)
+	power := session.Terminals[1]
+	require.Len(t, power.CommandStates, 1)
+	_, ok = power.CommandStates["n_backup_power"]
+	require.True(t, ok)
+
+	encoded, err := EncodeSession(session)
+	require.NoError(t, err)
+	roundTrip, err := DecodeSession(encoded)
+	require.NoError(t, err)
+	assert.Equal(t, session, roundTrip)
 }
 
 func TestUnknownFieldsRoundTrip(t *testing.T) {
@@ -71,19 +88,200 @@ func TestUnknownFieldsRoundTrip(t *testing.T) {
 }`)
 
 	session, err := DecodeSession(raw)
-	if err != nil {
-		t.Fatalf("DecodeSession() error = %v", err)
-	}
+	require.NoError(t, err)
 	encoded, err := EncodeSession(session)
-	if err != nil {
-		t.Fatalf("EncodeSession() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	for _, field := range []string{"campaignNote", "terminalNote", "nodeNote"} {
-		if !bytes.Contains(encoded, []byte(`"`+field+`"`)) {
-			t.Errorf("round trip dropped %s: %s", field, encoded)
-		}
+		assert.Contains(t, string(encoded), `"`+field+`"`)
 	}
+}
+
+func TestTerminalTransitionRoundTripTreatsConfigAsKnownAndDetachesClone(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Linked terminals",
+  "terminals": [
+    {"id":"a","name":"A","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[{"id":"go","type":"command","name":"GO","terminalTransition":{"targetTerminalId":"b"},"futureNode":true}]}},
+    {"id":"b","name":"B","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[]}}
+  ]
+}`)
+	session, err := DecodeSession(raw)
+	require.NoError(t, err)
+	transition := session.Terminals[0].Root.Children[0].TerminalTransition
+	require.NotNil(t, transition)
+	assert.Equal(t, "b", transition.TargetTerminalID)
+	assert.NotContains(t, session.Terminals[0].Root.Children[0].Extra, "terminalTransition")
+
+	encoded, err := EncodeSession(session)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"terminalTransition"`)
+	assert.Contains(t, string(encoded), `"futureNode"`)
+
+	clone := CloneSession(session)
+	clone.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID = "changed"
+	assert.Equal(t, "b", session.Terminals[0].Root.Children[0].TerminalTransition.TargetTerminalID)
+}
+
+func TestCommandBehaviorDiscriminatesOrdinaryStateChangeTransitionAndInvalid(t *testing.T) {
+	t.Parallel()
+
+	stateChange := &StateChangeConfig{CompletedName: "Done", ConfirmationText: "Proceed?"}
+	transition := &TerminalTransitionConfig{TargetTerminalID: "b"}
+	tests := []struct {
+		name string
+		node ContentNode
+		want CommandBehavior
+	}{
+		{name: "ordinary", node: ContentNode{Type: NodeCommand}, want: CommandBehaviorOrdinary},
+		{name: "state change", node: ContentNode{Type: NodeCommand, StateChange: stateChange}, want: CommandBehaviorStateChange},
+		{name: "terminal transition", node: ContentNode{Type: NodeCommand, TerminalTransition: transition}, want: CommandBehaviorTerminalTransition},
+		{name: "invalid dual config", node: ContentNode{Type: NodeCommand, StateChange: stateChange, TerminalTransition: transition}, want: CommandBehaviorInvalid},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.want, test.node.Behavior())
+		})
+	}
+}
+
+func TestDecodeSessionRejectsMalformedDualCommandBehavior(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Invalid behavior",
+  "terminals": [
+    {"id":"a","name":"A","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[{"id":"go","type":"command","name":"GO","text":"Done","stateChange":{"completedName":"Done","confirmationText":"Proceed?"},"terminalTransition":{"targetTerminalId":"b"}}]}},
+    {"id":"b","name":"B","hackLevel":0,"introText":"","root":{"id":"root","type":"folder","name":"ROOT","children":[]}}
+  ]
+}`)
+
+	_, err := DecodeSession(raw)
+	require.ErrorContains(t, err, "cannot contain both stateChange and terminalTransition")
+}
+
+func TestStateChangingCommandRoundTripPreservesFrozenSnapshotAndUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Stateful extras",
+  "campaignNote": {"keep": true},
+  "terminals": [{
+    "id": "t_security",
+    "name": "Security",
+    "hackLevel": 0,
+    "introText": "",
+    "terminalNote": 42,
+    "root": {
+      "id": "root",
+      "type": "folder",
+      "name": "ROOT",
+      "children": [{
+        "id": "n_doors",
+        "type": "command",
+        "name": "Open doors",
+        "text": "Doors opened.",
+        "stateChange": {
+          "completedName": "Doors open",
+          "confirmationText": "Open the doors?"
+        },
+        "nodeNote": [1, 2]
+      }]
+    },
+    "commandStates": {
+      "n_doors": {
+        "completedName": "Doors were opened",
+        "resultText": "Access to the sector was granted."
+      }
+    }
+  }]
+}`)
+
+	session, err := DecodeSession(raw)
+	require.NoError(t, err)
+	command := &session.Terminals[0].Root.Children[0]
+	require.NotNil(t, command.StateChange)
+	assert.Equal(t, StateChangeConfig{
+		CompletedName:    "Doors open",
+		ConfirmationText: "Open the doors?",
+	}, *command.StateChange)
+	snapshot, ok := session.Terminals[0].CommandStates["n_doors"]
+	require.True(t, ok)
+	assert.Equal(t, CommandExecutionState{
+		CompletedName: "Doors were opened",
+		ResultText:    "Access to the sector was granted.",
+	}, snapshot)
+
+	// The durable snapshot is a frozen record of the first successful execution,
+	// not a view over the command's subsequently edited authored fields.
+	command.StateChange.CompletedName = "New authored title"
+	command.Text = "New authored result"
+	assert.Equal(t, snapshot, session.Terminals[0].CommandStates["n_doors"])
+
+	encoded, err := EncodeSession(session)
+	require.NoError(t, err)
+	for _, field := range []string{
+		"stateChange", "completedName", "confirmationText", "commandStates", "resultText",
+		"campaignNote", "terminalNote", "nodeNote",
+	} {
+		assert.Contains(t, string(encoded), `"`+field+`"`)
+	}
+
+	decoded, err := DecodeSession(encoded)
+	require.NoError(t, err)
+	gotSnapshot := decoded.Terminals[0].CommandStates["n_doors"]
+	assert.Equal(t, snapshot, gotSnapshot)
+}
+
+func TestLegacyVersionOneSessionDefaultsToOrdinaryCommandsWithoutSnapshots(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+  "version": 1,
+  "name": "Legacy",
+  "terminals": [{
+    "id": "t1",
+    "name": "Terminal",
+    "hackLevel": 0,
+    "introText": "",
+    "root": {
+      "id": "root",
+      "type": "folder",
+      "name": "ROOT",
+      "children": [{
+        "id": "ordinary",
+        "type": "command",
+        "name": "Read status",
+        "text": "All systems nominal."
+      }]
+    }
+  }]
+}`)
+
+	session, err := DecodeSession(raw)
+	require.NoError(t, err)
+	assert.Nil(t, session.Terminals[0].Root.Children[0].StateChange)
+	assert.Empty(t, session.Terminals[0].CommandStates)
+
+	encoded, err := EncodeSession(session)
+	require.NoError(t, err)
+	for _, absent := range []string{`"stateChange"`, `"commandStates"`} {
+		assert.NotContains(t, string(encoded), absent)
+	}
+
+	roundTrip, err := DecodeSession(encoded)
+	require.NoError(t, err)
+	assert.Equal(t, 1, roundTrip.Version)
+	wantOrdinary := ContentNode{
+		ID: "ordinary", Type: NodeCommand, Name: "Read status", Text: "All systems nominal.",
+	}
+	assert.Equal(t, wantOrdinary, roundTrip.Terminals[0].Root.Children[0])
 }
 
 func TestVersionOneSessionNeverPersistsRuntimeHackAggregate(t *testing.T) {
@@ -111,35 +309,24 @@ func TestVersionOneSessionNeverPersistsRuntimeHackAggregate(t *testing.T) {
 		Log:     []string{"Ложное слово удалено."},
 		Columns: []HackColumn{{Text: "..CIPHER....", Words: []HackWord{{ID: "A1", Start: 2, Length: 6}}}},
 	}
-	if runtime.GenerationID == "" || runtime.AttemptsLeft == runtime.AttemptsMax {
-		t.Fatal("runtime fixture did not contain progressed puzzle state")
-	}
+	require.NotEmpty(t, runtime.GenerationID)
+	assert.NotEqual(t, runtime.AttemptsMax, runtime.AttemptsLeft)
 
 	encoded, err := EncodeSession(session)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, forbidden := range []string{
 		"generationId", "generation-runtime-only", "patterns", "usedPatterns",
 		"removedDuds", "attemptsMax", "attemptsLeft", "outcomes", "unlocked",
 		"puzzleSeed", "secretWord", "wordsById", "CIPHER", "Ложное слово удалено.",
 	} {
-		if strings.Contains(string(encoded), forbidden) {
-			t.Errorf("version-1 session persisted runtime hacking value %q: %s", forbidden, encoded)
-		}
+		assert.NotContains(t, string(encoded), forbidden)
 	}
 
 	decoded, err := DecodeSession(encoded)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	reencoded, err := EncodeSession(decoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(encoded, reencoded) {
-		t.Fatalf("version-1 round trip changed runtime-free document\nfirst: %s\nagain: %s", encoded, reencoded)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, encoded, reencoded)
 }
 
 func TestRuntimeCoordinationProjectionClonesDetachDeeply(t *testing.T) {
@@ -197,47 +384,27 @@ func TestRuntimeCoordinationProjectionClonesDetachDeeply(t *testing.T) {
 			projection := reflect.ValueOf(test.projection).Elem()
 			for fieldName, wantKind := range test.requiredFields {
 				field := projection.FieldByName(fieldName)
-				if !field.IsValid() {
-					t.Fatalf("%T is missing required projection field %s", test.projection, fieldName)
-				}
-				if field.Kind() != wantKind {
-					t.Fatalf("%T.%s kind = %s, want %s", test.projection, fieldName, field.Kind(), wantKind)
-				}
+				require.True(t, field.IsValid(), "%T is missing required projection field %s", test.projection, fieldName)
+				assert.Equal(t, wantKind, field.Kind(), "%T.%s", test.projection, fieldName)
 			}
 
 			seedProjection(t, projection, test.name, 0)
 			before, err := json.Marshal(test.projection)
-			if err != nil {
-				t.Fatalf("marshal seeded projection: %v", err)
-			}
+			require.NoError(t, err)
 			var publicProjection any
-			if err := json.Unmarshal(before, &publicProjection); err != nil {
-				t.Fatalf("decode seeded projection: %v", err)
-			}
+			require.NoError(t, json.Unmarshal(before, &publicProjection))
 			for _, forbidden := range test.forbiddenJSONFields {
-				if containsJSONField(publicProjection, forbidden) {
-					t.Errorf("projection exposes private field %q: %s", forbidden, before)
-				}
+				assert.False(t, containsJSONField(publicProjection, forbidden), "projection exposes private field %q: %s", forbidden, before)
 			}
 
 			clone := test.clone(test.projection)
-			if !reflect.DeepEqual(test.projection, clone) {
-				t.Fatalf("clone changed projection\nsource: %#v\nclone:  %#v", test.projection, clone)
-			}
-			if !mutateProjectionReferences(reflect.ValueOf(clone).Elem(), false) {
-				t.Fatal("projection fixture contains no nested mutable references")
-			}
-			if reflect.DeepEqual(test.projection, clone) {
-				t.Fatal("mutating clone did not change it")
-			}
+			assert.Equal(t, test.projection, clone)
+			require.True(t, mutateProjectionReferences(reflect.ValueOf(clone).Elem(), false), "projection fixture contains no nested mutable references")
+			assert.NotEqual(t, test.projection, clone)
 
 			after, err := json.Marshal(test.projection)
-			if err != nil {
-				t.Fatalf("marshal source after clone mutation: %v", err)
-			}
-			if !bytes.Equal(after, before) {
-				t.Fatalf("clone retained an alias into its source\nbefore: %s\nafter:  %s", before, after)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, before, after)
 		})
 	}
 }
@@ -265,24 +432,17 @@ func TestVersionOneSessionJSONContainsOnlyDurableAuthoredFields(t *testing.T) {
 	}
 
 	encoded, err := EncodeSession(session)
-	if err != nil {
-		t.Fatalf("EncodeSession() error = %v", err)
-	}
+	require.NoError(t, err)
 
 	var document map[string]any
-	if err := json.Unmarshal(encoded, &document); err != nil {
-		t.Fatalf("decode encoded session: %v", err)
-	}
+	require.NoError(t, json.Unmarshal(encoded, &document))
 	assertJSONFieldSet(t, document, "session", "name", "terminals", "version")
 
 	terminals, ok := document["terminals"].([]any)
-	if !ok || len(terminals) != 1 {
-		t.Fatalf("terminals = %#v, want one terminal", document["terminals"])
-	}
+	require.True(t, ok)
+	require.Len(t, terminals, 1)
 	terminal, ok := terminals[0].(map[string]any)
-	if !ok {
-		t.Fatalf("terminal = %#v, want object", terminals[0])
-	}
+	require.True(t, ok)
 	assertJSONFieldSet(t, terminal, "terminal", "hackLevel", "id", "introText", "name", "root")
 
 	for _, forbidden := range []string{
@@ -294,17 +454,13 @@ func TestVersionOneSessionJSONContainsOnlyDurableAuthoredFields(t *testing.T) {
 		"generationId", "secretWord", "wordsById", "usedPatterns", "attemptsLeft",
 		"board", "patterns", "log", "outcome",
 	} {
-		if containsJSONField(document, forbidden) {
-			t.Errorf("version-1 session JSON contains process-local field %q: %s", forbidden, encoded)
-		}
+		assert.False(t, containsJSONField(document, forbidden), "version-1 session JSON contains process-local field %q: %s", forbidden, encoded)
 	}
 }
 
 func seedProjection(t *testing.T, value reflect.Value, path string, depth int) {
 	t.Helper()
-	if depth > 12 {
-		t.Fatalf("projection type is unexpectedly recursive at %s", path)
-	}
+	require.LessOrEqual(t, depth, 12, "projection type is unexpectedly recursive at %s", path)
 
 	switch value.Kind() {
 	case reflect.Pointer:
@@ -407,9 +563,7 @@ func assertJSONFieldSet(t *testing.T, object map[string]any, location string, wa
 	}
 	sort.Strings(got)
 	sort.Strings(want)
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("%s fields = %v, want %v", location, got, want)
-	}
+	assert.Equal(t, want, got, "%s fields", location)
 }
 
 func containsJSONField(value any, forbidden string) bool {
@@ -445,9 +599,7 @@ func TestVersionOneEncodingIsInvariantAcrossCompleteProcessRuntimeActivity(t *te
 		}},
 	}
 	before, err := EncodeSession(session)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	controller := LogicalSessionID("session-1")
 	activeTerminal := "terminal-1"
 	_ = ProcessRuntime{
@@ -468,24 +620,16 @@ func TestVersionOneEncodingIsInvariantAcrossCompleteProcessRuntimeActivity(t *te
 		PendingSwitch: &TerminalSwitchDecision{ID: "switch-1", BroadcastID: "broadcast-1", SourceTerminalID: "terminal-1"},
 	}
 	after, err := EncodeSession(session)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(after) != string(before) {
-		t.Fatalf("runtime activity changed version-1 encoding:\nbefore %s\nafter  %s", before, after)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after), "runtime activity changed version-1 encoding")
 	for _, forbidden := range []string{"browserToken", "fallbackName", "connection", "broadcast", "controller", "claim", "pendingSwitch", "generation", "secretWord", "terminalRuntimes"} {
-		if strings.Contains(string(after), forbidden) {
-			t.Fatalf("durable encoding leaked runtime field %q: %s", forbidden, after)
-		}
+		assert.NotContains(t, string(after), forbidden, "durable encoding leaked runtime field")
 	}
 	decoded, err := DecodeSession(after)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(decoded.Terminals) != 1 || decoded.Terminals[0].ID != "terminal-1" || decoded.Terminals[0].HackLevel != 2 {
-		t.Fatalf("durable authored terminal changed after runtime activity: %#v", decoded)
-	}
+	require.NoError(t, err)
+	require.Len(t, decoded.Terminals, 1)
+	assert.Equal(t, "terminal-1", decoded.Terminals[0].ID)
+	assert.Equal(t, 2, decoded.Terminals[0].HackLevel)
 }
 
 func TestSessionPlayerConfigReferenceIsOptionalAndRoundTrips(t *testing.T) {
@@ -493,25 +637,15 @@ func TestSessionPlayerConfigReferenceIsOptionalAndRoundTrips(t *testing.T) {
 
 	legacy := validSessionForPlayerConfigTest()
 	encoded, err := EncodeSession(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if bytes.Contains(encoded, []byte(`"playerConfig"`)) {
-		t.Fatalf("legacy session unexpectedly gained playerConfig: %s", encoded)
-	}
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), `"playerConfig"`)
 
 	legacy.PlayerConfig = filepath.Join("players", "vault-13.json")
 	encoded, err = EncodeSession(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	decoded, err := DecodeSession(encoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if decoded.PlayerConfig != legacy.PlayerConfig {
-		t.Fatalf("playerConfig = %q, want %q", decoded.PlayerConfig, legacy.PlayerConfig)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, legacy.PlayerConfig, decoded.PlayerConfig)
 }
 
 func TestPlayerConfigV1StrictValidationAndStableEncoding(t *testing.T) {
@@ -519,69 +653,127 @@ func TestPlayerConfigV1StrictValidationAndStableEncoding(t *testing.T) {
 
 	empty := PlayerConfig{Version: 1, Name: "Empty Players", Roster: []CharacterRosterEntry{}}
 	emptyEncoded, err := EncodePlayerConfig(empty)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(emptyEncoded, []byte(`"roster": []`)) {
-		t.Fatalf("empty player config must encode roster as an array: %s", emptyEncoded)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, string(emptyEncoded), `"roster": []`)
 	emptyDecoded, err := DecodePlayerConfig(emptyEncoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if emptyDecoded.Roster == nil {
-		t.Fatal("empty player config round trip produced a nil roster")
-	}
+	require.NoError(t, err)
+	assert.NotNil(t, emptyDecoded.Roster)
 
 	config := PlayerConfig{
 		Version: 1,
 		Name:    "Vault 13 Players",
 		Roster: []CharacterRosterEntry{
-			{ID: "mara", Name: "Mara"},
-			{ID: "boone", Name: "Boone"},
+			{ID: "mara", Name: "Mara", Intelligence: 10, HackerPerkAvailable: true},
+			{ID: "boone", Name: "Boone", Intelligence: 1, HackerPerkAvailable: false},
 		},
 	}
 	encoded, err := EncodePlayerConfig(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, `{
+  "version": 1,
+  "name": "Vault 13 Players",
+  "roster": [
+    {
+      "id": "mara",
+      "name": "Mara",
+      "intelligence": 10,
+      "hackerPerkAvailable": true
+    },
+    {
+      "id": "boone",
+      "name": "Boone",
+      "intelligence": 1,
+      "hackerPerkAvailable": false
+    }
+  ]
+}
+`, string(encoded), "canonical player config must emit both attributes in stable order")
 	decoded, err := DecodePlayerConfig(encoded)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(decoded, config) {
-		t.Fatalf("round trip = %#v, want %#v", decoded, config)
-	}
-	if !bytes.HasSuffix(encoded, []byte("\n")) {
-		t.Fatal("player config must end with a newline")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, config, decoded)
+	assert.Equal(t, []CharacterID{"mara", "boone"}, []CharacterID{decoded.Roster[0].ID, decoded.Roster[1].ID})
+	assert.True(t, bytes.HasSuffix(encoded, []byte("\n")), "player config must end with a newline")
 	var document map[string]any
-	if err := json.Unmarshal(encoded, &document); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, json.Unmarshal(encoded, &document))
 	assertJSONFieldSet(t, document, "player config", "name", "roster", "version")
 	for _, forbidden := range []string{
 		"browserToken", "sessionId", "connectionId", "connected", "claimedBySessionId",
 		"controllerSessionId", "broadcastId", "revision", "requestId", "activeTerminalId",
 		"nav", "hack", "secretWord", "attemptsLeft", "patterns", "log", "outcome",
 	} {
-		if containsJSONField(document, forbidden) {
-			t.Errorf("player config contains runtime field %q: %s", forbidden, encoded)
-		}
+		assert.False(t, containsJSONField(document, forbidden), "player config contains runtime field %q: %s", forbidden, encoded)
 	}
 
-	invalid := []string{
-		`{"version":2,"name":"Players","roster":[]}`,
-		`{"version":1,"name":" ","roster":[]}`,
-		`{"version":1,"name":"Players","roster":null}`,
-		`{"version":1,"name":"Players","roster":[{"id":"same","name":"One"},{"id":"same","name":"Two"}]}`,
-		`{"version":1,"name":"Players","roster":[],"browserToken":"secret"}`,
+	invalid := []struct {
+		name string
+		raw  string
+	}{
+		{name: "unsupported version", raw: `{"version":2,"name":"Players","roster":[]}`},
+		{name: "blank name", raw: `{"version":1,"name":" ","roster":[]}`},
+		{name: "null roster", raw: `{"version":1,"name":"Players","roster":null}`},
+		{name: "duplicate stable ID", raw: `{"version":1,"name":"Players","roster":[{"id":"same","name":"One","intelligence":1,"hackerPerkAvailable":false},{"id":"same","name":"Two","intelligence":2,"hackerPerkAvailable":true}]}`},
+		{name: "unknown top level field", raw: `{"version":1,"name":"Players","roster":[],"browserToken":"secret"}`},
+		{name: "unknown nested field", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":5,"hackerPerkAvailable":true,"futureAttribute":1}]}`},
+		{name: "trailing value", raw: `{"version":1,"name":"Players","roster":[]} {}`},
+		{name: "explicit zero intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":0,"hackerPerkAvailable":false}]}`},
+		{name: "intelligence above maximum", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":11,"hackerPerkAvailable":false}]}`},
+		{name: "fractional intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":1.5,"hackerPerkAvailable":false}]}`},
+		{name: "string intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":"5","hackerPerkAvailable":false}]}`},
+		{name: "null intelligence", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":null,"hackerPerkAvailable":false}]}`},
+		{name: "null hacker perk", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":5,"hackerPerkAvailable":null}]}`},
 	}
-	for _, raw := range invalid {
-		if _, err := DecodePlayerConfig([]byte(raw)); err == nil {
-			t.Errorf("DecodePlayerConfig(%s) unexpectedly succeeded", raw)
-		}
+	for _, test := range invalid {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := DecodePlayerConfig([]byte(test.raw))
+			assert.Error(t, err, "DecodePlayerConfig(%s) unexpectedly succeeded", test.raw)
+		})
 	}
+}
+
+func TestDecodePlayerConfigV1AppliesOnlyLegacyAttributeDefaults(t *testing.T) {
+	t.Parallel()
+
+	decoded, err := DecodePlayerConfig([]byte(`{
+  "version": 1,
+  "name": "Legacy Players",
+  "roster": [
+    {"id":"legacy","name":"Legacy"},
+    {"id":"smart","name":"Smart","intelligence":8},
+    {"id":"hacker","name":"Hacker","hackerPerkAvailable":true}
+  ]
+}`))
+	require.NoError(t, err)
+	require.Len(t, decoded.Roster, 3)
+	assert.Equal(t, []CharacterRosterEntry{
+		{ID: "legacy", Name: "Legacy", Intelligence: 1, HackerPerkAvailable: false},
+		{ID: "smart", Name: "Smart", Intelligence: 8, HackerPerkAvailable: false},
+		{ID: "hacker", Name: "Hacker", Intelligence: 1, HackerPerkAvailable: true},
+	}, decoded.Roster, "legacy defaults must preserve stable identities and authored order")
+
+	encoded, err := EncodePlayerConfig(decoded)
+	require.NoError(t, err)
+	assert.Equal(t, 3, bytes.Count(encoded, []byte(`"intelligence"`)))
+	assert.Equal(t, 3, bytes.Count(encoded, []byte(`"hackerPerkAvailable"`)))
+}
+
+func TestCloneMasterCoordinationStatePreservesPlayerAttributesAndDetachesRoster(t *testing.T) {
+	t.Parallel()
+
+	original := &MasterCoordinationState{Roster: []MasterRosterEntry{
+		{ID: "mara", Name: "Mara", Intelligence: 9, HackerPerkAvailable: true},
+		{ID: "boone", Name: "Boone", Intelligence: 3, HackerPerkAvailable: false},
+	}}
+	clone := CloneMasterCoordinationState(original)
+	require.Equal(t, original, clone)
+
+	clone.Roster[0].Name = "Changed"
+	clone.Roster[0].Intelligence = 1
+	clone.Roster[0].HackerPerkAvailable = false
+	assert.Equal(t, MasterRosterEntry{
+		ID: "mara", Name: "Mara", Intelligence: 9, HackerPerkAvailable: true,
+	}, original.Roster[0])
 }
 
 func validSessionForPlayerConfigTest() Session {

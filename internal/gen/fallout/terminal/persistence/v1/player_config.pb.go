@@ -22,11 +22,13 @@ const (
 )
 
 type RosterEntry struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Intelligence        *int32                 `protobuf:"varint,3,opt,name=intelligence,proto3,oneof" json:"intelligence,omitempty"`
+	HackerPerkAvailable *bool                  `protobuf:"varint,4,opt,name=hacker_perk_available,json=hackerPerkAvailable,proto3,oneof" json:"hacker_perk_available,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RosterEntry) Reset() {
@@ -71,6 +73,20 @@ func (x *RosterEntry) GetName() string {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *RosterEntry) GetIntelligence() int32 {
+	if x != nil && x.Intelligence != nil {
+		return *x.Intelligence
+	}
+	return 0
+}
+
+func (x *RosterEntry) GetHackerPerkAvailable() bool {
+	if x != nil && x.HackerPerkAvailable != nil {
+		return *x.HackerPerkAvailable
+	}
+	return false
 }
 
 type PlayerConfig struct {
@@ -137,10 +153,14 @@ var File_fallout_terminal_persistence_v1_player_config_proto protoreflect.FileDe
 
 const file_fallout_terminal_persistence_v1_player_config_proto_rawDesc = "" +
 	"\n" +
-	"3fallout/terminal/persistence/v1/player_config.proto\x12\x1ffallout.terminal.persistence.v1\"1\n" +
+	"3fallout/terminal/persistence/v1/player_config.proto\x12\x1ffallout.terminal.persistence.v1\"\xbe\x01\n" +
 	"\vRosterEntry\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\x82\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
+	"\fintelligence\x18\x03 \x01(\x05H\x00R\fintelligence\x88\x01\x01\x127\n" +
+	"\x15hacker_perk_available\x18\x04 \x01(\bH\x01R\x13hackerPerkAvailable\x88\x01\x01B\x0f\n" +
+	"\r_intelligenceB\x18\n" +
+	"\x16_hacker_perk_available\"\x82\x01\n" +
 	"\fPlayerConfig\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12D\n" +
@@ -177,6 +197,7 @@ func file_fallout_terminal_persistence_v1_player_config_proto_init() {
 	if File_fallout_terminal_persistence_v1_player_config_proto != nil {
 		return
 	}
+	file_fallout_terminal_persistence_v1_player_config_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

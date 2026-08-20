@@ -7,6 +7,7 @@
 package privatev1
 
 import (
+	v11 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
 	v1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/player/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -390,11 +391,63 @@ func (x *CoordinationStateEvent) GetCoordinationState() *CoordinationState {
 	return nil
 }
 
+type SessionStateEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revision      uint64                 `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
+	Session       *v11.Session           `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionStateEvent) Reset() {
+	*x = SessionStateEvent{}
+	mi := &file_fallout_terminal_private_v1_runtime_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionStateEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionStateEvent) ProtoMessage() {}
+
+func (x *SessionStateEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_fallout_terminal_private_v1_runtime_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionStateEvent.ProtoReflect.Descriptor instead.
+func (*SessionStateEvent) Descriptor() ([]byte, []int) {
+	return file_fallout_terminal_private_v1_runtime_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SessionStateEvent) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *SessionStateEvent) GetSession() *v11.Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
 var File_fallout_terminal_private_v1_runtime_proto protoreflect.FileDescriptor
 
 const file_fallout_terminal_private_v1_runtime_proto_rawDesc = "" +
 	"\n" +
-	")fallout/terminal/private/v1/runtime.proto\x12\x1bfallout.terminal.private.v1\x1a(fallout/terminal/player/v1/hacking.proto\x1a.fallout/terminal/private/v1/coordination.proto\"\xf9\x01\n" +
+	")fallout/terminal/private/v1/runtime.proto\x12\x1bfallout.terminal.private.v1\x1a-fallout/terminal/persistence/v1/session.proto\x1a(fallout/terminal/player/v1/hacking.proto\x1a.fallout/terminal/private/v1/coordination.proto\"\xf9\x01\n" +
 	"\x11ServerInformation\x12\x1b\n" +
 	"\tlocal_url\x18\x01 \x01(\tR\blocalUrl\x12\"\n" +
 	"\n" +
@@ -429,7 +482,10 @@ const file_fallout_terminal_private_v1_runtime_proto_rawDesc = "" +
 	"\n" +
 	"hack_state\x18\x01 \x01(\v2+.fallout.terminal.player.v1.PublicHackStateR\thackState\"w\n" +
 	"\x16CoordinationStateEvent\x12]\n" +
-	"\x12coordination_state\x18\x01 \x01(\v2..fallout.terminal.private.v1.CoordinationStateR\x11coordinationStateB[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
+	"\x12coordination_state\x18\x01 \x01(\v2..fallout.terminal.private.v1.CoordinationStateR\x11coordinationState\"s\n" +
+	"\x11SessionStateEvent\x12\x1a\n" +
+	"\brevision\x18\x01 \x01(\x04R\brevision\x12B\n" +
+	"\asession\x18\x02 \x01(\v2(.fallout.terminal.persistence.v1.SessionR\asessionB[ZYgithub.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/private/v1;privatev1b\x06proto3"
 
 var (
 	file_fallout_terminal_private_v1_runtime_proto_rawDescOnce sync.Once
@@ -443,7 +499,7 @@ func file_fallout_terminal_private_v1_runtime_proto_rawDescGZIP() []byte {
 	return file_fallout_terminal_private_v1_runtime_proto_rawDescData
 }
 
-var file_fallout_terminal_private_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_fallout_terminal_private_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_fallout_terminal_private_v1_runtime_proto_goTypes = []any{
 	(*ServerInformation)(nil),      // 0: fallout.terminal.private.v1.ServerInformation
 	(*RuntimeStatus)(nil),          // 1: fallout.terminal.private.v1.RuntimeStatus
@@ -451,21 +507,24 @@ var file_fallout_terminal_private_v1_runtime_proto_goTypes = []any{
 	(*ClientCountEvent)(nil),       // 3: fallout.terminal.private.v1.ClientCountEvent
 	(*HackStateEvent)(nil),         // 4: fallout.terminal.private.v1.HackStateEvent
 	(*CoordinationStateEvent)(nil), // 5: fallout.terminal.private.v1.CoordinationStateEvent
-	(*v1.PublicHackState)(nil),     // 6: fallout.terminal.player.v1.PublicHackState
-	(*CoordinationState)(nil),      // 7: fallout.terminal.private.v1.CoordinationState
+	(*SessionStateEvent)(nil),      // 6: fallout.terminal.private.v1.SessionStateEvent
+	(*v1.PublicHackState)(nil),     // 7: fallout.terminal.player.v1.PublicHackState
+	(*CoordinationState)(nil),      // 8: fallout.terminal.private.v1.CoordinationState
+	(*v11.Session)(nil),            // 9: fallout.terminal.persistence.v1.Session
 }
 var file_fallout_terminal_private_v1_runtime_proto_depIdxs = []int32{
 	0, // 0: fallout.terminal.private.v1.RuntimeStatus.server_info:type_name -> fallout.terminal.private.v1.ServerInformation
-	6, // 1: fallout.terminal.private.v1.RuntimeStatus.hack_state:type_name -> fallout.terminal.player.v1.PublicHackState
-	7, // 2: fallout.terminal.private.v1.RuntimeStatus.coordination_state:type_name -> fallout.terminal.private.v1.CoordinationState
+	7, // 1: fallout.terminal.private.v1.RuntimeStatus.hack_state:type_name -> fallout.terminal.player.v1.PublicHackState
+	8, // 2: fallout.terminal.private.v1.RuntimeStatus.coordination_state:type_name -> fallout.terminal.private.v1.CoordinationState
 	0, // 3: fallout.terminal.private.v1.ServerInformationEvent.server_info:type_name -> fallout.terminal.private.v1.ServerInformation
-	6, // 4: fallout.terminal.private.v1.HackStateEvent.hack_state:type_name -> fallout.terminal.player.v1.PublicHackState
-	7, // 5: fallout.terminal.private.v1.CoordinationStateEvent.coordination_state:type_name -> fallout.terminal.private.v1.CoordinationState
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	7, // 4: fallout.terminal.private.v1.HackStateEvent.hack_state:type_name -> fallout.terminal.player.v1.PublicHackState
+	8, // 5: fallout.terminal.private.v1.CoordinationStateEvent.coordination_state:type_name -> fallout.terminal.private.v1.CoordinationState
+	9, // 6: fallout.terminal.private.v1.SessionStateEvent.session:type_name -> fallout.terminal.persistence.v1.Session
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_fallout_terminal_private_v1_runtime_proto_init() }
@@ -482,7 +541,7 @@ func file_fallout_terminal_private_v1_runtime_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_fallout_terminal_private_v1_runtime_proto_rawDesc), len(file_fallout_terminal_private_v1_runtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -65,6 +65,14 @@ func (service *desktopService) ResolveTerminalSwitch(payload TerminalSwitchDecis
 	return service.core.ResolveTerminalSwitch(payload)
 }
 
+func (service *desktopService) ResolveCommandExecution(payload CommandExecutionDecisionPayload) ResolveCommandExecutionResult {
+	return service.core.ResolveCommandExecution(payload)
+}
+
+func (service *desktopService) ResolveTerminalNavigation(payload TerminalNavigationDecisionPayload) ResolveTerminalNavigationResult {
+	return service.core.ResolveTerminalNavigation(payload)
+}
+
 func (service *desktopService) ForceHackSuccess() CommandResult {
 	return service.core.ForceHackSuccess()
 }
@@ -73,16 +81,24 @@ func (service *desktopService) ResetFailedHack(payload LiveTerminalPayload) Coor
 	return service.core.ResetFailedHack(payload)
 }
 
-func (service *desktopService) AddCharacter(name string) CoordinationCommandResult {
-	return service.core.AddCharacter(name)
+func (service *desktopService) ResetCommandState(payload ResetCommandStatePayload) SessionStateResult {
+	return service.core.ResetCommandState(payload)
 }
 
-func (service *desktopService) RenameCharacter(payload CharacterRenamePayload) CoordinationCommandResult {
-	return service.core.RenameCharacter(payload)
+func (service *desktopService) ResetTerminalCommandStates(payload ResetTerminalCommandStatesPayload) SessionStateResult {
+	return service.core.ResetTerminalCommandStates(payload)
 }
 
-func (service *desktopService) DeleteCharacter(characterID string) CoordinationCommandResult {
-	return service.core.DeleteCharacter(characterID)
+func (service *desktopService) AddCharacter(payload CharacterCreatePayload) CoordinationCommandResult {
+	return service.core.AddCharacter(payload)
+}
+
+func (service *desktopService) UpdateCharacter(payload CharacterUpdatePayload) CoordinationCommandResult {
+	return service.core.UpdateCharacter(payload)
+}
+
+func (service *desktopService) DeleteCharacter(payload CharacterDeletePayload) CoordinationCommandResult {
+	return service.core.DeleteCharacter(payload)
 }
 
 func (service *desktopService) RenameLogicalSession(payload LogicalSessionRenamePayload) CoordinationCommandResult {

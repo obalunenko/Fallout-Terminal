@@ -4,6 +4,8 @@
 
 **Bugfix**: 2026-08-17 — BUG-002 Added same-generation hacking-board reconciliation state.
 
+**Bugfix**: 2026-08-19 — BUG-003 Added generation-local complete-board font-fit state.
+
 This feature adds no persistent entity, Protobuf message, RPC payload, session field, or player-configuration field. The model below describes ephemeral presentation state owned independently by each browser tab.
 
 ## Presentation Mode
@@ -19,7 +21,7 @@ The visible player surface remains derived from existing connection state and au
 | List | Folder contents visible | A new folder identity may reveal ordered rows |
 | Record | Record title/body visible | A new record identity may reveal ordered lines |
 | Command output | Command result visible with list state | A new command identity may reveal ordered lines |
-| Hacking | Active public hacking board visible | ~~CRT frame, historical hover highlight, log, and cursor; no reveal~~ BUG-001: a new generation reveals complete code rows once; BUG-002: same-generation dud removal reconciles affected content without replay |
+| Hacking | Active public hacking board visible | ~~CRT frame, historical hover highlight, log, and cursor; no reveal~~ BUG-001: a new generation reveals complete code rows once; BUG-002: same-generation dud removal reconciles affected content without replay; BUG-003: the complete board is fitted before reveal and retains stable row typography during insertion |
 | Blocked | Failed hacking state visible | CRT frame and blocked message; no reveal |
 
 Presentation mode is not persisted, published, or used as an optimistic gameplay state.
@@ -33,6 +35,7 @@ One sequence owns one revealable container for the current visible content ident
 | `container` | `#termList`, `#entryBody`, `#termOutput`, or the active hacking-code container | Must be connected and belong to the current visible page |
 | `contentIdentity` | Existing folder path, record ID, command ID, or ~~authoritative hacking generation plus rendered board text~~ authoritative hacking generation under BUG-002 | Unchanged generation does not replay even when dud removal mutates board text |
 | `boardSnapshot` | Generation-local hacking column text, addresses, and word metadata | Compared only to reconcile same-generation changed rows; never creates a new reveal identity |
+| `boardFit` | Shared hacking-row font size plus the viewport, orientation, activity-log allocation, and active-font inputs used to calculate it from the complete `boardSnapshot` | Exists before the first hacking row is painted; ordinary row append or completion never invalidates it |
 | `pageIndex` | Visible pagination index when applicable | Pagination of already-opened text renders immediately |
 | `elements` | Ordered row or line nodes built through safe text boundaries; a hacking element is one complete address-and-code row | Order is immutable for the sequence; partial hacking rows are invalid |
 | `nextIndex` | Next node to append | Integer from 0 through `elements.length` |
@@ -44,11 +47,13 @@ One sequence owns one revealable container for the current visible content ident
 
 ```text
 Inactive
-  ├─ new folder/record/command or hacking-generation identity with elements → Revealing
+  ├─ new folder/record/command identity with elements → Revealing
+  ├─ new hacking-generation identity with complete boardSnapshot → calculate boardFit from every row → Revealing
   └─ unchanged identity or layout-only render → Complete (all nodes immediate)
 
 Revealing
   ├─ 40ms continuation + current generation → Revealing
+  ├─ genuine viewport/orientation/active-font change → recalculate boardFit from complete boardSnapshot → Revealing
   ├─ same-generation dud removal → Reconcile affected revealed or queued row → Revealing
   ├─ final node appended → Complete
   ├─ skip key for visible page → Completing → Complete
@@ -56,6 +61,7 @@ Revealing
 
 Complete
   ├─ unchanged update/pagination/resize/font fit → Complete (no replay)
+  ├─ genuine hacking viewport/orientation/active-font change → recalculate boardFit from complete boardSnapshot → Complete
   ├─ same-generation dud removal → Reconcile affected revealed row → Complete
   └─ new content identity or hacking generation → Inactive/new sequence
 
@@ -66,6 +72,8 @@ Cancelled
 Completing appends every remaining node synchronously in source order and does not require optional audio playback to succeed.
 
 Reconciliation retains the current sequence and schedule. A revealed hacking row is updated inside its existing row node; an unrevealed row remains queued and has its descriptor updated before its original append turn. No reconciliation operation registers a new controller or makes pending targets interactive.
+
+For hacking, `boardFit` is established from the complete snapshot before the first append. The reveal controller applies the retained value to every row, including rows appended during synchronous skip completion. Appending or reconciling a row does not invalidate the value. Only changed viewport, orientation, or active-font inputs may request recalculation, and recalculation still evaluates all snapshot rows without adding queued targets to the interaction surface.
 
 ## Active Page Reveal Registry
 
@@ -125,6 +133,8 @@ The guard is not a preference and does not disable later reveals or persistent C
 - A later physical key press uses the existing normal keyboard contract.
 - Unchanged content, pagination, same-generation hacking attempts/log/hover/reconnect/dud-removal updates, viewport recalculation, font readiness, and hacking fitting do not replay a reveal.
 - Each revealed hacking element contains one complete address-and-code row; unrevealed rows contribute no pointer, focus, or keyboard target.
+- A new hacking generation has a complete-board `boardFit` before its first row is visible, and every ordinary reveal append through uninterrupted or skipped completion uses exactly that value.
+- Row append, hover, attempts, log updates, reconnect, and same-generation reconciliation do not invalidate `boardFit`; a genuine viewport, orientation, or active-font change recalculates it from all revealed and queued rows while preserving the responsive font floor, containment, and maximal-fit tolerance.
 - ~~A changed hacking generation or rendered board invalidates the previous reveal before any replacement row is appended.~~ Under BUG-002, only a changed hacking generation invalidates the previous reveal; changed board content within the same generation is reconciled.
 - Same-generation dud removal removes zero unrelated rows, preserves every unaffected revealed row node, and updates a pending row without appending it early.
 - Screen flicker, blink, pulse, scanlines, vignette, palette, and glow have no reduced-motion branch.

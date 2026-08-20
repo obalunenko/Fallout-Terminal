@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/Fallout-Terminal/internal/nav"
 )
 
 const defaultRequestResultLimit = 256
@@ -61,7 +62,31 @@ type TrustedHackRuntime interface {
 // RosterStore persists one complete candidate player config. The coordinator
 // calls it while holding the transition lock and commits only after success.
 type RosterStore interface {
-	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) error
+	Save(domain.PlayerConfigHandle, []domain.CharacterRosterEntry) (domain.PlayerConfigHandle, error)
+}
+
+// CommandStateMutation is the detached durable document result returned by a
+// trusted command-state store. The coordinator owns publication and never
+// supplies a callback to the store.
+type CommandStateMutation struct {
+	Changed  bool
+	Revision uint64
+	Session  domain.Session
+}
+
+// CommandStateStore is the narrow synchronous durability boundary for
+// server-owned command execution snapshots. Coordinator transitions call it
+// in the one-way control-to-session lock order and commit only after success.
+type CommandStateStore interface {
+	ExecuteCommandState(terminalID, commandID string) (CommandStateMutation, error)
+	ResetCommandState(terminalID, commandID string) (CommandStateMutation, error)
+	ResetTerminalCommandStates(terminalID string) (CommandStateMutation, error)
+}
+
+// TerminalCatalog resolves only detached values from the latest validated session.
+type TerminalCatalog interface {
+	LookupTerminal(terminalID string) (domain.TerminalTarget, bool)
+	LookupTerminalTransition(sourceTerminalID, commandID string) (domain.TerminalTransitionTarget, bool)
 }
 
 // Config supplies deterministic seams for identifiers and ordered effects.
@@ -74,6 +99,8 @@ type Config struct {
 	Terminals          TerminalRuntimeLifecycle
 	TrustedHack        TrustedHackRuntime
 	RosterStore        RosterStore
+	CommandStateStore  CommandStateStore
+	TerminalCatalog    TerminalCatalog
 	RequestResultLimit int
 }
 
@@ -123,6 +150,8 @@ type Service struct {
 	terminals           TerminalRuntimeLifecycle
 	trustedHack         TrustedHackRuntime
 	rosterStore         RosterStore
+	commandStateStore   CommandStateStore
+	terminalCatalog     TerminalCatalog
 	requirePlayerConfig bool
 	requestResultLimit  int
 }
@@ -173,6 +202,8 @@ func New(config Config) *Service {
 		terminals:           config.Terminals,
 		trustedHack:         config.TrustedHack,
 		rosterStore:         config.RosterStore,
+		commandStateStore:   config.CommandStateStore,
+		terminalCatalog:     config.TerminalCatalog,
 		requirePlayerConfig: config.RosterStore != nil,
 		requestResultLimit:  requestResultLimit,
 	}
@@ -306,7 +337,7 @@ func (service *Service) compoundUpdateLocked(runtime *domain.ProcessRuntime, ses
 		update.Terminal = &presentation
 		return update
 	}
-	if live := service.terminals.ProjectRuntime(terminal); live != nil {
+	if live := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal)); live != nil {
 		presentation := domain.TerminalPresentation{Live: clonePublicLiveState(live)}
 		update.Terminal = &presentation
 		update.Nav = &live.Nav
@@ -350,41 +381,72 @@ func (service *Service) CurrentLiveForSession(sessionID domain.LogicalSessionID)
 	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
 		return nil, service.runtime.Revision, false
 	}
-	projection := service.terminals.ProjectRuntime(terminal)
+	projection := decorateTerminalNavigation(&service.runtime, service.terminals.ProjectRuntime(terminal))
 	if projection == nil {
 		return nil, service.runtime.Revision, false
 	}
 	return clonePublicLiveState(projection), service.runtime.Revision, true
 }
 
-// AddCharacter appends one stable process-local roster entry.
-func (service *Service) AddCharacter(name string) (*domain.MasterCoordinationState, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return service.Snapshot(), fmt.Errorf("character name must not be blank")
+// AddCharacter appends one complete stable roster profile while no broadcast
+// is active. All transaction guards run before stable-ID allocation or disk
+// persistence so stale and retried requests cannot create duplicate players.
+func (service *Service) AddCharacter(payload domain.CharacterCreatePayload) (*domain.MasterCoordinationState, error) {
+	name, err := validatedCoordinationName(payload.Name, "character name")
+	if err != nil {
+		return service.Snapshot(), err
 	}
-	if utf8.RuneCountInString(name) > 80 {
-		return service.Snapshot(), fmt.Errorf("character name must not exceed 80 characters")
+	if payload.Intelligence < 1 || payload.Intelligence > 10 {
+		return service.Snapshot(), fmt.Errorf("character intelligence must be between 1 and 10")
 	}
 
 	var state *domain.MasterCoordinationState
 	var addErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
 			addErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			addErr = fmt.Errorf("player roster cannot change during a broadcast")
+			return transition{}
+		}
 		characterID := domain.CharacterID(service.nextID())
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		candidateByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		candidateByID[characterID] = &domain.CharacterRosterEntry{
+			ID:                  characterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
 		candidateOrder = append(candidateOrder, characterID)
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
 			addErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
-		runtime.RosterByID[characterID] = &domain.CharacterRosterEntry{ID: characterID, Name: name}
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
+		runtime.RosterByID[characterID] = &domain.CharacterRosterEntry{
+			ID:                  characterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
 		runtime.RosterOrder = append(runtime.RosterOrder, characterID)
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
@@ -393,86 +455,135 @@ func (service *Service) AddCharacter(name string) (*domain.MasterCoordinationSta
 	return domain.CloneMasterCoordinationState(state), addErr
 }
 
-// RenameCharacter updates the player-facing name while retaining the stable
-// roster identity and any current claim.
-func (service *Service) RenameCharacter(characterID domain.CharacterID, name string) (*domain.MasterCoordinationState, error) {
-	name, err := validatedCoordinationName(name, "character name")
-	if err != nil {
-		return service.Snapshot(), err
-	}
-
+// UpdateCharacter replaces one complete roster profile while retaining its
+// stable identity and position. No-op replacements do not write, publish, or
+// advance the coordination revision.
+func (service *Service) UpdateCharacter(payload domain.CharacterUpdatePayload) (*domain.MasterCoordinationState, error) {
 	var state *domain.MasterCoordinationState
-	var renameErr error
+	var updateErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("select or create a player config first")
+			updateErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
-		character := runtime.RosterByID[characterID]
+		if runtime.Broadcast != nil {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("player roster cannot change during a broadcast")
+			return transition{}
+		}
+		character := runtime.RosterByID[payload.CharacterID]
 		if character == nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("character %q does not exist", characterID)
+			updateErr = fmt.Errorf("character %q does not exist", payload.CharacterID)
 			return transition{}
 		}
-		if character.Name == name {
+		name, err := validatedCoordinationName(payload.Name, "character name")
+		if err != nil {
+			state = masterSnapshot(runtime)
+			updateErr = err
+			return transition{}
+		}
+		if payload.Intelligence < 1 || payload.Intelligence > 10 {
+			state = masterSnapshot(runtime)
+			updateErr = fmt.Errorf("character intelligence must be between 1 and 10")
+			return transition{}
+		}
+		if character.Name == name &&
+			character.Intelligence == payload.Intelligence &&
+			character.HackerPerkAvailable == payload.HackerPerkAvailable {
 			state = masterSnapshot(runtime)
 			return transition{}
 		}
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		candidateByID[characterID].Name = name
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		candidateByID[payload.CharacterID] = &domain.CharacterRosterEntry{
+			ID:                  payload.CharacterID,
+			Name:                name,
+			Intelligence:        payload.Intelligence,
+			HackerPerkAvailable: payload.HackerPerkAvailable,
+		}
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
-			renameErr = fmt.Errorf("could not save player config: %w", err)
+			updateErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
 		character.Name = name
+		character.Intelligence = payload.Intelligence
+		character.HackerPerkAvailable = payload.HackerPerkAvailable
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
 	})
 	state.Revision = result.revision
-	return domain.CloneMasterCoordinationState(state), renameErr
+	return domain.CloneMasterCoordinationState(state), updateErr
 }
 
 // DeleteCharacter removes an unclaimed roster entry while preserving the
 // stable order of every survivor.
-func (service *Service) DeleteCharacter(characterID domain.CharacterID) (*domain.MasterCoordinationState, error) {
+func (service *Service) DeleteCharacter(payload domain.CharacterDeletePayload) (*domain.MasterCoordinationState, error) {
 	var state *domain.MasterCoordinationState
 	var deleteErr error
 	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		if payload.ExpectedRevision != runtime.Revision {
+			state = masterSnapshot(runtime)
+			deleteErr = fmt.Errorf(
+				"coordination revision is stale: expected %d, current %d",
+				payload.ExpectedRevision,
+				runtime.Revision,
+			)
+			return transition{}
+		}
 		if service.requirePlayerConfig && runtime.ActivePlayerConfig == nil {
 			state = masterSnapshot(runtime)
 			deleteErr = fmt.Errorf("select or create a player config first")
 			return transition{}
 		}
-		if runtime.RosterByID[characterID] == nil {
+		if runtime.Broadcast != nil {
 			state = masterSnapshot(runtime)
-			deleteErr = fmt.Errorf("character %q does not exist", characterID)
+			deleteErr = fmt.Errorf("player roster cannot change during a broadcast")
 			return transition{}
 		}
-		if characterClaimed(runtime.Broadcast, characterID) {
+		if runtime.RosterByID[payload.CharacterID] == nil {
 			state = masterSnapshot(runtime)
-			deleteErr = fmt.Errorf("character %q is currently claimed", characterID)
+			deleteErr = fmt.Errorf("character %q does not exist", payload.CharacterID)
 			return transition{}
 		}
 		candidateByID, candidateOrder := cloneRosterState(runtime)
-		delete(candidateByID, characterID)
+		delete(candidateByID, payload.CharacterID)
 		filtered := candidateOrder[:0]
 		for _, candidate := range candidateOrder {
-			if candidate != characterID {
+			if candidate != payload.CharacterID {
 				filtered = append(filtered, candidate)
 			}
 		}
 		candidateOrder = filtered
-		if err := service.persistRoster(runtime, candidateByID, candidateOrder); err != nil {
+		refreshedHandle, err := service.persistRoster(runtime, candidateByID, candidateOrder)
+		if err != nil {
 			state = masterSnapshot(runtime)
 			deleteErr = fmt.Errorf("could not save player config: %w", err)
 			return transition{}
 		}
-		delete(runtime.RosterByID, characterID)
+		if runtime.ActivePlayerConfig != nil {
+			value := refreshedHandle
+			runtime.ActivePlayerConfig = &value
+		}
+		delete(runtime.RosterByID, payload.CharacterID)
 		order := runtime.RosterOrder[:0]
 		for _, candidate := range runtime.RosterOrder {
-			if candidate != characterID {
+			if candidate != payload.CharacterID {
 				order = append(order, candidate)
 			}
 		}
@@ -688,6 +799,8 @@ func (service *Service) RequestTerminalActivation(target domain.TerminalTarget) 
 			activationErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
 			return transition{}
 		}
+		clearCommandExecutionRuntime(runtime)
+		clearTerminalNavigationRuntime(runtime)
 		if source := activeTerminalRuntime(broadcast); unfinishedTerminalRuntime(source) && source.TerminalID != target.TerminalID {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -754,6 +867,8 @@ func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState,
 			return transition{}
 		}
 		source := activeTerminalRuntime(broadcast)
+		clearCommandExecutionRuntime(runtime)
+		navigationCleared := clearTerminalNavigationRuntime(runtime)
 		if unfinishedTerminalRuntime(source) {
 			runtime.PendingSwitch = &domain.TerminalSwitchDecision{
 				ID: domain.SwitchID(service.nextID()), BroadcastID: broadcast.ID,
@@ -764,6 +879,9 @@ func (service *Service) RequestTerminalClear() (*domain.MasterCoordinationState,
 		}
 		if source == nil && broadcast.ActiveTerminalID == nil {
 			state = masterSnapshot(runtime)
+			if navigationCleared {
+				return transition{accepted: true, effects: stateEffects(runtime)}
+			}
 			return transition{}
 		}
 		if source != nil {
@@ -861,6 +979,252 @@ func (service *Service) ResolveTerminalSwitch(switchID domain.SwitchID, choice d
 	return domain.CloneMasterCoordinationState(state), resolveErr
 }
 
+// ResolveCommandExecution applies one exact private decision to the single
+// pending state-changing command. Approve holds the coordinator transaction
+// across the one-way durable store call and publishes completed state only
+// after that call succeeds.
+func (service *Service) ResolveCommandExecution(requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return service.Snapshot(), nil, fmt.Errorf("command execution request ID must not be blank")
+	}
+	if decision != domain.CommandExecutionApprove && decision != domain.CommandExecutionReject {
+		return service.Snapshot(), nil, fmt.Errorf("command execution decision must be approve or reject")
+	}
+
+	var state *domain.MasterCoordinationState
+	var mutation *CommandStateMutation
+	var resolveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		pending := runtime.PendingCommandExecution
+		broadcast := runtime.Broadcast
+		terminal := activeTerminalRuntime(broadcast)
+		if !currentPendingCommandExecution(pending, broadcast, terminal, requestID) {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("command execution decision is stale")
+			return transition{}
+		}
+		authored := contentNodeByStableID(&terminal.Tree, pending.CommandID)
+		if authored == nil || authored.Type != domain.NodeCommand || authored.StateChange == nil ||
+			authored.Name != pending.CommandName || authored.StateChange.ConfirmationText != pending.ConfirmationText {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("command execution decision is stale")
+			return transition{}
+		}
+
+		if decision == domain.CommandExecutionReject {
+			runtime.PendingCommandExecution = nil
+			terminal.CommandExecution = &domain.CommandExecutionPresentation{
+				Phase: domain.CommandExecutionPhaseRejected, CommandID: pending.CommandID,
+			}
+			state = masterSnapshot(runtime)
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+
+		if service.commandStateStore == nil {
+			resolveErr = fmt.Errorf("command execution could not be persisted")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		durable, err := service.commandStateStore.ExecuteCommandState(pending.TerminalID, pending.CommandID)
+		if err != nil {
+			resolveErr = fmt.Errorf("command execution could not be persisted")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		durableTerminal := terminalByStableID(&durable.Session, pending.TerminalID)
+		if durableTerminal == nil {
+			resolveErr = fmt.Errorf("command execution returned an invalid durable state")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+		if _, completed := durableTerminal.CommandStates[pending.CommandID]; !completed {
+			resolveErr = fmt.Errorf("command execution returned an invalid durable state")
+			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
+		}
+
+		terminal.CommandStates = cloneCommandStates(durableTerminal.CommandStates)
+		terminal.CommandExecution = nil
+		commandID := pending.CommandID
+		terminal.Nav.CommandNodeID = &commandID
+		runtime.PendingCommandExecution = nil
+		value := durable
+		mutation = &value
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		if projection := service.projectActiveTerminal(runtime); projection != nil {
+			effects = append(effects, Effect{Live: projection})
+		}
+		return transition{accepted: true, effects: effects}
+	})
+	if state == nil {
+		state = service.Snapshot()
+	}
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), mutation, resolveErr
+}
+
+// ResolveTerminalNavigation applies one exact game-master decision without
+// entering the manual terminal-switch lifecycle.
+func (service *Service) ResolveTerminalNavigation(requestID string, decision domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error) {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return service.Snapshot(), fmt.Errorf("terminal navigation request ID must not be blank")
+	}
+	if decision != domain.TerminalNavigationApprove && decision != domain.TerminalNavigationReject {
+		return service.Snapshot(), fmt.Errorf("terminal navigation decision must be approve or reject")
+	}
+
+	var state *domain.MasterCoordinationState
+	var resolveErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		pending := runtime.PendingTerminalNavigation
+		broadcast := runtime.Broadcast
+		source := activeTerminalRuntime(broadcast)
+		if pending == nil || pending.RequestID != requestID || broadcast == nil || pending.BroadcastID != broadcast.ID ||
+			source == nil || source.TerminalID != pending.SourceTerminalID {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation decision is stale")
+			return transition{}
+		}
+		if decision == domain.TerminalNavigationReject {
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = nil
+			state = masterSnapshot(runtime)
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+		if pending.Direction == domain.TerminalNavigationReturn {
+			if service.terminalCatalog == nil || len(broadcast.Route) == 0 ||
+				!sameTerminalReturnPoint(broadcast.Route[len(broadcast.Route)-1], pending.ReturnPoint) {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation route changed")
+				return transition{}
+			}
+			latest, ok := service.terminalCatalog.LookupTerminal(pending.TargetTerminalID)
+			if !ok || latest.TerminalID != pending.ReturnPoint.TerminalID {
+				targetID := pending.TargetTerminalID
+				runtime.PendingTerminalNavigation = nil
+				runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+					Reason: domain.TerminalNavigationNoticeTargetMissing, SourceTerminalID: pending.SourceTerminalID,
+					CommandID: pending.CommandID, TargetTerminalID: &targetID,
+				}
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation return target is unavailable")
+				effects := stateEffects(runtime)
+				if projection := service.projectActiveTerminal(runtime); projection != nil {
+					effects = append(effects, Effect{Live: projection})
+				}
+				return transition{accepted: true, effects: effects}
+			}
+			lifecycle, ok := service.terminals.(terminalDecisionLifecycle)
+			if !ok {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation lifecycle is unavailable")
+				return transition{}
+			}
+			lifecycle.SuspendRuntime(source)
+			targetRuntime := broadcast.TerminalRuntimes[latest.TerminalID]
+			var projection *domain.PublicLiveState
+			if targetRuntime == nil {
+				targetRuntime, projection = lifecycle.CreateRuntime(latest)
+				broadcast.TerminalRuntimes[latest.TerminalID] = targetRuntime
+			} else {
+				projection = lifecycle.ReactivateRuntime(targetRuntime, latest)
+			}
+			if targetRuntime == nil || projection == nil {
+				state = masterSnapshot(runtime)
+				resolveErr = fmt.Errorf("terminal navigation return target could not be activated")
+				return transition{}
+			}
+			targetRuntime.Nav = nav.RestoreFolder(latest.Tree, pending.ReturnPoint.FolderID, pending.ReturnPoint.AncestorFolderIDs)
+			projection.Nav = targetRuntime.Nav
+			broadcast.Route = broadcast.Route[:len(broadcast.Route)-1]
+			targetID := latest.TerminalID
+			broadcast.ActiveTerminalID = &targetID
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = nil
+			projection = decorateTerminalNavigation(runtime, projection)
+			state = masterSnapshot(runtime)
+			return transition{accepted: true, effects: append(stateEffects(runtime), Effect{Live: projection})}
+		}
+		if pending.Direction != domain.TerminalNavigationForward || service.terminalCatalog == nil {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target is unavailable")
+			return transition{}
+		}
+		latest, ok := service.terminalCatalog.LookupTerminalTransition(pending.SourceTerminalID, pending.CommandID)
+		if !ok || latest.Target.TerminalID != pending.TargetTerminalID || latest.Target.TerminalID == pending.SourceTerminalID {
+			targetID := pending.TargetTerminalID
+			runtime.PendingTerminalNavigation = nil
+			runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+				Reason: domain.TerminalNavigationNoticeTargetChanged, SourceTerminalID: pending.SourceTerminalID,
+				CommandID: pending.CommandID, TargetTerminalID: &targetID,
+			}
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target changed")
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+		lifecycle, ok := service.terminals.(terminalDecisionLifecycle)
+		if !ok {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation lifecycle is unavailable")
+			return transition{}
+		}
+		lifecycle.SuspendRuntime(source)
+		targetRuntime := broadcast.TerminalRuntimes[latest.Target.TerminalID]
+		var projection *domain.PublicLiveState
+		if targetRuntime == nil {
+			targetRuntime, projection = lifecycle.CreateRuntime(latest.Target)
+			broadcast.TerminalRuntimes[latest.Target.TerminalID] = targetRuntime
+		} else {
+			projection = lifecycle.ReactivateRuntime(targetRuntime, latest.Target)
+		}
+		if targetRuntime == nil || projection == nil {
+			state = masterSnapshot(runtime)
+			resolveErr = fmt.Errorf("terminal navigation target could not be activated")
+			return transition{}
+		}
+		targetRuntime.Nav = domain.NavState{Path: []string{"root"}, Mode: "list"}
+		projection.Nav = targetRuntime.Nav
+		broadcast.Route = append(broadcast.Route, pending.ReturnPoint)
+		targetID := latest.Target.TerminalID
+		broadcast.ActiveTerminalID = &targetID
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
+		projection = decorateTerminalNavigation(runtime, projection)
+		state = masterSnapshot(runtime)
+		return transition{accepted: true, effects: append(stateEffects(runtime), Effect{Live: projection})}
+	})
+	if state == nil {
+		state = service.Snapshot()
+	}
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), resolveErr
+}
+
+func (service *Service) failPendingCommandExecution(runtime *domain.ProcessRuntime, terminal *domain.TerminalRuntime, pending *domain.PendingCommandExecution, state **domain.MasterCoordinationState) transition {
+	runtime.PendingCommandExecution = nil
+	terminal.CommandExecution = nil
+	if session := runtime.SessionsByID[pending.ControllerSessionID]; session != nil {
+		session.Notice = &domain.PlayerNotice{Kind: domain.PlayerNoticeCommandPersistenceFailed}
+	}
+	*state = masterSnapshot(runtime)
+	effects := stateEffects(runtime)
+	if projection := service.projectActiveTerminal(runtime); projection != nil {
+		effects = append(effects, Effect{Live: projection})
+	}
+	return transition{accepted: true, effects: effects}
+}
+
 // CanDeleteTerminal prevents durable deletion while a process-local runtime
 // still owns active or preserved state for that authored terminal.
 func (service *Service) CanDeleteTerminal(terminalID string) error {
@@ -900,7 +1264,8 @@ func (service *Service) UpdateLiveTerminal(tree domain.ContentNode, introText *s
 		}
 		projection := service.terminals.UpdateRuntime(active, domain.TerminalTarget{
 			TerminalID: active.TerminalID, TerminalName: active.TerminalName,
-			Tree: tree, HackLevel: active.HackLevel, IntroText: intro,
+			Tree: tree, CommandStates: cloneCommandStates(active.CommandStates),
+			HackLevel: active.HackLevel, IntroText: intro,
 		})
 		if projection == nil {
 			state = masterSnapshot(runtime)
@@ -914,6 +1279,58 @@ func (service *Service) UpdateLiveTerminal(tree domain.ContentNode, introText *s
 	})
 	state.Revision = result.revision
 	return domain.CloneMasterCoordinationState(state), updateErr
+}
+
+// RefreshActiveTerminal installs one complete trusted backend target. Unlike
+// authored live updates, this path intentionally replaces CommandStates and is
+// used after a durable reset so the active projection cannot retain stale
+// frontend or runtime snapshots.
+func (service *Service) RefreshActiveTerminal(target domain.TerminalTarget) (*domain.MasterCoordinationState, error) {
+	target.TerminalID = strings.TrimSpace(target.TerminalID)
+	if target.TerminalID == "" {
+		return service.Snapshot(), fmt.Errorf("terminal ID must not be blank")
+	}
+	var state *domain.MasterCoordinationState
+	var refreshErr error
+	result := service.commit(func(runtime *domain.ProcessRuntime) transition {
+		broadcast := runtime.Broadcast
+		active := activeTerminalRuntime(broadcast)
+		if broadcast == nil || active == nil || broadcast.ActiveTerminalID == nil ||
+			active.TerminalID != target.TerminalID {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("target terminal is not active")
+			return transition{}
+		}
+		if service.terminals == nil {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("terminal runtime lifecycle is unavailable")
+			return transition{}
+		}
+		// A durable reset removes the frozen snapshot that made the current
+		// command result view valid. Clear only that stale completed view before
+		// applying the canonical target; ordinary command results and completed
+		// commands whose snapshots remain are preserved.
+		if active.Nav.CommandNodeID != nil {
+			commandID := *active.Nav.CommandNodeID
+			_, wasCompleted := active.CommandStates[commandID]
+			_, remainsCompleted := target.CommandStates[commandID]
+			if wasCompleted && !remainsCompleted {
+				active.Nav.CommandNodeID = nil
+			}
+		}
+		projection := service.terminals.UpdateRuntime(active, target)
+		if projection == nil {
+			state = masterSnapshot(runtime)
+			refreshErr = fmt.Errorf("active terminal could not be refreshed")
+			return transition{}
+		}
+		state = masterSnapshot(runtime)
+		effects := stateEffects(runtime)
+		effects = append(effects, Effect{Live: projection})
+		return transition{accepted: true, effects: effects}
+	})
+	state.Revision = result.revision
+	return domain.CloneMasterCoordinationState(state), refreshErr
 }
 
 // ResetFailedHack atomically replaces only the failed puzzle checkpoint of
@@ -996,6 +1413,8 @@ func (service *Service) StartBroadcast() (*domain.MasterCoordinationState, error
 			TerminalRuntimes:     make(map[string]*domain.TerminalRuntime),
 		}
 		runtime.PendingSwitch = nil
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
 		clearRequestResults(runtime)
 		state = masterSnapshot(runtime)
 		return transition{accepted: true, effects: stateEffects(runtime)}
@@ -1018,6 +1437,9 @@ func (service *Service) EndBroadcast() (*domain.MasterCoordinationState, error) 
 		}
 		runtime.Broadcast = nil
 		runtime.PendingSwitch = nil
+		runtime.PendingCommandExecution = nil
+		runtime.PendingTerminalNavigation = nil
+		runtime.TerminalNavigationNotice = nil
 		clearRequestResults(runtime)
 		state = masterSnapshot(runtime)
 		effects := stateEffects(runtime)
@@ -1164,7 +1586,7 @@ func (service *Service) subscriptionSnapshot(runtime *domain.ProcessRuntime, ses
 	if service.terminals != nil && runtime.Broadcast != nil && sessionAssigned(runtime.Broadcast, sessionID) {
 		terminal := activeTerminalRuntime(runtime.Broadcast)
 		if terminal != nil && terminal.Lifecycle == domain.TerminalLifecycleActive {
-			if live := service.terminals.ProjectRuntime(terminal); live != nil {
+			if live := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal)); live != nil {
 				presentation = domain.TerminalPresentation{Live: clonePublicLiveState(live)}
 			}
 		}
@@ -1346,6 +1768,98 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonStaleTerminal, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
 		}
+		if runtime.PendingCommandExecution != nil || runtime.PendingTerminalNavigation != nil {
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonConflict, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
+		}
+		if rootReturnRequested(terminal, command, runtime.Broadcast.Route) {
+			top := cloneTerminalReturnPoint(runtime.Broadcast.Route[len(runtime.Broadcast.Route)-1])
+			runtime.PendingTerminalNavigation = &domain.PendingTerminalNavigation{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID, ControllerSessionID: sessionID,
+				Direction:        domain.TerminalNavigationReturn,
+				SourceTerminalID: terminal.TerminalID, SourceTerminalName: terminal.TerminalName,
+				CommandID: top.CommandID, CommandName: top.CommandName,
+				TargetTerminalID: top.TerminalID, TargetTerminalName: top.TerminalName,
+				ReturnPoint: top,
+			}
+			runtime.TerminalNavigationNotice = nil
+			outcome = domain.ActionResult{RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted, Revision: runtime.Revision + 1}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
+		}
+		if authored, linked := authoredLinkedCommand(terminal, command); linked {
+			lookup, ok := domain.TerminalTransitionTarget{}, false
+			if service.terminalCatalog != nil {
+				lookup, ok = service.terminalCatalog.LookupTerminalTransition(terminal.TerminalID, authored.ID)
+			}
+			if !ok || lookup.Target.TerminalID == terminal.TerminalID || lookup.Target.TerminalID != authored.TerminalTransition.TargetTerminalID {
+				targetID := authored.TerminalTransition.TargetTerminalID
+				runtime.TerminalNavigationNotice = &domain.TerminalNavigationNotice{
+					Reason: domain.TerminalNavigationNoticeTargetMissing, SourceTerminalID: terminal.TerminalID,
+					CommandID: authored.ID, TargetTerminalID: &targetID,
+				}
+				outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision+1)
+				service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+				return transition{accepted: true, effects: append(stateEffects(runtime), playerActionResultEffect(connectionID, sessionID, outcome))}
+			}
+			folderID := "root"
+			ancestors := []string(nil)
+			if len(terminal.Nav.Path) != 0 {
+				folderID = terminal.Nav.Path[len(terminal.Nav.Path)-1]
+				ancestors = append([]string(nil), terminal.Nav.Path[:len(terminal.Nav.Path)-1]...)
+			}
+			runtime.PendingTerminalNavigation = &domain.PendingTerminalNavigation{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID, ControllerSessionID: sessionID,
+				Direction:        domain.TerminalNavigationForward,
+				SourceTerminalID: terminal.TerminalID, SourceTerminalName: terminal.TerminalName,
+				CommandID: authored.ID, CommandName: authored.Name,
+				TargetTerminalID: lookup.Target.TerminalID, TargetTerminalName: lookup.Target.TerminalName,
+				ReturnPoint: domain.TerminalReturnPoint{
+					TerminalID: terminal.TerminalID, TerminalName: terminal.TerminalName,
+					FolderID: folderID, AncestorFolderIDs: ancestors,
+					CommandID: authored.ID, CommandName: authored.Name,
+				},
+			}
+			runtime.TerminalNavigationNotice = nil
+			outcome = domain.ActionResult{RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted, Revision: runtime.Revision + 1}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{Fingerprint: fingerprint, Result: outcome})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
+		}
+		if authored, initial := initialStateChangingCommand(terminal, command); initial {
+			runtime.PendingCommandExecution = &domain.PendingCommandExecution{
+				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID,
+				TerminalID: terminal.TerminalID, CommandID: authored.ID,
+				CommandName: authored.Name, ConfirmationText: authored.StateChange.ConfirmationText,
+				ControllerSessionID: sessionID,
+			}
+			terminal.CommandExecution = &domain.CommandExecutionPresentation{
+				Phase: domain.CommandExecutionPhasePending, CommandID: authored.ID,
+			}
+			session.Notice = nil
+			outcome = domain.ActionResult{
+				RequestID: command.RequestID, Accepted: true, Reason: domain.ActionReasonAccepted,
+				Revision: runtime.Revision + 1,
+			}
+			service.storeRequestResult(runtime, sessionID, command.RequestID, domain.RequestResultRecord{
+				Fingerprint: fingerprint, Result: outcome,
+			})
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
+			return transition{accepted: true, effects: effects}
+		}
 		if service.actions == nil {
 			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
 			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
@@ -1368,6 +1882,7 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			Fingerprint: fingerprint,
 			Result:      outcome,
 		})
+		session.Notice = nil
 		return transition{
 			accepted: true,
 			effects: []Effect{
@@ -1572,8 +2087,213 @@ func activeTerminalRuntime(broadcast *domain.LiveBroadcast) *domain.TerminalRunt
 	return broadcast.TerminalRuntimes[*broadcast.ActiveTerminalID]
 }
 
+func clearCommandExecutionRuntime(runtime *domain.ProcessRuntime) {
+	if runtime == nil {
+		return
+	}
+	runtime.PendingCommandExecution = nil
+	if runtime.Broadcast == nil {
+		return
+	}
+	for _, terminal := range runtime.Broadcast.TerminalRuntimes {
+		if terminal != nil {
+			terminal.CommandExecution = nil
+		}
+	}
+}
+
+func authoredLinkedCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
+	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
+		return nil, false
+	}
+	folder := &runtime.Tree
+	if len(runtime.Nav.Path) == 0 || runtime.Nav.Path[0] != runtime.Tree.ID {
+		return nil, false
+	}
+	for _, folderID := range runtime.Nav.Path[1:] {
+		var next *domain.ContentNode
+		for index := range folder.Children {
+			child := &folder.Children[index]
+			if child.ID == folderID && child.Type == domain.NodeFolder {
+				next = child
+				break
+			}
+		}
+		if next == nil {
+			return nil, false
+		}
+		folder = next
+	}
+	for index := range folder.Children {
+		candidate := &folder.Children[index]
+		if candidate.ID == command.NodeID && candidate.Type == domain.NodeCommand && candidate.TerminalTransition != nil {
+			return candidate, true
+		}
+	}
+	return nil, false
+}
+
+func initialStateChangingCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
+	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
+		return nil, false
+	}
+	folder := &runtime.Tree
+	if len(runtime.Nav.Path) == 0 || runtime.Nav.Path[0] != runtime.Tree.ID {
+		return nil, false
+	}
+	for _, folderID := range runtime.Nav.Path[1:] {
+		var next *domain.ContentNode
+		for index := range folder.Children {
+			child := &folder.Children[index]
+			if child.ID == folderID && child.Type == domain.NodeFolder {
+				next = child
+				break
+			}
+		}
+		if next == nil {
+			return nil, false
+		}
+		folder = next
+	}
+	for index := range folder.Children {
+		candidate := &folder.Children[index]
+		if candidate.ID != command.NodeID || candidate.Type != domain.NodeCommand || candidate.StateChange == nil {
+			continue
+		}
+		if _, completed := runtime.CommandStates[candidate.ID]; completed {
+			return nil, false
+		}
+		return candidate, true
+	}
+	return nil, false
+}
+
+func currentPendingCommandExecution(pending *domain.PendingCommandExecution, broadcast *domain.LiveBroadcast, terminal *domain.TerminalRuntime, requestID string) bool {
+	return pending != nil && pending.RequestID == requestID &&
+		broadcast != nil && pending.BroadcastID == broadcast.ID &&
+		broadcast.ActiveTerminalID != nil && *broadcast.ActiveTerminalID == pending.TerminalID &&
+		terminal != nil && terminal.TerminalID == pending.TerminalID && terminal.Lifecycle == domain.TerminalLifecycleActive &&
+		terminal.CommandExecution != nil && terminal.CommandExecution.Phase == domain.CommandExecutionPhasePending &&
+		terminal.CommandExecution.CommandID == pending.CommandID
+}
+
+func contentNodeByStableID(root *domain.ContentNode, nodeID string) *domain.ContentNode {
+	if root == nil {
+		return nil
+	}
+	if root.ID == nodeID {
+		return root
+	}
+	for index := range root.Children {
+		if found := contentNodeByStableID(&root.Children[index], nodeID); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+func terminalByStableID(session *domain.Session, terminalID string) *domain.Terminal {
+	if session == nil {
+		return nil
+	}
+	for index := range session.Terminals {
+		if session.Terminals[index].ID == terminalID {
+			return &session.Terminals[index]
+		}
+	}
+	return nil
+}
+
+func cloneCommandStates(states map[string]domain.CommandExecutionState) map[string]domain.CommandExecutionState {
+	if states == nil {
+		return nil
+	}
+	clone := make(map[string]domain.CommandExecutionState, len(states))
+	for commandID, state := range states {
+		clone[commandID] = state
+	}
+	return clone
+}
+
+func (service *Service) projectActiveTerminal(runtime *domain.ProcessRuntime) *domain.PublicLiveState {
+	if service == nil || service.terminals == nil || runtime == nil || runtime.Broadcast == nil {
+		return nil
+	}
+	terminal := activeTerminalRuntime(runtime.Broadcast)
+	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
+		return nil
+	}
+	return decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal))
+}
+
+func decorateTerminalNavigation(runtime *domain.ProcessRuntime, live *domain.PublicLiveState) *domain.PublicLiveState {
+	if live == nil {
+		return nil
+	}
+	result := clonePublicLiveState(live)
+	if runtime == nil || runtime.Broadcast == nil {
+		result.TerminalNavigation = nil
+		return result
+	}
+	broadcast := runtime.Broadcast
+	if len(broadcast.Route) == 0 && runtime.PendingTerminalNavigation == nil {
+		result.TerminalNavigation = nil
+		return result
+	}
+	presentation := &domain.TerminalNavigationPresentation{RouteDepth: uint32(len(broadcast.Route))}
+	if len(broadcast.Route) != 0 {
+		top := broadcast.Route[len(broadcast.Route)-1]
+		presentation.ReturnTarget = &domain.TerminalReturnTarget{TerminalID: top.TerminalID, TerminalName: top.TerminalName}
+	}
+	if pending := runtime.PendingTerminalNavigation; pending != nil {
+		presentation.Pending = &domain.PendingTerminalNavigationPresentation{
+			Direction: pending.Direction, TargetTerminalID: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+		}
+	}
+	result.TerminalNavigation = presentation
+	return result
+}
+
 func unfinishedTerminalRuntime(runtime *domain.TerminalRuntime) bool {
 	return runtime != nil && runtime.Hack != nil && !runtime.Hack.Solved && !runtime.Hack.Failed
+}
+
+func clearTerminalNavigationRuntime(runtime *domain.ProcessRuntime) bool {
+	if runtime == nil {
+		return false
+	}
+	changed := runtime.PendingTerminalNavigation != nil || runtime.TerminalNavigationNotice != nil
+	runtime.PendingTerminalNavigation = nil
+	runtime.TerminalNavigationNotice = nil
+	if runtime.Broadcast != nil && len(runtime.Broadcast.Route) != 0 {
+		runtime.Broadcast.Route = nil
+		changed = true
+	}
+	return changed
+}
+
+func rootReturnRequested(terminal *domain.TerminalRuntime, command domain.RuntimeCommand, route []domain.TerminalReturnPoint) bool {
+	return terminal != nil && command.Kind == domain.RuntimeCommandNavigate && command.Action == "back" &&
+		len(route) != 0 && terminal.Nav.Mode == "list" && len(terminal.Nav.Path) == 1 && terminal.Nav.Path[0] == "root" &&
+		terminal.Nav.ViewEntryID == nil && terminal.Nav.CommandNodeID == nil
+}
+
+func cloneTerminalReturnPoint(point domain.TerminalReturnPoint) domain.TerminalReturnPoint {
+	point.AncestorFolderIDs = append([]string(nil), point.AncestorFolderIDs...)
+	return point
+}
+
+func sameTerminalReturnPoint(left, right domain.TerminalReturnPoint) bool {
+	if left.TerminalID != right.TerminalID || left.TerminalName != right.TerminalName || left.FolderID != right.FolderID ||
+		left.CommandID != right.CommandID || left.CommandName != right.CommandName || len(left.AncestorFolderIDs) != len(right.AncestorFolderIDs) {
+		return false
+	}
+	for index := range left.AncestorFolderIDs {
+		if left.AncestorFolderIDs[index] != right.AncestorFolderIDs[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func sessionAssigned(broadcast *domain.LiveBroadcast, sessionID domain.LogicalSessionID) bool {
@@ -1668,7 +2388,7 @@ func (service *Service) appendCurrentTerminalEffect(runtime *domain.ProcessRunti
 	if terminal == nil || terminal.Lifecycle != domain.TerminalLifecycleActive {
 		return effects
 	}
-	projection := service.terminals.ProjectRuntime(terminal)
+	projection := decorateTerminalNavigation(runtime, service.terminals.ProjectRuntime(terminal))
 	if projection == nil {
 		return effects
 	}
@@ -1851,7 +2571,12 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 		if character == nil {
 			continue
 		}
-		entry := domain.MasterRosterEntry{ID: character.ID, Name: character.Name}
+		entry := domain.MasterRosterEntry{
+			ID:                  character.ID,
+			Name:                character.Name,
+			Intelligence:        character.Intelligence,
+			HackerPerkAvailable: character.HackerPerkAvailable,
+		}
 		if runtime.Broadcast != nil {
 			if sessionID, claimed := runtime.Broadcast.SessionByCharacter[character.ID]; claimed {
 				claimedBy := sessionID
@@ -1896,6 +2621,32 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 			state.PendingSwitch.TargetTerminalID = &targetID
 		}
 	}
+	if pending := runtime.PendingCommandExecution; pending != nil {
+		state.PendingCommandExecution = &domain.MasterPendingCommandExecution{
+			RequestID: pending.RequestID, BroadcastID: pending.BroadcastID,
+			TerminalID: pending.TerminalID, CommandID: pending.CommandID,
+			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
+		}
+	}
+	if pending := runtime.PendingTerminalNavigation; pending != nil {
+		routeDepth := uint32(0)
+		if runtime.Broadcast != nil {
+			routeDepth = uint32(len(runtime.Broadcast.Route))
+		}
+		state.PendingTerminalNavigation = &domain.MasterPendingTerminalNavigation{
+			RequestID: pending.RequestID, BroadcastID: pending.BroadcastID, Direction: pending.Direction,
+			SourceTerminalID: pending.SourceTerminalID, SourceTerminalName: pending.SourceTerminalName,
+			CommandID: pending.CommandID, CommandName: pending.CommandName,
+			TargetTerminalID: pending.TargetTerminalID, TargetTerminalName: pending.TargetTerminalName,
+			RouteDepth: routeDepth,
+		}
+	}
+	if notice := runtime.TerminalNavigationNotice; notice != nil {
+		state.TerminalNavigationNotice = &domain.MasterTerminalNavigationNotice{
+			Reason: notice.Reason, SourceTerminalID: notice.SourceTerminalID,
+			CommandID: notice.CommandID, TargetTerminalID: cloneString(notice.TargetTerminalID),
+		}
+	}
 	return state
 }
 
@@ -1909,6 +2660,10 @@ func playerSnapshot(runtime *domain.ProcessRuntime, sessionID domain.LogicalSess
 		SessionID:    session.ID,
 		FallbackName: session.FallbackName,
 		Role:         roleForSession(runtime.Broadcast, session.ID),
+	}
+	if session.Notice != nil {
+		notice := *session.Notice
+		state.Notice = &notice
 	}
 	if runtime.Broadcast == nil {
 		state.Phase = domain.PlayerPhaseNoBroadcast
@@ -1996,12 +2751,15 @@ func rosterEntries(byID map[domain.CharacterID]*domain.CharacterRosterEntry, ord
 	return entries
 }
 
-func (service *Service) persistRoster(runtime *domain.ProcessRuntime, byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) error {
+func (service *Service) persistRoster(runtime *domain.ProcessRuntime, byID map[domain.CharacterID]*domain.CharacterRosterEntry, order []domain.CharacterID) (domain.PlayerConfigHandle, error) {
 	if !service.requirePlayerConfig {
-		return nil
+		if runtime.ActivePlayerConfig == nil {
+			return domain.PlayerConfigHandle{}, nil
+		}
+		return *runtime.ActivePlayerConfig, nil
 	}
 	if runtime.ActivePlayerConfig == nil || service.rosterStore == nil {
-		return fmt.Errorf("no active player config")
+		return domain.PlayerConfigHandle{}, fmt.Errorf("no active player config")
 	}
 	return service.rosterStore.Save(*runtime.ActivePlayerConfig, rosterEntries(byID, order))
 }
@@ -2084,6 +2842,20 @@ func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime 
 	}
 	clone.Broadcast = cloneBroadcast(runtime.Broadcast)
 	clone.PendingSwitch = clonePendingSwitch(runtime.PendingSwitch)
+	if runtime.PendingCommandExecution != nil {
+		pending := *runtime.PendingCommandExecution
+		clone.PendingCommandExecution = &pending
+	}
+	if runtime.PendingTerminalNavigation != nil {
+		pending := *runtime.PendingTerminalNavigation
+		pending.ReturnPoint.AncestorFolderIDs = append([]string(nil), runtime.PendingTerminalNavigation.ReturnPoint.AncestorFolderIDs...)
+		clone.PendingTerminalNavigation = &pending
+	}
+	if runtime.TerminalNavigationNotice != nil {
+		notice := *runtime.TerminalNavigationNotice
+		notice.TargetTerminalID = cloneString(runtime.TerminalNavigationNotice.TargetTerminalID)
+		clone.TerminalNavigationNotice = &notice
+	}
 	return &clone
 }
 
@@ -2099,6 +2871,10 @@ func cloneLogicalSession(session *domain.LogicalSession) *domain.LogicalSession 
 	clone.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord, len(session.RequestResults))
 	for requestID, result := range session.RequestResults {
 		clone.RequestResults[requestID] = result
+	}
+	if session.Notice != nil {
+		notice := *session.Notice
+		clone.Notice = &notice
 	}
 	return &clone
 }
@@ -2122,6 +2898,11 @@ func cloneBroadcast(broadcast *domain.LiveBroadcast) *domain.LiveBroadcast {
 	for terminalID, runtime := range broadcast.TerminalRuntimes {
 		clone.TerminalRuntimes[terminalID] = cloneTerminalRuntime(runtime)
 	}
+	clone.Route = make([]domain.TerminalReturnPoint, len(broadcast.Route))
+	for index, point := range broadcast.Route {
+		clone.Route[index] = point
+		clone.Route[index].AncestorFolderIDs = append([]string(nil), point.AncestorFolderIDs...)
+	}
 	return &clone
 }
 
@@ -2131,9 +2912,7 @@ func clonePendingSwitch(pending *domain.TerminalSwitchDecision) *domain.Terminal
 	}
 	clone := *pending
 	if pending.Target != nil {
-		target := *pending.Target
-		target.Tree = cloneContentNode(pending.Target.Tree)
-		clone.Target = &target
+		clone.Target = cloneTerminalTarget(pending.Target)
 	}
 	return &clone
 }
@@ -2144,6 +2923,7 @@ func cloneTerminalTarget(target *domain.TerminalTarget) *domain.TerminalTarget {
 	}
 	clone := *target
 	clone.Tree = cloneContentNode(target.Tree)
+	clone.CommandStates = cloneCommandStates(target.CommandStates)
 	return &clone
 }
 
@@ -2153,6 +2933,11 @@ func cloneTerminalRuntime(runtime *domain.TerminalRuntime) *domain.TerminalRunti
 	}
 	clone := *runtime
 	clone.Tree = cloneContentNode(runtime.Tree)
+	clone.CommandStates = cloneCommandStates(runtime.CommandStates)
+	if runtime.CommandExecution != nil {
+		execution := *runtime.CommandExecution
+		clone.CommandExecution = &execution
+	}
 	clone.Nav = cloneNavState(runtime.Nav)
 	clone.Hack = cloneHackState(runtime.Hack)
 	return &clone
@@ -2166,11 +2951,35 @@ func clonePublicLiveState(state *domain.PublicLiveState) *domain.PublicLiveState
 	clone.Tree = cloneContentNode(state.Tree)
 	clone.Nav = cloneNavState(state.Nav)
 	clone.Hack = clonePublicHackState(state.Hack)
+	if state.CommandExecution != nil {
+		execution := *state.CommandExecution
+		clone.CommandExecution = &execution
+	}
+	if state.TerminalNavigation != nil {
+		navigation := *state.TerminalNavigation
+		if state.TerminalNavigation.ReturnTarget != nil {
+			value := *state.TerminalNavigation.ReturnTarget
+			navigation.ReturnTarget = &value
+		}
+		if state.TerminalNavigation.Pending != nil {
+			value := *state.TerminalNavigation.Pending
+			navigation.Pending = &value
+		}
+		clone.TerminalNavigation = &navigation
+	}
 	return &clone
 }
 
 func cloneContentNode(node domain.ContentNode) domain.ContentNode {
 	clone := node
+	if node.StateChange != nil {
+		value := *node.StateChange
+		clone.StateChange = &value
+	}
+	if node.TerminalTransition != nil {
+		value := *node.TerminalTransition
+		clone.TerminalTransition = &value
+	}
 	if node.Children != nil {
 		clone.Children = make([]domain.ContentNode, len(node.Children))
 		for index := range node.Children {

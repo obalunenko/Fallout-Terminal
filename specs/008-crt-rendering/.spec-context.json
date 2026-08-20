@@ -331,6 +331,70 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-16T21:54:07.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T15:46:40.249Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:48:44.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:50:34.615Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T15:55:34.781Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T15:56:18.527Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T16:00:34.682Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T16:07:32.614Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T16:11:19.751Z"
     }
   ],
   "approach": "Keep the current DOM/CSS CRT shell and exact historical visual timing, then refactor only the browser-local row/line reveal into an explicit controller. A capture-phase key guard completes the current visible reveal and consumes that physical key while preserving all persistent effects, authoritative state, and current architecture.",
@@ -394,6 +458,16 @@
       "decision": "Replace the queued descriptor row for an unrevealed dud target without appending it",
       "why": "The active reveal controller retains the descriptor and exposes the updated row only at its original turn",
       "rejected": "Reconciling pending content directly into the live DOM, which would expose interaction early"
+    },
+    {
+      "decision": "Pre-fit each hacking generation with an inert offscreen clone containing every revealed and queued row, then apply one stored fit before first paint",
+      "why": "Complete-board metrics prevent append-driven font shrink while keeping unrevealed targets outside the interaction DOM",
+      "rejected": "Fitting the partial live DOM after each append or temporarily inserting queued rows into the interactive board"
+    },
+    {
+      "decision": "Keep the accepted bundled demo completed-command snapshot and update the stale browser assertion to validate that every snapshot belongs to a state-changing command with complete frozen text",
+      "why": "The newer terminal-navigation asset contract intentionally showcases a completed command resettable in a writable copy, while the failing assertion still enforced the older initial-only demo shape",
+      "rejected": "Removing commandStates from sessions/demo.json, which would violate TestBundledDemoShowcasesEveryCommandBehavior and erase the accepted completed-example behavior"
     }
   ],
   "step_summaries": {
@@ -405,9 +479,9 @@
       "summary": "16 dependency-ordered tasks across Setup, Foundational, three test-first user-story phases, and single-owner validation Polish."
     },
     "implement": {
-      "summary": "Same-generation dud removal now reconciles revealed and queued hacking rows without replay, while new generations retain ordered reveal behavior.",
-      "key_finding": "Safe row-level DOM insertion through the existing reveal controller provides cadence, cancellation, skip, and non-interactivity guarantees without protocol changes",
-      "risks": "Native startup requires GUI permission in restricted automation; macOS linker emits known deployment-target warnings"
+      "summary": "Completed convergence T036 by aligning the stale bundled-demo browser assertion with the accepted completed-example contract and restoring the full browser regression gate to 98 passed, 2 conditional skips, 0 failures.",
+      "key_finding": "The demo data was intentional and already protected by a newer Go asset contract; the stale initial-only Playwright assertion was the inconsistent artifact.",
+      "risks": "No remaining local test failures; authenticated ngrok checks remain conditional on an external provider."
     }
   },
   "coverage": {
@@ -623,7 +697,10 @@
         "T020",
         "T021",
         "T022",
-        "T024"
+        "T024",
+        "T032",
+        "T033",
+        "T035"
       ],
       "tests": [
         "internal/platform/assets_test.go::TestPlayerCRTHackingRevealAssetContract",
@@ -692,7 +769,10 @@
         "T019",
         "T021",
         "T022",
-        "T024"
+        "T024",
+        "T032",
+        "T033",
+        "T035"
       ],
       "tests": [
         "tests/browser/crt-rendering.spec.mjs::CRT hacking code reveal"
@@ -710,9 +790,39 @@
         "tests/browser/crt-rendering.spec.mjs::removing a dud from a revealed row reconciles that row without replaying the board",
         "tests/browser/crt-rendering.spec.mjs::removing a dud from a pending row preserves reveal cadence and existing interaction"
       ]
+    },
+    "FR-023": {
+      "title": "Fit one shared hacking-row font from the complete generation before first paint and reuse it through reveal unless genuine layout or font metrics change.",
+      "tasks": [
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTHackingRevealFontStabilityAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::complete-board row font cases",
+        "tests/browser/crt-rendering.spec.mjs::skip completion retains the precomputed hacking row font",
+        "tests/browser/crt-rendering.spec.mjs::viewport orientation and active-font refits use queued rows without replay"
+      ]
+    },
+    "SC-012": {
+      "title": "Normal compact stacked zoom and bundled or fallback font layouts keep one computed row size through ordinary or skipped completion; legitimate refits use all rows.",
+      "tasks": [
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestPlayerCRTHackingRevealFontStabilityAssetContract",
+        "tests/browser/crt-rendering.spec.mjs::CRT hacking code reveal stable font cases"
+      ]
     }
   },
-  "currentTask": "T030",
+  "currentTask": "T036",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -929,6 +1039,51 @@
       "files": [
         "specs/008-crt-rendering/quickstart.md"
       ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Added a failing asset contract for complete-board pre-fit, stable reveal typography, and removal of append-driven fitting.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Added failing Playwright coverage for stable hacking fonts across reveal, skip, viewport/orientation refit, zoom-equivalent, and fallback-font layouts.",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Precomputed one generation-local hacking font fit from an inert offscreen complete-board probe before reveal; removed append-driven partial-DOM refits while retaining complete-board external refits and skip/reconciliation behavior.",
+      "files": [
+        "client/client.js",
+        "internal/platform/assets_test.go",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Documented BUG-003 computed-font sampling for normal, skipped, compact/stacked, 200%-zoom, bundled/fallback-font, and genuine complete-board refit journeys, including a no-zoom runtime check.",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Validated FR-023/SC-012 and inherited responsive/reveal behavior with focused and full checks, browser-interactive reveal/skip/refit journeys, player and unsigned app builds, and binding drift; documented one unrelated HEAD demo-state browser failure.",
+      "files": [
+        "specs/008-crt-rendering/quickstart.md"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Aligned the stale bundled-demo authoring assertion with the accepted completed-example contract without changing demo persistence, restored the full browser gate, and updated the validation record.",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "specs/008-crt-rendering/quickstart.md"
+      ]
     }
   },
   "verified": [
@@ -1064,6 +1219,64 @@
       "command": "go run ./cmd/build build",
       "result": "passed; build/bin/Fallout Terminal.app produced",
       "warnings": []
+    },
+    {
+      "what": "BUG-003 focused asset and browser checks",
+      "result": "passed: asset contracts and 5/5 font-stability journeys",
+      "command": "node --check client/client.js; go test ./internal/platform -run 'CRT|Player.*Asset' -count=1; npm test --prefix tests/browser -- crt-rendering.spec.mjs --grep 'complete-board row font|skip completion retains|viewport, orientation'",
+      "warnings": [
+        "benign macOS deployment-target linker warnings"
+      ]
+    },
+    {
+      "what": "Focused CRT browser journey after BUG-003",
+      "result": "30 passed",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs"
+    },
+    {
+      "what": "BUG-003 Go, formatting, vet, and player build gates",
+      "result": "passed",
+      "command": "npm run build --prefix client; gofmt -l .; go vet ./...; go test ./...",
+      "warnings": [
+        "benign macOS deployment-target linker warnings"
+      ]
+    },
+    {
+      "what": "Complete browser regression after BUG-003",
+      "result": "97 passed, 2 conditional authenticated-ngrok tests skipped, 1 unrelated tracked-demo baseline failure",
+      "command": "npm test --prefix tests/browser",
+      "warnings": [
+        "state-changing-command-authoring expects empty commandStates, while HEAD:sessions/demo.json already contains completed n_cmd_1; all 30 CRT tests passed"
+      ]
+    },
+    {
+      "what": "BUG-003 bindings and unsigned application build",
+      "result": "binding generation had zero drift; unsigned macOS app build passed",
+      "command": "go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...; git diff --exit-code -- frontend/bindings; go run ./cmd/build build"
+    },
+    {
+      "what": "Bundled demo authoring and asset contracts after convergence",
+      "result": "6 Playwright authoring tests and 2 focused Go demo asset tests passed; sessions/demo.json unchanged",
+      "command": "npm test --prefix tests/browser -- state-changing-command-authoring.spec.mjs; go test ./internal/platform -run 'TestBundledDemoShowcasesEveryCommandBehavior|TestBundledDemoManifestIsValidAndResolvesFromResources' -count=1; git diff --exit-code -- sessions/demo.json",
+      "warnings": [
+        "benign macOS deployment-target linker warnings"
+      ]
+    },
+    {
+      "what": "Complete browser regression after convergence T036",
+      "result": "98 passed, 2 conditional authenticated-ngrok tests skipped, 0 failed",
+      "command": "npm test --prefix tests/browser",
+      "warnings": [
+        "external authenticated ngrok provider was not enabled"
+      ]
+    },
+    {
+      "what": "Repository Go and working-tree integrity after convergence T036",
+      "result": "all Go packages passed; JS syntax and diff checks passed",
+      "command": "go test ./...; node --check tests/browser/state-changing-command-authoring.spec.mjs; git diff --check",
+      "warnings": [
+        "benign macOS deployment-target linker warnings"
+      ]
     }
   ],
   "concerns": [
@@ -1071,7 +1284,12 @@
       "note": "The complete native GUI journey was not manually driven after launch; equivalent state, viewport, reveal, skip, input, audio-failure, and persistent-effect behavior is covered by Playwright.",
       "step": "implement",
       "kind": "manual-check-unavailable"
+    },
+    {
+      "note": "The complete browser suite retains one unrelated baseline failure because tracked HEAD:sessions/demo.json contains completed n_cmd_1 while its authoring test expects no completed commands; BUG-003 did not modify demo state and all CRT cases pass.",
+      "step": "implement",
+      "kind": "pre-existing-regression"
     }
   ],
-  "last_action": "BUG-002 implementation complete — focused and full validation passed"
+  "last_action": "Convergence T036 complete — full browser gate 98 passed, 2 conditional skips, 0 failures"
 }

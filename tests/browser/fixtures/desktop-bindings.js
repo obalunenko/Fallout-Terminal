@@ -1,3 +1,59 @@
+function stateChangingAuthoringSession() {
+  return {
+    version: 1,
+    name: 'State-changing authoring fixture',
+    terminals: [{
+      id: 'terminal-stateful',
+      name: 'Терминал охраны',
+      hackLevel: 0,
+      introText: '',
+      root: {
+        id: 'root',
+        type: 'folder',
+        name: 'ROOT',
+        children: [
+          {
+            id: 'emergency-lights',
+            type: 'command',
+            name: 'Включить аварийный свет',
+            text: 'Аварийное освещение включено.',
+          },
+          {
+            id: 'doors',
+            type: 'command',
+            name: 'Открыть двери',
+            text: 'Новая редакция результата открытия.',
+            stateChange: {
+              completedName: 'Двери разблокированы',
+              confirmationText: 'Открыть двери?',
+            },
+          },
+          {
+            id: 'alarm',
+            type: 'command',
+            name: 'Включить тревогу',
+            text: 'Сигнал тревоги активирован.',
+            stateChange: {
+              completedName: 'Сигнал тревоги активен',
+              confirmationText: 'Включить тревогу?',
+            },
+          },
+        ],
+      },
+      commandStates: {
+        doors: {
+          completedName: 'Двери открыты',
+          resultText: 'Доступ в сектор разрешён.',
+        },
+        alarm: {
+          completedName: 'Тревога включена',
+          resultText: 'Охрана сектора предупреждена.',
+        },
+      },
+    }],
+  };
+}
+
 const state = globalThis.__desktopFixtureState ??= {
   calls: [],
   listeners: new Map(),
@@ -22,7 +78,31 @@ const state = globalThis.__desktopFixtureState ??= {
   resolveSavePublicAccess: null,
   pendingSavePublicAccess: null,
   clipboardText: '',
+  authoringSession: stateChangingAuthoringSession(),
+  authoringRevision: 1,
 };
+if (!state.authoringSession) state.authoringSession = stateChangingAuthoringSession();
+if (!Number.isSafeInteger(state.authoringRevision)) state.authoringRevision = 1;
+try {
+  const durableAuthoring = JSON.parse(globalThis.localStorage?.getItem('fallout-fixture-authoring-session') ?? 'null');
+  if (durableAuthoring?.session && Number.isSafeInteger(durableAuthoring.revision)) {
+    state.authoringSession = durableAuthoring.session;
+    state.authoringRevision = durableAuthoring.revision;
+  }
+} catch {
+  // A fresh fixture remains available when browser storage is unavailable.
+}
+
+function persistAuthoringState() {
+  try {
+    globalThis.localStorage?.setItem('fallout-fixture-authoring-session', JSON.stringify({
+      session: state.authoringSession,
+      revision: state.authoringRevision,
+    }));
+  } catch {
+    // The in-memory authoring fixture remains authoritative for this page.
+  }
+}
 
 const durablePublicAccess = (() => {
   try {
@@ -59,9 +139,88 @@ function record(method, args) {
   return Promise.resolve({ ok: true, method, args });
 }
 
+function authoringFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-authoring';
+}
+
+const authoringFixtureBase = '/__fixture/state-changing-command-authoring';
+
+async function authoringFixtureCommand(path, payload) {
+  const response = await fetch(`${authoringFixtureBase}/${path}`, {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: payload === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`authoring fixture ${path} failed`);
+  const result = await response.json();
+  if (result?.session) {
+    state.authoringSession = structuredClone(result.session);
+    state.authoringRevision = Number(result.revision || state.authoringRevision);
+  }
+  return result;
+}
+
+function approvalFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-approval/master';
+}
+
+function terminalNavigationFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/terminal-navigation/master';
+}
+
+function syncFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-sync/master';
+}
+
+function playerManagementFixtureActive() {
+  return globalThis.location?.pathname === '/__fixture/player-management';
+}
+
+async function playerManagementFixtureCommand(path, payload) {
+  const response = await fetch(`/__fixture/player-management/${path}`, {
+    method: payload === undefined ? 'GET' : 'POST',
+    headers: payload === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`player-management fixture ${path} failed`);
+  return response.json();
+}
+
+function stateChangingLifecycleBase() {
+	if (terminalNavigationFixtureActive()) return '/__fixture/terminal-navigation';
+  if (approvalFixtureActive()) return '/__fixture/state-changing-command-approval';
+  if (syncFixtureActive()) return '/__fixture/state-changing-command-sync';
+  return '';
+}
+
+async function stateChangingCoordinationState() {
+  const response = await fetch(`${stateChangingLifecycleBase()}/state`);
+  if (!response.ok) throw new Error('state-changing coordination fixture is unavailable');
+  return response.json();
+}
+
+function emitFixtureEvent(name, data) {
+  for (const callback of state.listeners.get(name) ?? []) callback({ data: structuredClone(data) });
+}
+
+function authoringSessionResult() {
+  return {
+    ok: true,
+    revision: state.authoringRevision,
+    session: structuredClone(state.authoringSession),
+  };
+}
+
 globalThis.__desktopFixture = {
   calls: state.calls,
   timeline: state.calls,
+  async authoringDurableState() {
+    if (authoringFixtureActive()) await authoringFixtureCommand('session');
+    return {
+      revision: state.authoringRevision,
+      commandStates: structuredClone(state.authoringSession.terminals[0].commandStates ?? {}),
+    };
+  },
   emit(name, data) {
 	if (name === 'public-access-status' && data?.preferences && data?.status) {
 	  state.publicAccess = structuredClone(data);
@@ -111,10 +270,28 @@ export const Events = {
     const listeners = state.listeners.get(name) ?? new Set();
     listeners.add(callback);
     state.listeners.set(name, listeners);
+    let coordinationPoll = null;
+    if (stateChangingLifecycleBase() && name === 'coordination-state') {
+      let lastProjection = '';
+      const poll = async () => {
+        try {
+          const coordination = await stateChangingCoordinationState();
+          const projection = JSON.stringify(coordination);
+          if (projection === lastProjection) return;
+          lastProjection = projection;
+          callback({ data: coordination });
+        } catch {
+          // The next poll retries while the deterministic fixture is running.
+        }
+      };
+      void poll();
+      coordinationPoll = setInterval(() => { void poll(); }, 25);
+    }
     let active = true;
     return () => {
       if (!active) return;
       active = false;
+      if (coordinationPoll !== null) clearInterval(coordinationPoll);
       listeners.delete(callback);
       state.releases.set(name, (state.releases.get(name) ?? 0) + 1);
     };
@@ -130,6 +307,18 @@ export const Clipboard = {
 
 export function GetRuntimeStatus() {
   state.calls.push({ method: 'GetRuntimeStatus', args: [] });
+  if (playerManagementFixtureActive()) {
+    return playerManagementFixtureCommand('state').then(coordinationState => ({
+      ...state.status,
+      coordinationState,
+    }));
+  }
+  if (stateChangingLifecycleBase()) {
+    return stateChangingCoordinationState().then(coordinationState => ({
+      ...state.status,
+      coordinationState,
+    }));
+  }
   return state.statusPromise ?? Promise.resolve(state.status);
 }
 
@@ -208,10 +397,26 @@ export function StopPublicAccess(request) {
   return Promise.resolve({ ok: true, snapshot: snapshot() });
 }
 
-export const AddCharacter = (...args) => record('AddCharacter', args);
+export async function AddCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('AddCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'AddCharacter', args: [retained] });
+  return playerManagementFixtureCommand('add', retained);
+}
+export async function UpdateCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('UpdateCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'UpdateCharacter', args: [retained] });
+  return playerManagementFixtureCommand('update', retained);
+}
+export async function DeleteCharacter(payload) {
+  if (!playerManagementFixtureActive()) return record('DeleteCharacter', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'DeleteCharacter', args: [retained] });
+  return playerManagementFixtureCommand('delete', retained);
+}
 export const AssignCharacter = (...args) => record('AssignCharacter', args);
 export const CopyDemo = (...args) => record('CopyDemo', args);
-export const DeleteCharacter = (...args) => record('DeleteCharacter', args);
 export const EndBroadcast = (...args) => record('EndBroadcast', args);
 export const ForceHackSuccess = (...args) => record('ForceHackSuccess', args);
 export const LoadReferencedPlayerConfig = (...args) => record('LoadReferencedPlayerConfig', args);
@@ -219,16 +424,101 @@ export const MoveCharacter = (...args) => record('MoveCharacter', args);
 export const NewPlayerConfig = (...args) => record('NewPlayerConfig', args);
 export const NewSession = (...args) => record('NewSession', args);
 export const OpenPlayerConfig = (...args) => record('OpenPlayerConfig', args);
-export const OpenSession = (...args) => record('OpenSession', args);
+export async function OpenSession(...args) {
+	if (!authoringFixtureActive() && !stateChangingLifecycleBase()) return record('OpenSession', args);
+  state.calls.push({ method: 'OpenSession', args: [] });
+  if (syncFixtureActive()) {
+    return fetch('/__fixture/state-changing-command-sync/session').then(async response => ({
+      ok: response.ok,
+      error: response.ok ? '' : 'synchronization session fixture is unavailable',
+      filePath: '/private/tmp/fallout-state-changing-sync.json',
+      session: response.ok ? await response.json() : null,
+    }));
+  }
+  if (approvalFixtureActive()) {
+    return fetch('/__fixture/state-changing-command-approval/session').then(async response => ({
+      ok: response.ok,
+      error: response.ok ? '' : 'approval session fixture is unavailable',
+      filePath: '/private/tmp/fallout-state-changing-approval.json',
+      session: response.ok ? await response.json() : null,
+    }));
+  }
+	if (terminalNavigationFixtureActive()) {
+		return fetch('/__fixture/terminal-navigation/session').then(async response => ({
+			ok: response.ok,
+			error: response.ok ? '' : 'terminal navigation session fixture is unavailable',
+			filePath: '/private/tmp/fallout-terminal-navigation.json',
+			session: response.ok ? await response.json() : null,
+		}));
+	}
+  const result = await authoringFixtureCommand('session');
+  return {
+    ok: true,
+    filePath: '/private/tmp/fallout-state-changing-authoring.json',
+    session: structuredClone(result.session),
+  };
+}
 export const OpenURL = (...args) => record('OpenURL', args);
 export const ReleaseCharacter = (...args) => record('ReleaseCharacter', args);
-export const RenameCharacter = (...args) => record('RenameCharacter', args);
 export const RenameLogicalSession = (...args) => record('RenameLogicalSession', args);
 export const RequestTerminalActivation = (...args) => record('RequestTerminalActivation', args);
 export const RequestTerminalClear = (...args) => record('RequestTerminalClear', args);
 export const ResetFailedHack = (...args) => record('ResetFailedHack', args);
+export async function ResolveCommandExecution(payload) {
+  const fixtureBase = stateChangingLifecycleBase();
+  if (!fixtureBase) return record('ResolveCommandExecution', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResolveCommandExecution', args: [retained] });
+  const response = await fetch(`${fixtureBase}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(retained),
+  });
+  const result = await response.json();
+  return result;
+}
+export async function ResolveTerminalNavigation(payload) {
+	const retained = structuredClone(payload ?? {});
+	state.calls.push({ method: 'ResolveTerminalNavigation', args: [retained] });
+	if (!terminalNavigationFixtureActive()) return { ok: true };
+	const response = await fetch('/__fixture/terminal-navigation/resolve', {
+		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retained),
+	});
+	return response.json();
+}
+export async function ResetCommandState(payload) {
+  if (!authoringFixtureActive()) return record('ResetCommandState', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResetCommandState', args: [retained] });
+  const result = await authoringFixtureCommand('reset-command', retained);
+  emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
+  return result;
+}
+export async function ResetTerminalCommandStates(payload) {
+  if (!authoringFixtureActive()) return record('ResetTerminalCommandStates', [payload]);
+  const retained = structuredClone(payload ?? {});
+  state.calls.push({ method: 'ResetTerminalCommandStates', args: [retained] });
+  const result = await authoringFixtureCommand('reset-terminal', retained);
+  emitFixtureEvent('session-state', { revision: result.revision, session: result.session });
+  return result;
+}
 export const ResolveTerminalSwitch = (...args) => record('ResolveTerminalSwitch', args);
-export const SaveSession = (...args) => record('SaveSession', args);
+export async function SaveSession(session) {
+	if (terminalNavigationFixtureActive()) {
+		const retained = structuredClone(session);
+		state.calls.push({ method: 'SaveSession', args: [retained] });
+		const response = await fetch('/__fixture/terminal-navigation/save', {
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(retained),
+		});
+		const result = response.ok ? await response.json() : { ok: false, error: 'terminal navigation save failed' };
+		return { ok: result.ok === true, error: result.error || '', savedRevision: result.revision };
+	}
+	if (!authoringFixtureActive()) return record('SaveSession', [session]);
+  const retained = structuredClone(session);
+  state.calls.push({ method: 'SaveSession', args: [retained] });
+  const result = await authoringFixtureCommand('save', retained);
+  return { ok: result.ok === true, error: result.error || '', savedRevision: result.revision };
+}
 export const SetActiveController = (...args) => record('SetActiveController', args);
 export const StartBroadcast = (...args) => record('StartBroadcast', args);
 export const UpdateLiveTerminal = (...args) => record('UpdateLiveTerminal', args);

@@ -1,19 +1,17 @@
 package nav
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefault(t *testing.T) {
 	t.Parallel()
 
 	want := domain.NavState{Path: []string{"root"}, Mode: "list"}
-	if got := Default(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("Default() = %#v, want %#v", got, want)
-	}
+	assert.Equal(t, want, Default())
 }
 
 func TestApplyAction(t *testing.T) {
@@ -95,6 +93,12 @@ func TestApplyAction(t *testing.T) {
 			want:   Default(),
 		},
 		{
+			name:   "back at root closes command result",
+			state:  navState([]string{"root"}, "list", "", "root-command"),
+			action: "back",
+			want:   Default(),
+		},
+		{
 			name:   "unknown action is a no-op",
 			state:  Default(),
 			action: "launch",
@@ -107,9 +111,7 @@ func TestApplyAction(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := ApplyAction(test.state, tree, test.action, test.nodeID); !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("ApplyAction() = %#v, want %#v", got, test.want)
-			}
+			assert.Equal(t, test.want, ApplyAction(test.state, tree, test.action, test.nodeID))
 		})
 	}
 }
@@ -171,11 +173,56 @@ func TestRevalidate(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			if got := Revalidate(test.state, test.tree); !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("Revalidate() = %#v, want %#v", got, test.want)
-			}
+			assert.Equal(t, test.want, Revalidate(test.state, test.tree))
 		})
 	}
+}
+
+func TestStableFolderLookupAndReturnRestoration(t *testing.T) {
+	t.Parallel()
+
+	tree := navigationTree()
+	path, ok := FindFolderPath(tree, "nested")
+	assert.True(t, ok)
+	assert.Equal(t, []string{"root", "docs", "nested"}, path)
+
+	// Stable-ID lookup follows the folder to its current location after an edit.
+	moved := tree
+	nested := moved.Children[0].Children[2]
+	moved.Children[0].Children = moved.Children[0].Children[:2]
+	moved.Children[1].Children = append(moved.Children[1].Children, nested)
+	assert.Equal(t, domain.NavState{Path: []string{"root", "archive", "nested"}, Mode: "list"}, RestoreFolder(moved, "nested", []string{"root", "docs"}))
+
+	// If the exact folder is gone, the nearest surviving authored ancestor wins.
+	withoutNested := treeWithout("nested")
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs"}, Mode: "list"}, RestoreFolder(withoutNested, "nested", []string{"root", "docs"}))
+	withoutDocs := treeWithout("docs")
+	assert.Equal(t, Default(), RestoreFolder(withoutDocs, "nested", []string{"root", "docs"}))
+	assert.Equal(t, Default(), RestoreFolder(tree, "missing", nil))
+}
+
+func TestRestoreFolderUsesStableIdentityThenNearestSurvivingAncestor(t *testing.T) {
+	t.Parallel()
+
+	tree := navigationTree()
+	// Rename does not change a stable folder identity.
+	tree.Children[0].Children[2].Name = "RENAMED"
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs", "nested"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+
+	// Moving the saved folder wins over its historical ancestry.
+	nested := tree.Children[0].Children[2]
+	tree.Children[0].Children = tree.Children[0].Children[:2]
+	tree.Children[1].Children = append(tree.Children[1].Children, nested)
+	assert.Equal(t, domain.NavState{Path: []string{"root", "archive", "nested"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+
+	// Deleting the saved folder falls back from the closest saved ancestor to root.
+	removeNode(&tree, "nested")
+	assert.Equal(t, domain.NavState{Path: []string{"root", "docs"}, Mode: "list"},
+		RestoreFolder(tree, "nested", []string{"root", "docs"}))
+	removeNode(&tree, "docs")
+	assert.Equal(t, Default(), RestoreFolder(tree, "nested", []string{"root", "docs"}))
 }
 
 func navigationTree() domain.ContentNode {
