@@ -160,7 +160,7 @@ type DesktopRuntime interface {
 	Close(context.Context) error
 }
 
-// EventSink publishes narrow, public values to the game-master frontend.
+// EventSink publishes narrow, public values to the Overseer frontend.
 type EventSink interface {
 	Emit(name string, payload any) error
 }
@@ -306,7 +306,7 @@ type CoordinationCommandResult struct {
 	State *domain.MasterCoordinationState `json:"state"`
 }
 
-// ResolveCommandExecutionResult is the private master-only response to one
+// ResolveCommandExecutionResult is the private Overseer-only response to one
 // exact pending command decision.
 type ResolveCommandExecutionResult struct {
 	OK    bool                            `json:"ok"`
@@ -472,7 +472,7 @@ type App struct {
 
 // lifecyclePhase returns the host-owned lifecycle observation used by Go
 // tests and adapters. It is deliberately absent from RuntimeStatus and every
-// protobuf/native DTO; the master derives presentation from serverInfo and
+// protobuf/native DTO; the Overseer derives presentation from serverInfo and
 // startupError instead.
 func (app *App) lifecyclePhase() string {
 	app.mu.RLock()

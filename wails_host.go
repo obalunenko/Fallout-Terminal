@@ -23,16 +23,16 @@ func init() {
 	application.RegisterEvent[PublicAccessSnapshot](publicAccessStatusEvent)
 }
 
-func newWailsApplication(frontendAssets fs.FS) *application.App {
-	return application.New(wailsApplicationOptions(frontendAssets))
+func newWailsApplication(overseerAssets fs.FS) *application.App {
+	return application.New(wailsApplicationOptions(overseerAssets))
 }
 
-func wailsApplicationOptions(frontendAssets fs.FS) application.Options {
+func wailsApplicationOptions(overseerAssets fs.FS) application.Options {
 	return application.Options{
 		Name:        "Fallout Terminal",
-		Description: "Fallout Terminal — Master Control",
+		Description: "Fallout Terminal — Overseer Control",
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(frontendAssets),
+			Handler: application.AssetFileServerFS(overseerAssets),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
@@ -40,13 +40,13 @@ func wailsApplicationOptions(frontendAssets fs.FS) application.Options {
 	}
 }
 
-func newMasterWindow(host *application.App) *application.WebviewWindow {
-	window := host.Window.NewWithOptions(masterWindowOptions())
-	registerMasterWindowQuitOnClose(window, host)
+func newOverseerWindow(host *application.App) *application.WebviewWindow {
+	window := host.Window.NewWithOptions(overseerWindowOptions())
+	registerOverseerWindowQuitOnClose(window, host)
 	return window
 }
 
-type masterWindowCloseRegistrar interface {
+type overseerWindowCloseRegistrar interface {
 	RegisterHook(events.WindowEventType, func(*application.WindowEvent)) func()
 	OnWindowEvent(events.WindowEventType, func(*application.WindowEvent)) func()
 }
@@ -55,7 +55,7 @@ type applicationQuitter interface {
 	Quit()
 }
 
-func registerMasterWindowQuitOnClose(window masterWindowCloseRegistrar, host applicationQuitter) {
+func registerOverseerWindowQuitOnClose(window overseerWindowCloseRegistrar, host applicationQuitter) {
 	var quitOnce sync.Once
 	requestQuit := func(*application.WindowEvent) {
 		quitOnce.Do(func() {
@@ -73,9 +73,9 @@ func registerMasterWindowQuitOnClose(window masterWindowCloseRegistrar, host app
 	window.OnWindowEvent(events.Mac.WindowWillClose, requestQuit)
 }
 
-func masterWindowOptions() application.WebviewWindowOptions {
+func overseerWindowOptions() application.WebviewWindowOptions {
 	return application.WebviewWindowOptions{
-		Title:            "Fallout Terminal — Master Control",
+		Title:            "Fallout Terminal — Overseer Control",
 		Width:            1200,
 		Height:           780,
 		MinWidth:         900,
@@ -129,7 +129,7 @@ func newWailsLifecycleService(core coreLifecycle) *wailsLifecycleService {
 
 func (service *wailsLifecycleService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	// Application-owned failures are recorded by the core in RuntimeStatus and
-	// leave the master window available to explain the failure. Returning them
+	// leave the Overseer window available to explain the failure. Returning them
 	// here would make Wails abort before that status can be presented.
 	_ = service.core.Start(ctx)
 	return nil

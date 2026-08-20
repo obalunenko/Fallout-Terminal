@@ -161,15 +161,15 @@ async function authoringFixtureCommand(path, payload) {
 }
 
 function approvalFixtureActive() {
-  return globalThis.location?.pathname === '/__fixture/state-changing-command-approval/master';
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-approval/overseer';
 }
 
 function terminalNavigationFixtureActive() {
-  return globalThis.location?.pathname === '/__fixture/terminal-navigation/master';
+  return globalThis.location?.pathname === '/__fixture/terminal-navigation/overseer';
 }
 
 function syncFixtureActive() {
-  return globalThis.location?.pathname === '/__fixture/state-changing-command-sync/master';
+  return globalThis.location?.pathname === '/__fixture/state-changing-command-sync/overseer';
 }
 
 function playerManagementFixtureActive() {

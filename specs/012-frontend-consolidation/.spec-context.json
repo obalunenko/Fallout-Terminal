@@ -1,0 +1,657 @@
+{
+  "workflow": "companion",
+  "specName": "frontend consolidation",
+  "branch": "main",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T14:34:26.837Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T14:37:31.940Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T14:37:57.104Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:39:51.667Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:40:31.550Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T14:40:39.869Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T14:41:13.374Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:42:20.145Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T14:42:30.323Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T14:42:44.599Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:43:23.585Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:43:42.660Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:44:17.078Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:47:47.513Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:48:25.382Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:48:56.490Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:49:55.154Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:50:37.692Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:51:41.466Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:52:11.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:53:08.346Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:54:14.952Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:54:59.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:56:41.447Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:58:24.870Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T14:59:43.148Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T15:39:30.022Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T15:39:52.287Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T15:39:52.348Z"
+    }
+  ],
+  "unattended": true,
+  "last_action": "all 18 tasks complete — frontend build, 22 browser tests, full Go suite, deterministic generation, and native build pass",
+  "coverage": {
+    "FR-001": {
+      "title": "The repository MUST contain all active player-client and privileged desktop frontend code beneath the top-level frontend directory.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T009"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "production_resources_test.go",
+        "internal/buildtool/buildtool_test.go"
+      ]
+    },
+    "FR-002": {
+      "title": "The player client and privileged application MUST occupy separate, role-based subdirectories with unambiguous ownership.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "production_resources_test.go"
+      ]
+    },
+    "FR-003": {
+      "title": "The privileged frontend MUST be named and presented as overseer across active frontend, host, build, and verification surfaces.",
+      "tasks": [
+        "T003",
+        "T010",
+        "T011",
+        "T012",
+        "T013",
+        "T015"
+      ],
+      "tests": [
+        "wails_host_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs"
+      ]
+    },
+    "FR-004": {
+      "title": "The completed layout MUST NOT retain an active top-level client application or references to its former location.",
+      "tasks": [
+        "T002",
+        "T005",
+        "T006",
+        "T007",
+        "T008",
+        "T009",
+        "T014",
+        "T018"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go",
+        "internal/player/http_test.go",
+        "active-tree obsolete-path scan"
+      ]
+    },
+    "FR-005": {
+      "title": "Repository workflows MUST resolve the consolidated locations without requiring an additional manual command.",
+      "tasks": [
+        "T004",
+        "T005",
+        "T006",
+        "T008",
+        "T014",
+        "T016",
+        "T017"
+      ],
+      "tests": [
+        "internal/buildtool/buildtool_test.go",
+        "internal/platform/startup_test.go",
+        "go run ./cmd/build build"
+      ]
+    },
+    "FR-006": {
+      "title": "Native composition MUST keep the Overseer desktop bundle and player client bundle as distinct capability boundaries.",
+      "tasks": [
+        "T001",
+        "T007",
+        "T009",
+        "T017"
+      ],
+      "tests": [
+        "production_resources_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "FR-007": {
+      "title": "Existing behavior, security boundaries, generated contracts, and data formats MUST remain unchanged except for Overseer terminology.",
+      "tasks": [
+        "T009",
+        "T010",
+        "T011",
+        "T012",
+        "T013",
+        "T016",
+        "T017"
+      ],
+      "tests": [
+        "go test ./...",
+        "npm run test:overseer --prefix frontend"
+      ]
+    },
+    "FR-008": {
+      "title": "Automated checks MUST detect obsolete paths and verify consolidated generated outputs, bundles, markers, and embedded resources.",
+      "tasks": [
+        "T001",
+        "T009",
+        "T014",
+        "T016",
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "scripts/proto-check.sh",
+        "scripts/wails-bindings-check.sh",
+        "scripts/reproducible-build-check.sh"
+      ]
+    },
+    "FR-009": {
+      "title": "Historical completed specifications and rollback records MUST remain intact.",
+      "tasks": [
+        "T015",
+        "T018"
+      ],
+      "tests": [
+        "active-tree scan excludes historical specs and docs by policy"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 55,
+    "projectedTasks": 18,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: frontend privileged application, player client, generated assets, build graph, embeds, scripts, and tests",
+    "constraint: preserve separate trusted Overseer and untrusted client runtime bundles",
+    "constraint: historical completed specs and rollback records remain unchanged"
+  ],
+  "intent": "Consolidate both frontend applications under one role-oriented frontend tree and establish Overseer as the canonical privileged UI identity without behavioral change.",
+  "expectations": [
+    "No interface redesign or behavior change.",
+    "No unrelated backend wire or persisted-data contract migration.",
+    "No rewrite of completed historical specs or rollback records."
+  ],
+  "approach": "Create one npm workspace under frontend with isolated client and overseer packages, move generated assets and independent dist roots with them, and update every active path consumer in one no-alias cutover. Preserve the public/private embed boundary and all runtime behavior.",
+  "decisions": [
+    {
+      "decision": "Use one npm workspace with client and overseer application members",
+      "why": "One lockfile expresses common frontend ownership while role roots preserve independent builds",
+      "rejected": "Two nested independent dependency graphs"
+    },
+    {
+      "decision": "Keep distinct client and Overseer production bundles and embeds",
+      "why": "Preserves the simplest auditable public/private capability boundary",
+      "rejected": "A combined distribution tree"
+    },
+    {
+      "decision": "Rename active privileged frontend and host terminology without migrating unrelated stable backend contracts",
+      "why": "Satisfies the canonical Overseer identity without unrelated API churn",
+      "rejected": "Mechanical repository-wide Master type renaming"
+    },
+    {
+      "decision": "Cut over all active paths without aliases",
+      "why": "Prevents generators, CI, and tests from recreating a dual layout",
+      "rejected": "Compatibility symlinks and fallback commands"
+    },
+    {
+      "decision": "Preserve stable backend Master* domain contract identifiers while renaming the privileged frontend, host window, fixtures, assets, and visible terminology to Overseer.",
+      "why": "The request targets frontend ownership and role identity; preserving internal serialized/API names avoids an unrelated breaking contract migration.",
+      "rejected": "Renaming every backend domain type and wire-facing field in the same structural refactor."
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Designed one frontend workspace with isolated client and Overseer apps plus a complete active-path cutover.",
+      "key_finding": "Generated outputs, native embeds, fixture servers, security scans, CI, governance, and templates all encode the old split and must move atomically."
+    },
+    "tasks": {
+      "summary": "18 tasks across setup, foundational cutover, three user-story phases, and two ordered validation waves."
+    },
+    "implement": {
+      "summary": "Consolidated both frontend applications under one workspace, renamed the privileged role to Overseer, migrated every active producer and consumer, and passed all governed validation.",
+      "key_finding": "Distinct client and Overseer outputs remain separately embedded and served.",
+      "risks": "No known residual implementation risk; stable backend Master* identifiers remain intentionally unchanged."
+    }
+  },
+  "currentTask": "T018",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added failing layout, build-order, naming, and separate-embed contracts for the target frontend workspace.",
+      "files": [
+        "internal/platform/assets_test.go",
+        "production_resources_test.go",
+        "internal/buildtool/buildtool_test.go"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Moved the complete player client package, generated contracts, assets, sounds, and output marker under frontend/client.",
+      "files": [
+        "client/",
+        "frontend/client/"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Moved the private frontend package, bindings, sources, generated compatibility cache, and dist marker into frontend/overseer and renamed master entry assets.",
+      "files": [
+        "frontend/overseer/",
+        "frontend/src/",
+        "frontend/bindings/",
+        "frontend/dist/"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Created one private npm workspace with client and Overseer members, shared install policy, root commands, and a merged exact lockfile.",
+      "files": [
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/client/package.json",
+        "frontend/overseer/package.json",
+        "frontend/client/package-lock.json"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Redirected ECMAScript generation, pinned generator lookup, public-contract scans, drift hashes, and client build verification to frontend/client.",
+      "files": [
+        "proto/buf.gen.es.yaml",
+        "scripts/proto-generate.sh",
+        "scripts/proto-check.sh"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Changed the canonical build graph to one workspace install, nested client build, nested Wails binding generation, and nested Overseer build with passing plan tests.",
+      "files": [
+        "internal/buildtool/buildtool.go",
+        "internal/buildtool/buildtool_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Moved native embed declarations and subtree selection to separate frontend/overseer/dist and frontend/client/dist filesystems.",
+      "files": [
+        "main.go",
+        "production_resources_test.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Updated Make dependency ownership, generated whitespace rules, nested dist marker exceptions, and Overseer generated-cache ignores for the workspace.",
+      "files": [
+        "Makefile",
+        ".gitignore",
+        ".gitattributes"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Migrated static asset, generated binding, startup, clean-checkout, embed, and player filesystem assertions to nested client and Overseer paths; focused resource tests pass.",
+      "files": [
+        "internal/platform/assets_test.go",
+        "internal/platform/startup_test.go",
+        "internal/player/http.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Switched the private UI to overseer.js/overseer.css and presented Overseer Control in the window document without changing DOM behavior.",
+      "files": [
+        "frontend/overseer/src/index.html",
+        "frontend/overseer/src/overseer.js",
+        "frontend/overseer/src/overseer.css"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Renamed the Wails private asset parameters, window constructor/options/close seam, titles, fixtures, and focused host tests to Overseer; focused tests pass.",
+      "files": [
+        "wails_host.go",
+        "wails_host_test.go",
+        "main.go",
+        "production_resources_test.go",
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Renamed privileged browser fixture routes, source assets, page variables, and assertion copy to Overseer while preserving stable Master domain contract types; fixture server compiles.",
+      "files": [
+        "tests/browser/fixture-server/main.go",
+        "tests/browser/fixtures/desktop-bindings.js",
+        "tests/browser/public-access-fallback.spec.mjs",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Renamed active trusted-frontend comments, plist descriptions, native reset smoke functions/messages, public smoke copy, and secret-check terminology to Overseer.",
+      "files": [
+        "app.go",
+        "app_contract.go",
+        "build/darwin/Info.plist",
+        "build/darwin/Info.dev.plist",
+        "scripts/state-changing-reset-native-smoke.sh",
+        "scripts/secret-leak-check.sh",
+        "scripts/public-access-macos-smoke.sh"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Migrated CI cache/install/diff steps, Playwright startup, reproducibility digests, package verification, security exclusions, and Wails cutover fixtures to the workspace; focused CI pin tests and cutover self-test pass.",
+      "files": [
+        ".github/workflows/wails-macos.yml",
+        "tests/browser/playwright.config.mjs",
+        "scripts/reproducible-build-check.sh",
+        "scripts/verify-macos-app.sh",
+        "scripts/wails-v3-cutover-check.sh",
+        "scripts/wails-v3-contract-check.sh",
+        "scripts/tool-modules-check.sh",
+        "scripts/legacy-public-access-check.sh",
+        "scripts/secret-leak-check.sh",
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Updated Russian setup/operation guidance, amended the constitution to 5.1.0, and revised Spec Kit templates for the frontend workspace, Overseer terminology, canonical commands, and nested paths.",
+      "files": [
+        "README.md",
+        ".specify/memory/constitution.md",
+        ".specify/templates/spec-template.md",
+        ".specify/templates/plan-template.md",
+        ".specify/templates/tasks-template.md"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Completed clean workspace install, regenerated public ECMAScript contracts and 34-method/52-model Wails bindings in nested owners, and proved no obsolete source/output root was recreated.",
+      "files": [
+        "frontend/package-lock.json",
+        "frontend/client/gen/",
+        "frontend/overseer/bindings/"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Validated JavaScript syntax, both production builds, 22 Overseer browser journeys, Go formatting/vet/tests, and resource contracts.",
+      "files": [
+        "frontend/",
+        "tests/browser/",
+        "internal/platform/",
+        "internal/buildtool/",
+        "internal/player/http_test.go"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Verified deterministic generation, Wails bindings, native build, and zero obsolete client/master-frontend paths or identities.",
+      "files": [
+        "scripts/",
+        "main.go",
+        "frontend/",
+        ".github/workflows/wails-macos.yml"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Unified frontend workspace install and builds",
+      "command": "npm ci --prefix frontend && npm run build --prefix frontend",
+      "result": "passed; client and overseer production bundles built from one lockfile",
+      "warnings": []
+    },
+    {
+      "what": "Overseer browser journeys",
+      "command": "npm run test:overseer --prefix frontend",
+      "result": "22 passed",
+      "warnings": [
+        "NO_COLOR is ignored when FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Go formatting, vet, and full test suite",
+      "command": "gofmt -l . && go vet ./... && go test ./...",
+      "result": "passed",
+      "warnings": [
+        "local listener tests require execution outside the network sandbox",
+        "linker reports objects built for macOS 26 while targeting macOS 11"
+      ]
+    },
+    {
+      "what": "Deterministic generated contracts",
+      "command": "scripts/proto-check.sh && scripts/wails-bindings-check.sh",
+      "result": "passed; protobuf and 34-method Wails bindings deterministic",
+      "warnings": []
+    },
+    {
+      "what": "Native application build",
+      "command": "go run ./cmd/build build",
+      "result": "passed; workspace install, generation, both frontend bundles, Wails bindings, and macOS arm64 binary completed",
+      "warnings": []
+    },
+    {
+      "what": "Obsolete path and identity audit",
+      "command": "active-tree rg scan plus filesystem absence checks",
+      "result": "passed; no top-level client, legacy frontend roots, master entry assets, or master-facing identities remain",
+      "warnings": [
+        "stable backend Master* contract identifiers intentionally preserved"
+      ]
+    }
+  ]
+}

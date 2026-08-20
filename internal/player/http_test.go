@@ -383,7 +383,7 @@ func TestBrowserRecognitionNeverUsesHTTPURLsOrWeakensOriginAndHeaders(t *testing
 
 	}
 
-	clientScript, err := os.ReadFile(filepath.Join("..", "..", "client", "client.js"))
+	clientScript, err := os.ReadFile(filepath.Join("..", "..", "frontend", "client", "client.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}

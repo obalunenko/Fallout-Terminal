@@ -968,7 +968,7 @@ export class ResetTerminalCommandStatesPayload {
 }
 
 /**
- * ResolveCommandExecutionResult is the private master-only response to one
+ * ResolveCommandExecutionResult is the private Overseer-only response to one
  * exact pending command decision.
  */
 export class ResolveCommandExecutionResult {

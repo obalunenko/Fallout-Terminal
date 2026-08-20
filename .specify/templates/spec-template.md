@@ -12,13 +12,13 @@
 
 <!--
 Prioritize stories as P1, P2, P3, and keep each story independently usable and
-verifiable. Include both the game-master and player experience when the feature
+verifiable. Include both the Overseer and player experience when the feature
 crosses the Wails/Go, HTTP, or WebSocket boundary.
 -->
 
 ### User Story 1 - [Brief Title] (Priority: P1)
 
-[Describe the game-master or player journey in plain language]
+[Describe the Overseer or player journey in plain language]
 
 **Why this priority**: [Explain its value and priority]
 
@@ -91,10 +91,10 @@ Mark material ambiguity inline, for example:
 - **Persistence (`internal/session/`, `internal/playerconfig/`, `sessions/`)**: [Affected/not affected — JSON shape, validation, file references, storage behavior, or examples]
 - **Player transport (`internal/player/`)**: [Affected/not affected — HTTP routes, WebSocket protocol, validation, broadcast, or reconnect behavior]
 - **Platform and public access (`internal/platform/`, `internal/tunnel/`)**: [Affected/not affected — macOS paths, desktop operations, embedded endpoint ownership, Keychain secrets, or provider behavior]
-- **Master UI (`frontend/src/`)**: [Affected/not affected — game-master editing/control workflow or Wails bridge consumer]
-- **Player UI (`client/`)**: [Affected/not affected — browser behavior, presentation, audio, or WebSocket consumer]
+- **Overseer UI (`frontend/overseer/src/`)**: [Affected/not affected — Overseer editing/control workflow or Wails bridge consumer]
+- **Player UI (`frontend/client/`)**: [Affected/not affected — browser behavior, presentation, audio, or WebSocket consumer]
 - **Tests and fixtures (`internal/**/*_test.go`, `tests/browser/`, `internal/testutil/`)**: [Affected/not affected — automated coverage or fixtures]
-- **Build and packaging (`go.mod`, `frontend/`, `wails.json`, `build/`, `scripts/`)**: [Affected/not affected — dependencies, embedding, macOS build, signing, or release behavior]
+- **Build and packaging (`go.mod`, `frontend/`, `build/`, `scripts/`)**: [Affected/not affected — dependencies, embedding, macOS build, signing, or release behavior]
 
 ### State and Contract Requirements *(include when applicable)*
 
@@ -117,7 +117,7 @@ Mark material ambiguity inline, for example:
 - **Go tests**: [Affected packages and observable behavior, or N/A]
 - **Race testing**: [Affected concurrent services and required command, or N/A]
 - **Browser tests**: [Playwright journey under `tests/browser/`, or N/A]
-- **Interactive verification**: [Affected `go run ./cmd/build dev` master/player journey]
+- **Interactive verification**: [Affected `go run ./cmd/build dev` Overseer/player journey]
 - **Packaging/release verification**: [arm64 app, signing/notarization, or N/A]
 
 No numeric coverage threshold or repository-wide linter is currently defined.
@@ -144,7 +144,7 @@ Specify concrete behavioral checks rather than inventing either gate.
 
 ## Assumptions
 
-- [Assumption about the game-master/player environment or local network]
+- [Assumption about the Overseer/player environment or local network]
 - [Assumption about compatible session or player-configuration versions]
 - [Assumption about connected-player count or supported macOS profile]
 - [Dependency on existing Wails, Go service, browser, or optional public-provider behavior]

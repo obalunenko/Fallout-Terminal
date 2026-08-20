@@ -18,7 +18,7 @@ import { Create as $Create } from "@wailsio/runtime";
 
 /**
  * CommandApprovalMode records the exact behavior that will run after the
- * game master approves a pending command. Completed state-changing commands
+ * Overseer approves a pending command. Completed state-changing commands
  * remain distinct because approval must show their frozen result without a
  * second durable write.
  * @readonly
@@ -36,7 +36,7 @@ export const CommandApprovalMode = {
 };
 
 /**
- * CommandExecutionDecision is the trusted game-master resolution for the
+ * CommandExecutionDecision is the trusted Overseer resolution for the
  * exact currently pending state-changing command request.
  * @readonly
  * @enum {string}
@@ -160,7 +160,7 @@ export class HackWord {
  */
 
 /**
- * MasterBroadcastState is the game-master view of the current broadcast epoch.
+ * MasterBroadcastState is the Overseer view of the current broadcast epoch.
  */
 export class MasterBroadcastState {
     /**
@@ -540,7 +540,7 @@ export class MasterPendingTerminalNavigation {
 }
 
 /**
- * MasterRosterEntry is the game-master view of one roster claim.
+ * MasterRosterEntry is the Overseer view of one roster claim.
  */
 export class MasterRosterEntry {
     /**
@@ -599,7 +599,7 @@ export class MasterRosterEntry {
 }
 
 /**
- * MasterSessionEntry is the game-master view of one recognized logical session.
+ * MasterSessionEntry is the Overseer view of one recognized logical session.
  */
 export class MasterSessionEntry {
     /**
@@ -749,7 +749,7 @@ export class PlayerCharacter {
 }
 
 /**
- * PlayerConfigMetadata is the detached game-master view of the active config.
+ * PlayerConfigMetadata is the detached Overseer view of the active config.
  */
 export class PlayerConfigMetadata {
     /**
@@ -975,7 +975,7 @@ export class PublicHackState {
 }
 
 /**
- * ServerInfo is safe status displayed to the game master.
+ * ServerInfo is safe status displayed to the Overseer.
  */
 export class ServerInfo {
     /**
@@ -1097,7 +1097,7 @@ export const TerminalNavigationNoticeReason = {
 };
 
 /**
- * TerminalSwitchChoice is the game master's explicit unfinished-puzzle decision.
+ * TerminalSwitchChoice is the Overseer's explicit unfinished-puzzle decision.
  * @readonly
  * @enum {string}
  */

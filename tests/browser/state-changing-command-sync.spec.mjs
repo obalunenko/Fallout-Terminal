@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const TOKEN_KEY = 'fallout-terminal.player-token';
 const FIXTURE = '/__fixture/state-changing-command-sync';
-const MASTER_URL = `${FIXTURE}/master`;
+const OVERSEER_URL = `${FIXTURE}/overseer`;
 
 async function postLifecycle(request, action) {
   const response = await request.post(`${FIXTURE}/${action}`);
@@ -34,10 +34,10 @@ async function openPlayer(browser, storedToken = null) {
   return { context, page };
 }
 
-async function openMaster(browser) {
+async function openOverseer(browser) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(MASTER_URL);
+  await page.goto(OVERSEER_URL);
   await page.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
   await expect(page.locator('#mainLayout')).toBeVisible();
   return { context, page };
@@ -60,18 +60,18 @@ async function assignControllerAndObservers(players, expectedMenuTitle = 'Отк
 }
 
 async function openThreePlayerJourney(browser) {
-  const master = await openMaster(browser);
+  const overseer = await openOverseer(browser);
   const players = [];
   for (let index = 0; index < 3; index += 1) players.push(await openPlayer(browser));
   await assignControllerAndObservers(players);
-  return { master, players };
+  return { overseer, players };
 }
 
 async function closeJourney(journey) {
   for (const player of journey.players) {
     await player.context.close().catch(() => {});
   }
-  await journey.master.context.close().catch(() => {});
+  await journey.overseer.context.close().catch(() => {});
 }
 
 async function expectFullScreenCommandSurface(page, text, timeout) {
@@ -138,7 +138,7 @@ async function chooseStateChangingCommand(journey, request) {
   await Promise.all(journey.players.slice(1).map(player =>
     expect(player.page.locator('#backBtn')).toBeHidden()));
 
-  const dialog = journey.master.page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
+  const dialog = journey.overseer.page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
   await expect(dialog).toBeVisible();
   const stateResponse = await request.get(`${FIXTURE}/state`);
   expect(stateResponse.ok()).toBe(true);

@@ -3,19 +3,20 @@ __pycache__/
 # Node/Vite artifacts and local configuration
 node_modules/
 dist/
-!client/dist/
-client/dist/*
-!client/dist/.keep
+!frontend/client/dist/
+frontend/client/dist/*
+!frontend/client/dist/.keep
+!frontend/overseer/dist/
+frontend/overseer/dist/*
+!frontend/overseer/dist/.keep
 *.log
 .env*
 
 # Go/Wails build output
 build/bin/
 build/dev/
-frontend/dist/*
-!frontend/dist/.keep
 frontend/node_modules/
-frontend/wailsjs/
+frontend/overseer/wailsjs/
 tests/browser/test-results/
 
 # Go test/build artifacts

@@ -54,7 +54,6 @@ jobs:
           cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
-            client/package-lock.json
 
       - name: Lint
         run: |
@@ -71,12 +70,12 @@ jobs:
 
       - name: Build protobuf
         run: |
-          npm ci --prefix client
+          npm ci --prefix frontend
           go tool -modfile=tools/buf/go.mod buf format proto --diff --exit-code
           go tool -modfile=tools/buf/go.mod buf lint proto
           go tool -modfile=tools/buf/go.mod buf build proto >/dev/null
           scripts/proto-generate.sh
-          git diff --exit-code -- internal/gen client/gen
+          git diff --exit-code -- internal/gen frontend/client/gen
 
       - name: Build application
         run: go run ./cmd/build package

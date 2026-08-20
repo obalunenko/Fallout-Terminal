@@ -186,20 +186,20 @@ for terminal in document.get("terminals", []):
 run_self_test() {
   validate_command_only_fixture "${default_fixture}"
   node --check "${player_probe}"
-  grep -Fq "resetConfirmationDialog.id = 'resetConfirmationDialog';" "${repository_root}/frontend/src/master.js" ||
-    fail 'master reset confirmation dialog is missing'
-  grep -Fq 'desktopAPI.resetTerminalCommandStates({ terminalId: term.id })' "${repository_root}/frontend/src/master.js" ||
-    fail 'master reset-all control is not wired to the generated desktop facade'
-  grep -Fq 'resetTerminalCommandStates: desktopService.ResetTerminalCommandStates' "${repository_root}/frontend/src/desktop-api.js" ||
+  grep -Fq "resetConfirmationDialog.id = 'resetConfirmationDialog';" "${repository_root}/frontend/overseer/src/overseer.js" ||
+    fail 'overseer reset confirmation dialog is missing'
+  grep -Fq 'desktopAPI.resetTerminalCommandStates({ terminalId: term.id })' "${repository_root}/frontend/overseer/src/overseer.js" ||
+    fail 'overseer reset-all control is not wired to the generated desktop facade'
+  grep -Fq 'resetTerminalCommandStates: desktopService.ResetTerminalCommandStates' "${repository_root}/frontend/overseer/src/desktop-api.js" ||
     fail 'desktop facade is not wired to the generated Wails binding'
-  grep -Fq 'saveStatus.dataset.sessionStateRevision' "${repository_root}/frontend/src/master.js" ||
-    fail 'master session-state evidence is missing'
-  grep -Fq 'screen.dataset.runtimeRevision' "${repository_root}/client/client.js" ||
+  grep -Fq 'saveStatus.dataset.sessionStateRevision' "${repository_root}/frontend/overseer/src/overseer.js" ||
+    fail 'overseer session-state evidence is missing'
+  grep -Fq 'screen.dataset.runtimeRevision' "${repository_root}/frontend/client/client.js" ||
     fail 'player runtime revision evidence is missing'
-  if grep -F 'window.confirm(`Сбросить' "${repository_root}/frontend/src/master.js" >/dev/null; then
+  if grep -F 'window.confirm(`Сбросить' "${repository_root}/frontend/overseer/src/overseer.js" >/dev/null; then
     fail 'command-state reset still depends on unsupported native window.confirm'
   fi
-  pass 'command-only fixture, native master evidence, generated Wails chain, and two-player probe are present'
+  pass 'command-only fixture, native overseer evidence, generated Wails chain, and two-player probe are present'
 }
 
 launch_app() {
@@ -330,7 +330,7 @@ end run
 APPLESCRIPT
 }
 
-verify_native_master_reset() {
+verify_native_overseer_reset() {
   local terminal_id="$1"
   osascript - "${app_pid}" "${terminal_id}" >>"${smoke_root}/native-automation.log" 2>&1 <<'APPLESCRIPT'
 on findNamedButton(containerElement, buttonName)
@@ -383,12 +383,12 @@ on run argv
     end tell
     delay 0.1
   end repeat
-  error "master DOM did not expose canonical Wails/session-state reset evidence"
+  error "overseer DOM did not expose canonical Wails/session-state reset evidence"
 end run
 APPLESCRIPT
 }
 
-verify_native_master_reopen() {
+verify_native_overseer_reopen() {
   osascript - "${app_pid}" >>"${smoke_root}/native-automation.log" 2>&1 <<'APPLESCRIPT'
 on findNamedButton(containerElement, buttonName)
   tell application "System Events"
@@ -417,7 +417,7 @@ on run argv
     end tell
     delay 0.1
   end repeat
-  error "reopened master DOM did not remain INITIAL"
+  error "reopened overseer DOM did not remain INITIAL"
 end run
 APPLESCRIPT
 }
@@ -456,7 +456,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
 fi
 
 [[ "$#" -le 3 ]] || fail 'usage: scripts/state-changing-reset-native-smoke.sh [APP_PATH] [SESSION_FIXTURE] [PLAYER_CONFIG]'
-[[ "$(uname -s)" == Darwin ]] || fail 'native master-click smoke requires macOS'
+[[ "$(uname -s)" == Darwin ]] || fail 'native overseer-click smoke requires macOS'
 for command in curl grep mktemp node open osascript pgrep python3; do
   require_command "${command}"
 done
@@ -498,11 +498,11 @@ reset_log="${smoke_root}/reset-player.log"
 start_player_probe reset "${reset_ready}" "${reset_trigger}" "${reset_result}" "${reset_log}"
 wait_for_marker "${reset_ready}" "${reset_log}" || fail 'controller and observer did not reach the completed pre-reset screen'
 
-drive_native_reset || fail 'native master reset click or confirmation failed'
+drive_native_reset || fail 'native overseer reset click or confirmation failed'
 touch "${reset_trigger}"
 wait_for_file_reset "${session_path}" "${terminal_id}" ||
-  fail 'native master click did not remove canonical commandStates within the deadline'
-verify_native_master_reset "${terminal_id}" || fail 'master did not expose Wails result and session-state evidence'
+  fail 'native overseer click did not remove canonical commandStates within the deadline'
+verify_native_overseer_reset "${terminal_id}" || fail 'overseer did not expose Wails result and session-state evidence'
 finish_player_probe "${reset_result}" "${reset_log}"
 
 after_selected_states="$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1], encoding="utf-8")); t=next(x for x in d["terminals"] if x["id"]==sys.argv[2]); print(len(t.get("commandStates", {})))' "${session_path}" "${terminal_id}")"
@@ -521,7 +521,7 @@ reopen_result="${smoke_root}/reopen-result.json"
 reopen_log="${smoke_root}/reopen-player.log"
 start_player_probe reopen "${reopen_ready}" "${reopen_trigger}" "${reopen_result}" "${reopen_log}"
 finish_player_probe "${reopen_result}" "${reopen_log}"
-verify_native_master_reopen || fail 'master DOM did not remain initial after full reopen'
+verify_native_overseer_reopen || fail 'overseer DOM did not remain initial after full reopen'
 
 python3 -c '
 import json, sys
@@ -539,4 +539,4 @@ print("runtime {}->{} in {}ms; reopen runtime {}".format(
 ' "${reset_result}" "${reopen_result}"
 
 smoke_succeeded=1
-pass "native click traversed generated Wails reset for terminal ${terminal_id}; selected commandStates ${before_selected_states}->${after_selected_states}, other terminal preserved ${before_other_states}; master/controller/observer reached INITIAL within 1s, navigation stayed initial, and full reopen preserved it"
+pass "native click traversed generated Wails reset for terminal ${terminal_id}; selected commandStates ${before_selected_states}->${after_selected_states}, other terminal preserved ${before_other_states}; overseer/controller/observer reached INITIAL within 1s, navigation stayed initial, and full reopen preserved it"

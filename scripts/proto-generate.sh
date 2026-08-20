@@ -45,7 +45,7 @@ root_module_before="$(root_module_revision)"
 require_version "Buf" "$(go tool -modfile=tools/buf/go.mod buf --version)" "1.72.0"
 require_version "protoc-gen-go" "$(go tool -modfile=tools/protoc-gen-go/go.mod protoc-gen-go --version)" "protoc-gen-go v1.36.11"
 require_version "protoc-gen-connect-go" "$(go tool -modfile=tools/protoc-gen-connect-go/go.mod protoc-gen-connect-go --version)" "1.20.0"
-require_version "protoc-gen-es" "$(node -p "require('./client/node_modules/@bufbuild/protoc-gen-es/package.json').version")" "2.13.0"
+require_version "protoc-gen-es" "$(node -p "require('./frontend/node_modules/@bufbuild/protoc-gen-es/package.json').version")" "2.13.0"
 
 # Node 22+ exposes experimental Web Storage globals even when no persistence
 # file is configured. TypeScript VFS probes localStorage while protoc-gen-es is
@@ -69,8 +69,8 @@ if [[ "$(grep -Ec '^    out: internal/gen$' proto/buf.gen.go.yaml)" -ne 2 ]]; th
   printf 'Go generation outputs must remain isolated under internal/gen\n' >&2
   exit 1
 fi
-if [[ "$(grep -Ec '^    out: client/gen$' proto/buf.gen.es.yaml)" -ne 1 ]]; then
-  printf 'ECMAScript generation output must remain isolated under client/gen\n' >&2
+if [[ "$(grep -Ec '^    out: frontend/client/gen$' proto/buf.gen.es.yaml)" -ne 1 ]]; then
+  printf 'ECMAScript generation output must remain isolated under frontend/client/gen\n' >&2
   exit 1
 fi
 

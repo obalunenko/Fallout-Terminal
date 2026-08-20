@@ -52,7 +52,7 @@ type failedHackLifecycle interface {
 	ResetFailedHack(*domain.TerminalRuntime, domain.TerminalTarget) (*domain.TerminalRuntime, *domain.PublicLiveState)
 }
 
-// TrustedHackRuntime is the private game-master-only hacking operation used
+// TrustedHackRuntime is the private Overseer-only hacking operation used
 // during the transition from the legacy live aggregate to coordinator-owned
 // terminal slots. It is never exposed through the player protocol.
 type TrustedHackRuntime interface {
@@ -346,7 +346,7 @@ func (service *Service) compoundUpdateLocked(runtime *domain.ProcessRuntime, ses
 	return domain.CloneCompoundUpdate(update)
 }
 
-// Snapshot returns a deeply detached game-master coordination projection.
+// Snapshot returns a deeply detached Overseer coordination projection.
 func (service *Service) Snapshot() *domain.MasterCoordinationState {
 	service.mu.RLock()
 	defer service.mu.RUnlock()
@@ -1086,7 +1086,7 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 	return domain.CloneMasterCoordinationState(state), mutation, resolveErr
 }
 
-// ResolveTerminalNavigation applies one exact game-master decision without
+// ResolveTerminalNavigation applies one exact Overseer decision without
 // entering the manual terminal-switch lifecycle.
 func (service *Service) ResolveTerminalNavigation(requestID string, decision domain.TerminalNavigationDecision) (*domain.MasterCoordinationState, error) {
 	requestID = strings.TrimSpace(requestID)
@@ -1958,7 +1958,7 @@ func (service *Service) DispatchPlayerActionForRecognition(handle domain.Recogni
 	return service.DispatchPlayerAction(connectionID, command)
 }
 
-// ForceHackSuccess executes the exact private game-master operation inside the
+// ForceHackSuccess executes the exact private Overseer operation inside the
 // coordinator order. It spends no attempt and grants no player authority.
 func (service *Service) ForceHackSuccess() (*domain.PublicHackState, bool) {
 	var state *domain.PublicHackState
