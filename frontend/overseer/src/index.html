@@ -71,8 +71,12 @@
 
         <section class="coord-group session-management" aria-labelledby="logicalSessionsHeading">
           <h2 class="coord-group-title" id="logicalSessionsHeading">ЛОГИЧЕСКИЕ СЕССИИ</h2>
-          <div class="session-list" id="logicalSessionList" role="list" aria-label="Распознанные логические сессии">
-            <div class="session-empty" role="listitem">СЕССИИ НЕ ПОДКЛЮЧЕНЫ</div>
+          <div class="logical-session-summary">
+            <div class="logical-session-count">
+              <span class="logical-session-count-label">АКТИВНО</span>
+              <output id="activeLogicalSessionCount" aria-label="Количество активных логических сессий" aria-live="polite" aria-atomic="true">0</output>
+            </div>
+            <button class="btn btn-mini btn-secondary" id="btnManageLogicalSessions" type="button" aria-haspopup="dialog" aria-controls="logicalSessionDialog">УПРАВЛЯТЬ</button>
           </div>
         </section>
 
@@ -83,44 +87,6 @@
           <div class="coord-error" id="coordinationError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
         </div>
 
-        <template id="logicalSessionRowTemplate">
-          <article class="session-row logical-session-row" role="listitem" data-session-id="" data-connected="false" data-role="unassigned">
-            <header class="session-summary">
-              <span class="session-primary-name">—</span>
-              <span class="session-presence" data-presence="disconnected">ОТКЛЮЧЕН</span>
-              <span class="session-role" data-session-role="unassigned">БЕЗ РОЛИ</span>
-            </header>
-            <div class="session-identity">
-              <span class="session-character-name">ПЕРСОНАЖ НЕ НАЗНАЧЕН</span>
-              <span class="session-fallback-label">—</span>
-            </div>
-            <div class="session-controls" role="group" aria-label="Исправление логической сессии и назначения">
-              <label class="field-label-inline session-name-field">
-                МЕТКА СЕССИИ
-                <input class="field-input session-name-input" name="sessionFallbackName" type="text" maxlength="80" autocomplete="off">
-              </label>
-              <button class="btn btn-mini session-rename" type="button" data-action="rename-logical-session">ПЕРЕИМЕНОВАТЬ СЕССИЮ</button>
-              <div class="session-assignment-controls" data-unassigned-only>
-                <label class="field-label-inline">
-                  НАЗНАЧИТЬ ПЕРСОНАЖА
-                  <select class="field-input session-character-select" name="assignCharacter"></select>
-                </label>
-                <button class="btn btn-mini session-assign" type="button" data-action="assign-character">НАЗНАЧИТЬ</button>
-              </div>
-              <div class="session-claimed-controls" data-assigned-only hidden>
-                <button class="btn btn-mini session-release" type="button" data-action="release-character">ОСВОБОДИТЬ ПЕРСОНАЖА</button>
-                <button class="btn btn-mini session-controller" type="button" data-action="set-active-controller">СДЕЛАТЬ УПРАВЛЯЮЩИМ</button>
-                <div class="session-move-controls">
-                  <label class="field-label-inline">
-                    ПЕРЕМЕСТИТЬ В СЕССИЮ
-                    <select class="field-input session-move-session-select" name="moveCharacterToSession"></select>
-                  </label>
-                  <button class="btn btn-mini session-move" type="button" data-action="move-character">ПЕРЕМЕСТИТЬ</button>
-                </div>
-              </div>
-            </div>
-          </article>
-        </template>
       </section>
 
       <div class="term-footer">
@@ -255,6 +221,66 @@
 
   </div><!-- /main -->
 </div><!-- /layout -->
+
+<dialog class="logical-session-dialog" id="logicalSessionDialog" aria-modal="true" aria-labelledby="logicalSessionDialogTitle" aria-describedby="logicalSessionDialogStatus logicalSessionDialogError" hidden>
+  <div class="logical-session-dialog-panel">
+    <header class="logical-session-dialog-header">
+      <div>
+        <h2 class="logical-session-dialog-title" id="logicalSessionDialogTitle">ЛОГИЧЕСКИЕ СЕССИИ</h2>
+        <p class="logical-session-dialog-description">ПОДРОБНАЯ ИНФОРМАЦИЯ И УПРАВЛЕНИЕ РАСПОЗНАННЫМИ СЕССИЯМИ</p>
+      </div>
+      <button class="btn btn-secondary" id="btnCloseLogicalSessions" type="button">ЗАКРЫТЬ</button>
+    </header>
+
+    <div class="session-list logical-session-dialog-list" id="logicalSessionList" role="list" aria-label="Распознанные логические сессии">
+      <div class="session-empty" role="listitem">СЕССИИ НЕ ПОДКЛЮЧЕНЫ</div>
+    </div>
+
+    <div class="logical-session-dialog-feedback" aria-label="Состояние операций с логическими сессиями">
+      <div class="logical-session-dialog-status" id="logicalSessionDialogStatus" role="status" aria-live="polite" aria-atomic="true"></div>
+      <div class="logical-session-dialog-error" id="logicalSessionDialogError" role="alert" aria-live="assertive" aria-atomic="true" hidden></div>
+    </div>
+  </div>
+
+  <template id="logicalSessionRowTemplate">
+    <article class="session-row logical-session-row" role="listitem" data-session-id="" data-connected="false" data-role="unassigned">
+      <header class="session-summary">
+        <span class="session-primary-name">—</span>
+        <span class="session-presence" data-presence="disconnected">ОТКЛЮЧЕН</span>
+        <span class="session-role" data-session-role="unassigned">БЕЗ РОЛИ</span>
+      </header>
+      <div class="session-identity">
+        <span class="session-character-name">ПЕРСОНАЖ НЕ НАЗНАЧЕН</span>
+        <span class="session-fallback-label">—</span>
+      </div>
+      <div class="session-controls" role="group" aria-label="Исправление логической сессии и назначения">
+        <label class="field-label-inline session-name-field">
+          МЕТКА СЕССИИ
+          <input class="field-input session-name-input" name="sessionFallbackName" type="text" maxlength="80" autocomplete="off">
+        </label>
+        <button class="btn btn-mini session-rename" type="button" data-action="rename-logical-session">ПЕРЕИМЕНОВАТЬ СЕССИЮ</button>
+        <div class="session-assignment-controls" data-unassigned-only>
+          <label class="field-label-inline">
+            НАЗНАЧИТЬ ПЕРСОНАЖА
+            <select class="field-input session-character-select" name="assignCharacter"></select>
+          </label>
+          <button class="btn btn-mini session-assign" type="button" data-action="assign-character">НАЗНАЧИТЬ</button>
+        </div>
+        <div class="session-claimed-controls" data-assigned-only hidden>
+          <button class="btn btn-mini session-release" type="button" data-action="release-character">ОСВОБОДИТЬ ПЕРСОНАЖА</button>
+          <button class="btn btn-mini session-controller" type="button" data-action="set-active-controller">СДЕЛАТЬ УПРАВЛЯЮЩИМ</button>
+          <div class="session-move-controls">
+            <label class="field-label-inline">
+              ПЕРЕМЕСТИТЬ В СЕССИЮ
+              <select class="field-input session-move-session-select" name="moveCharacterToSession"></select>
+            </label>
+            <button class="btn btn-mini session-move" type="button" data-action="move-character">ПЕРЕМЕСТИТЬ</button>
+          </div>
+        </div>
+      </div>
+    </article>
+  </template>
+</dialog>
 
 <dialog class="player-management-dialog" id="playerManagementDialog" aria-modal="true" aria-readonly="false" aria-labelledby="playerManagementDialogTitle" aria-describedby="playerManagementMode playerManagementStatus playerManagementError" hidden>
   <div class="player-management-dialog-panel">

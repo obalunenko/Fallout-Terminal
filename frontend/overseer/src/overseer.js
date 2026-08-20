@@ -77,6 +77,12 @@ const btnCancelEndBroadcast = document.getElementById('btnCancelEndBroadcast');
 const btnConfirmEndBroadcast = document.getElementById('btnConfirmEndBroadcast');
 const coordinationStatus = document.getElementById('coordinationStatus');
 const coordinationError = document.getElementById('coordinationError');
+const activeLogicalSessionCount = document.getElementById('activeLogicalSessionCount');
+const btnManageLogicalSessions = document.getElementById('btnManageLogicalSessions');
+const logicalSessionDialog = document.getElementById('logicalSessionDialog');
+const btnCloseLogicalSessions = document.getElementById('btnCloseLogicalSessions');
+const logicalSessionDialogStatus = document.getElementById('logicalSessionDialogStatus');
+const logicalSessionDialogError = document.getElementById('logicalSessionDialogError');
 const logicalSessionList = document.getElementById('logicalSessionList');
 const logicalSessionRowTemplate = document.getElementById('logicalSessionRowTemplate');
 const playerManagementDialog = document.getElementById('playerManagementDialog');
@@ -150,6 +156,7 @@ let terminalNavigationDialogRequestID = null;
 let terminalNavigationDecisionRequestID = null;
 let terminalNavigationDialogEpoch = 0;
 const resolvedTerminalNavigationRequestIDs = new Set();
+let logicalSessionDialogOpener = null;
 let playerManagementOpener = null;
 let pendingPlayerDelete = null;
 
@@ -787,6 +794,7 @@ function renderCoordination() {
   btnStartBroadcast.disabled = coordinationCommandPending || Boolean(broadcast) || !playerConfig;
   btnEndBroadcast.hidden = !broadcast;
   btnEndBroadcast.disabled = coordinationCommandPending || !broadcast;
+  activeLogicalSessionCount.textContent = String(sessions.filter(session => Boolean(session.connected)).length);
 
   renderPlayerManagementRoster(roster, Boolean(broadcast), Boolean(playerConfig));
 
@@ -1062,6 +1070,32 @@ function setPlayerManagementFeedback(message = '', isError = false) {
   playerManagementStatus.textContent = isError ? '' : message;
   playerManagementError.textContent = isError ? message : '';
   playerManagementError.hidden = !isError || !message;
+}
+
+function showLogicalSessionManagement() {
+  logicalSessionDialogOpener = document.activeElement instanceof HTMLElement
+    ? document.activeElement
+    : btnManageLogicalSessions;
+  setLogicalSessionDialogFeedback('');
+  logicalSessionDialog.hidden = false;
+  if (typeof logicalSessionDialog.showModal === 'function' && !logicalSessionDialog.open) {
+    logicalSessionDialog.showModal();
+  } else {
+    logicalSessionDialog.setAttribute('open', '');
+  }
+  queueMicrotask(() => btnCloseLogicalSessions.focus());
+}
+
+function hideLogicalSessionManagement() {
+  if (typeof logicalSessionDialog.close === 'function' && logicalSessionDialog.open) {
+    logicalSessionDialog.close();
+  } else {
+    logicalSessionDialog.removeAttribute('open');
+  }
+  logicalSessionDialog.hidden = true;
+  const opener = logicalSessionDialogOpener;
+  logicalSessionDialogOpener = null;
+  if (opener?.isConnected) opener.focus();
 }
 
 function showPlayerManagement() {
@@ -1452,6 +1486,13 @@ function setCoordinationStatus(message, isError = false) {
   coordinationStatus.classList.remove('err');
   coordinationError.textContent = isError ? (message || '') : '';
   coordinationError.hidden = !isError || !message;
+  setLogicalSessionDialogFeedback(message, isError);
+}
+
+function setLogicalSessionDialogFeedback(message = '', isError = false) {
+  logicalSessionDialogStatus.textContent = isError ? '' : (message || '');
+  logicalSessionDialogError.textContent = isError ? (message || '') : '';
+  logicalSessionDialogError.hidden = !isError || !message;
 }
 
 function fillSelect(select, values, valueOf, labelOf, emptyLabel) {
@@ -2111,6 +2152,12 @@ btnAddCommand.addEventListener('click', () => addNode('command'));
 btnAddEntry.addEventListener('click', () => addNode('entry'));
 
 // ── Player roster and broadcast management ──────────────────
+btnManageLogicalSessions.addEventListener('click', showLogicalSessionManagement);
+btnCloseLogicalSessions.addEventListener('click', hideLogicalSessionManagement);
+logicalSessionDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  hideLogicalSessionManagement();
+});
 btnManagePlayers.addEventListener('click', showPlayerManagement);
 btnClosePlayerManagement.addEventListener('click', hidePlayerManagement);
 playerManagementDialog.addEventListener('cancel', (event) => {
