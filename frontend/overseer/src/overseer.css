@@ -139,6 +139,12 @@ button {
 .term-row-name { color: #d8ffb8; font-size: 13px; }
 .term-row-meta { font-size: 11px; color: #d0a63a; display: none; }
 .term-row.is-live .term-row-meta { display: block; }
+.term-list-actions {
+  flex: 0 0 auto;
+  padding: 8px;
+  border-top: 1px solid #2a3520;
+}
+.term-list-actions .full-w { margin-bottom: 0; }
 .coord-panel {
   flex: 0 1 48%;
   min-height: 190px;
@@ -158,6 +164,11 @@ button {
   letter-spacing: .5px;
 }
 .broadcast-summary.is-live { color: #ff9a7a; }
+.broadcast-terminal-actions {
+  padding: 7px 8px 1px;
+  border-bottom: 1px solid #253018;
+}
+.broadcast-terminal-actions:has(#btnStopBroadcast[hidden]) { display: none; }
 .coord-group {
   min-width: 0;
   border-bottom: 1px solid #253018;
@@ -306,7 +317,44 @@ button {
 .tree-hdr { display: flex; justify-content: space-between; align-items: center; }
 #editingTermName { color: #d8ffb8; font-size: 13px; }
 .tree-hdr-actions { display: flex; align-items: center; gap: 10px; }
+.selected-terminal-actions,
+.editor-publish-actions { display: flex; align-items: center; gap: 8px; }
 .live-flag { color: #ff9a7a; font-size: 11px; letter-spacing: 1px; }
+.terminal-settings-menu { position: relative; }
+.terminal-settings-menu[hidden] { display: none; }
+.terminal-settings-menu summary {
+  padding: 7px 10px;
+  border: 1px solid #3a4a30;
+  background: #14180f;
+  color: #9fe89a;
+  cursor: pointer;
+  font-size: 12px;
+  letter-spacing: .5px;
+  list-style-position: inside;
+}
+.terminal-settings-menu summary:hover,
+.terminal-settings-menu summary:focus-visible {
+  border-color: #6fae55;
+  color: #d8ffb8;
+}
+.terminal-settings-menu-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(330px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid #6fae55;
+  background: #0d0f09;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .55);
+}
+.terminal-settings-menu-panel p {
+  margin: 0 0 10px;
+  color: #9fe89a;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.terminal-settings-menu-panel .btn { width: 100%; white-space: normal; }
 
 .tree-toolbar {
   display: flex;
@@ -771,6 +819,28 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+.dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+.dialog-actions .btn {
+  min-width: 0;
+  min-height: 48px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.dialog-actions .btn:focus-visible,
+.create-terminal-dialog input:focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 3px;
+}
+.create-terminal-dialog .field-label-inline {
+  display: block;
+  margin-bottom: 5px;
+  color: #6f9a5f;
+}
 .end-broadcast-actions .btn {
   min-width: 0;
   min-height: 48px;
@@ -833,6 +903,8 @@ button {
   .panel-hdr { padding-inline: 8px; }
   .tree-toolbar,
   .tree-hdr-actions { flex-wrap: wrap; }
+  .selected-terminal-actions,
+  .editor-publish-actions { flex-wrap: wrap; }
   .public-access-actions,
   .public-access-runtime-actions { grid-template-columns: 1fr; }
   .player-management-row { grid-template-columns: 1fr; }
@@ -848,6 +920,12 @@ button {
   .terminal-switch-dialog-description { margin-bottom: 14px; }
   .terminal-switch-actions { grid-template-columns: 1fr; }
   .terminal-switch-actions .btn { min-height: 40px; }
+  .dialog-actions { grid-template-columns: 1fr; }
+  .terminal-settings-menu-panel {
+    position: fixed;
+    inset: auto 10px 10px;
+    width: auto;
+  }
   .generated-password-actions { grid-template-columns: 1fr; }
   .player-management-dialog {
     width: calc(100vw - 20px);

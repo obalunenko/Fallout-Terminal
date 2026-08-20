@@ -48,10 +48,214 @@ async function authoringDurableState(page) {
   return page.evaluate(() => __desktopFixture.authoringDurableState());
 }
 
+async function emitCoordination(page, revision, activeTerminalId = null) {
+  await page.evaluate(({ nextRevision, liveTerminalId }) => {
+    __desktopFixture.emit('coordination-state', {
+      revision: nextRevision,
+      playerConfig: {
+        name: 'Игроки теста',
+        filePath: '/private/tmp/fallout-overseer-actions-players.json',
+        revision: 1,
+      },
+      roster: [],
+      sessions: [],
+      broadcast: {
+        id: 'broadcast-overseer-actions',
+        activeTerminalId: liveTerminalId,
+      },
+    });
+  }, { nextRevision: revision, liveTerminalId: activeTerminalId });
+}
+
 test.beforeEach(async ({ page }) => {
   const reset = await page.request.post(`${FIXTURE_URL}/reset`);
   expect(reset.ok()).toBe(true);
   await openAuthoringFixture(page);
+});
+
+test('terminal actions follow selected-terminal, editor, and broadcast context', async ({ page }) => {
+  const makeLive = page.locator('#btnMakeLive');
+  const liveFlag = page.locator('#liveFlag');
+  const publish = page.locator('#btnPublish');
+  const settings = page.locator('#terminalSettingsMenu');
+  const takeOffAir = page.locator('#btnStopBroadcast');
+
+  await expect(page.locator('#btnAddTerminal')).toHaveText('+ СОЗДАТЬ ТЕРМИНАЛ');
+  await expect(makeLive).toHaveText('СДЕЛАТЬ АКТИВНЫМ');
+  await expect(makeLive).toBeDisabled();
+  await expect(liveFlag).toBeHidden();
+  await expect(publish).toBeHidden();
+  await expect(settings).toBeHidden();
+  await expect(takeOffAir).toBeHidden();
+
+  await emitCoordination(page, 20, 'another-terminal');
+  await expect(makeLive).toBeVisible();
+  await expect(makeLive).toBeEnabled();
+  await expect(publish).toBeHidden();
+  await expect(settings).toBeHidden();
+  await expect(takeOffAir).toBeVisible();
+  await makeLive.click();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalActivation')).toBe(1);
+
+  await emitCoordination(page, 21, TERMINAL_ID);
+  await expect(makeLive).toBeHidden();
+  await expect(liveFlag).toBeVisible();
+  await expect(liveFlag).toContainText('В ЭФИРЕ');
+  await expect(publish).toBeVisible();
+  await expect(publish).toHaveText('ОПУБЛИКОВАТЬ ИЗМЕНЕНИЯ');
+  await expect(settings).toBeVisible();
+
+  const disclosure = settings.getByText('ДОПОЛНИТЕЛЬНО', { exact: true });
+  await disclosure.focus();
+  await page.keyboard.press('Enter');
+  await expect(settings).toHaveAttribute('open', '');
+  await expect(settings).toContainText(/все настройки.*не только содержимое/i);
+  await settings.getByRole('button', { name: 'ПЕРЕПРИМЕНИТЬ НАСТРОЙКИ' }).click();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalActivation')).toBe(2);
+  await expect(settings).not.toHaveAttribute('open', '');
+});
+
+test('publishing uses only the live-content command and preserves active identity', async ({ page }) => {
+  await emitCoordination(page, 30, TERMINAL_ID);
+  const publish = page.locator('#btnPublish');
+  await expect(publish).toBeVisible();
+
+  await page.evaluate(() => __desktopFixture.deferTerminalAction('UpdateLiveTerminal'));
+  await publish.click();
+  await expect.poll(() => desktopCallCount(page, 'UpdateLiveTerminal')).toBe(1);
+  await expect(publish).toBeDisabled();
+  await publish.click({ force: true });
+  await expect.poll(() => desktopCallCount(page, 'UpdateLiveTerminal')).toBe(1);
+  await page.evaluate(() => __desktopFixture.resolveTerminalAction('UpdateLiveTerminal', {
+    ok: true,
+    status: 'updated',
+  }));
+  await expect(publish).toBeEnabled();
+  await expect(publish).toHaveText('ОБНОВЛЕНО ✓');
+
+  const publishCall = await lastDesktopCall(page, 'UpdateLiveTerminal');
+  expect(publishCall.args).toHaveLength(1);
+  expect(publishCall.args[0]).toEqual(expect.objectContaining({
+    introText: expect.any(String),
+    tree: expect.objectContaining({ id: 'root', type: 'folder' }),
+  }));
+  expect(await desktopCallCount(page, 'RequestTerminalActivation')).toBe(0);
+  await expect(page.locator('#liveFlag')).toBeVisible();
+
+  await page.evaluate(() => __desktopFixture.setNextTerminalActionResult('UpdateLiveTerminal', {
+    ok: false,
+    error: 'fixture publish failed',
+  }));
+  await publish.click();
+  await expect(page.locator('#coordinationError')).toContainText('fixture publish failed');
+  await expect(page.locator('#liveFlag')).toBeVisible();
+
+  await emitCoordination(page, 31, 'another-terminal');
+  await expect(publish).toBeHidden();
+});
+
+test('terminal creation validates a name and mutates the session only after confirmation', async ({ page }) => {
+  const createButton = page.locator('#btnAddTerminal');
+  const dialog = page.getByRole('dialog', { name: 'СОЗДАТЬ ТЕРМИНАЛ' });
+  const nameInput = page.locator('#createTerminalName');
+  const saveCountBefore = await desktopCallCount(page, 'SaveSession');
+
+  await createButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(nameInput).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(createButton).toBeFocused();
+  await expect.poll(() => desktopCallCount(page, 'SaveSession')).toBe(saveCountBefore);
+
+  await createButton.click();
+  await dialog.getByRole('button', { name: 'СОЗДАТЬ ТЕРМИНАЛ' }).click();
+  await expect(page.locator('#createTerminalError')).toHaveText('УКАЖИТЕ НАЗВАНИЕ ТЕРМИНАЛА');
+  await expect(dialog).toBeVisible();
+  await expect(nameInput).toBeFocused();
+  await expect.poll(() => desktopCallCount(page, 'SaveSession')).toBe(saveCountBefore);
+
+  await nameInput.fill('  Технический терминал  ');
+  await dialog.getByRole('button', { name: 'СОЗДАТЬ ТЕРМИНАЛ' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#editingTermName')).toHaveText('Технический терминал');
+  await expect(page.locator('.term-row', { hasText: 'Технический терминал' })).toHaveCount(1);
+  await expect.poll(() => desktopCallCount(page, 'SaveSession')).toBe(saveCountBefore + 1);
+  expect((await lastDesktopCall(page, 'SaveSession')).args[0].terminals.at(-1)).toEqual(expect.objectContaining({
+    name: 'Технический терминал',
+    hackLevel: 0,
+    introText: '',
+  }));
+  expect(await desktopCallCount(page, 'RequestTerminalActivation')).toBe(0);
+});
+
+test('take-off-air always confirms, exposes failures, and chains unfinished progress', async ({ page }) => {
+  await emitCoordination(page, 40, TERMINAL_ID);
+  const takeOffAir = page.locator('#btnStopBroadcast');
+  const dialog = page.getByRole('dialog', { name: 'СНЯТЬ ТЕРМИНАЛ С ЭФИРА?' });
+
+  await takeOffAir.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Трансляция, подключения, роли, назначения и сохранённый терминал останутся без изменений.');
+  await expect(page.locator('#btnCancelTakeOffAir')).toBeFocused();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(0);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(takeOffAir).toBeFocused();
+
+  await page.evaluate(() => __desktopFixture.setNextTerminalActionResult('RequestTerminalClear', {
+    ok: false,
+    error: 'fixture clear failed',
+  }));
+  await takeOffAir.click();
+  await page.locator('#btnConfirmTakeOffAir').click();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(1);
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#takeOffAirError')).toContainText('fixture clear failed');
+  await expect(page.locator('#liveFlag')).toBeVisible();
+
+  await page.evaluate(() => __desktopFixture.setNextTerminalActionResult('RequestTerminalClear', {
+    ok: true,
+    status: 'decision-required',
+    switchId: 'switch-clear-1',
+  }));
+  await page.locator('#btnConfirmTakeOffAir').click();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(2);
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'НЕЗАВЕРШЁННЫЙ ВЗЛОМ' })).toBeVisible();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(2);
+});
+
+test('take-off-air prevents duplicates and focuses the surviving broadcast control', async ({ page }) => {
+  await emitCoordination(page, 50, TERMINAL_ID);
+  const dialog = page.getByRole('dialog', { name: 'СНЯТЬ ТЕРМИНАЛ С ЭФИРА?' });
+  await page.evaluate(() => __desktopFixture.deferTerminalAction('RequestTerminalClear'));
+  await page.locator('#btnStopBroadcast').click();
+  await page.locator('#btnConfirmTakeOffAir').click();
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(1);
+  await expect(page.locator('#btnConfirmTakeOffAir')).toBeDisabled();
+  await page.locator('#btnConfirmTakeOffAir').click({ force: true });
+  await expect.poll(() => desktopCallCount(page, 'RequestTerminalClear')).toBe(1);
+
+  await page.evaluate(() => __desktopFixture.resolveTerminalAction('RequestTerminalClear', {
+    ok: true,
+    status: 'cleared',
+    state: {
+      revision: 51,
+      playerConfig: {
+        name: 'Игроки теста',
+        filePath: '/private/tmp/fallout-overseer-actions-players.json',
+        revision: 1,
+      },
+      roster: [],
+      sessions: [],
+      broadcast: { id: 'broadcast-overseer-actions', activeTerminalId: null },
+    },
+  }));
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#btnStopBroadcast')).toBeHidden();
+  await expect(page.locator('#btnEndBroadcast')).toBeFocused();
+  await expect(page.locator('#broadcastSummary')).toContainText('ОЖИДАНИЕ ТЕРМИНАЛА');
 });
 
 test('bundled read-only demo exposes every configurable command mode and a completed example', async () => {

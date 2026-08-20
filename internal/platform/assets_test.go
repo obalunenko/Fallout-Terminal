@@ -1478,6 +1478,110 @@ func TestOverseerEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testing
 
 }
 
+func TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+	openingTag := func(document, id string) string {
+		t.Helper()
+		marker := `id="` + id + `"`
+		markerAt := strings.Index(document, marker)
+		if markerAt < 0 {
+			return ""
+		}
+		start := strings.LastIndex(document[:markerAt], "<")
+		endOffset := strings.Index(document[markerAt:], ">")
+		if start < 0 || endOffset < 0 {
+			return ""
+		}
+		return document[start : markerAt+endOffset+1]
+	}
+
+	overseerHTML := read("frontend/overseer/src/index.html")
+	overseerJS := read("frontend/overseer/src/overseer.js")
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	overseerSurface := strings.Join([]string{overseerHTML, overseerJS, overseerCSS}, "\n")
+
+	for _, required := range []string{
+		"+ СОЗДАТЬ ТЕРМИНАЛ",
+		"СДЕЛАТЬ АКТИВНЫМ",
+		"ОПУБЛИКОВАТЬ ИЗМЕНЕНИЯ",
+		"СНЯТЬ С ЭФИРА",
+		"ПЕРЕПРИМЕНИТЬ НАСТРОЙКИ",
+		"В ЭФИРЕ",
+		`id="terminalSettingsMenu"`,
+		`id="btnReapplySettings"`,
+		`id="createTerminalDialog"`,
+		`id="takeOffAirDialog"`,
+		"Игроки перестанут видеть активный терминал.",
+		"Трансляция, подключения, роли, назначения и сохранённый терминал останутся без изменений.",
+	} {
+		assert.Contains(t, overseerSurface, required,
+			"Overseer terminal-action surface is missing %q", required)
+	}
+	for _, superseded := range []string{
+		"+ НОВЫЙ ТЕРМИНАЛ",
+		"ОБНОВИТЬ АКТИВНЫЙ",
+		"ОБНОВИТЬ У ИГРОКОВ",
+		"УБРАТЬ АКТИВНЫЙ ТЕРМИНАЛ",
+	} {
+		assert.NotContains(t, overseerSurface, superseded,
+			"Overseer terminal-action surface retains superseded label %q", superseded)
+	}
+
+	for id, labelledBy := range map[string]string{
+		"createTerminalDialog": "createTerminalDialogTitle",
+		"takeOffAirDialog":     "takeOffAirDialogTitle",
+	} {
+		tag := openingTag(overseerHTML, id)
+		assert.Contains(t, tag, "<dialog")
+		assert.Contains(t, tag, `aria-modal="true"`)
+		assert.Contains(t, tag, `aria-labelledby="`+labelledBy+`"`)
+		assert.Contains(t, tag, "hidden")
+	}
+	for _, id := range []string{
+		"createTerminalName",
+		"createTerminalError",
+		"btnCancelCreateTerminal",
+		"btnConfirmCreateTerminal",
+		"takeOffAirError",
+		"btnCancelTakeOffAir",
+		"btnConfirmTakeOffAir",
+	} {
+		assert.Contains(t, overseerHTML, `id="`+id+`"`,
+			"Overseer terminal-action dialog is missing %q", id)
+	}
+	for _, id := range []string{"createTerminalError", "takeOffAirError"} {
+		tag := openingTag(overseerHTML, id)
+		assert.Contains(t, tag, `role="alert"`)
+		assert.Contains(t, tag, `aria-live="assertive"`)
+		assert.Contains(t, tag, "hidden")
+	}
+
+	playerSurface := strings.Join([]string{
+		read("frontend/client/index.html"),
+		read("frontend/client/client.css"),
+		read("frontend/client/client.js"),
+	}, "\n")
+	for _, privateControl := range []string{
+		"btnReapplySettings",
+		"createTerminalDialog",
+		"takeOffAirDialog",
+		"RequestTerminalActivation",
+		"RequestTerminalClear",
+		"UpdateLiveTerminal",
+	} {
+		assert.NotContains(t, playerSurface, privateControl,
+			"player surface exposes private Overseer action %q", privateControl)
+	}
+}
+
 func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 	t.Parallel()
 
