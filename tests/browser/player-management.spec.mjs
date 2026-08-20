@@ -471,8 +471,11 @@ test('keeps assignment, release, controller, and claimed transfer corrections in
   await expect(dialog.locator('[data-character-id="character-observer"] .player-name-input')).toHaveValue('Veronica');
   await dialog.locator('#btnClosePlayerManagement').click();
 
-  const unassigned = page.locator('[data-session-id="session-unassigned"]');
-  const observer = page.locator('[data-session-id="session-observer"]');
+  await page.locator('#btnManageLogicalSessions').click();
+  const sessionDialog = page.getByRole('dialog', { name: 'ЛОГИЧЕСКИЕ СЕССИИ' });
+  await expect(sessionDialog).toBeVisible();
+  const unassigned = sessionDialog.locator('[data-session-id="session-unassigned"]');
+  const observer = sessionDialog.locator('[data-session-id="session-observer"]');
   await expect(unassigned.locator('.session-assignment-controls')).toBeVisible();
   await expect(unassigned.locator('.session-character-select')).toHaveAccessibleName(/назначить персонажа/i);
   await expect(unassigned.locator('.session-assign')).toBeEnabled();

@@ -48,8 +48,8 @@ async function authoringDurableState(page) {
   return page.evaluate(() => __desktopFixture.authoringDurableState());
 }
 
-async function emitCoordination(page, revision, activeTerminalId = null) {
-  await page.evaluate(({ nextRevision, liveTerminalId }) => {
+async function emitCoordination(page, revision, activeTerminalId = null, { roster = [], sessions = [] } = {}) {
+  await page.evaluate(({ nextRevision, liveTerminalId, nextRoster, nextSessions }) => {
     __desktopFixture.emit('coordination-state', {
       revision: nextRevision,
       playerConfig: {
@@ -57,14 +57,19 @@ async function emitCoordination(page, revision, activeTerminalId = null) {
         filePath: '/private/tmp/fallout-overseer-actions-players.json',
         revision: 1,
       },
-      roster: [],
-      sessions: [],
+      roster: nextRoster,
+      sessions: nextSessions,
       broadcast: {
         id: 'broadcast-overseer-actions',
         activeTerminalId: liveTerminalId,
       },
     });
-  }, { nextRevision: revision, liveTerminalId: activeTerminalId });
+  }, {
+    nextRevision: revision,
+    liveTerminalId: activeTerminalId,
+    nextRoster: roster,
+    nextSessions: sessions,
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -113,6 +118,140 @@ test('terminal actions follow selected-terminal, editor, and broadcast context',
   await settings.getByRole('button', { name: 'ПЕРЕПРИМЕНИТЬ НАСТРОЙКИ' }).click();
   await expect.poll(() => desktopCallCount(page, 'RequestTerminalActivation')).toBe(2);
   await expect(settings).not.toHaveAttribute('open', '');
+});
+
+test('logical-session details and controls live in a reactive keyboard-accessible dialog', async ({ page }) => {
+  const roster = [
+    { id: 'character-1', name: 'Амата', claimedBySessionId: 'session-1' },
+    { id: 'character-2', name: 'Буч', claimedBySessionId: '' },
+  ];
+  const sessions = [
+    {
+      id: 'session-1',
+      fallbackName: 'Убежище 101',
+      connected: true,
+      role: 'active',
+      character: { id: 'character-1', name: 'Амата' },
+    },
+    {
+      id: 'session-2',
+      fallbackName: 'Пип-Бой гостя',
+      connected: true,
+      role: 'observer',
+      character: null,
+    },
+    {
+      id: 'session-3',
+      fallbackName: 'Старая сессия',
+      connected: false,
+      role: 'unassigned',
+      character: null,
+    },
+  ];
+
+  const opener = page.locator('#btnManageLogicalSessions');
+  const dialog = page.getByRole('dialog', { name: 'ЛОГИЧЕСКИЕ СЕССИИ' });
+  await expect(page.locator('#activeLogicalSessionCount')).toHaveText('0');
+  await expect(page.locator('#coordinationPanel #logicalSessionList')).toHaveCount(0);
+  await expect(page.locator('#coordinationPanel .logical-session-row')).toHaveCount(0);
+  await opener.click();
+  await expect(dialog.locator('.session-empty')).toHaveText('СЕССИИ НЕ ПОДКЛЮЧЕНЫ');
+  await page.keyboard.press('Escape');
+  await expect(opener).toBeFocused();
+
+  await emitCoordination(page, 60, TERMINAL_ID, { roster, sessions });
+  await expect(page.locator('#activeLogicalSessionCount')).toHaveText('2');
+  await expect(page.locator('#coordinationPanel')).not.toContainText('Убежище 101');
+  await expect(page.locator('#coordinationPanel')).not.toContainText('Пип-Бой гостя');
+
+  await opener.click();
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#btnCloseLogicalSessions')).toBeFocused();
+  await expect(dialog.locator('.logical-session-row')).toHaveCount(3);
+  await expect(dialog).toContainText('Убежище 101');
+  await expect(dialog).toContainText('Амата');
+  await expect(dialog).toContainText('УПРАВЛЯЮЩИЙ');
+  await expect(dialog).toContainText('Старая сессия');
+  await expect(dialog).toContainText('ОТКЛЮЧЕН');
+
+  const observerRow = dialog.locator('[data-session-id="session-2"]');
+  await expect(observerRow.locator('.session-assign')).toBeEnabled();
+  await observerRow.locator('.session-name-input').fill('Гостевой терминал');
+  await observerRow.locator('.session-rename').click();
+  await expect.poll(() => desktopCallCount(page, 'RenameLogicalSession')).toBe(1);
+  await expect(dialog.locator('#logicalSessionDialogStatus')).toHaveText('МЕТКА СЕССИИ ОБНОВЛЕНА');
+
+  await emitCoordination(page, 61, TERMINAL_ID, {
+    roster,
+    sessions: [
+      { ...sessions[0], connected: false, role: 'observer' },
+      {
+        id: 'session-4',
+        fallbackName: 'Новый контроллер',
+        connected: true,
+        role: 'active',
+        character: null,
+      },
+    ],
+  });
+  await expect(page.locator('#activeLogicalSessionCount')).toHaveText('1');
+  await expect(dialog.locator('.logical-session-row')).toHaveCount(2);
+  await expect(dialog).toContainText('Новый контроллер');
+  await expect(dialog).not.toContainText('Пип-Бой гостя');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+
+  await opener.click();
+  await page.locator('#btnCloseLogicalSessions').click();
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+});
+
+test('counts zero through seven sessions and keeps a seven-session mobile dialog scrollable', async ({ page }) => {
+  let latestSessions = [];
+  for (let total = 0; total <= 7; total += 1) {
+    latestSessions = Array.from({ length: total }, (_, index) => ({
+      id: `mobile-session-${index + 1}`,
+      fallbackName: `Мобильная сессия ${index + 1}`,
+      connected: index % 2 === 0,
+      role: index === 0 ? 'active' : 'observer',
+      character: null,
+    }));
+    await emitCoordination(page, 70 + total, TERMINAL_ID, { sessions: latestSessions });
+    await expect(page.locator('#activeLogicalSessionCount')).toHaveText(String(Math.ceil(total / 2)));
+  }
+
+  await page.setViewportSize({ width: 390, height: 640 });
+  await page.locator('#btnManageLogicalSessions').click();
+  const dialog = page.getByRole('dialog', { name: 'ЛОГИЧЕСКИЕ СЕССИИ' });
+  const list = dialog.locator('#logicalSessionList');
+  await expect(dialog).toBeVisible();
+  await expect(list.locator('.logical-session-row')).toHaveCount(7);
+  await list.locator('[data-session-id="mobile-session-7"]').scrollIntoViewIfNeeded();
+  await expect(list.locator('[data-session-id="mobile-session-7"]')).toBeVisible();
+
+  const metrics = await dialog.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const sessionList = element.querySelector('#logicalSessionList');
+    const style = getComputedStyle(sessionList);
+    return {
+      top: bounds.top,
+      right: bounds.right,
+      bottom: bounds.bottom,
+      left: bounds.left,
+      clientHeight: sessionList.clientHeight,
+      scrollHeight: sessionList.scrollHeight,
+      overflowY: style.overflowY,
+    };
+  });
+  expect(metrics.left).toBeGreaterThanOrEqual(0);
+  expect(metrics.top).toBeGreaterThanOrEqual(0);
+  expect(metrics.right).toBeLessThanOrEqual(390);
+  expect(metrics.bottom).toBeLessThanOrEqual(640);
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  expect(metrics.overflowY).toMatch(/auto|scroll/);
 });
 
 test('publishing uses only the live-content command and preserves active identity', async ({ page }) => {

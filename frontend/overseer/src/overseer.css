@@ -181,6 +181,32 @@ button {
   font-weight: normal;
   letter-spacing: 1px;
 }
+.logical-session-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px 8px;
+}
+.logical-session-count {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+  color: #6f9a5f;
+  font-size: 10px;
+  letter-spacing: .8px;
+}
+.logical-session-count output {
+  color: #d8ffb8;
+  font-size: 18px;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(111, 174, 85, .3);
+}
+.logical-session-summary .btn {
+  flex: 0 0 auto;
+  min-width: 0;
+}
 .player-config-management {
   padding-bottom: 7px;
   background: #0d110a;
@@ -619,6 +645,107 @@ button {
 .hack-retry[hidden] { display: none; }
 .hack-retry:disabled { opacity: .55; cursor: wait; }
 
+/* ── Logical-session management ────────────────────────── */
+.logical-session-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #6fae55;
+  background: #0d0f09;
+  color: #b9ffb0;
+  box-shadow: 0 0 0 1px #253018, 0 0 36px rgba(111, 174, 85, .3);
+}
+.logical-session-dialog[hidden] { display: none; }
+.logical-session-dialog::backdrop { background: rgba(2, 4, 2, .84); }
+.logical-session-dialog-panel {
+  display: flex;
+  max-height: calc(100dvh - 32px);
+  flex-direction: column;
+  padding: clamp(18px, 3vw, 28px);
+}
+.logical-session-dialog-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #2a3520;
+}
+.logical-session-dialog-title {
+  margin: 0;
+  color: #ffe08a;
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: normal;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(208, 166, 58, .3);
+}
+.logical-session-dialog-description {
+  margin: 7px 0 0;
+  color: #6f9a5f;
+  font-size: 12px;
+  letter-spacing: .8px;
+}
+.logical-session-dialog-list {
+  min-height: 76px;
+  margin: 12px -8px 0;
+  padding: 0 8px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-color: #3a4a30 #0a0c07;
+}
+.logical-session-dialog-list .session-row {
+  margin-bottom: 8px;
+  padding: 11px;
+  border: 1px solid #253018;
+  background: #0a0d08;
+}
+.logical-session-dialog-list .session-row:last-child { margin-bottom: 0; border-bottom: 1px solid #253018; }
+.logical-session-dialog-list .session-row:focus-within {
+  border-color: #6fae55;
+  background: #10150c;
+}
+.logical-session-dialog-list :is(.session-presence, .session-role, .session-fallback-label) {
+  font-size: 11px;
+}
+.logical-session-dialog-list .field-label-inline,
+.logical-session-dialog-list .session-empty {
+  font-size: 12px;
+}
+.logical-session-dialog-list .session-controls .field-input {
+  font-size: 12px;
+}
+.logical-session-dialog-list .session-controls .btn {
+  font-size: 13px;
+}
+.logical-session-dialog-feedback {
+  flex: 0 0 auto;
+  min-height: 21px;
+  padding-top: 10px;
+}
+.logical-session-dialog-status {
+  color: #6f9a5f;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.logical-session-dialog-error {
+  padding: 7px 8px;
+  border: 1px solid #8a3a2a;
+  background: #1d0e0a;
+  color: #ff9a7a;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.logical-session-dialog-error[hidden] { display: none; }
+.logical-session-dialog :is(input, select, button):focus-visible {
+  outline: 2px solid #ffe08a;
+  outline-offset: 2px;
+}
+
 /* ── Player management ─────────────────────────────────── */
 .player-management-dialog {
   width: min(920px, calc(100vw - 32px));
@@ -909,6 +1036,7 @@ button {
   .public-access-runtime-actions { grid-template-columns: 1fr; }
   .player-management-row { grid-template-columns: 1fr; }
   .player-management-row-actions { justify-content: flex-end; }
+  .logical-session-dialog-header { align-items: stretch; flex-direction: column; }
 }
 
 @media (max-width: 620px), (max-height: 560px) {
@@ -927,6 +1055,15 @@ button {
     width: auto;
   }
   .generated-password-actions { grid-template-columns: 1fr; }
+  .logical-session-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .logical-session-dialog-panel {
+    max-height: calc(100dvh - 20px);
+    padding: 16px;
+  }
+  .logical-session-dialog-header { align-items: stretch; flex-direction: column; }
   .player-management-dialog {
     width: calc(100vw - 20px);
     max-height: calc(100dvh - 20px);
