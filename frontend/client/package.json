@@ -1,13 +1,10 @@
 {
-  "name": "fallout-terminal-player",
+  "name": "fallout-terminal-client",
   "version": "1.0.0",
   "private": true,
-  "allowScripts": {
-    "fsevents": false
-  },
   "type": "module",
   "scripts": {
-    "generate": "../scripts/proto-generate.sh --sync-revision",
+    "generate": "../../scripts/proto-generate.sh --sync-revision",
     "dev": "vite",
     "build": "vite build"
   },

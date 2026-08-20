@@ -42,10 +42,10 @@ run_once() {
 
   go run ./cmd/build package
   tree_digest internal/gen >"${temporary}/${run}.internal-gen"
-  tree_digest client/gen >"${temporary}/${run}.client-gen"
-  tree_digest frontend/bindings >"${temporary}/${run}.bindings"
-  tree_digest client/dist >"${temporary}/${run}.client-dist"
-  tree_digest frontend/dist >"${temporary}/${run}.frontend-dist"
+  tree_digest frontend/client/gen >"${temporary}/${run}.client-gen"
+  tree_digest frontend/overseer/bindings >"${temporary}/${run}.bindings"
+  tree_digest frontend/client/dist >"${temporary}/${run}.client-dist"
+  tree_digest frontend/overseer/dist >"${temporary}/${run}.overseer-dist"
   shasum -a 256 "${application_executable}" | awk '{print $1}' >"${temporary}/${run}.native"
   scripts/verify-macos-app.sh "${application_bundle}"
   scripts/hash-macos-app.sh "${application_bundle}" >"${temporary}/${run}.app"
@@ -63,7 +63,7 @@ tracked_state "${temporary}/before"
 run_once first
 run_once second
 
-for output in internal-gen client-gen bindings client-dist frontend-dist native app; do
+for output in internal-gen client-gen bindings client-dist overseer-dist native app; do
   cmp "${temporary}/first.${output}" "${temporary}/second.${output}" \
     || fail "two clean runs produced different ${output} output"
 done

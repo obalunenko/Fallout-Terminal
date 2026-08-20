@@ -70,7 +70,7 @@ for entitlement in com.apple.security.cs.allow-jit com.apple.security.network.cl
   [[ "$(/usr/libexec/PlistBuddy -c "Print :${entitlement}" "${expected_entitlements}")" == true ]] || fail "source entitlement is missing: ${entitlement}"
 done
 
-for distribution in "${repository_root}/frontend/dist" "${repository_root}/client/dist"; do
+for distribution in "${repository_root}/frontend/overseer/dist" "${repository_root}/frontend/client/dist"; do
   [[ -s "${distribution}/index.html" ]] || fail "offline distribution is incomplete: ${distribution}"
   if grep -ERIn 'https://cdn\.|http://localhost:|http://127\.0\.0\.1:5173|@vite/client|frontend/wailsjs|window\.(go|runtime)' "${distribution}"; then
     fail "offline distribution contains a development, CDN, or legacy runtime dependency: ${distribution}"

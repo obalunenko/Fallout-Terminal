@@ -30,8 +30,8 @@ scan_tree() {
     return 1
   fi
 
-  matches="$(grep -ERIn 'frontend/wailsjs|window\.(go|runtime)|electronAPI|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' \
-    "${root}/frontend/src" "${root}/frontend/bindings" "${root}/frontend/dist" 2>/dev/null || true)"
+  matches="$(grep -ERIn 'frontend/(overseer/)?wailsjs|window\.(go|runtime)|electronAPI|WAILS_V2|USE_WAILS_V2|legacyWails|dual.?runtime' \
+    "${root}/frontend/overseer/src" "${root}/frontend/overseer/bindings" "${root}/frontend/overseer/dist" 2>/dev/null || true)"
   [[ -z "${matches}" ]] || { printf '%s\n' "${matches}" >&2; fail 'frontend source/generated/bundle contains a v2 global or dual-runtime fallback'; return 1; }
 
   matches="$(find "${root}/README.md" "${root}/scripts" "${root}/.github/workflows" -type f \
@@ -53,15 +53,15 @@ self_test() {
   local fixture
   fixture="$(mktemp -d "${TMPDIR:-/tmp}/fallout-cutover-check.XXXXXX")"
   trap 'rm -rf "${fixture}"' RETURN
-  mkdir -p "${fixture}/build/darwin" "${fixture}/frontend/src" "${fixture}/frontend/bindings" "${fixture}/frontend/dist" \
+  mkdir -p "${fixture}/build/darwin" "${fixture}/frontend/overseer/src" "${fixture}/frontend/overseer/bindings" "${fixture}/frontend/overseer/dist" \
     "${fixture}/internal/app" "${fixture}/scripts" "${fixture}/.github/workflows" \
     "${fixture}/specs/001-wails-v2-migration" "${fixture}/docs"
   printf 'module example.test/app\n\ngo 1.26\n\nrequire github.com/wailsapp/wails/v3 v3.0.0-beta.10\n' >"${fixture}/go.mod"
   : >"${fixture}/go.sum"
   printf 'package main\nimport _ "github.com/wailsapp/wails/v3/pkg/application"\n' >"${fixture}/main.go"
-  printf 'export const ready = true;\n' >"${fixture}/frontend/src/app.js"
-  printf 'export const generated = true;\n' >"${fixture}/frontend/bindings/service.js"
-  printf '<!doctype html>\n' >"${fixture}/frontend/dist/index.html"
+  printf 'export const ready = true;\n' >"${fixture}/frontend/overseer/src/app.js"
+  printf 'export const generated = true;\n' >"${fixture}/frontend/overseer/bindings/service.js"
+  printf '<!doctype html>\n' >"${fixture}/frontend/overseer/dist/index.html"
   printf 'Active: specs/006-wails-v3-migration/quickstart.md and docs/wails-v3-migration-rollback.md. Earlier records are historical evidence.\n' >"${fixture}/README.md"
   printf '# Historical v2 spec\n' >"${fixture}/specs/001-wails-v2-migration/spec.md"
   printf '# Historical rollback\n' >"${fixture}/docs/wails-migration-rollback.md"
@@ -75,9 +75,9 @@ self_test() {
   if scan_tree "${fixture}" >/dev/null 2>&1; then fail 'self-test accepted wails.json'; return 1; fi
   rm "${fixture}/wails.json"
 
-  printf 'window.go.main.App();\n' >"${fixture}/frontend/src/app.js"
+  printf 'window.go.main.App();\n' >"${fixture}/frontend/overseer/src/app.js"
   if scan_tree "${fixture}" >/dev/null 2>&1; then fail 'self-test accepted a generated v2 global'; return 1; fi
-  printf 'export const ready = true;\n' >"${fixture}/frontend/src/app.js"
+  printf 'export const ready = true;\n' >"${fixture}/frontend/overseer/src/app.js"
 
   printf 'wails build\n' >>"${fixture}/README.md"
   if scan_tree "${fixture}" >/dev/null 2>&1; then fail 'self-test accepted a bare v2 Wails command'; return 1; fi

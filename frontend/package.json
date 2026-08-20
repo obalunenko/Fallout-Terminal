@@ -5,23 +5,20 @@
   "allowScripts": {
     "fsevents": false
   },
-  "type": "module",
+  "workspaces": [
+    "client",
+    "overseer"
+  ],
   "scripts": {
-    "install:all": "npm ci && npm ci --prefix ../client",
     "proto:generate": "../scripts/proto-generate.sh --sync-revision",
-    "dev:all": "npm run proto:generate && vite",
-    "build:all": "npm run proto:generate && npm run build --prefix ../client && vite build",
-    "dev": "vite",
-    "build": "vite build",
-    "test": "npm test --prefix ../tests/browser -- state-changing-command-authoring.spec.mjs state-changing-command-approval.spec.mjs desktop-api.spec.mjs"
-  },
-  "devDependencies": {
-    "vite": "8.1.5"
+    "dev:client": "npm run dev --workspace fallout-terminal-client",
+    "dev:overseer": "npm run dev --workspace fallout-terminal-overseer",
+    "build:client": "npm run build --workspace fallout-terminal-client",
+    "build:overseer": "npm run build --workspace fallout-terminal-overseer",
+    "build": "npm run build:client && npm run build:overseer",
+    "test:overseer": "npm run test --workspace fallout-terminal-overseer"
   },
   "engines": {
     "node": ">=20.19.0"
-  },
-  "dependencies": {
-    "@wailsio/runtime": "3.0.0-beta.10"
   }
 }

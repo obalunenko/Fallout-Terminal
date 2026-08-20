@@ -14,7 +14,7 @@
 
 **Language/Version**: Go 1.26; browser JavaScript modules with Node.js 20.19+ build/test tooling
 
-**Primary Dependencies**: Wails v2.13.0, `github.com/coder/websocket` v1.8.15, Vite 8.1.5; Playwright 1.62.1 for browser journeys
+**Primary Dependencies**: Wails v3.0.0-beta.10, `github.com/coder/websocket` v1.8.15, Vite 8.1.5; Playwright 1.62.1 for browser journeys
 
 **Storage**: Versioned local JSON session and player-configuration files; ephemeral live, navigation, hacking, connection, and coordination state in process memory
 
@@ -22,19 +22,19 @@
 
 **Target Platform**: Wails desktop application on macOS 13+ / Apple Silicon (`arm64`), with modern browser clients on the local network or an authenticated public endpoint
 
-**Project Type**: Go modular desktop monolith with a Wails master frontend and embedded HTTP/WebSocket player frontend
+**Project Type**: Go modular desktop monolith with a Wails Overseer frontend and embedded HTTP/WebSocket player frontend
 
 **Performance Goals**: [Feature-specific responsiveness, synchronization, startup, persistence, or client-count goal]
 
 **Constraints**: Preserve narrow Wails bindings, server-authoritative shared state, persistent JSON compatibility, same-host WebSocket policy, owned-resource cleanup, and the single-process runtime
 
-**Scale/Scope**: One game-master desktop process, one active broadcast, and [expected connected player-client count or NEEDS CLARIFICATION]
+**Scale/Scope**: One Overseer desktop process, one active broadcast, and [expected connected player-client count or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research and be re-checked after Phase 1 design.*
 
-- [ ] Runtime ownership remains within `main.go`/`app.go`, the relevant `internal/` packages, `frontend/src/`, `client/`, and `sessions/` boundaries.
+- [ ] Runtime ownership remains within `main.go`/`app.go`, the relevant `internal/` packages, `frontend/overseer/src/`, `frontend/client/`, and `sessions/` boundaries.
 - [ ] Cross-boundary Wails, HTTP, and WebSocket contracts document producer, consumer, payload, validation, failure, ordering, and reconnect behavior.
 - [ ] Shared navigation, hacking, roster, and controller behavior remains server-authoritative and reconnect-safe.
 - [ ] Wails method exposure, CSP, external URL handling, player-origin/input checks, and public-access secret protections are preserved where applicable.
@@ -77,26 +77,30 @@ internal/
 ├── tunnel/                     # Optional embedded public-endpoint lifecycle
 └── testutil/                   # Shared deterministic test fakes and fixtures
 frontend/
-├── src/
-│   ├── index.html
-│   ├── desktop-api.js          # Narrow Wails binding/event adapter
-│   ├── master.js               # Game-master state and interactions
-│   └── master.css
 ├── package.json
-└── vite.config.js
-client/
-├── index.html
-├── client.js                   # Player state/rendering and WebSocket client
-├── sound.js                    # Browser audio behavior
-├── client.css
-└── sounds/
+├── package-lock.json
+├── client/
+│   ├── index.html
+│   ├── client.js               # Player state/rendering and ConnectRPC client
+│   ├── sound.js                # Browser audio behavior
+│   ├── client.css
+│   ├── gen/
+│   └── sounds/
+└── overseer/
+    ├── package.json
+    ├── vite.config.js
+    ├── bindings/               # Generated narrow Wails bridge
+    └── src/
+        ├── index.html
+        ├── desktop-api.js      # Narrow Wails binding/event adapter
+        ├── overseer.js         # Overseer state and interactions
+        └── overseer.css
 tests/browser/
 ├── *.spec.mjs                  # Playwright player journeys
 ├── fixture-server/main.go      # In-process browser-test fixture
 └── playwright.config.mjs
 sessions/
 └── demo.json                   # Versioned example session
-wails.json                      # Wails development/build orchestration
 build/                          # macOS metadata, icon, hooks, and output location
 scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 ```
@@ -150,8 +154,8 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 ### Phase 3: Desktop and Presentation Integration
 
 - [Wire services or privileged commands/events in `main.go` and `app.go`]
-- [Implement game-master behavior in `frontend/src/`]
-- [Implement player behavior in `client/`]
+- [Implement Overseer behavior in `frontend/overseer/src/`]
+- [Implement player behavior in `frontend/client/`]
 - [Deliver independently verifiable vertical user-story slices]
 
 ### Phase 4: Integration and Packaging
@@ -167,7 +171,7 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 | Go domain/services | `go test ./...` | [Focused scenario if needed] | [Result] |
 | Concurrent runtime | `go test -race ./...` when affected | [Stress/reconnect scenario] | [Result] |
 | Go quality | `gofmt -l .` and `go vet ./...` | N/A | No formatting paths; vet succeeds |
-| Master frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `go run ./cmd/build dev` + [game-master journey] | [Result] |
+| Overseer frontend | `npm ci --prefix frontend` and `npm run build --prefix frontend` | `go run ./cmd/build dev` + [Overseer journey] | [Result] |
 | Player browser(s) | `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected | [Multi-client/audio/reconnect journey] | [Result] |
 | Unsigned package | `go run ./cmd/build package` when affected | [Packaged `.app` smoke] | [Result] |
 | Signed release/public provider | [Configured preflight or N/A] | [Credential-dependent journey] | [Result or explicitly unavailable] |
@@ -175,7 +179,7 @@ scripts/build-macos.sh          # Signing, notarization, DMG release pipeline
 ## Project-Specific Complexity Factors
 
 - Concurrent lifecycle and shutdown across Wails, persistence workers, HTTP/ConnectRPC clients, and optional embedded public endpoints
-- Server-authoritative state projections shared across master and player presentation surfaces
+- Server-authoritative state projections shared across Overseer and player presentation surfaces
 - Backward-compatible user-owned JSON files and cross-file player-configuration references
 - Browser identity, multi-tab recognition, controller authority, revisions, and reconnect convergence
 - macOS application embedding, arm64 packaging, signing/notarization, and Gatekeeper requirements

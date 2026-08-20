@@ -106,7 +106,7 @@
     {
       "id": "t_demo2",
       "name": "Терминал службы безопасности — Убежище 76",
-      "hackLevel": 2,
+      "hackLevel": 5,
       "introText": "",
       "root": {
         "children": [

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:*; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Fallout Terminal — Master Control</title>
-  <link rel="stylesheet" href="./master.css">
+  <title>Fallout Terminal — Overseer Control</title>
+  <link rel="stylesheet" href="./overseer.css">
 </head>
 <body>
 
@@ -12,7 +12,7 @@
 <div class="start-screen" id="startScreen">
   <div class="start-box">
     <div class="start-title">FALLOUT TERMINAL</div>
-    <div class="start-sub">MASTER CONTROL — VAULT-TEC R&amp;D</div>
+    <div class="start-sub">OVERSEER CONTROL — VAULT-TEC R&amp;D</div>
     <div class="start-actions">
       <button class="btn btn-primary" id="btnOpenSession">ОТКРЫТЬ СЕССИЮ</button>
       <button class="btn btn-secondary" id="btnNewSession">НОВАЯ СЕССИЯ</button>
@@ -367,6 +367,6 @@
 </dialog>
 
 <script type="module" src="./desktop-api.js"></script>
-<script type="module" src="./master.js"></script>
+<script type="module" src="./overseer.js"></script>
 </body>
 </html>

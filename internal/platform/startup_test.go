@@ -79,7 +79,7 @@ func TestWailsV3PinsAndGoBuildToolAreOwnedAndExact(t *testing.T) {
 	applicationModule := readAcceptanceDocument(t, filepath.Join(root, "go.mod"))
 	assert.Equal(t, 1, strings.Count(applicationModule, "github.com/wailsapp/wails/v3 v3.0.0-beta.10"))
 
-	packageRaw, err := os.ReadFile(filepath.Join(root, "frontend", "package.json"))
+	packageRaw, err := os.ReadFile(filepath.Join(root, "frontend", "overseer", "package.json"))
 	require.NoError(t, err)
 	var packageConfig struct {
 		Dependencies map[string]string `json:"dependencies"`
@@ -96,7 +96,7 @@ func TestWailsV3PinsAndGoBuildToolAreOwnedAndExact(t *testing.T) {
 		tokens []string
 	}{
 		{"cmd/build/main.go", []string{"buildtool.Run", "dev|build|package|run|prepare"}},
-		{"internal/buildtool/buildtool.go", []string{"scripts", "proto-check.sh", "tools/wails/go.mod", "frontend/bindings", "GOARCH", "arm64", "13.0", `applicationName+".app"`}},
+		{"internal/buildtool/buildtool.go", []string{"scripts", "proto-check.sh", "tools/wails/go.mod", "frontend/overseer/bindings", "GOARCH", "arm64", "13.0", `applicationName+".app"`}},
 		{"build/darwin/Info.plist", []string{"com.vaulttec.fallout-terminal", "13.0", "icon.icns"}},
 		{"build/darwin/Info.dev.plist", []string{"com.vaulttec.fallout-terminal", "13.0", "icon.icns"}},
 		{"build/darwin/entitlements.plist", []string{"com.apple.security.network.server"}},
@@ -225,7 +225,7 @@ func TestCIRunsOnlyMinimalLintTestProtobufAndApplicationBuild(t *testing.T) {
 		"buf lint proto",
 		"buf build proto",
 		"scripts/proto-generate.sh",
-		"git diff --exit-code -- internal/gen client/gen",
+		"git diff --exit-code -- internal/gen frontend/client/gen",
 		"- name: Build application",
 		"go run ./cmd/build package",
 	} {

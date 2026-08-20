@@ -43,9 +43,9 @@ test('all public failures leave local gameplay live and a later public generatio
   await expect(player.locator('#playerCharacterName')).toHaveText(characterName);
   await expect(player.locator('#termList')).toBeVisible();
 
-  const master = await browser.newPage();
-  await master.goto('/__fixture/public-access-settings');
-  await expect(master.locator('#publicAccessSection')).toBeVisible();
+  const overseer = await browser.newPage();
+  await overseer.goto('/__fixture/public-access-settings');
+  await expect(overseer.locator('#publicAccessSection')).toBeVisible();
 
   const failures = [
     'invalid-token', 'revoked-token', 'no-network', 'dns-timeout', 'domain-conflict',
@@ -56,10 +56,10 @@ test('all public failures leave local gameplay live and a later public generatio
     const response = await request.post(`/__fixture/public-access/failure/${failure}`);
     expect(response.status(), failure).toBe(200);
     const snapshot = await response.json();
-    await master.evaluate(value => __desktopFixture.emit('public-access-status', value), snapshot);
-    await expect(master.locator('#publicAccessStatus')).toHaveText('ОШИБКА');
-    await expect(master.locator('#publicAccessURL')).toHaveText('');
-    await expect(master.locator('#publicAccessError')).toContainText('ЛОКАЛЬНЫЙ РЕЖИМ ПРОДОЛЖАЕТ РАБОТАТЬ');
+    await overseer.evaluate(value => __desktopFixture.emit('public-access-status', value), snapshot);
+    await expect(overseer.locator('#publicAccessStatus')).toHaveText('ОШИБКА');
+    await expect(overseer.locator('#publicAccessURL')).toHaveText('');
+    await expect(overseer.locator('#publicAccessError')).toContainText('ЛОКАЛЬНЫЙ РЕЖИМ ПРОДОЛЖАЕТ РАБОТАТЬ');
 
     await expect(player.locator('#connOverlay')).toBeHidden();
     await expect(player.locator('#playerCharacterName')).toHaveText(characterName);
@@ -91,12 +91,12 @@ test('all public failures leave local gameplay live and a later public generatio
   const recoveryResponse = await request.post('/__fixture/public-access/recover');
   expect(recoveryResponse.status()).toBe(200);
   const recovered = await recoveryResponse.json();
-  await master.evaluate(value => __desktopFixture.emit('public-access-status', value), recovered);
-  await expect(master.locator('#publicAccessStatus')).toHaveText('ГОТОВ');
-  await expect(master.locator('#publicAccessURL')).toHaveText('https://recovered.example');
+  await overseer.evaluate(value => __desktopFixture.emit('public-access-status', value), recovered);
+  await expect(overseer.locator('#publicAccessStatus')).toHaveText('ГОТОВ');
+  await expect(overseer.locator('#publicAccessURL')).toHaveText('https://recovered.example');
   await expect(player.locator('#connOverlay')).toBeHidden();
   await expect(player.locator('#playerCharacterName')).toHaveText(characterName);
 
-  await master.close();
+  await overseer.close();
   await playerContext.close();
 });

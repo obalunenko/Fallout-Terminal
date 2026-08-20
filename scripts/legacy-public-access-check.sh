@@ -20,7 +20,7 @@ list_active_files() {
 
 is_active_surface() {
   case "$1" in
-    .git/*|build/*|node_modules/*|frontend/node_modules/*|client/node_modules/*|tests/browser/node_modules/*|specs/*|docs/*rollback*.md|scripts/legacy-public-access-check.sh)
+    .git/*|build/*|node_modules/*|frontend/node_modules/*|frontend/client/node_modules/*|frontend/overseer/node_modules/*|tests/browser/node_modules/*|specs/*|docs/*rollback*.md|scripts/legacy-public-access-check.sh)
       return 1
       ;;
     *)
