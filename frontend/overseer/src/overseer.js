@@ -35,6 +35,8 @@ const editingTermName   = document.getElementById('editingTermName');
 const liveFlag          = document.getElementById('liveFlag');
 const btnMakeLive       = document.getElementById('btnMakeLive');
 const btnPublish        = document.getElementById('btnPublish');
+const terminalSettingsMenu = document.getElementById('terminalSettingsMenu');
+const btnReapplySettings = document.getElementById('btnReapplySettings');
 const treeView          = document.getElementById('treeView');
 const nodeForm          = document.getElementById('nodeForm');
 const toolbarHint       = document.getElementById('toolbarHint');
@@ -43,6 +45,16 @@ const btnAddCommand     = document.getElementById('btnAddCommand');
 const btnAddEntry       = document.getElementById('btnAddEntry');
 const btnAddTerminal    = document.getElementById('btnAddTerminal');
 const btnStopBroadcast  = document.getElementById('btnStopBroadcast');
+const createTerminalDialog = document.getElementById('createTerminalDialog');
+const createTerminalForm = document.getElementById('createTerminalForm');
+const createTerminalName = document.getElementById('createTerminalName');
+const createTerminalError = document.getElementById('createTerminalError');
+const btnCancelCreateTerminal = document.getElementById('btnCancelCreateTerminal');
+const btnConfirmCreateTerminal = document.getElementById('btnConfirmCreateTerminal');
+const takeOffAirDialog = document.getElementById('takeOffAirDialog');
+const takeOffAirError = document.getElementById('takeOffAirError');
+const btnCancelTakeOffAir = document.getElementById('btnCancelTakeOffAir');
+const btnConfirmTakeOffAir = document.getElementById('btnConfirmTakeOffAir');
 const hackStatus        = document.getElementById('hackStatus');
 const hackStatusLine    = document.getElementById('hackStatusLine');
 const btnHackSuccess    = document.getElementById('btnHackSuccess');
@@ -122,6 +134,8 @@ let saveInvocation = 0;
 let latestRenderedSave = 0;
 let newestDurableRevision = 0;
 let coordinationCommandPending = false;
+let createTerminalSubmitting = false;
+let takeOffAirPending = false;
 let pendingTerminalSwitch = null;
 let startupStatus = null;
 let publicAccessSnapshot = null;
@@ -1466,6 +1480,7 @@ async function runCoordinationCommand(command, successMessage, pendingMessage) {
   coordinationCommandPending = true;
   setCoordinationStatus(pendingMessage || 'ВЫПОЛНЕНИЕ ОПЕРАЦИИ...');
   renderCoordination();
+  if (state.session) renderTreeHeader();
   renderHackStatus();
   let result;
   try {
@@ -1475,6 +1490,7 @@ async function runCoordinationCommand(command, successMessage, pendingMessage) {
   }
   coordinationCommandPending = false;
   renderHackStatus();
+  if (state.session) renderTreeHeader();
   if (!result?.ok) {
     if (result?.state) applyCoordinationState(result.state);
     setCoordinationStatus(result?.error || 'ОПЕРАЦИЯ ОТКЛОНЕНА', true);
@@ -1532,6 +1548,34 @@ function hideEndBroadcastConfirmation({ restoreFocus = true } = {}) {
   btnCancelEndBroadcast.disabled = false;
   btnConfirmEndBroadcast.disabled = false;
   if (restoreFocus && !btnEndBroadcast.hidden) btnEndBroadcast.focus();
+}
+
+function showTakeOffAirConfirmation() {
+  if (takeOffAirPending || !state.coordination?.broadcast || !state.liveTerminalId) return;
+  takeOffAirError.textContent = '';
+  takeOffAirError.hidden = true;
+  btnCancelTakeOffAir.disabled = false;
+  btnConfirmTakeOffAir.disabled = false;
+  takeOffAirDialog.hidden = false;
+  if (typeof takeOffAirDialog.showModal === 'function' && !takeOffAirDialog.open) {
+    takeOffAirDialog.showModal();
+  } else {
+    takeOffAirDialog.setAttribute('open', '');
+  }
+  btnCancelTakeOffAir.focus();
+}
+
+function hideTakeOffAirConfirmation({ restoreFocus = true } = {}) {
+  if (typeof takeOffAirDialog.close === 'function' && takeOffAirDialog.open) {
+    takeOffAirDialog.close();
+  } else {
+    takeOffAirDialog.removeAttribute('open');
+  }
+  takeOffAirDialog.hidden = true;
+  takeOffAirPending = false;
+  btnCancelTakeOffAir.disabled = false;
+  btnConfirmTakeOffAir.disabled = false;
+  if (restoreFocus && !btnStopBroadcast.hidden) btnStopBroadcast.focus();
 }
 
 async function runTerminalSwitchRequest(command, completedMessage, pendingMessage) {
@@ -1665,11 +1709,17 @@ function renderTreeHeader() {
   editingTermName.textContent = term ? term.name : '—';
   const isLive = !!term && term.id === state.liveTerminalId;
   const broadcastActive = Boolean(state.coordination?.broadcast);
-  liveFlag.style.display   = isLive ? '' : 'none';
-  btnMakeLive.textContent  = isLive ? 'ОБНОВИТЬ АКТИВНЫЙ' : 'СДЕЛАТЬ АКТИВНЫМ';
-  btnMakeLive.disabled     = !term || !broadcastActive || coordinationCommandPending;
-  btnPublish.style.display = isLive ? '' : 'none';
+  liveFlag.hidden = !isLive;
+  btnMakeLive.hidden = isLive;
+  btnMakeLive.textContent = 'СДЕЛАТЬ АКТИВНЫМ';
+  btnMakeLive.disabled = !term || !broadcastActive || coordinationCommandPending;
+  terminalSettingsMenu.hidden = !isLive;
+  if (!isLive) terminalSettingsMenu.open = false;
+  btnReapplySettings.disabled = !isLive || coordinationCommandPending;
+  btnPublish.hidden = !isLive;
   btnPublish.disabled = !isLive || coordinationCommandPending;
+  btnPublish.setAttribute('aria-busy', String(isLive && coordinationCommandPending));
+  btnStopBroadcast.hidden = !broadcastActive || !state.liveTerminalId;
   btnStopBroadcast.disabled = !broadcastActive || !state.liveTerminalId || coordinationCommandPending;
 }
 
@@ -2176,10 +2226,63 @@ btnConfirmEndBroadcast.addEventListener('click', async () => {
 });
 
 // ── Terminal management ───────────────────────────────────────
-btnAddTerminal.addEventListener('click', () => {
+function showCreateTerminalDialog() {
+  if (!state.session || createTerminalSubmitting) return;
+  createTerminalName.value = '';
+  createTerminalError.textContent = '';
+  createTerminalError.hidden = true;
+  btnCancelCreateTerminal.disabled = false;
+  btnConfirmCreateTerminal.disabled = false;
+  createTerminalDialog.hidden = false;
+  if (typeof createTerminalDialog.showModal === 'function' && !createTerminalDialog.open) {
+    createTerminalDialog.showModal();
+  } else {
+    createTerminalDialog.setAttribute('open', '');
+  }
+  createTerminalName.focus();
+}
+
+function hideCreateTerminalDialog({ restoreFocus = true } = {}) {
+  if (typeof createTerminalDialog.close === 'function' && createTerminalDialog.open) {
+    createTerminalDialog.close();
+  } else {
+    createTerminalDialog.removeAttribute('open');
+  }
+  createTerminalDialog.hidden = true;
+  createTerminalSubmitting = false;
+  btnCancelCreateTerminal.disabled = false;
+  btnConfirmCreateTerminal.disabled = false;
+  if (restoreFocus && !btnAddTerminal.hidden) btnAddTerminal.focus();
+}
+
+btnAddTerminal.addEventListener('click', showCreateTerminalDialog);
+
+btnCancelCreateTerminal.addEventListener('click', () => {
+  if (!createTerminalSubmitting) hideCreateTerminalDialog();
+});
+
+createTerminalDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!createTerminalSubmitting) hideCreateTerminalDialog();
+});
+
+createTerminalForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!state.session || createTerminalSubmitting) return;
+  const name = createTerminalName.value.trim();
+  if (!name) {
+    createTerminalError.textContent = 'УКАЖИТЕ НАЗВАНИЕ ТЕРМИНАЛА';
+    createTerminalError.hidden = false;
+    createTerminalName.focus();
+    return;
+  }
+
+  createTerminalSubmitting = true;
+  btnCancelCreateTerminal.disabled = true;
+  btnConfirmCreateTerminal.disabled = true;
   const term = {
     id:        uid('t'),
-    name:      `Терминал ${state.session.terminals.length + 1}`,
+    name,
     hackLevel: 0,
     introText: '',
     root:      { id: 'root', type: 'folder', name: 'ROOT', children: [] },
@@ -2188,8 +2291,10 @@ btnAddTerminal.addEventListener('click', () => {
   state.editTerminalId = term.id;
   state.selectedNodeId = null;
   state.expanded = new Set(['root']);
-  autosave();
+  await autosave();
   renderAll();
+  hideCreateTerminalDialog({ restoreFocus: false });
+  hackLevelSelect.focus();
 });
 
 btnApplySettings.addEventListener('click', async () => {
@@ -2209,17 +2314,21 @@ btnApplySettings.addEventListener('click', async () => {
   }
 });
 
+function terminalActivationRequest(term) {
+  return desktopAPI.requestTerminalActivation({
+    terminalId: term.id,
+    terminalName: term.name,
+    tree: term.root,
+    hackLevel: term.hackLevel || 0,
+    introText: term.introText || '',
+  });
+}
+
 btnMakeLive.addEventListener('click', async () => {
   const term = getEditTerminal();
-  if (!term || !state.coordination?.broadcast) return;
+  if (!term || term.id === state.liveTerminalId || !state.coordination?.broadcast || coordinationCommandPending) return;
   const result = await runTerminalSwitchRequest(
-    () => desktopAPI.requestTerminalActivation({
-      terminalId: term.id,
-      terminalName: term.name,
-      tree: term.root,
-      hackLevel: term.hackLevel || 0,
-      introText: term.introText || '',
-    }),
+    () => terminalActivationRequest(term),
     'АКТИВНЫЙ ТЕРМИНАЛ ВЫБРАН',
     'ПЕРЕКЛЮЧЕНИЕ АКТИВНОГО ТЕРМИНАЛА...'
   );
@@ -2229,31 +2338,85 @@ btnMakeLive.addEventListener('click', async () => {
   renderHackStatus();
 });
 
-btnPublish.addEventListener('click', async () => {
+btnReapplySettings.addEventListener('click', async () => {
   const term = getEditTerminal();
-  if (!term || term.id !== state.liveTerminalId) return;
+  if (!term || term.id !== state.liveTerminalId || !state.coordination?.broadcast || coordinationCommandPending) return;
+  terminalSettingsMenu.open = false;
   const result = await runTerminalSwitchRequest(
-    () => desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText || '' }),
-    'АКТИВНЫЙ ТЕРМИНАЛ ОБНОВЛЁН',
-    'ПУБЛИКАЦИЯ ОБНОВЛЕНИЯ...'
+    () => terminalActivationRequest(term),
+    'НАСТРОЙКИ АКТИВНОГО ТЕРМИНАЛА ПЕРЕПРИМЕНЕНЫ',
+    'ПЕРЕПРИМЕНЕНИЕ НАСТРОЕК...'
   );
-  if (!result?.ok) return;
-  const original = btnPublish.textContent;
-  btnPublish.textContent = 'ОБНОВЛЕНО ✓';
-  setTimeout(() => { btnPublish.textContent = original; }, 1200);
+  if (result?.ok && result.status === 'activated') state.liveHack = null;
+  renderTermList();
+  renderTreeHeader();
+  renderHackStatus();
 });
 
-btnStopBroadcast.addEventListener('click', async () => {
-  if (!state.coordination?.broadcast || !state.liveTerminalId) return;
+btnPublish.addEventListener('click', async () => {
+  const term = getEditTerminal();
+  if (!term || term.id !== state.liveTerminalId || coordinationCommandPending) return;
+  const result = await runTerminalSwitchRequest(
+    () => desktopAPI.updateLiveTerminal({ tree: term.root, introText: term.introText || '' }),
+    'ИЗМЕНЕНИЯ ОПУБЛИКОВАНЫ У ИГРОКОВ',
+    'ПУБЛИКАЦИЯ ИЗМЕНЕНИЙ...'
+  );
+  if (!result?.ok) return;
+  btnPublish.textContent = 'ОБНОВЛЕНО ✓';
+  setTimeout(() => { btnPublish.textContent = 'ОПУБЛИКОВАТЬ ИЗМЕНЕНИЯ'; }, 1200);
+});
+
+btnStopBroadcast.addEventListener('click', showTakeOffAirConfirmation);
+
+btnCancelTakeOffAir.addEventListener('click', () => {
+  if (!takeOffAirPending) hideTakeOffAirConfirmation();
+});
+
+takeOffAirDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  if (!takeOffAirPending) hideTakeOffAirConfirmation();
+});
+
+btnConfirmTakeOffAir.addEventListener('click', async () => {
+  if (takeOffAirPending || coordinationCommandPending || !state.coordination?.broadcast || !state.liveTerminalId) return;
+  takeOffAirPending = true;
+  takeOffAirError.textContent = '';
+  takeOffAirError.hidden = true;
+  btnCancelTakeOffAir.disabled = true;
+  btnConfirmTakeOffAir.disabled = true;
   const result = await runCoordinationCommand(
     () => desktopAPI.requestTerminalClear(),
     'АКТИВНЫЙ ТЕРМИНАЛ УБРАН · ТРАНСЛЯЦИЯ ПРОДОЛЖАЕТСЯ',
     'ОЧИСТКА АКТИВНОГО ТЕРМИНАЛА...'
   );
-  if (result?.ok && result.status === 'cleared') state.liveHack = null;
+  takeOffAirPending = false;
+  if (!result?.ok) {
+    takeOffAirError.textContent = result?.error || 'НЕ УДАЛОСЬ СНЯТЬ ТЕРМИНАЛ С ЭФИРА';
+    takeOffAirError.hidden = false;
+    btnCancelTakeOffAir.disabled = false;
+    btnConfirmTakeOffAir.disabled = false;
+    btnConfirmTakeOffAir.focus();
+    return;
+  }
+  if (result.status === 'decision-required' && result.switchId) {
+    hideTakeOffAirConfirmation({ restoreFocus: false });
+    showTerminalSwitchDecision(result);
+    return;
+  }
+  if (result.status !== 'cleared') {
+    takeOffAirError.textContent = 'СНЯТИЕ С ЭФИРА НЕ ПОДТВЕРЖДЕНО';
+    takeOffAirError.hidden = false;
+    btnCancelTakeOffAir.disabled = false;
+    btnConfirmTakeOffAir.disabled = false;
+    btnConfirmTakeOffAir.focus();
+    return;
+  }
+  state.liveHack = null;
+  hideTakeOffAirConfirmation({ restoreFocus: false });
   renderTermList();
   renderTreeHeader();
   renderHackStatus();
+  if (!btnEndBroadcast.hidden) btnEndBroadcast.focus();
 });
 
 for (const button of terminalSwitchButtons) {

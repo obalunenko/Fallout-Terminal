@@ -80,9 +80,13 @@ const state = globalThis.__desktopFixtureState ??= {
   clipboardText: '',
   authoringSession: stateChangingAuthoringSession(),
   authoringRevision: 1,
+  terminalActionNextResults: new Map(),
+  terminalActionDeferred: new Map(),
 };
 if (!state.authoringSession) state.authoringSession = stateChangingAuthoringSession();
 if (!Number.isSafeInteger(state.authoringRevision)) state.authoringRevision = 1;
+if (!(state.terminalActionNextResults instanceof Map)) state.terminalActionNextResults = new Map();
+if (!(state.terminalActionDeferred instanceof Map)) state.terminalActionDeferred = new Map();
 try {
   const durableAuthoring = JSON.parse(globalThis.localStorage?.getItem('fallout-fixture-authoring-session') ?? 'null');
   if (durableAuthoring?.session && Number.isSafeInteger(durableAuthoring.revision)) {
@@ -137,6 +141,19 @@ function persistPublicAccess({ preserveVisiblePreferences = false } = {}) {
 function record(method, args) {
   state.calls.push({ method, args });
   return Promise.resolve({ ok: true, method, args });
+}
+
+function terminalAction(method, args) {
+  const retained = structuredClone(args ?? []);
+  state.calls.push({ method, args: retained });
+  const deferred = state.terminalActionDeferred.get(method);
+  if (deferred) return deferred.promise;
+  if (state.terminalActionNextResults.has(method)) {
+    const result = structuredClone(state.terminalActionNextResults.get(method));
+    state.terminalActionNextResults.delete(method);
+    return Promise.resolve(result);
+  }
+  return Promise.resolve({ ok: true, method, args: retained });
 }
 
 function authoringFixtureActive() {
@@ -226,6 +243,21 @@ globalThis.__desktopFixture = {
 	  state.publicAccess = structuredClone(data);
 	}
     for (const callback of state.listeners.get(name) ?? []) callback({ data });
+  },
+  setNextTerminalActionResult(method, result) {
+    state.terminalActionNextResults.set(method, structuredClone(result));
+  },
+  deferTerminalAction(method) {
+    if (state.terminalActionDeferred.has(method)) return;
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    state.terminalActionDeferred.set(method, { promise, resolve });
+  },
+  resolveTerminalAction(method, result = { ok: true }) {
+    const deferred = state.terminalActionDeferred.get(method);
+    if (!deferred) return;
+    state.terminalActionDeferred.delete(method);
+    deferred.resolve(structuredClone(result));
   },
   deferStatus() {
     state.statusPromise = new Promise(resolve => { state.resolveStatus = resolve; });
@@ -461,8 +493,8 @@ export async function OpenSession(...args) {
 export const OpenURL = (...args) => record('OpenURL', args);
 export const ReleaseCharacter = (...args) => record('ReleaseCharacter', args);
 export const RenameLogicalSession = (...args) => record('RenameLogicalSession', args);
-export const RequestTerminalActivation = (...args) => record('RequestTerminalActivation', args);
-export const RequestTerminalClear = (...args) => record('RequestTerminalClear', args);
+export const RequestTerminalActivation = (...args) => terminalAction('RequestTerminalActivation', args);
+export const RequestTerminalClear = (...args) => terminalAction('RequestTerminalClear', args);
 export const ResetFailedHack = (...args) => record('ResetFailedHack', args);
 export async function ResolveCommandExecution(payload) {
   const fixtureBase = stateChangingLifecycleBase();
@@ -521,4 +553,4 @@ export async function SaveSession(session) {
 }
 export const SetActiveController = (...args) => record('SetActiveController', args);
 export const StartBroadcast = (...args) => record('StartBroadcast', args);
-export const UpdateLiveTerminal = (...args) => record('UpdateLiveTerminal', args);
+export const UpdateLiveTerminal = (...args) => terminalAction('UpdateLiveTerminal', args);
