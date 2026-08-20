@@ -136,51 +136,33 @@ html, body {
   opacity: .85;
 }
 
-/* ── Player identity / character assignment ───────────── */
-.player-identity {
+/* ── Player status log / character assignment ─────────── */
+.player-status-line {
   flex: 0 0 auto;
   min-width: 0;
-  max-height: min(16vh, 5.5rem);
-  margin-bottom: clamp(4px, 1vh, 10px);
-  padding: clamp(4px, .8vh, 8px) clamp(6px, 1vw, 12px);
-  border: 1px solid rgba(87, 255, 110, .32);
-  background: rgba(20, 77, 24, .12);
   display: flex;
-  align-items: center;
-  gap: clamp(6px, 1.2vw, 14px);
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 .55ch;
+  margin-top: clamp(2px, .5vh, 5px);
   font-size: var(--font-chrome);
-  line-height: 1.2;
-  overflow: hidden;
-}
-.player-identity-name {
-  min-width: 0;
-  color: #d8ffb8;
-  font-size: var(--font-menu);
+  line-height: 1.15;
+  opacity: .58;
+  text-transform: uppercase;
   overflow-wrap: anywhere;
 }
-.player-identity-fallback {
-  min-width: 0;
-  margin-left: auto;
-  opacity: .62;
-  overflow-wrap: anywhere;
-}
-.role-badge {
+.player-status-prefix,
+.player-status-separator,
+.player-status-role {
   flex: 0 0 auto;
-  padding: 2px clamp(5px, .8vw, 9px);
-  border: 1px solid currentColor;
-  color: #d8ffb8;
-  letter-spacing: .7px;
   white-space: nowrap;
 }
-.role-badge[data-role="active"] { color: #ffe08a; }
-.role-badge[data-role="observer"],
-#roleBadge[data-role="observer"] {
-  color: #7fc0ff;
-  border-style: dashed;
-  background: rgba(127, 192, 255, .08);
-  text-shadow: 0 0 5px rgba(127, 192, 255, .45);
+.player-status-input,
+.player-status-character {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
-.role-badge[data-role="unassigned"] { opacity: .65; }
+.player-status-separator { opacity: .72; }
 
 .character-select {
   height: 100%;
@@ -488,11 +470,6 @@ html, body {
    These states alter only controls that can mutate the shared terminal.
    Paging, hover selection, focus, and hacking preview remain local and keep
    their ordinary highlight behavior. */
-#screen.observer-read-only .player-identity {
-  border-color: rgba(127, 192, 255, .48);
-  background: rgba(36, 70, 92, .14);
-}
-
 #screen.observer-read-only :is(.term-row, .back-btn, .hcell),
 #screen.shared-input-pending :is(.term-row, .back-btn, .hcell) {
   cursor: not-allowed;
@@ -650,11 +627,7 @@ html, body {
   .term-divider { margin-top: 3px; }
   .term-output { max-height: 25%; }
   .term-footer { min-height: 24px; }
-  .player-identity {
-    max-height: min(13vh, 4rem);
-    margin-bottom: 3px;
-    padding-block: 2px;
-  }
+  .player-status-line { margin-top: 1px; line-height: 1.05; }
   .character-select { gap: 4px; padding-block: 2px; }
   .character-select-copy, .assigned-waiting-copy { max-height: 2.5em; line-height: 1.1; }
   .character-options { gap: 3px 6px; }
@@ -667,7 +640,6 @@ html, body {
 }
 
 @media (max-width: 760px) {
-  .player-identity { flex-wrap: wrap; gap: 3px 8px; }
-  .player-identity-fallback { width: 100%; margin-left: 0; }
+  .player-status-line { gap-inline: .4ch; }
   .character-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -76,7 +76,7 @@ async function runtimeRevision(page) {
 }
 
 async function assertRoles(players) {
-  await waitFor('active controller role', () => textVisible(players[0].page, '#roleBadge', 'АКТИВНЫЙ КОНТРОЛЛЕР'));
+  await waitFor('active controller role', () => textVisible(players[0].page, '#roleBadge', 'АКТИВЕН'));
   await waitFor('observer role', () => textVisible(players[1].page, '#roleBadge', 'НАБЛЮДАТЕЛЬ'));
 }
 
