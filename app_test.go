@@ -1445,6 +1445,11 @@ func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T)
 		NodeID:      "command-stable-1",
 	})
 	require.True(t, shown.Accepted)
+	pending := coordination.Snapshot().PendingCommandExecution
+	require.NotNil(t, pending)
+	_, mutation, err := coordination.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	require.NoError(t, err)
+	require.Nil(t, mutation, "completed command approval must not write durable state")
 	require.NotEmpty(t, effects)
 	var beforeReset *domain.PublicLiveState
 	for index := len(effects) - 1; index >= 0; index-- {
@@ -1572,6 +1577,11 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 		Action: "command", NodeID: "command-stable-1",
 	})
 	require.True(t, shown.Accepted)
+	pending := coordination.Snapshot().PendingCommandExecution
+	require.NotNil(t, pending)
+	_, mutation, err := coordination.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	require.NoError(t, err)
+	require.Nil(t, mutation, "completed command approval must not write durable state")
 
 	effects = nil
 	app := NewAppWithDependencies(AppDependencies{

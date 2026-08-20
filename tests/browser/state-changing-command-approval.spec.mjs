@@ -54,6 +54,24 @@ async function closeApprovalJourney(journey) {
   await journey.masterContext.close();
 }
 
+async function openApprovalParticipant(browser, token = '') {
+  const context = await browser.newContext();
+  await installPlayerDiagnostics(context);
+  if (token) {
+    await context.addInitScript(({ tokenKey, retainedToken }) => {
+      localStorage.setItem(tokenKey, retainedToken);
+    }, { tokenKey: TOKEN_KEY, retainedToken: token });
+  }
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  if (await page.locator('#characterSelect').isVisible()) {
+    await page.locator('#characterOptions button:not([disabled])').first().click();
+  }
+  await expect(page.locator('#roleBadge')).toContainText(/АКТИВНЫЙ|НАБЛЮДАТЕЛЬ/);
+  return { context, page };
+}
+
 async function chooseStateChangingCommand(journey) {
   await journey.player.locator('.term-row', { hasText: COMMAND_NAME }).click();
   await expectFullScreenCommandSurface(journey.player, 'Выполняется запрос');
@@ -62,7 +80,9 @@ async function chooseStateChangingCommand(journey) {
   await expect(dialogs).toHaveCount(1);
   const dialog = dialogs.first();
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(`КОМАНДА: ${COMMAND_NAME}`);
+  await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(
+    `ЗАПРОС: ${REQUEST_ID} · РЕЖИМ: ИЗМЕНЕНИЕ СОСТОЯНИЯ · КОМАНДА: ${COMMAND_NAME}`,
+  );
   await expect(dialog.locator('#commandExecutionDialogDescription')).toHaveText(CONFIRMATION_TEXT);
   await expect(dialog.locator('#commandExecutionDialogDescription')).not.toContainText(COMMAND_NAME);
   return dialog;
@@ -182,6 +202,48 @@ test('one pending request opens exactly one master dialog and approve publishes 
     await expect(journey.player.locator('.term-row', { hasText: 'Двери открыты' })).toBeVisible();
     await expect(journey.player.locator('.term-row', { hasText: 'Открыть двери' })).toHaveCount(0);
   } finally {
+    await closeApprovalJourney(journey);
+  }
+});
+
+test('initial state-changing approval converges for controller, two observers, and reconnect before any effect', async ({ browser, request }) => {
+  const journey = await openApprovalJourney(browser);
+  const firstObserver = await openApprovalParticipant(browser);
+  let secondObserver = await openApprovalParticipant(browser);
+  try {
+    await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+    await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+    const dialog = await chooseStateChangingCommand(journey);
+
+    await Promise.all([firstObserver, secondObserver].map(participant =>
+      expectFullScreenCommandSurface(participant.page, 'Выполняется запрос')));
+    const pendingResponse = await request.get(`${FIXTURE}/state`);
+    expect(pendingResponse.ok()).toBe(true);
+    const pendingState = await pendingResponse.json();
+    expect(pendingState.pendingCommandExecution).toMatchObject({
+      terminalId: 'terminal-stateful',
+      commandId: 'doors',
+      commandName: COMMAND_NAME,
+    });
+
+    const retainedToken = await secondObserver.page.evaluate(tokenKey =>
+      localStorage.getItem(tokenKey), TOKEN_KEY);
+    await secondObserver.context.close();
+    secondObserver = await openApprovalParticipant(browser, retainedToken);
+    await expectFullScreenCommandSurface(secondObserver.page, 'Выполняется запрос');
+
+    for (const participant of [
+      { page: journey.player }, firstObserver, secondObserver,
+    ]) {
+      await participant.page.keyboard.press('Enter');
+      await participant.page.keyboard.press('Backspace');
+      await expectFullScreenCommandSurface(participant.page, 'Выполняется запрос');
+    }
+    await expect(dialog).toBeVisible();
+    expect(await resolveCalls(journey.master)).toEqual([]);
+  } finally {
+    await firstObserver.context.close();
+    await secondObserver.context.close();
     await closeApprovalJourney(journey);
   }
 });
@@ -325,7 +387,17 @@ test('pending, rejected, and completed command states match the selected-record 
     expect(await pageCount(journey.player)).toBe(completedNarrowPages);
     await journey.player.locator('#backBtn').click();
 
+    await journey.master.reload();
+    await journey.master.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
+    await expect(journey.master.locator('#mainLayout')).toBeVisible();
     await journey.player.locator('.term-row', { hasText: 'Двери открыты' }).click();
+    await expectFullScreenCommandSurface(journey.player, 'Выполняется запрос');
+    dialog = journey.master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' }).first();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(
+      `ЗАПРОС: ${REQUEST_ID} · РЕЖИМ: ЗАВЕРШЁННОЕ ИЗМЕНЕНИЕ СОСТОЯНИЯ · КОМАНДА: Двери открыты`,
+    );
+    await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
     await expectFullScreenCommandSurface(journey.player, 'Доступ в сектор разрешён.');
     await completeVisibleReveal(journey.player);
     expect(await recordRendererSnapshot(journey.player)).toEqual(completedNarrow);

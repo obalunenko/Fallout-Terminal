@@ -1092,6 +1092,14 @@ func run() error {
 			navigationPending.Store(false)
 			navigationProjectionRevision.Add(1)
 			state = service.Snapshot()
+		} else if pending := service.Snapshot().PendingCommandExecution; pending != nil && pending.RequestID == payload.RequestID {
+			resolved, _, resolveErr := service.ResolveCommandExecution(payload.RequestID, domain.CommandExecutionDecision(payload.Decision))
+			if resolveErr != nil {
+				response.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(response).Encode(map[string]any{"ok": false, "error": resolveErr.Error(), "state": resolved})
+				return
+			}
+			state = resolved
 		} else {
 			decision := domain.TerminalNavigationReject
 			if payload.Decision == "approve" {
@@ -1409,6 +1417,18 @@ func run() error {
 	mux.HandleFunc("POST /__fixture/local/hacking", func(response http.ResponseWriter, _ *http.Request) {
 		edge.activateHacking(response)
 	})
+	mux.HandleFunc("POST /__fixture/local/crt/approve-command", func(response http.ResponseWriter, _ *http.Request) {
+		pending := service.Snapshot().PendingCommandExecution
+		if pending == nil {
+			http.Error(response, "CRT command approval is not pending", http.StatusConflict)
+			return
+		}
+		if _, _, err := service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove); err != nil {
+			http.Error(response, err.Error(), http.StatusConflict)
+			return
+		}
+		response.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("POST /__fixture/local/crt/{state}", func(response http.ResponseWriter, request *http.Request) {
 		state := request.PathValue("state")
 		switch state {
@@ -1657,6 +1677,7 @@ func terminalNavigationSession() domain.Session {
 			{
 				ID: "residential", Name: "Жилой терминал",
 				Root: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{
+					{ID: "ordinary", Type: domain.NodeCommand, Name: "ЗАПУСТИТЬ ДИАГНОСТИКУ", Text: "СИСТЕМА ИСПРАВНА"},
 					{ID: "go-security", Type: domain.NodeCommand, Name: "ПЕРЕЙТИ В ОХРАНУ", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "security"}},
 					{ID: "navigation", Type: domain.NodeFolder, Name: "НАВИГАЦИЯ", Children: []domain.ContentNode{
 						{ID: "go-security-nested", Type: domain.NodeCommand, Name: "ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ", TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "security"}},

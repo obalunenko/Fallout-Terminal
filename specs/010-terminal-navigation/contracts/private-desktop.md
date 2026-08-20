@@ -1,5 +1,7 @@
 # Приватный desktop-контракт
 
+**Bugfix**: 2026-08-20 — BUG-005 Уточнены единый логический approval lifecycle и взаимное исключение типизированных command/transition/return pending-состояний.
+
 ## Coordination projection
 
 ```proto
@@ -15,6 +17,17 @@ enum TerminalNavigationNoticeReason {
   TERMINAL_NAVIGATION_NOTICE_REASON_SELF_TARGET = 2;
   TERMINAL_NAVIGATION_NOTICE_REASON_COMMAND_STALE = 3;
   TERMINAL_NAVIGATION_NOTICE_REASON_TARGET_CHANGED = 4;
+}
+
+message PendingCommandExecution {
+  string request_id = 1;
+  string broadcast_id = 2;
+  string terminal_id = 3;
+  string command_id = 4;
+  string command_name = 5;
+  string confirmation_text = 6;
+  // ordinary | state-change | completed-state-change
+  string command_mode = 7;
 }
 
 message PendingTerminalNavigation {
@@ -38,13 +51,16 @@ message TerminalNavigationNotice {
 }
 
 message CoordinationState {
-  // existing fields 1..7 unchanged
+  // existing fields 1..6 unchanged
+  optional PendingCommandExecution pending_command_execution = 7;
   optional PendingTerminalNavigation pending_terminal_navigation = 8;
   optional TerminalNavigationNotice terminal_navigation_notice = 9;
 }
 ```
 
 `coordination.proto` переиспользует public enum direction, но private pending не попадает в public descriptor. Existing `coordination-state` named event и `GetRuntimeStatus.coordination_state` доставляют один и тот же current pending/notice для live UI и master reload.
+
+`pending_command_execution` используется для ordinary, initial state-changing и completed state-changing command. Поле `command_mode` аддитивно фиксирует exact post-approve behavior; ordinary не требует нового authoring config, а completed state-changing сохраняет текущие displayed name и frozen result без повторной durable write. Terminal-transition и route-return продолжают использовать `pending_terminal_navigation`. По BUG-005 оба типизированных pending-вида входят в один логический approval lifecycle и взаимно исключаются на уровне coordinator: одновременно существует не более одного ordinary/state-change/terminal-transition/return request.
 
 ## Resolve operation
 
@@ -71,8 +87,8 @@ ResolveTerminalNavigation(ResolveTerminalNavigationRequest) ResolveTerminalNavig
 
 ## Master dialog flow
 
-1. `frontend/src/master.js` получает `pendingTerminalNavigation` из bootstrap/event и deduplicate-ит dialog по exact `requestId`.
-2. Dialog отдельно показывает direction, source terminal, command name и target terminal.
+1. `frontend/src/master.js` получает pending из bootstrap/event и deduplicate-ит dialog по exact `requestId`.
+2. Command dialog показывает exact request ID, текущее отображаемое command name, `commandMode` и применимый confirmation text; navigation dialog показывает exact request ID, direction, source terminal, command name и target terminal.
 3. Positive action посылает `APPROVE`; negative action, Escape и dialog close посылают `REJECT`.
 4. Пока resolve в полёте, buttons disabled; dialog epoch не позволяет stale callback закрыть новый request.
 5. Frontend применяет только coordination state с revision новее current; пропущенный event восстанавливается bootstrap-ом.
@@ -83,11 +99,12 @@ ResolveTerminalNavigation(ResolveTerminalNavigationRequest) ResolveTerminalNavig
 
 - nonblank exact request ID и allowlisted enum decision;
 - current broadcast ID и active source terminal;
+- для ordinary/initial/completed state-change: frozen exact command identity и соответствующий current/frozen mode context;
 - для forward: source command с тем же stable ID всё ещё ссылается на тот же target ID;
 - для return: top route point всё ещё равна pending copy;
 - latest target terminal существует в trusted session catalog и не равен source.
 
-Approve одной coordinator transaction сохраняет source checkpoint, меняет route/active target, очищает pending/notice и публикует одну revision. Он никогда не создаёт `PendingTerminalSwitch` и не открывает preserve/discard dialog.
+~~Approve одной coordinator transaction сохраняет source checkpoint, меняет route/active target, очищает pending/notice и публикует одну revision.~~ По BUG-005 approve сначала проверяет exact typed pending, затем применяет ровно один mode-specific effect: ordinary публикует authored result без durable write; initial state-change выполняет persist-once; completed state-change публикует frozen result без повторного execution/write; terminal-transition сохраняет source checkpoint и атомарно меняет route/active target; return атомарно восстанавливает предыдущую route point. Каждый путь очищает exact pending и публикует одну revision; transition/return никогда не создают `PendingTerminalSwitch` и не открывают preserve/discard dialog.
 
 Reject очищает только exact pending. Stale/duplicate decision возвращает `ok=false` и не меняет current state. Если target/command устарели после создания pending, coordinator очищает pending, сохраняет active/nav/route, ставит typed notice и возвращает safe private error.
 
@@ -97,7 +114,7 @@ Reject очищает только exact pending. Stale/duplicate decision во�
 
 ## Lifecycle and ordering
 
-- Manual `RequestTerminalActivation`/`RequestTerminalClear` очищает terminal-navigation pending, notice и route перед своим existing switch lifecycle; поздний dialog callback становится stale.
+- Manual `RequestTerminalActivation`/`RequestTerminalClear` очищает любой command/terminal-navigation pending, notice и route перед своим existing switch lifecycle; поздний dialog callback становится stale.
 - `EndBroadcast` и `Shutdown` очищают route/pending/notice вместе с broadcast runtimes. `StartBroadcast` начинает с пустыми значениями.
 - Coordinator может синхронно читать detached session target по существующему lock order `control → session`; catalog не вызывает coordinator callbacks.
 - Effect publication остаётся detached и revision ordered. Master result/event и player updates относятся к одной committed revision.

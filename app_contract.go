@@ -790,6 +790,7 @@ func coordinationStateToPrivate(state *domain.MasterCoordinationState) *privatev
 			RequestId: pending.RequestID, BroadcastId: string(pending.BroadcastID),
 			TerminalId: pending.TerminalID, CommandId: pending.CommandID,
 			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
+			CommandMode: string(pending.Mode),
 		}
 	}
 	if state.PendingTerminalNavigation != nil {
@@ -878,7 +879,8 @@ func coordinationStateFromPrivate(state *privatev1.CoordinationState) *domain.Ma
 		result.PendingCommandExecution = &domain.MasterPendingCommandExecution{
 			RequestID: pending.GetRequestId(), BroadcastID: domain.BroadcastID(pending.GetBroadcastId()),
 			TerminalID: pending.GetTerminalId(), CommandID: pending.GetCommandId(),
-			CommandName: pending.GetCommandName(), ConfirmationText: pending.GetConfirmationText(),
+			CommandName: pending.GetCommandName(), Mode: domain.CommandApprovalMode(pending.GetCommandMode()),
+			ConfirmationText: pending.GetConfirmationText(),
 		}
 	}
 	if state.PendingTerminalNavigation != nil {

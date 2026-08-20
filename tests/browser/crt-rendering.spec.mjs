@@ -32,6 +32,22 @@ async function activateCRTFixture(request, state = 'content') {
   expect(response.status()).toBe(204);
 }
 
+async function approveCRTCommand(page, request, { verifyInputLock = true } = {}) {
+  await expect(page.locator('#termEntry')).toBeVisible();
+  await expect(page.locator('#entryBody')).toHaveText('Выполняется запрос');
+  await expect(page.locator('#termOutput')).toBeHidden();
+  await expect(page.locator('#backBtn')).toBeHidden();
+  if (verifyInputLock) {
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Backspace');
+    await expect(page.locator('#entryBody')).toHaveText('Выполняется запрос');
+  }
+
+  const response = await request.post('/__fixture/local/crt/approve-command');
+  expect(response.status()).toBe(204);
+  await expect(page.locator('#entryBody')).toContainText('DIAGNOSTIC OUTPUT');
+}
+
 async function visibleHackPatternCell(page) {
   let coordinates = null;
   await expect.poll(async () => {
@@ -283,8 +299,7 @@ test.describe('CRT visual shell', () => {
       const command = page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' });
       await expect(command).toBeVisible();
       await command.click();
-      await expect(page.locator('#termEntry')).toBeVisible();
-      await expect(page.locator('#termOutput')).toBeHidden();
+      await approveCRTCommand(page, request);
       await page.keyboard.press('Shift');
       await expectStateContained(page, '#termEntry');
       await expect(page.locator('#entryBody')).toContainText('DIAGNOSTIC OUTPUT');
@@ -860,7 +875,7 @@ test.describe('CRT reveal skip', () => {
     await expect.poll(() => mutations.filter(value => value === 'Navigate').length).toBe(1);
   });
 
-  test('record and command pages skip independently while persistent effects continue', async ({ page, request }) => {
+  test('record reveal skips while approved command pages and persistent effects continue', async ({ page, request }) => {
     await resetAndOpen({ page, request });
     await assignPlayer(page);
     await activateCRTFixture(request, 'content');
@@ -885,13 +900,9 @@ test.describe('CRT reveal skip', () => {
     await expect(page.locator('#termList')).toBeVisible();
 
     await page.locator('.term-row', { hasText: 'RUN DIAGNOSTIC' }).click();
-    await expect(page.locator('#termEntry')).toBeVisible();
-    await expect(page.locator('#termOutput')).toBeHidden();
+    await approveCRTCommand(page, request, { verifyInputLock: false });
     await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(1);
     const indicatorBefore = await page.locator('#pageIndicator').textContent();
-    await page.keyboard.press('PageDown');
-    await expect(page.locator('#pageIndicator')).toHaveText(indicatorBefore);
-    await expect.poll(() => page.locator('#entryBody > div').count()).toBeGreaterThan(2);
     await page.keyboard.press('PageDown');
     await expect(page.locator('#pageIndicator')).not.toHaveText(indicatorBefore);
 

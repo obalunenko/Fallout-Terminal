@@ -1004,9 +1004,14 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 			resolveErr = fmt.Errorf("command execution decision is stale")
 			return transition{}
 		}
-		authored := contentNodeByStableID(&terminal.Tree, pending.CommandID)
-		if authored == nil || authored.Type != domain.NodeCommand || authored.StateChange == nil ||
-			authored.Name != pending.CommandName || authored.StateChange.ConfirmationText != pending.ConfirmationText {
+		authored, current := selectedAuthoredCommand(terminal, domain.RuntimeCommand{
+			Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: pending.CommandID,
+		})
+		if !current || authored.Behavior() == domain.CommandBehaviorInvalid ||
+			authored.Behavior() == domain.CommandBehaviorTerminalTransition ||
+			displayedCommandName(terminal, authored) != pending.CommandName ||
+			commandApprovalMode(terminal, authored) != pending.Mode ||
+			commandConfirmationText(authored) != pending.ConfirmationText {
 			state = masterSnapshot(runtime)
 			resolveErr = fmt.Errorf("command execution decision is stale")
 			return transition{}
@@ -1014,9 +1019,25 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 
 		if decision == domain.CommandExecutionReject {
 			runtime.PendingCommandExecution = nil
-			terminal.CommandExecution = &domain.CommandExecutionPresentation{
-				Phase: domain.CommandExecutionPhaseRejected, CommandID: pending.CommandID,
+			if pending.Mode == domain.CommandApprovalModeStateChange {
+				terminal.CommandExecution = &domain.CommandExecutionPresentation{
+					Phase: domain.CommandExecutionPhaseRejected, CommandID: pending.CommandID,
+				}
+			} else {
+				terminal.CommandExecution = nil
 			}
+			state = masterSnapshot(runtime)
+			effects := stateEffects(runtime)
+			if projection := service.projectActiveTerminal(runtime); projection != nil {
+				effects = append(effects, Effect{Live: projection})
+			}
+			return transition{accepted: true, effects: effects}
+		}
+
+		if pending.Mode == domain.CommandApprovalModeOrdinary || pending.Mode == domain.CommandApprovalModeCompletedStateChange {
+			terminal.CommandExecution = nil
+			terminal.Nav = nav.ApplyAction(terminal.Nav, terminal.Tree, "command", pending.CommandID)
+			runtime.PendingCommandExecution = nil
 			state = masterSnapshot(runtime)
 			effects := stateEffects(runtime)
 			if projection := service.projectActiveTerminal(runtime); projection != nil {
@@ -1792,7 +1813,16 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
 			return transition{accepted: true, effects: effects}
 		}
-		if authored, linked := authoredLinkedCommand(terminal, command); linked {
+		authored, commandSelected := selectedAuthoredCommand(terminal, command)
+		if command.Kind == domain.RuntimeCommandNavigate && command.Action == "command" && !commandSelected {
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
+		}
+		if commandSelected && authored.Behavior() == domain.CommandBehaviorInvalid {
+			outcome = rejectedAction(command.RequestID, domain.ActionReasonInvalidAction, runtime.Revision)
+			return service.cachePlayerActionRejection(runtime, connectionID, sessionID, command, outcome)
+		}
+		if commandSelected && authored.Behavior() == domain.CommandBehaviorTerminalTransition {
 			lookup, ok := domain.TerminalTransitionTarget{}, false
 			if service.terminalCatalog != nil {
 				lookup, ok = service.terminalCatalog.LookupTerminalTransition(terminal.TerminalID, authored.ID)
@@ -1835,11 +1865,13 @@ func (service *Service) DispatchPlayerAction(connectionID domain.ConnectionID, c
 			effects = append(effects, playerActionResultEffect(connectionID, sessionID, outcome))
 			return transition{accepted: true, effects: effects}
 		}
-		if authored, initial := initialStateChangingCommand(terminal, command); initial {
+		if commandSelected {
+			mode := commandApprovalMode(terminal, authored)
 			runtime.PendingCommandExecution = &domain.PendingCommandExecution{
 				RequestID: service.nextID(), BroadcastID: runtime.Broadcast.ID,
 				TerminalID: terminal.TerminalID, CommandID: authored.ID,
-				CommandName: authored.Name, ConfirmationText: authored.StateChange.ConfirmationText,
+				CommandName: displayedCommandName(terminal, authored), Mode: mode,
+				ConfirmationText:    commandConfirmationText(authored),
 				ControllerSessionID: sessionID,
 			}
 			terminal.CommandExecution = &domain.CommandExecutionPresentation{
@@ -2102,7 +2134,7 @@ func clearCommandExecutionRuntime(runtime *domain.ProcessRuntime) {
 	}
 }
 
-func authoredLinkedCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
+func selectedAuthoredCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
 	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
 		return nil, false
 	}
@@ -2126,46 +2158,42 @@ func authoredLinkedCommand(runtime *domain.TerminalRuntime, command domain.Runti
 	}
 	for index := range folder.Children {
 		candidate := &folder.Children[index]
-		if candidate.ID == command.NodeID && candidate.Type == domain.NodeCommand && candidate.TerminalTransition != nil {
+		if candidate.ID == command.NodeID && candidate.Type == domain.NodeCommand {
 			return candidate, true
 		}
 	}
 	return nil, false
 }
 
-func initialStateChangingCommand(runtime *domain.TerminalRuntime, command domain.RuntimeCommand) (*domain.ContentNode, bool) {
-	if runtime == nil || command.Kind != domain.RuntimeCommandNavigate || command.Action != "command" || command.NodeID == "" {
-		return nil, false
+func commandApprovalMode(runtime *domain.TerminalRuntime, command *domain.ContentNode) domain.CommandApprovalMode {
+	if command == nil || command.StateChange == nil {
+		return domain.CommandApprovalModeOrdinary
 	}
-	folder := &runtime.Tree
-	if len(runtime.Nav.Path) == 0 || runtime.Nav.Path[0] != runtime.Tree.ID {
-		return nil, false
+	if runtime != nil {
+		if _, completed := runtime.CommandStates[command.ID]; completed {
+			return domain.CommandApprovalModeCompletedStateChange
+		}
 	}
-	for _, folderID := range runtime.Nav.Path[1:] {
-		var next *domain.ContentNode
-		for index := range folder.Children {
-			child := &folder.Children[index]
-			if child.ID == folderID && child.Type == domain.NodeFolder {
-				next = child
-				break
-			}
-		}
-		if next == nil {
-			return nil, false
-		}
-		folder = next
+	return domain.CommandApprovalModeStateChange
+}
+
+func displayedCommandName(runtime *domain.TerminalRuntime, command *domain.ContentNode) string {
+	if command == nil {
+		return ""
 	}
-	for index := range folder.Children {
-		candidate := &folder.Children[index]
-		if candidate.ID != command.NodeID || candidate.Type != domain.NodeCommand || candidate.StateChange == nil {
-			continue
+	if runtime != nil {
+		if completed, ok := runtime.CommandStates[command.ID]; ok {
+			return completed.CompletedName
 		}
-		if _, completed := runtime.CommandStates[candidate.ID]; completed {
-			return nil, false
-		}
-		return candidate, true
 	}
-	return nil, false
+	return command.Name
+}
+
+func commandConfirmationText(command *domain.ContentNode) string {
+	if command != nil && command.StateChange != nil {
+		return command.StateChange.ConfirmationText
+	}
+	return "Выполнить команду?"
 }
 
 func currentPendingCommandExecution(pending *domain.PendingCommandExecution, broadcast *domain.LiveBroadcast, terminal *domain.TerminalRuntime, requestID string) bool {
@@ -2625,7 +2653,8 @@ func masterSnapshot(runtime *domain.ProcessRuntime) *domain.MasterCoordinationSt
 		state.PendingCommandExecution = &domain.MasterPendingCommandExecution{
 			RequestID: pending.RequestID, BroadcastID: pending.BroadcastID,
 			TerminalID: pending.TerminalID, CommandID: pending.CommandID,
-			CommandName: pending.CommandName, ConfirmationText: pending.ConfirmationText,
+			CommandName: pending.CommandName, Mode: pending.Mode,
+			ConfirmationText: pending.ConfirmationText,
 		}
 	}
 	if pending := runtime.PendingTerminalNavigation; pending != nil {

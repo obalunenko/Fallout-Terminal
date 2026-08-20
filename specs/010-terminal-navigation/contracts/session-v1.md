@@ -1,6 +1,7 @@
 # Контракт session JSON version 1
 
 **Bugfix**: 2026-08-19 — BUG-004 Уточнён общий `CommandContent.oneof behavior` без изменения JSON v1 или field numbers.
+**Bugfix**: 2026-08-20 — BUG-005 Уточнено, что unset `behavior` выбирает ordinary outcome, но не отменяет универсальный private master approval lifecycle.
 
 ## JSON shape
 
@@ -22,7 +23,7 @@
 |---|---|
 | `terminals[].root…terminalTransition.targetTerminalId` | Stable ID другого терминала той же session. |
 
-Нет `terminalTransition` — команда сохраняет прежнюю семантику. Runtime route, pending request, active terminal, navigation и hack checkpoints в session JSON не записываются.
+~~Нет `terminalTransition` — команда сохраняет прежнюю семантику.~~ Unset `behavior` означает ordinary mode и сохраняет только non-durable semantics одобренного результата: после одобрения мастером команда показывает авторский результат без долговечного изменения состояния команды, смены активного терминала или маршрута. Сам выбор такой команды по-прежнему MUST проходить универсальный private master approval lifecycle, определённый FR-033–FR-036. Runtime route, runtime pending request и его decision state, active terminal, navigation и hack checkpoints остаются вне session JSON и в него не записываются.
 
 ## Persistence protobuf
 

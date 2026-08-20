@@ -6,6 +6,7 @@
 **Bugfix**: 2026-08-18 — BUG-004 Updated from bugfix patch
 **Bugfix**: 2026-08-18 — BUG-005 Updated from bugfix patch
 **Bugfix**: 2026-08-18 — BUG-006 Updated from bugfix patch
+**Cross-feature bugfix**: 2026-08-20 — Approval-free ordinary/completed expectations in Phase 6, T035, T037, T047, T071 and T072 are superseded by `specs/010-terminal-navigation/bugs/BUG-005.md`; completed implementation-task status remains unchanged because no implementation gap was found by this reconciliation.
 
 **Input**: [spec.md](./spec.md), [plan.md](./plan.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/)
 
@@ -174,16 +175,16 @@
 
 ## Phase 6: User Story 4 — совместимость обычных команд и session JSON v1 (P2)
 
-**Goal**: Старые v1-документы открываются без миграции, ordinary-команды идут прежним путём, а unknown fields и исходный формат остаются совместимыми.
+**Goal**: Старые v1-документы открываются без миграции, ~~ordinary-команды идут прежним approval-free путём~~ ordinary-команды сохраняют только non-durable approved-result semantics по `specs/010-terminal-navigation/bugs/BUG-005.md`, а unknown fields и исходный формат остаются совместимыми.
 
-**Independent Test**: Открыть неизменённый legacy fixture, выполнить ordinary-команды без pending/dialog/store write, сохранить и переоткрыть документ; отдельно round-trip новый optional-field fixture и проверить unknown extras.
+**Independent Test**: Открыть неизменённый legacy fixture, ~~выполнить ordinary-команды без pending/dialog/store write~~ выбрать ordinary-команды, получить pending/private master dialog и после approve проверить авторский результат без state-store write, сохранить и переоткрыть документ; отдельно round-trip новый optional-field fixture и проверить unknown extras. Approval-free часть теста заменена `specs/010-terminal-navigation/bugs/BUG-005.md`.
 
 ### Tests
 
 **Wave 1 — independent (different files):**
 
 - [x] **T034** [P] [US4] Написать падающие legacy/forward-compat тесты для отсутствующих optional fields, version 1 round-trip, unknown extras и сохранения ordinary content · `internal/domain/model_test.go`, `internal/session/contract_test.go`, `internal/session/service_test.go`
-- [x] **T035** [P] [US4] Написать падающие ordinary-command regression тесты: нет pending/master dialog/state-store write, прежние navigation/result/replay semantics · `internal/control/service_test.go`, `internal/live/service_test.go`, `internal/player/handler_test.go`
+- [x] **T035** [P] [US4] ~~Написать падающие ordinary-command regression тесты: нет pending/master dialog/state-store write, прежние navigation/result/replay semantics.~~ Approval-free expectation заменено `specs/010-terminal-navigation/bugs/BUG-005.md`: ordinary selection требует pending/private master dialog, а approve сохраняет прежний авторский result/replay outcome без state-store write · `internal/control/service_test.go`, `internal/live/service_test.go`, `internal/player/handler_test.go`
 
 ### Implementation
 
@@ -192,7 +193,7 @@
 **Wave 2 — independent (different files):**
 
 - [x] **T036** [P] [US4] Закрепить absent-field defaults, unknown-field preservation и pruning только удалённых stable IDs в domain/session adapters · `internal/domain/json.go`, `internal/session/contract.go`, `internal/session/service.go`
-- [x] **T037** [P] [US4] Сохранить отдельный прежний branch для ordinary commands без pending, master effect или command-state persistence · `internal/control/service.go`, `internal/live/service.go`, `internal/player/adapter.go`
+- [x] **T037** [P] [US4] ~~Сохранить отдельный прежний branch для ordinary commands без pending, master effect или command-state persistence.~~ Approval-free branch заменён `specs/010-terminal-navigation/bugs/BUG-005.md`: ordinary commands входят в универсальный approval lifecycle, но их одобренный outcome не создаёт command-state persistence · `internal/control/service.go`, `internal/live/service.go`, `internal/player/adapter.go`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
@@ -200,7 +201,7 @@
 
 - [x] **T038** [US4] Зафиксировать неизменённый legacy fixture и добавить отдельный state-changing v1 fixture для reopen/frozen/reset тестов · `internal/testutil/testdata/session-v1.json`, `internal/testutil/testdata/session-v1-state-changing.json`
 
-**Checkpoint**: User Story 4 независимо доказывает открытие/сохранение legacy v1 и byte/behavior-compatible ordinary command flow без ручной конвертации.
+**Checkpoint**: User Story 4 независимо доказывает открытие/сохранение legacy v1 и ~~byte/behavior-compatible approval-free ordinary command flow~~ JSON/authoring-compatible ordinary flow с обязательным master approval и non-durable approved result по `specs/010-terminal-navigation/bugs/BUG-005.md`, без ручной конвертации.
 
 ---
 
@@ -311,7 +312,7 @@ Phase 4 завершает минимальный вертикальный пр�
 
 ## Phase 9: Convergence
 
-- [x] T047 Добавить 100 одновременных distinct requests к уже completed-команде и доказать, что все обращения получают frozen result без нового pending/master effect, а счётчики execution и durable write остаются равны одному · `internal/control/service_test.go` per SC-004, T041 (partial)
+- [x] T047 Добавить 100 одновременных distinct requests к уже completed-команде и доказать, что ~~все обращения получают frozen result без нового pending/master effect~~ каждый distinct selection создаёт ровно один private master approval request, а после approve возвращает frozen result без повторного execution или durable write; счётчики execution и durable write остаются равны одному · `internal/control/service_test.go` per SC-004, T041 (partial)
 - [x] T048 Провести полную 100-command матрицу стадиями над каждой командой: rename/move и authored edit сохраняют frozen snapshot, reset/re-execute применяет новые тексты, а последующее удаление всех команд и создание 100 новых ID не наследует ни одного состояния · `internal/session/service_test.go` per SC-010, SC-012, T046 (partial)
 
 ## Phase 10: Bugfix BUG-001 — восстановление индивидуального и общего сброса
@@ -444,10 +445,10 @@ Phase 4 завершает минимальный вертикальный пр�
 
 **Wave 2 — canonical fixture parity correction:**
 
-- [x] **T071** [US2] По падающему T070 определить один канонический approval fixture contract либо точную автоматическую parity-проекцию и выровнять его Go/JavaScript/JSON представления: добавить явные folder/entry/command, обеспечить initial `stateChange` каждой команды и раздельный `commandName`/`confirmationText` в master dialog; не менять ordinary semantics, legacy fixture и отдельный completed fixture для reset/reopen (reopened T026; T024/T033/T038 только audit) · `sessions/demo.json`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`, `frontend/src/master.js`, `README.md` per FR-004, FR-005/BUG-006, FR-017, FR-028, SC-007, SC-018
+- [x] **T071** [US2] По падающему T070 определить один канонический approval fixture contract либо точную автоматическую parity-проекцию и выровнять его Go/JavaScript/JSON представления: добавить явные folder/entry/command, обеспечить initial `stateChange` каждой команды и раздельный `commandName`/`confirmationText` в master dialog; ~~не менять ordinary semantics~~ сохранить только non-durable semantics одобренного ordinary-результата, тогда как approval-free selection expectation заменено `specs/010-terminal-navigation/bugs/BUG-005.md`; legacy fixture и отдельный completed fixture для reset/reopen остаются исторической областью задачи (reopened T026; T024/T033/T038 только audit) · `sessions/demo.json`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`, `frontend/src/master.js`, `README.md` per FR-004, FR-005/BUG-006, FR-017, FR-028, SC-007, SC-018
 
 **⟶ T071 and reopened T026 must finish before Wave 3:**
 
 **Wave 3 — every-command focused verification:**
 
-- [x] **T072** [US2] [US4] Пройти каждую команду канонического approval input через approve, reject и close, проверяя точное имя и отличный prompt, единственный pending/request ID, отсутствие initial completed snapshot и ordinary bypass; отдельно подтвердить неизменный ordinary flow legacy fixture, parity fixture sources и полный frontend/Playwright suite, затем передать результат в переоткрытую T040 · `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js` per SC-002, SC-007, SC-013, SC-018/BUG-006
+- [x] **T072** [US2] [US4] Пройти каждую команду канонического approval input через approve, reject и close, проверяя точное имя и отличный prompt, единственный pending/request ID, отсутствие initial completed snapshot и ordinary bypass; ~~отдельно подтвердить неизменный approval-free ordinary flow legacy fixture~~ это ожидание заменено `specs/010-terminal-navigation/bugs/BUG-005.md`: каждый выбор требует master approval, ordinary approval остаётся non-durable, а completed state-changing approval не вызывает второго выполнения или записи; parity fixture sources и полный frontend/Playwright suite остаются исторической областью задачи, затем передать результат в переоткрытую T040 · `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-sync.spec.mjs`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js` per SC-002, SC-007, SC-013, SC-018/BUG-006

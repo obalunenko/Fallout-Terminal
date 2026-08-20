@@ -327,6 +327,18 @@ const (
 	CommandExecutionReject  CommandExecutionDecision = "reject"
 )
 
+// CommandApprovalMode records the exact behavior that will run after the
+// game master approves a pending command. Completed state-changing commands
+// remain distinct because approval must show their frozen result without a
+// second durable write.
+type CommandApprovalMode string
+
+const (
+	CommandApprovalModeOrdinary             CommandApprovalMode = "ordinary"
+	CommandApprovalModeStateChange          CommandApprovalMode = "state-change"
+	CommandApprovalModeCompletedStateChange CommandApprovalMode = "completed-state-change"
+)
+
 // CommandExecutionPhase is the public broadcast-scoped presentation state.
 type CommandExecutionPhase string
 
@@ -595,6 +607,7 @@ type PendingCommandExecution struct {
 	TerminalID          string
 	CommandID           string
 	CommandName         string
+	Mode                CommandApprovalMode
 	ConfirmationText    string
 	ControllerSessionID LogicalSessionID
 }
@@ -779,12 +792,13 @@ type MasterPendingSwitch struct {
 
 // MasterPendingCommandExecution is the complete private prompt projection.
 type MasterPendingCommandExecution struct {
-	RequestID        string      `json:"requestId"`
-	BroadcastID      BroadcastID `json:"broadcastId"`
-	TerminalID       string      `json:"terminalId"`
-	CommandID        string      `json:"commandId"`
-	CommandName      string      `json:"commandName"`
-	ConfirmationText string      `json:"confirmationText"`
+	RequestID        string              `json:"requestId"`
+	BroadcastID      BroadcastID         `json:"broadcastId"`
+	TerminalID       string              `json:"terminalId"`
+	CommandID        string              `json:"commandId"`
+	CommandName      string              `json:"commandName"`
+	Mode             CommandApprovalMode `json:"mode"`
+	ConfirmationText string              `json:"confirmationText"`
 }
 
 type MasterPendingTerminalNavigation struct {

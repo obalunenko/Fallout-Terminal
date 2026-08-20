@@ -704,6 +704,60 @@ func TestPendingCommandBlocksEverySharedRuntimeAction(t *testing.T) {
 	}
 }
 
+func TestUniversalApprovalPresentationKeepsEveryCommandModeOutOfRuntime(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		target    domain.TerminalTarget
+		completed bool
+	}{
+		{
+			name: "ordinary",
+			target: domain.TerminalTarget{
+				TerminalID: "terminal-ordinary", TerminalName: "Diagnostics",
+				Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{{
+					ID: "command", Type: domain.NodeCommand, Name: "RUN", Text: "DONE",
+				}}},
+			},
+		},
+		{name: "initial state-changing", target: stateChangingTarget()},
+		{name: "completed state-changing", target: stateChangingTarget(), completed: true},
+		{
+			name: "terminal transition",
+			target: domain.TerminalTarget{
+				TerminalID: "terminal-transition", TerminalName: "Transit",
+				Tree: domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{{
+					ID: "command", Type: domain.NodeCommand, Name: "GO",
+					TerminalTransition: &domain.TerminalTransitionConfig{TargetTerminalID: "terminal-b"},
+				}}},
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := New(&constantRandom{}, fixedWords{})
+			target := test.target
+			commandID := target.Tree.Children[0].ID
+			if test.completed {
+				target.CommandStates = map[string]domain.CommandExecutionState{
+					commandID: {CompletedName: "DONE", ResultText: "DONE"},
+				}
+			}
+			runtime, _ := service.CreateRuntime(target)
+			require.NotNil(t, runtime)
+			runtime.CommandExecution = &domain.CommandExecutionPresentation{
+				Phase: domain.CommandExecutionPhasePending, CommandID: commandID,
+			}
+			before := cloneTerminalRuntimeForTest(runtime)
+
+			projection, accepted := service.Apply(runtime, domain.RuntimeCommand{
+				Kind: domain.RuntimeCommandNavigate, Action: "command", NodeID: commandID,
+			})
+			assert.False(t, accepted)
+			assert.Nil(t, projection)
+			assert.Equal(t, before, runtime)
+		})
+	}
+}
+
 func TestRejectedCommandAcceptsOnlyBackAndClearsPresentation(t *testing.T) {
 	service := New(&constantRandom{}, fixedWords{})
 	runtime, _ := service.CreateRuntime(stateChangingTarget())

@@ -17,6 +17,25 @@ import { Create as $Create } from "@wailsio/runtime";
  */
 
 /**
+ * CommandApprovalMode records the exact behavior that will run after the
+ * game master approves a pending command. Completed state-changing commands
+ * remain distinct because approval must show their frozen result without a
+ * second durable write.
+ * @readonly
+ * @enum {string}
+ */
+export const CommandApprovalMode = {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero: "",
+
+    CommandApprovalModeOrdinary: "ordinary",
+    CommandApprovalModeStateChange: "state-change",
+    CommandApprovalModeCompletedStateChange: "completed-state-change",
+};
+
+/**
  * CommandExecutionDecision is the trusted game-master resolution for the
  * exact currently pending state-changing command request.
  * @readonly
@@ -347,6 +366,13 @@ export class MasterPendingCommandExecution {
              * @type {string}
              */
             this["commandName"] = "";
+        }
+        if (!("mode" in $$source)) {
+            /**
+             * @member
+             * @type {CommandApprovalMode}
+             */
+            this["mode"] = CommandApprovalMode.$zero;
         }
         if (!("confirmationText" in $$source)) {
             /**
