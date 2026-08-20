@@ -125,7 +125,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   await form.getByLabel('ТЕКСТ ЗАПРОСА ПОДТВЕРЖДЕНИЯ').fill('Подготовить переход?');
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
   const stateChangeSave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
-    ?.terminals?.[0]?.root?.children?.[0]);
+    ?.terminals?.[0]?.root?.children?.find(node => node.id === 'go-security'));
   expect(stateChangeSave).toHaveProperty('stateChange');
   expect(stateChangeSave).not.toHaveProperty('terminalTransition');
 
@@ -138,7 +138,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   await form.getByLabel('ЦЕЛЕВОЙ ТЕРМИНАЛ').selectOption('security');
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
   const transitionSave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
-    ?.terminals?.[0]?.root?.children?.[0]);
+    ?.terminals?.[0]?.root?.children?.find(node => node.id === 'go-security'));
   expect(transitionSave).toHaveProperty('terminalTransition.targetTerminalId', 'security');
   expect(transitionSave).not.toHaveProperty('stateChange');
   await expect.poll(() => page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
@@ -154,7 +154,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   await page.getByLabel('РЕЖИМ КОМАНДЫ').selectOption('ordinary');
   await form.getByRole('button', { name: 'ПРИМЕНИТЬ' }).click();
   const ordinarySave = await page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'SaveSession').at(-1)?.args?.[0]
-    ?.terminals?.[0]?.root?.children?.[0]);
+    ?.terminals?.[0]?.root?.children?.find(node => node.id === 'go-security'));
   expect(ordinarySave).not.toHaveProperty('stateChange');
   expect(ordinarySave).not.toHaveProperty('terminalTransition');
 
@@ -184,6 +184,9 @@ test('one forward request opens one exact master dialog and close rejects it', a
   await expect(dialog).toContainText('ИЗ: Жилой терминал');
   await expect(dialog).toContainText('КОМАНДА: ПЕРЕЙТИ В ОХРАНУ');
   await expect(dialog).toContainText('В: Терминал охраны');
+  await expect(dialog.getByRole('button', { name: 'ОДОБРИТЬ' })).toBeFocused();
+  await dialog.press('ArrowRight');
+  await expect(dialog.getByRole('button', { name: 'ОТКЛОНИТЬ' })).toBeFocused();
   await dialog.press('Escape');
   await expect.poll(() => page.evaluate(() => __desktopFixture.calls.filter(call => call.method === 'ResolveTerminalNavigation'))).toEqual([
     expect.objectContaining({ args: [{ requestId: 'navigation-forward-1', decision: 'reject' }] }),
@@ -205,6 +208,97 @@ test('approved first entry opens the destination hack at root without a terminal
     await masterContext.close();
   }
 });
+
+for (const command of [
+  { mode: 'ordinary', modeLabel: 'ОБЫЧНАЯ', name: 'ЗАПУСТИТЬ ДИАГНОСТИКУ', result: 'СИСТЕМА ИСПРАВНА' },
+  { mode: 'completed state-changing', modeLabel: 'ЗАВЕРШЁННОЕ ИЗМЕНЕНИЕ СОСТОЯНИЯ', name: 'ЗАВЕРШЁННАЯ КОМАНДА', result: 'Done' },
+]) {
+  test(`${command.mode} command preserves its approve/reject/close result across controller, observers, and reconnect`, async ({ browser, request }) => {
+    const runDecision = async decision => {
+      const masterContext = await browser.newContext();
+      const master = await masterContext.newPage();
+      await openMaster(master);
+      const controller = await openParticipant(browser);
+      const firstObserver = await openParticipant(browser);
+      let secondObserver = await openParticipant(browser);
+      try {
+        await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+        await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+        await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
+        const sourceMenu = await controller.page.locator('#termList').textContent();
+
+        await controller.page.locator('.term-row', { hasText: command.name }).click();
+        await Promise.all([controller, firstObserver, secondObserver].map(participant =>
+          expectPendingTransitionSurface(participant.page)));
+
+        const dialog = master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
+        await expect(dialog).toHaveCount(1);
+
+        const stateResponse = await request.get(`${FIXTURE}/state`);
+        expect(stateResponse.ok()).toBe(true);
+        const state = await stateResponse.json();
+        expect(state.broadcast.activeTerminalId).toBe('residential');
+        expect(state.pendingCommandExecution).toMatchObject({
+          terminalId: 'residential',
+          commandName: command.name,
+        });
+        expect(state.pendingTerminalNavigation).toBeNull();
+        await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(
+          `ЗАПРОС: ${state.pendingCommandExecution.requestId} · РЕЖИМ: ${command.modeLabel} · КОМАНДА: ${command.name}`,
+        );
+
+        const retainedToken = await secondObserver.page.evaluate(() =>
+          localStorage.getItem('fallout-terminal.player-token'));
+        await secondObserver.context.close();
+        secondObserver = await openParticipant(browser, retainedToken);
+        await expectPendingTransitionSurface(secondObserver.page);
+
+        for (const participant of [controller, firstObserver, secondObserver]) {
+          await participant.page.keyboard.press('Enter');
+          await participant.page.keyboard.press('Backspace');
+          await expectPendingTransitionSurface(participant.page);
+        }
+
+        if (decision === 'close') await dialog.press('Escape');
+        else if (decision === 'reject') {
+          await expect(dialog.getByRole('button', { name: 'ОДОБРИТЬ' })).toBeFocused();
+          await dialog.press('ArrowRight');
+          await expect(dialog.getByRole('button', { name: 'ОТКЛОНИТЬ' })).toBeFocused();
+          await master.keyboard.press('Enter');
+        } else {
+          await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
+        }
+        await expect(dialog).toBeHidden();
+
+        if (decision === 'approve') {
+          await Promise.all([controller, firstObserver, secondObserver].map(async participant => {
+            await expect(participant.page.locator('#termEntry')).toBeVisible({ timeout: 2000 });
+            await participant.page.keyboard.press('Shift');
+            await expect(participant.page.locator('#entryBody')).toHaveText(command.result);
+            await expect(participant.page.locator('#termList')).toBeHidden();
+          }));
+        } else {
+          await Promise.all([controller, firstObserver, secondObserver].map(async participant => {
+            await expect(participant.page.locator('#termList')).toBeVisible({ timeout: 2000 });
+            await expect(participant.page.locator('#termList')).toHaveText(sourceMenu);
+            await expect(participant.page.locator('#termEntry')).toBeHidden();
+          }));
+        }
+      } finally {
+        await controller.context.close();
+        await firstObserver.context.close();
+        await secondObserver.context.close();
+        await masterContext.close();
+      }
+    };
+
+    await runDecision('approve');
+    expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+    await runDecision('reject');
+    expect((await request.post(FIXTURE + '/reset')).ok()).toBe(true);
+    await runDecision('close');
+  });
+}
 
 test('direct pending replaces every player menu with the inert record surface across reconnect and decisions', async ({ browser, request }) => {
   const runDecision = async decision => {

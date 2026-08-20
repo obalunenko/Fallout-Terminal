@@ -687,6 +687,7 @@ type PendingCommandExecution struct {
 	CommandId        string                 `protobuf:"bytes,4,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"`
 	CommandName      string                 `protobuf:"bytes,5,opt,name=command_name,json=commandName,proto3" json:"command_name,omitempty"`
 	ConfirmationText string                 `protobuf:"bytes,6,opt,name=confirmation_text,json=confirmationText,proto3" json:"confirmation_text,omitempty"`
+	CommandMode      string                 `protobuf:"bytes,7,opt,name=command_mode,json=commandMode,proto3" json:"command_mode,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -759,6 +760,13 @@ func (x *PendingCommandExecution) GetCommandName() string {
 func (x *PendingCommandExecution) GetConfirmationText() string {
 	if x != nil {
 		return x.ConfirmationText
+	}
+	return ""
+}
+
+func (x *PendingCommandExecution) GetCommandMode() string {
+	if x != nil {
+		return x.CommandMode
 	}
 	return ""
 }
@@ -1096,7 +1104,7 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1b\n" +
 	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x05R\aversion\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\"\xeb\x01\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"\x8e\x02\n" +
 	"\x17PendingCommandExecution\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +
@@ -1106,7 +1114,8 @@ const file_fallout_terminal_private_v1_coordination_proto_rawDesc = "" +
 	"\n" +
 	"command_id\x18\x04 \x01(\tR\tcommandId\x12!\n" +
 	"\fcommand_name\x18\x05 \x01(\tR\vcommandName\x12+\n" +
-	"\x11confirmation_text\x18\x06 \x01(\tR\x10confirmationText\"\xd7\x03\n" +
+	"\x11confirmation_text\x18\x06 \x01(\tR\x10confirmationText\x12!\n" +
+	"\fcommand_mode\x18\a \x01(\tR\vcommandMode\"\xd7\x03\n" +
 	"\x19PendingTerminalNavigation\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12!\n" +

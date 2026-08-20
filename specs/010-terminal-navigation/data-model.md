@@ -1,6 +1,7 @@
 # Модель данных: переходы между терминалами
 
 **Bugfix**: 2026-08-19 — BUG-004 Уточнён дискриминированный режим содержимого команды.
+**Bugfix**: 2026-08-20 — BUG-005 Уточнён один логический approval lifecycle и взаимное исключение типизированных command/transition/return pending-состояний.
 
 ## Границы жизненного цикла
 
@@ -8,6 +9,7 @@
 |---|---|---|---|
 | `TerminalTransitionConfig` | session/domain | Пока существует command-узел | session JSON version 1 |
 | `TerminalReturnPoint` | coordinator | Один broadcast | Нет |
+| `PendingCommandExecution` | coordinator | Один broadcast, взаимоисключён с terminal-navigation pending | Нет |
 | `PendingTerminalNavigation` | coordinator | Один broadcast, не более одного запроса | Нет |
 | `TerminalNavigationNotice` | coordinator/private master projection | До следующего transition/lifecycle action | Нет |
 | `TerminalRuntime` | coordinator/live | Один broadcast | Нет |
@@ -60,7 +62,7 @@
 | `TargetTerminalID`, `TargetTerminalName` | `string` | Кандидат цели; перепроверяется при approve. |
 | `ReturnPoint` | `TerminalReturnPoint` | Для forward — кандидат push; для return — точная копия верхней точки, которая ещё не извлечена. |
 
-В `ProcessRuntime` может быть не более одного `PendingTerminalNavigation`. Пока он существует, все shared navigation/hack actions отклоняются как conflict после обычных identity/authority checks.
+В `ProcessRuntime` может быть не более одного `PendingTerminalNavigation`. По BUG-005 `PendingCommandExecution` для ordinary/initial/completed state-change и `PendingTerminalNavigation` для terminal-transition/return являются типизированными проекциями одного логического approval lifecycle и взаимно исключаются: одновременно во всём broadcast существует не более одного pending любого из этих видов. Пока любой из них существует, все shared navigation/hack actions отклоняются как conflict после обычных identity/authority checks.
 
 ### `TerminalNavigationNotice`
 
@@ -88,7 +90,7 @@
 | Master reject/close | Exact pending | Clear pending; active terminal, nav, route и checkpoints не менятся. |
 | Stale approve | Target/command/source/route больше не совпадают | Clear pending, set private notice/error, active/nav/route не менятся. |
 | Invalid linked command | Missing/self/stale target до pending | Rejected `invalid-action`; одна private-notice revision, но active/nav/route/checkpoints не меняются. |
-| Competing action | Pending navigation exists | Rejected `conflict`, без новой revision, gameplay call или RNG. |
+| Competing action | Любой command/transition/return pending exists | Rejected `conflict`, без новой revision, gameplay call или RNG. |
 | Manual activate/clear | Master action | Cancel pending navigation and clear route before existing manual switch semantics. |
 | End broadcast / shutdown | Lifecycle action | Drop route, pending, notice и all terminal runtimes; durable session unchanged. |
 

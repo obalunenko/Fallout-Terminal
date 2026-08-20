@@ -183,7 +183,7 @@ func TestPrivateDescriptorFieldsAndEnumsHaveExplicitAdapterCoverage(t *testing.T
 		{&privatev1.LogicalSessionState{}, []string{"logical_session_id", "fallback_name", "connected", "active_streams", "character_id", "role"}},
 		{&privatev1.BroadcastState{}, []string{"broadcast_id", "active_controller_session_id", "active_terminal_id", "revision"}},
 		{&privatev1.PendingTerminalSwitch{}, []string{"switch_id", "terminal_id", "terminal_name", "requested_terminal", "broadcast_id", "source_terminal_id", "target_terminal_id"}},
-		{&privatev1.PendingCommandExecution{}, []string{"request_id", "broadcast_id", "terminal_id", "command_id", "command_name", "confirmation_text"}},
+		{&privatev1.PendingCommandExecution{}, []string{"request_id", "broadcast_id", "terminal_id", "command_id", "command_name", "confirmation_text", "command_mode"}},
 		{&privatev1.PendingTerminalNavigation{}, []string{"request_id", "broadcast_id", "direction", "source_terminal_id", "source_terminal_name", "command_id", "command_name", "target_terminal_id", "target_terminal_name", "route_depth"}},
 		{&privatev1.TerminalNavigationNotice{}, []string{"reason", "source_terminal_id", "command_id", "target_terminal_id"}},
 		{&privatev1.PlayerConfigMetadata{}, []string{"status", "file_path", "version", "name"}},
@@ -488,7 +488,8 @@ func TestPrivateStatusResultAndEventAdaptersRoundTripEveryNativeSemantic(t *test
 		PendingSwitch: &domain.MasterPendingSwitch{SwitchID: "switch-1", BroadcastID: "broadcast-1", SourceTerminalID: terminal, TargetTerminalID: &target},
 		PendingCommandExecution: &domain.MasterPendingCommandExecution{
 			RequestID: "request-1", BroadcastID: "broadcast-1", TerminalID: terminal,
-			CommandID: "command-1", CommandName: "Open doors", ConfirmationText: "Open the doors?",
+			CommandID: "command-1", CommandName: "Open doors", Mode: domain.CommandApprovalModeStateChange,
+			ConfirmationText: "Open the doors?",
 		},
 	}
 	status := RuntimeStatus{

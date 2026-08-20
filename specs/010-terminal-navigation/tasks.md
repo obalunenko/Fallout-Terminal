@@ -4,6 +4,7 @@
 **Bugfix**: 2026-08-19 — BUG-002 Updated from bugfix patch
 **Bugfix**: 2026-08-19 — BUG-003 Updated from bugfix patch
 **Bugfix**: 2026-08-19 — BUG-004 Updated from bugfix patch
+**Bugfix**: 2026-08-20 — BUG-005 Updated from bugfix patch; ~~T031/T036 packaged acceptance verification remains pending without the recorded controller + two-observer approve/reject/close evidence.~~ T031/T036 are complete with accepted packaged controller + two-observer approve/reject/close evidence recorded in `.spec-context.json`.
 
 **Input**: design artifacts from `specs/010-terminal-navigation/`
 
@@ -70,16 +71,16 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [x] **T012** [P] [US1] Добавить coordinator tests для controller-only linked command, exact-one pending, 20 replayed requests, competing-action conflict, approve/reject, stale/missing/self target и atomic route/active revision · `internal/control/service_test.go`
+- [x] **T012** [P] [US1] ⚠️ Reopened — Добавить coordinator tests для controller-only linked command, exact-one pending, 20 replayed requests, competing-action conflict, approve/reject, stale/missing/self target и atomic route/active revision; по BUG-005 расширить матрицу до ordinary, initial/completed state-change и terminal-transition command, запретив result/write/terminal/route effect до exact approve `(reopened — BUG-005)` · `internal/control/service_test.go`
 - [x] **T013** [P] [US1] ⚠️ Reopened — добавить Playwright tests для mutually-exclusive authoring, completed-state guard, save/reopen, inbound-delete guard и master forward decision dialog; согласовать fixture round-trip с полной session, не теряющей второй terminal `(reopened — BUG-001)`; по BUG-004 заменить checkbox assertions на один ordinary/state-change/transition selector и проверить отсутствие inactive config после каждого switch/save/reopen `(reopened — BUG-004)` · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixtures/desktop-bindings.js`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then Wave 2 — independent (different files):**
 
-- [x] **T014** [P] [US1] Перехватывать linked `NavigateCommand` после authority/replay checks, создавать один `PendingTerminalNavigation`, блокировать gameplay и атомарно approve/reject со свежим catalog lookup · `internal/control/service.go`
+- [x] **T014** [P] [US1] ⚠️ Reopened — Перехватывать linked `NavigateCommand` после authority/replay checks, создавать один `PendingTerminalNavigation`, блокировать gameplay и атомарно approve/reject со свежим catalog lookup; по BUG-005 перенести interception перед dispatch любого command mode, обеспечить один общий pending invariant и выполнять ordinary/state-change/transition effect только после exact approve `(reopened — BUG-005)` · `internal/control/service.go`
 - [x] **T015** [P] [US1] ⚠️ Reopened — ~~использовать два command-editor checkbox toggle с программным mutual exclusion~~; по BUG-004 добавить один ordinary/state-change/terminal-transition mode selector, очищать inactive config, сохранять target select, local validation, completed-state guard, inbound-reference delete guard и deduplicated master dialog `(reopened — BUG-004)` · `frontend/src/master.js`, `frontend/src/master.css`, `frontend/src/desktop-api.js`
-- [x] **T016** [P] [US1] [US3] ⚠️ Reopened — отображать authoritative pending status и делать shared controls inert без optimistic terminal switch; по BUG-002 для прямого pending скрывать меню и переиспользовать полноэкранный record-description renderer с точным текстом «Выполняется запрос», не объединяя отдельные protocol lifecycles; по BUG-003 применять тот же renderer к return pending, скрывать текущий экран и notice overlay и не выполнять преждевременный pop маршрута `(reopened — BUG-002)` `(reopened — BUG-003)` · `client/client.js`, `client/client.css`
+- [x] **T016** [P] [US1] [US3] ⚠️ Reopened — отображать authoritative pending status и делать shared controls inert без optimistic terminal switch; по BUG-002 для прямого pending скрывать меню и переиспользовать полноэкранный record-description renderer с точным текстом «Выполняется запрос», не объединяя отдельные protocol lifecycles; по BUG-003 применять тот же renderer к return pending, скрывать текущий экран и notice overlay и не выполнять преждевременный pop маршрута; по BUG-005 применять этот renderer и server-authoritative input lock к ordinary, initial/completed state-change и terminal-transition pending без раннего result `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-005)` · `client/client.js`, `client/client.css`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
@@ -87,7 +88,7 @@
 
 **⟶ Wait for T017 to finish, then:**
 
-- [x] **T018** [US1] Регенерировать allowlisted Wails binding и завершить browser fixture/server wiring для полного authored-link → pending → approve/reject journey · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
+- [x] **T018** [US1] ⚠️ Reopened — Регенерировать allowlisted Wails binding и завершить browser fixture/server wiring для полного authored-link → pending → approve/reject journey; по BUG-005 fixtures/private wiring MUST переносить exact command identity и mode-specific context для ordinary, initial/completed state-change и transition requests без обязательного ordinary config `(reopened — BUG-005)` · `frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js`, `frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
 
 **Checkpoint**: User Story 1 independently persists and executes one master-approved forward transition, while rejection and invalid/stale links preserve the source state.
 
@@ -150,14 +151,14 @@
 
 **Wave 1 — independent (different files), write these tests to fail first:**
 
-- [x] **T026** [P] [US4] Добавить authority, concurrent request, snapshot/reconnect, monotonic stream, stale edit, manual/end/shutdown clearing и public/private capability-separation tests · `internal/control/service_test.go`, `internal/player/adapter_test.go`, `internal/player/public_stream_test.go`, `app_test.go`, `app_contract_test.go`, `wails_host_test.go`
-- [x] **T027** [P] [US4] ⚠️ Reopened — расширить journey controller + two observers проверками pending reconnect, convergence ≤2s, stale target safe failure, moved/deleted return path и new-broadcast cleanup; по BUG-002 доказать для прямого pending одинаковый полноэкранный record-description screen с точным текстом «Выполняется запрос», скрытым меню и заблокированными `Back`/`Enter` до решения; по BUG-003 доказать ту же поверхность и блокировку для return pending у controller/observers/reconnect `(reopened — BUG-002)` `(reopened — BUG-003)` · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixture-server/main.go`
+- [x] **T026** [P] [US4] ⚠️ Reopened — Добавить authority, concurrent request, snapshot/reconnect, monotonic stream, stale edit, manual/end/shutdown clearing и public/private capability-separation tests; по BUG-005 доказать один pending across command modes, private-only decision и отсутствие mode-specific эффекта до approve `(reopened — BUG-005)` · `internal/control/service_test.go`, `internal/player/adapter_test.go`, `internal/player/public_stream_test.go`, `app_test.go`, `app_contract_test.go`, `wails_host_test.go`
+- [x] **T027** [P] [US4] ⚠️ Reopened — расширить journey controller + two observers проверками pending reconnect, convergence ≤2s, stale target safe failure, moved/deleted return path и new-broadcast cleanup; по BUG-002 доказать для прямого pending одинаковый полноэкранный record-description screen с точным текстом «Выполняется запрос», скрытым меню и заблокированными `Back`/`Enter` до решения; по BUG-003 доказать ту же поверхность и блокировку для return pending у controller/observers/reconnect; по BUG-005 распространить тот же экран, блокировку и reconnect convergence на ordinary, initial/completed state-change и terminal-transition commands `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-005)` · `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixture-server/main.go`
 
 ### Implementation
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [x] **T028** [US4] Завершить single-revision public/private publication, reconnect projection, typed master notice и route/pending/notice clearing при manual activation/clear, end broadcast и shutdown · `internal/control/service.go`, `internal/player/adapter.go`, `app.go`, `frontend/src/master.js`, `client/client.js`
+- [x] **T028** [US4] ⚠️ Reopened — Завершить single-revision public/private publication, reconnect projection, typed master notice и route/pending/notice clearing при manual activation/clear, end broadcast и shutdown; по BUG-005 публиковать exact generic command identity/mode в private coordination и единый secret-free waiting state публично для каждого command mode `(reopened — BUG-005)` · `internal/control/service.go`, `internal/player/adapter.go`, `app.go`, `frontend/src/master.js`, `client/client.js`
 
 **Checkpoint**: User Story 4 independently proves authoritative multi-client convergence, safe stale handling and broadcast-scoped cleanup.
 
@@ -173,11 +174,11 @@
 
 **⟶ Wait for T029 to finish, then:**
 
-- [x] **T030** ⚠️ Reopened — выполнить единственную полную Success Criteria validation: `go test ./internal/domain ./internal/session ./internal/nav`, `go test -race ./internal/control ./internal/live ./internal/player`, `go test ./...`, frontend/client builds, focused `terminal-navigation.spec.mjs`, затем `make check`, включая SC-009 `(reopened — BUG-001)`, SC-010 `(reopened — BUG-002)`, SC-011 `(reopened — BUG-003)` и SC-012 shared oneof/single-choice authoring `(reopened — BUG-004)` · `specs/010-terminal-navigation/spec.md`, `Makefile`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
+- [x] **T030** ⚠️ Reopened — выполнить единственную полную Success Criteria validation: `go test ./internal/domain ./internal/session ./internal/nav`, `go test -race ./internal/control ./internal/live ./internal/player`, `go test ./...`, frontend/client builds, focused `terminal-navigation.spec.mjs`, затем `make check`, включая SC-009 `(reopened — BUG-001)`, SC-010 `(reopened — BUG-002)`, SC-011 `(reopened — BUG-003)`, SC-012 shared oneof/single-choice authoring `(reopened — BUG-004)` и SC-013–SC-014 universal command approval `(reopened — BUG-005)` · `specs/010-terminal-navigation/spec.md`, `Makefile`, `frontend/package.json`, `client/package.json`, `tests/browser/package.json`
 
 **⟶ Wait for T030 to finish, then:**
 
-- [x] **T031** ⚠️ Reopened — собрать accepted Wails runtime и пройти native master + controller + two observers smoke для approve/reject, 10 revisits, three-terminal unwind, reconnect and shutdown cleanup; дополнительно открыть реальный `sessions/demo.json`, применить `t_demo1` → `t_demo2`, дождаться durable revision и проверить цель после reopen; по BUG-002 доказать полноэкранный прямой pending «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать ту же полноэкранную поверхность для return pending и восстановление текущего root screen после reject/close; по BUG-004 пройти native ordinary/state-change/transition selector, switch cleanup и save/reopen ровно одного config; зафиксировать любой недоступный manual gate без ложного PASS `(reopened — BUG-001)` `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-004)` · `main.go`, `app.go`, `wails.json`, `sessions/demo.json`, `specs/010-terminal-navigation/spec.md`
+- [x] **T031** ⚠️ Reopened — собрать accepted Wails runtime и пройти native master + controller + two observers smoke для approve/reject, 10 revisits, three-terminal unwind, reconnect and shutdown cleanup; дополнительно открыть реальный `sessions/demo.json`, применить `t_demo1` → `t_demo2`, дождаться durable revision и проверить цель после reopen; по BUG-002 доказать полноэкранный прямой pending «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать ту же полноэкранную поверхность для return pending и восстановление текущего root screen после reject/close; по BUG-004 пройти native ordinary/state-change/transition selector, switch cleanup и save/reopen ровно одного config; по BUG-005 выбрать в native journey ordinary, initial/completed state-change и transition command, получить exact master request и один общий waiting screen до единственного mode-specific approve effect, отдельно проверить reject/close без эффекта; зафиксировать любой недоступный manual gate без ложного PASS `(reopened — BUG-001)` `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-004)` `(reopened — BUG-005)` ~~`(verification pending — BUG-005: recorded native evidence does not satisfy the complete two-observer approve/reject/close matrix)`~~ `(verified — BUG-005: accepted packaged controller + two-observer approve/reject/close evidence is recorded in .spec-context.json)` · `main.go`, `app.go`, `wails.json`, `sessions/demo.json`, `specs/010-terminal-navigation/spec.md`
 
 ---
 
@@ -195,12 +196,15 @@
 - BUG-002 corrective DAG overrides the earlier completion state: `T037` failing presentation regression → reopened `T016` correction → reopened `T027` multi-player/reconnect proof → reopened `T030` full gate → reopened `T031` native smoke → reopened `T036` accepted packaged-runtime gate.
 - BUG-003 corrective DAG overrides the earlier completion state: `T038` failing return-presentation regression → reopened `T016` correction → reopened `T023` return journey and `T027` multi-player/reconnect proof → reopened `T030` full gate → reopened `T031` native smoke → reopened `T036` accepted packaged-runtime gate.
 - BUG-004 corrective DAG overrides phase ordering for its reopened tasks: schema branch `T039` failing regression → reopened `T001` → `T004` → reopened `T005` and `T006` fail/pass cycle → reopened `T008` → `T009`; authoring branch `T040` failing regression → reopened `T013` fail/pass cycle → reopened `T015`; both branches → reopened `T029` → `T030` → `T031`.
+- BUG-005 corrective DAG overrides phase ordering for its reopened tasks: `T041` plus reopened `T012/T026/T037` failing universal-approval regressions → `T042` plus reopened `T014/T018/T028` correction and `T015/T017` focused audit → `T043` plus reopened `T016/T027` shared-presentation correction → `T044` focused mode matrix → reopened `T030` full gate → reopened `T031` native smoke → reopened `T036` packaged-runtime gate.
+- Phase 14 post-verification convergence tail: `T036` packaged-runtime gate → `T045` exact master-dialog lifecycle coverage → `T046` CRT approval/rendering and full-browser coverage.
 
 ## Parallel Opportunities
 
 - Contract files `T001–T003`, foundation test files `T005–T007`, and foundation implementations `T009–T010` are independent inside their declared waves.
 - After the foundation, each story's Go tests and Playwright tests can be authored together; implementation work marked `[P]` separates coordinator, master UI and player UI files.
 - Tasks that revisit `internal/control/service.go`, `internal/control/service_test.go`, `client/client.js`, `frontend/src/master.js`, or `tests/browser/terminal-navigation.spec.mjs` stay ordered by phase even when they cover different stories.
+- BUG-005 work touching the shared coordinator, private dialog, player renderer or browser fixture follows `T041 → T042 → T043 → T044`; prior feature-009 ordinary/completed regression expectations are changed only inside that ordered correction.
 
 ## Phase 7: Convergence
 
@@ -225,7 +229,7 @@
 
 ## Phase 9: Convergence
 
-- [x] T036 **HIGH** ⚠️ Reopened — пройти и зафиксировать на accepted packaged Wails runtime полный native master + controller + two observers journey для approve/reject, 10 повторных посещений без повторного взлома, трёхтерминального LIFO unwind, reconnect во время pending и shutdown/new-broadcast cleanup; по BUG-002 доказать SC-010: прямой pending использует полноэкранный record-description screen «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать SC-011: return pending использует ту же поверхность без текущего terminal screen/notice overlay и reject/close восстанавливает неизменённый root screen/return control; не считать browser-fixture coverage или отдельный `sessions/demo.json` save/reopen smoke заменой этому acceptance gate per SC-001–SC-011 / plan: Verification Strategy and interactive acceptance / T031 (partial) `(reopened — BUG-002)` `(reopened — BUG-003)` · `build/bin/Fallout Terminal.app`, `sessions/demo.json`, `specs/010-terminal-navigation/.spec-context.json`
+- [x] T036 **HIGH** ⚠️ Reopened — пройти и зафиксировать на accepted packaged Wails runtime полный native master + controller + two observers journey для approve/reject, 10 повторных посещений без повторного взлома, трёхтерминального LIFO unwind, reconnect во время pending и shutdown/new-broadcast cleanup; по BUG-002 доказать SC-010: прямой pending использует полноэкранный record-description screen «Выполняется запрос» без одновременно видимого меню у controller/observers/reconnect; по BUG-003 доказать SC-011: return pending использует ту же поверхность без текущего terminal screen/notice overlay и reject/close восстанавливает неизменённый root screen/return control; по BUG-005 доказать SC-013–SC-014 на ordinary, initial/completed state-change и transition approve/reject/close с exact master request, общим waiting renderer и ровно одним либо нулевым mode-specific effect; не считать browser-fixture coverage или отдельный `sessions/demo.json` save/reopen smoke заменой этому acceptance gate per SC-001–SC-014 / plan: Verification Strategy and interactive acceptance / T031 (partial) `(reopened — BUG-002)` `(reopened — BUG-003)` `(reopened — BUG-005)` ~~`(verification pending — BUG-005: complete packaged acceptance evidence is not recorded)`~~ `(verified — BUG-005: complete packaged acceptance evidence is recorded in .spec-context.json)` · `build/bin/Fallout Terminal.app`, `sessions/demo.json`, `specs/010-terminal-navigation/.spec-context.json`
 
 ## Phase 10: BUG-002 — full-screen pending presentation for direct transitions
 
@@ -233,7 +237,7 @@
 
 ### Tests
 
-- [x] **T037** [US1] [US4] Добавить падающий Playwright regression для controller + two observers + reconnect: после выбора команды перехода source menu скрыто, отображается тот же record-description renderer, что у ожидающей state-changing команды, body точно равен «Выполняется запрос», `Back`/`Enter`/shared actions неэффективны, approve показывает target initial screen, а reject/close восстанавливает неизменённое source menu · `tests/browser/terminal-navigation.spec.mjs`
+- [x] **T037** [US1] [US4] ⚠️ Reopened — Добавить падающий Playwright regression для controller + two observers + reconnect: после выбора команды перехода source menu скрыто, отображается тот же record-description renderer, что у ожидающей state-changing команды, body точно равен «Выполняется запрос», `Back`/`Enter`/shared actions неэффективны, approve показывает target initial screen, а reject/close восстанавливает неизменённое source menu; по BUG-005 использовать эту поверхность как baseline и доказать тот же pending contract для ordinary и initial/completed state-change `(reopened — BUG-005)` · `tests/browser/terminal-navigation.spec.mjs`
 
 ### Implementation and verification
 
@@ -269,3 +273,36 @@
 **⟶ After the regressions fail:** выполнить schema branch **T039** → **T001** → **T004** → **T005/T006** → **T008** → **T009** и authoring branch **T040** → **T013** → **T015**; после завершения обеих веток выполнить **T029** → **T030** → **T031**.
 
 **Checkpoint**: SC-012 доказана на descriptor, adapters, browser и packaged native paths; каждый command имеет ordinary/unset либо ровно один configured behavior, а существующие session v1 field numbers и JSON names не меняются.
+
+## Phase 13: BUG-005 — universal master approval for every command
+
+**Purpose**: Поместить единый server-authoritative master approval gate перед эффектом каждого command mode и показывать всем игрокам один record-description экран «Выполняется запрос» до решения, не превращая ordinary-команды в durable state changes и не объединяя mode-specific approved outcomes.
+
+### Wave 1 — failing regression and artifact-conflict proof
+
+- [x] **T041** [US1] [US4] Добавить падающую cross-mode regression matrix для ordinary, initial state-changing, completed state-changing и terminal-transition commands: каждый controller selection создаёт один exact master request, controller + two observers + reconnect видят один полноэкранный «Выполняется запрос», 20 replays/competing actions не создают второй pending, а до approve отсутствуют result, durable write и terminal/route mutation; отдельно зафиксировать падение feature-009 ordinary/completed no-request expectations per FR-028/FR-033–FR-036, SC-013 · `internal/control/service_test.go`, `internal/live/service_test.go`, `internal/player/public_stream_test.go`, `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/terminal-navigation.spec.mjs`
+
+**⟶ T041 and reopened T012/T026/T037 must fail for the approval bypass before Wave 2.**
+
+### Wave 2 — universal approval boundary and private decision
+
+- [x] **T042** [US1] Реализовать behavior-independent command interception после authority/replay и немутирующих mode-specific preflight checks, но до mode dispatch: сохранить safe pre-pending rejection invalid/stale/missing/self-target, хранить не более одного pending across ordinary/state-change/transition/return, проецировать exact command name/mode и применимый existing context в private master dialog, принимать exact approve/reject/close, затем направлять approve в ordinary result без write, initial state-change persist-once, completed frozen result без write или atomic terminal transition; reject/close сохраняет существующую mode-specific post-decision presentation без эффекта. Переиспользовать существующие private/public contracts либо сделать только минимальное additive расширение и обновить superseded feature-009 ordinary/completed tests `(reopened T014/T018/T028; audit T015/T017)` · `internal/control/service.go`, `internal/live/service.go`, `internal/player/adapter.go`, `app.go`, `app_contract.go`, `desktop_service.go`, `frontend/src/master.js`, `frontend/src/desktop-api.js`, `tests/browser/fixture-server/main.go`, `tests/browser/fixtures/desktop-bindings.js`
+
+**⟶ T042 and reopened T014/T018/T028 plus the T015/T017 audit must finish before Wave 3.**
+
+### Wave 3 — shared player presentation and reconnect
+
+- [x] **T043** [US1] [US4] Провести ordinary, initial/completed state-change и transition pending через один record-description presentation primitive с точным текстом «Выполняется запрос», скрытым menu/result/terminal screen, server + UI блокировкой `Back`/`Enter`/shared actions, monotonic controller/observer/reconnect projection и без optimistic result; сохранить существующие mode-specific post-decision screens `(reopened T016/T027)` · `client/client.js`, `client/client.css`, `internal/player/adapter.go`, `internal/player/stream.go`, `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/terminal-navigation.spec.mjs`, `tests/browser/fixture-server/main.go`
+
+**⟶ T043 and reopened T016/T027 must finish before Wave 4.**
+
+### Wave 4 — focused verification
+
+- [x] **T044** [US1] [US4] Проверить controller + two observers + reconnect для approve/reject/close каждого command mode, exact visible master identity/context, 20 replayed/concurrent selections, lifecycle cancellation и отсутствие раннего эффекта; доказать ordinary/completed zero-write, initial state-change exactly-one durable write, transition exactly-one active-terminal/route mutation и reject/close zero-effect с существующей mode-specific post-decision presentation, затем передать SC-013–SC-014 в переоткрытые T030 → T031 → T036 · `internal/control/service_test.go`, `internal/live/service_test.go`, `internal/player/public_stream_test.go`, `tests/browser/state-changing-command-authoring.spec.mjs`, `tests/browser/state-changing-command-approval.spec.mjs`, `tests/browser/terminal-navigation.spec.mjs`
+
+**Checkpoint**: Любая команда требует private master approval, все игроки видят один server-authoritative экран ожидания, а approve сохраняет ровно исходную семантику выбранного command mode.
+
+## Phase 14: Convergence
+
+- [x] T045 HIGH Обновить `tests/browser/state-changing-command-sync.spec.mjs`, чтобы helper и три lifecycle journey проверяли обязательные exact request ID, command mode и command name в master dialog, сохраняя controller + two observers convergence, disconnect, restart/reopen и zero-extra-write assertions, затем провести isolated и полный browser gate per FR-035 / plan: Verification Strategy (contradicts)
+- [x] T046 HIGH Провести ordinary-command состояния CRT fixture через явное private master approval до diagnostic result/reveal assertions, сохранить отдельную проверку полноэкранного `Выполняется запрос` и input lock и восстановить все viewport/reveal и полный browser gate в `tests/browser/crt-rendering.spec.mjs` и `tests/browser/fixture-server/main.go` per FR-033, FR-034, FR-036, SC-013, SC-014 / plan: Phase 5 (contradicts)

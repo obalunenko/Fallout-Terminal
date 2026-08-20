@@ -1202,52 +1202,176 @@ func TestAcceptedPlayerActionsPreserveNavigationAndHackingOutcomes(t *testing.T)
 
 }
 
-func TestOrdinaryCommandKeepsLegacyNavigationResultAndReplayWithoutPendingOrPersistence(t *testing.T) {
-	store := &recordingCommandStateStore{}
-	fixture := newCommandExecutionFixture(t, store)
-	const commandID = "diagnostic"
-	fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
-		terminal := runtime.Broadcast.TerminalRuntimes[fixture.terminalID]
-		terminal.Tree.Children = append(terminal.Tree.Children, domain.ContentNode{
-			ID: commandID, Type: domain.NodeCommand, Name: "RUN DIAGNOSTIC", Text: "SYSTEM NOMINAL",
+func TestUniversalCommandApprovalMatrixCreatesOnePendingBeforeAnyModeEffect(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		commandName string
+		mode        domain.CommandApprovalMode
+		configure   func(*commandExecutionFixture)
+		transition  bool
+	}{
+		{
+			name: "ordinary", commandName: "Open doors", mode: domain.CommandApprovalModeOrdinary,
+			configure: func(fixture *commandExecutionFixture) {
+				fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+					children := runtime.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children
+					for index := range children {
+						if children[index].ID == fixture.commandID {
+							children[index].StateChange = nil
+						}
+					}
+					return transition{accepted: true}
+				})
+			},
+		},
+		{name: "initial state-changing", commandName: "Open doors", mode: domain.CommandApprovalModeStateChange},
+		{
+			name: "completed state-changing", commandName: "Doors open", mode: domain.CommandApprovalModeCompletedStateChange,
+			configure: func(fixture *commandExecutionFixture) {
+				fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+					terminal := runtime.Broadcast.TerminalRuntimes[fixture.terminalID]
+					terminal.CommandStates = map[string]domain.CommandExecutionState{
+						fixture.commandID: {CompletedName: "Doors open", ResultText: "Doors opened"},
+					}
+					return transition{accepted: true}
+				})
+			},
+		},
+		{
+			name: "terminal transition", commandName: "Open doors",
+			configure: func(fixture *commandExecutionFixture) {
+				fixture.service.terminalCatalog = &recordingTerminalCatalog{transitions: map[string]domain.TerminalTransitionTarget{
+					fixture.terminalID + "/" + fixture.commandID: {
+						SourceTerminalID: fixture.terminalID, SourceTerminalName: "Terminal 1",
+						CommandID: fixture.commandID, CommandName: "Open doors",
+						Target: terminalTarget("terminal-b", "Terminal B"),
+					},
+				}}
+				fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+					children := runtime.Broadcast.TerminalRuntimes[fixture.terminalID].Tree.Children
+					for index := range children {
+						if children[index].ID == fixture.commandID {
+							children[index].StateChange = nil
+							children[index].TerminalTransition = &domain.TerminalTransitionConfig{TargetTerminalID: "terminal-b"}
+						}
+					}
+					return transition{accepted: true}
+				})
+			},
+			transition: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &recordingCommandStateStore{}
+			fixture := newCommandExecutionFixture(t, store)
+			if test.configure != nil {
+				test.configure(&fixture)
+			}
+
+			before := canonicalTerminal(t, fixture.service, fixture.terminalID)
+			activeBefore := *fixture.service.Snapshot().Broadcast.ActiveTerminalID
+			command := fixture.command(domain.RequestID("universal-approval-" + test.name))
+			result := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
+			require.True(t, result.Accepted)
+
+			state := fixture.service.Snapshot()
+			var pendingID string
+			if test.transition {
+				require.NotNil(t, state.PendingTerminalNavigation, "%s bypassed master approval", test.name)
+				require.Nil(t, state.PendingCommandExecution)
+				require.Equal(t, fixture.commandID, state.PendingTerminalNavigation.CommandID)
+				require.Equal(t, test.commandName, state.PendingTerminalNavigation.CommandName)
+				pendingID = state.PendingTerminalNavigation.RequestID
+			} else {
+				require.NotNil(t, state.PendingCommandExecution, "%s bypassed master approval", test.name)
+				require.Nil(t, state.PendingTerminalNavigation)
+				require.Equal(t, fixture.commandID, state.PendingCommandExecution.CommandID)
+				require.Equal(t, test.commandName, state.PendingCommandExecution.CommandName)
+				require.Equal(t, test.mode, state.PendingCommandExecution.Mode)
+				pendingID = state.PendingCommandExecution.RequestID
+			}
+			require.NotEmpty(t, pendingID)
+			require.Equal(t, activeBefore, *state.Broadcast.ActiveTerminalID)
+			after := canonicalTerminal(t, fixture.service, fixture.terminalID)
+			require.Equal(t, before.Nav, after.Nav)
+			require.Equal(t, before.CommandStates, after.CommandStates)
+			require.Zero(t, fixture.runtime.Calls(), "result became visible before approval")
+			require.Zero(t, store.ExecuteCalls(), "durable state changed before approval")
+
+			for attempt := range 20 {
+				replayed := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
+				require.Equal(t, result, replayed, "exact replay %d", attempt)
+				current := fixture.service.Snapshot()
+				if test.transition {
+					require.Equal(t, pendingID, current.PendingTerminalNavigation.RequestID)
+				} else {
+					require.Equal(t, pendingID, current.PendingCommandExecution.RequestID)
+				}
+			}
+			competing := fixture.command(domain.RequestID("competing-" + test.name))
+			competing.Action, competing.NodeID = "back", ""
+			require.Equal(t, domain.ActionReasonConflict,
+				fixture.service.DispatchPlayerAction(fixture.controllerConnection, competing).Reason)
+			require.Zero(t, fixture.runtime.Calls())
+			require.Zero(t, store.ExecuteCalls())
 		})
-		return transition{accepted: true}
-	})
-
-	command := domain.RuntimeCommand{
-		RequestID: "ordinary-command-replay", BroadcastID: fixture.broadcastID,
-		TerminalID: fixture.terminalID, Kind: domain.RuntimeCommandNavigate,
-		Action: "command", NodeID: commandID,
 	}
-	effectsBefore := len(fixture.effects.Values())
-	revisionBefore := fixture.service.Revision()
-	first := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
-	require.True(t, first.Accepted)
-	require.Equal(t, domain.ActionReasonAccepted, first.Reason)
-	require.Equal(t, revisionBefore+1, first.Revision)
-	require.Nil(t, fixture.service.Snapshot().PendingCommandExecution)
-	require.Zero(t, store.ExecuteCalls())
-	require.Equal(t, 1, fixture.runtime.Calls())
-	terminal := canonicalTerminal(t, fixture.service, fixture.terminalID)
-	require.Nil(t, terminal.CommandExecution)
-	require.NotNil(t, terminal.Nav.CommandNodeID)
-	require.Equal(t, commandID, *terminal.Nav.CommandNodeID)
-	for _, effect := range fixture.effects.Values()[effectsBefore:] {
-		require.Nil(t, effect.Master, "ordinary command emitted a private master prompt projection")
-	}
+}
 
-	afterFirst := canonicalTerminalBytes(t, fixture.service, fixture.terminalID)
-	afterFirstEffects := len(fixture.effects.Values())
-	replayed := fixture.service.DispatchPlayerAction(fixture.controllerConnection, command)
-	require.Equal(t, first, replayed)
-	require.Equal(t, first.Revision, fixture.service.Revision())
-	require.Equal(t, 1, fixture.runtime.Calls(), "exact replay repeated ordinary navigation")
-	require.Zero(t, store.ExecuteCalls())
-	require.Nil(t, fixture.service.Snapshot().PendingCommandExecution)
-	require.Equal(t, afterFirst, canonicalTerminalBytes(t, fixture.service, fixture.terminalID))
-	for _, effect := range fixture.effects.Values()[afterFirstEffects:] {
-		require.Nil(t, effect.Master)
-		require.Nil(t, effect.Live, "exact replay republished ordinary terminal mutation")
+func TestOrdinaryAndCompletedCommandDecisionsPreserveModeSpecificEffects(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		completed bool
+		decision  domain.CommandExecutionDecision
+	}{
+		{name: "ordinary approve", decision: domain.CommandExecutionApprove},
+		{name: "ordinary reject", decision: domain.CommandExecutionReject},
+		{name: "completed approve", completed: true, decision: domain.CommandExecutionApprove},
+		{name: "completed reject", completed: true, decision: domain.CommandExecutionReject},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := &recordingCommandStateStore{}
+			fixture := newCommandExecutionFixture(t, store)
+			fixture.service.commit(func(runtime *domain.ProcessRuntime) transition {
+				terminal := runtime.Broadcast.TerminalRuntimes[fixture.terminalID]
+				if test.completed {
+					terminal.CommandStates = map[string]domain.CommandExecutionState{
+						fixture.commandID: {CompletedName: "Doors open", ResultText: "Doors opened"},
+					}
+				} else {
+					for index := range terminal.Tree.Children {
+						if terminal.Tree.Children[index].ID == fixture.commandID {
+							terminal.Tree.Children[index].StateChange = nil
+						}
+					}
+				}
+				return transition{accepted: true}
+			})
+
+			before := canonicalTerminal(t, fixture.service, fixture.terminalID)
+			selected := fixture.service.DispatchPlayerAction(
+				fixture.controllerConnection,
+				fixture.command(domain.RequestID("decision-"+test.name)),
+			)
+			require.True(t, selected.Accepted)
+			pending := fixture.service.Snapshot().PendingCommandExecution
+			require.NotNil(t, pending)
+
+			state, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, test.decision)
+			require.NoError(t, err)
+			require.Nil(t, mutation)
+			require.Nil(t, state.PendingCommandExecution)
+			require.Zero(t, store.ExecuteCalls())
+			after := canonicalTerminal(t, fixture.service, fixture.terminalID)
+			require.Nil(t, after.CommandExecution)
+			require.Equal(t, before.CommandStates, after.CommandStates)
+			if test.decision == domain.CommandExecutionApprove {
+				require.NotNil(t, after.Nav.CommandNodeID)
+				require.Equal(t, fixture.commandID, *after.Nav.CommandNodeID)
+			} else {
+				require.Equal(t, before.Nav, after.Nav)
+			}
+		})
 	}
 }
 
@@ -1269,6 +1393,7 @@ func TestStateChangingCommandSelectionCreatesOneServerOwnedPendingRequest(t *tes
 	require.Equal(t, fixture.terminalID, pending.TerminalID)
 	require.Equal(t, fixture.commandID, pending.CommandID)
 	require.Equal(t, "Open doors", pending.CommandName)
+	require.Equal(t, domain.CommandApprovalModeStateChange, pending.Mode)
 	require.Equal(t, "Open the doors?", pending.ConfirmationText)
 	require.Equal(t, 0, fixture.runtime.Calls(), "pending selection must not execute ordinary navigation")
 	require.Equal(t, 0, fixture.store.ExecuteCalls())
@@ -1289,7 +1414,7 @@ func TestStateChangingCommandSelectionCreatesOneServerOwnedPendingRequest(t *tes
 	}
 }
 
-func TestCompletedStateChangingCommandHandles100ConcurrentRepeatsWithOneDurableExecution(t *testing.T) {
+func TestCompletedStateChangingCommandRequiresFreshApprovalWithoutSecondDurableExecution(t *testing.T) {
 	store := &recordingCommandStateStore{
 		mutation: CommandStateMutation{Changed: true, Revision: 72, Session: commandExecutionSession(true)},
 	}
@@ -1306,62 +1431,22 @@ func TestCompletedStateChangingCommandHandles100ConcurrentRepeatsWithOneDurableE
 	require.Equal(t, 1, store.ExecuteCalls())
 	require.Equal(t, 0, fixture.runtime.Calls())
 
-	effectsBefore := len(fixture.effects.Values())
-	const callers = 100
-	start := make(chan struct{})
-	results := make(chan domain.ActionResult, callers)
-	var group sync.WaitGroup
-	group.Add(callers)
-	for attempt := range callers {
-		go func(attempt int) {
-			defer group.Done()
-			<-start
-			results <- fixture.service.DispatchPlayerAction(
-				fixture.controllerConnection,
-				fixture.command(domain.RequestID(fmt.Sprintf("completed-concurrent-%03d", attempt))),
-			)
-		}(attempt)
-	}
-	close(start)
-	group.Wait()
-	close(results)
-
-	accepted := 0
-	for result := range results {
-		require.True(t, result.Accepted)
-		require.Equal(t, domain.ActionReasonAccepted, result.Reason)
-		accepted++
-	}
-	require.Equal(t, callers, accepted)
-	require.Equal(t, callers, fixture.runtime.Calls())
-	require.Equal(t, 1, store.ExecuteCalls(), "concurrent completed requests performed a second durable execution")
-	require.Nil(t, fixture.service.Snapshot().PendingCommandExecution, "concurrent completed requests recreated pending")
-
-	wantFrozen := domain.CommandExecutionState{CompletedName: "Doors open", ResultText: "Doors opened"}
-	terminal := canonicalTerminal(t, fixture.service, fixture.terminalID)
-	require.NotNil(t, terminal.Nav.CommandNodeID)
-	require.Equal(t, fixture.commandID, *terminal.Nav.CommandNodeID)
-	require.Equal(t, wantFrozen, terminal.CommandStates[fixture.commandID])
-
-	resultEffects := 0
-	liveEffects := 0
-	for _, effect := range fixture.effects.Values()[effectsBefore:] {
-		require.Nil(t, effect.Master, "completed repeat emitted a master prompt")
-		if effect.Result != nil {
-			resultEffects++
-			require.True(t, effect.Result.Accepted)
-			require.Equal(t, domain.ActionReasonAccepted, effect.Result.Reason)
-		}
-		if effect.Live == nil {
-			continue
-		}
-		liveEffects++
-		require.Nil(t, effect.Live.CommandExecution)
-		require.NotNil(t, effect.Live.Nav.CommandNodeID)
-		require.Equal(t, fixture.commandID, *effect.Live.Nav.CommandNodeID)
-	}
-	require.Equal(t, callers, resultEffects)
-	require.GreaterOrEqual(t, liveEffects, callers)
+	beforeRepeat := canonicalTerminal(t, fixture.service, fixture.terminalID)
+	repeated := fixture.service.DispatchPlayerAction(
+		fixture.controllerConnection,
+		fixture.command("completed-requires-approval"),
+	)
+	require.True(t, repeated.Accepted)
+	pending = fixture.service.Snapshot().PendingCommandExecution
+	require.NotNil(t, pending, "completed command bypassed the universal approval boundary")
+	require.Equal(t, fixture.commandID, pending.CommandID)
+	require.Equal(t, "Doors open", pending.CommandName)
+	require.Equal(t, domain.CommandApprovalModeCompletedStateChange, pending.Mode)
+	require.Equal(t, 1, store.ExecuteCalls(), "completed repeat performed a second durable execution")
+	require.Equal(t, 0, fixture.runtime.Calls(), "completed result became visible before approval")
+	afterRepeat := canonicalTerminal(t, fixture.service, fixture.terminalID)
+	require.Equal(t, beforeRepeat.Nav, afterRepeat.Nav)
+	require.Equal(t, beforeRepeat.CommandStates, afterRepeat.CommandStates)
 }
 
 func TestApproveCommandExecutionWaitsForDurabilityBeforePublishingSuccess(t *testing.T) {

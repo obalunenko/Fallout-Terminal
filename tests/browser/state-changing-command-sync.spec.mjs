@@ -130,7 +130,7 @@ async function pageCount(page) {
   return Number.parseInt(value.split('/')[1], 10);
 }
 
-async function chooseStateChangingCommand(journey) {
+async function chooseStateChangingCommand(journey, request) {
   await journey.players[0].page.locator('.term-row', { hasText: 'Открыть двери' }).click();
   await Promise.all(journey.players.map(player =>
     expectFullScreenCommandSurface(player.page, 'Выполняется запрос')));
@@ -140,7 +140,16 @@ async function chooseStateChangingCommand(journey) {
 
   const dialog = journey.master.page.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText('КОМАНДА: Открыть двери');
+  const stateResponse = await request.get(`${FIXTURE}/state`);
+  expect(stateResponse.ok()).toBe(true);
+  const state = await stateResponse.json();
+  expect(state.pendingCommandExecution).toMatchObject({
+    commandName: 'Открыть двери',
+    mode: 'state-change',
+  });
+  await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(
+    `ЗАПРОС: ${state.pendingCommandExecution.requestId} · РЕЖИМ: ИЗМЕНЕНИЕ СОСТОЯНИЯ · КОМАНДА: Открыть двери`,
+  );
   await expect(dialog.locator('#commandExecutionDialogDescription')).toHaveText('Разрешить доступ в защищённый сектор?');
   return dialog;
 }
@@ -158,7 +167,7 @@ test.beforeEach(async ({ request }) => {
 test('controller and two observers converge on completed result and title within one second', async ({ browser, request }) => {
   const journey = await openThreePlayerJourney(browser);
   try {
-    const dialog = await chooseStateChangingCommand(journey);
+    const dialog = await chooseStateChangingCommand(journey, request);
     const startedAt = Date.now();
     await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
     await Promise.all(journey.players.map(player =>
@@ -199,7 +208,7 @@ test('controller and two observers converge on completed result and title within
 test('controller disconnect keeps one pending request and durable completion survives every shared lifecycle', async ({ browser, request }) => {
   const journey = await openThreePlayerJourney(browser);
   try {
-    const dialog = await chooseStateChangingCommand(journey);
+    const dialog = await chooseStateChangingCommand(journey, request);
     const controllerToken = await journey.players[0].page.evaluate(key => localStorage.getItem(key), TOKEN_KEY);
     expect(controllerToken).toMatch(/\S+/);
 
@@ -270,7 +279,7 @@ test('controller disconnect keeps one pending request and durable completion sur
 test('terminal switch, broadcast restart, and reopen cancel transient pending or rejected state without a write', async ({ browser, request }) => {
   const journey = await openThreePlayerJourney(browser);
   try {
-    let dialog = await chooseStateChangingCommand(journey);
+    let dialog = await chooseStateChangingCommand(journey, request);
     await postLifecycle(request, 'switch-away');
     await expect(dialog).toBeHidden();
     await Promise.all(journey.players.map(player =>
@@ -281,7 +290,7 @@ test('terminal switch, broadcast restart, and reopen cancel transient pending or
     await Promise.all(journey.players.map(player =>
       expect(player.page.locator('.term-row', { hasText: 'Открыть двери' })).toBeVisible()));
 
-    dialog = await chooseStateChangingCommand(journey);
+    dialog = await chooseStateChangingCommand(journey, request);
     await dialog.getByRole('button', { name: 'ОТКЛОНИТЬ' }).click();
     await expect(dialog).toBeHidden();
     await Promise.all(journey.players.map(player =>
@@ -305,7 +314,7 @@ test('terminal switch, broadcast restart, and reopen cancel transient pending or
       expect(player.page.locator('.term-row', { hasText: 'Открыть двери' })).toBeVisible()));
     await expect(journey.players[0].page.locator('#entryBody')).not.toContainText('Ошибка доступа');
 
-    dialog = await chooseStateChangingCommand(journey);
+    dialog = await chooseStateChangingCommand(journey, request);
     await dialog.press('Escape');
     await expect(dialog).toBeHidden();
     await Promise.all(journey.players.map(player =>
@@ -315,7 +324,7 @@ test('terminal switch, broadcast restart, and reopen cancel transient pending or
     await Promise.all(journey.players.map(player =>
       expect(player.page.locator('.term-row', { hasText: 'Открыть двери' })).toBeVisible()));
 
-    dialog = await chooseStateChangingCommand(journey);
+    dialog = await chooseStateChangingCommand(journey, request);
     await postLifecycle(request, 'reopen-session');
     await expect(dialog).toBeHidden();
     await Promise.all(journey.players.map(player => expect(player.page.locator('#characterSelect')).toBeVisible()));

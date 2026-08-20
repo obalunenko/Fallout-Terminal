@@ -683,9 +683,197 @@
       "by": "ai",
       "at": "2026-08-19T14:43:40.064Z",
       "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T21:30:53.023Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:41:38.438Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:01.802Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:01.919Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:02.037Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:55.564Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:55.669Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:55.779Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:42:55.899Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:43:08.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:43:08.141Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:43:08.254Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:45:51.067Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T21:52:09.261Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T21:54:04.208Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:21:13.128Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:21:24.307Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:36:47.594Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:36:54.859Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T00:08:34.745Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:10:42.236Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:16:53.832Z"
     }
   ],
-  "last_action": "BUG-004 implemented; 40/40 tasks complete; automated and accepted packaged native gates pass",
+  "last_action": "Idempotent implement reconciliation — 46/46 tasks complete; no source changes required",
   "coverage": {
     "FR-001": {
       "title": "Мастер MUST иметь возможность настроить обычную команду как команду перехода и выбрать для неё другой терминал из текущей сессии.",
@@ -1225,6 +1413,123 @@
         "tests/browser/terminal-navigation.spec.mjs::transition authoring is mutually exclusive validates locally and survives reopen",
         "native packaged command-mode save/reopen smoke"
       ]
+    },
+    "FR-033": {
+      "title": "Every valid command creates exactly one approval request before its mode-specific effect",
+      "tasks": [
+        "T041",
+        "T012",
+        "T014",
+        "T042",
+        "T044",
+        "T031",
+        "T036",
+        "T046"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native packaged four-mode acceptance",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "FR-034": {
+      "title": "All participants and reconnect use the same full-screen waiting renderer",
+      "tasks": [
+        "T016",
+        "T027",
+        "T043",
+        "T044",
+        "T031",
+        "T036",
+        "T046"
+      ],
+      "tests": [
+        "internal/live/service_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native packaged reconnect acceptance",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "FR-035": {
+      "title": "Private master request exposes exact request ID, command identity, mode, and context",
+      "tasks": [
+        "T015",
+        "T017",
+        "T018",
+        "T042",
+        "T044",
+        "T031",
+        "T036",
+        "T045"
+      ],
+      "tests": [
+        "app_contract_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native exact master request acceptance",
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "FR-036": {
+      "title": "Approve applies exactly the mode-specific effect and reject or close applies none",
+      "tasks": [
+        "T028",
+        "T042",
+        "T044",
+        "T031",
+        "T036",
+        "T046"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native packaged approve-reject-close matrix",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "SC-013": {
+      "title": "Universal approval and waiting convergence matrix passes across controller, observers, and reconnect",
+      "tasks": [
+        "T041",
+        "T044",
+        "T030",
+        "T031",
+        "T036",
+        "T045",
+        "T046"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native packaged controller-two-observers-reconnect matrix",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
+    },
+    "SC-014": {
+      "title": "Approve reject and close mode matrix preserves exactly one or zero effects",
+      "tasks": [
+        "T044",
+        "T030",
+        "T031",
+        "T036",
+        "T045",
+        "T046"
+      ],
+      "tests": [
+        "internal/control/service_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "native packaged four-mode decision matrix",
+        "tests/browser/state-changing-command-sync.spec.mjs",
+        "tests/browser/crt-rendering.spec.mjs"
+      ]
     }
   },
   "size": "oversized",
@@ -1343,6 +1648,31 @@
       "decision": "Use one three-option master command mode selector and delete inactive configs on apply",
       "why": "The UI can represent only ordinary, state-change, or terminal-transition and save/reopen restores exactly one choice",
       "rejected": "Two checkboxes with JavaScript mutual exclusion"
+    },
+    {
+      "decision": "Every valid player-selected command enters one server-authoritative master approval lifecycle; authored mode controls only the approved effect.",
+      "why": "BUG-005 requires approval to be behavior-independent while retaining ordinary, state-change, completed-state-change, and transition semantics.",
+      "rejected": "Preserving the ordinary/completed fast paths that bypass master approval."
+    },
+    {
+      "decision": "Provide deterministic Left/Right keyboard focus movement between Approve and Reject in private command and terminal-navigation dialogs.",
+      "why": "The signed Wails WebView does not expose dialog buttons in the macOS accessibility tree; the keyboard seam makes explicit reject independently operable and testable while preserving button behavior.",
+      "rejected": "Relying on inaccessible AX descendants or coordinate-only clicks."
+    },
+    {
+      "decision": "Assert the state-changing master dialog against the pending request ID returned by the fixture state endpoint.",
+      "why": "The dialog must prove the exact server-authoritative request identity, mode, and command name across every lifecycle journey.",
+      "rejected": "A fixed legacy string or request-ID pattern would not prove identity convergence."
+    },
+    {
+      "decision": "Approve CRT ordinary commands through a fixture-only endpoint that resolves the current private pending request.",
+      "why": "This exercises the real universal approval boundary while keeping production behavior and protobuf contracts unchanged.",
+      "rejected": "Bypassing approval or changing the command to a state-changing mode would invalidate the acceptance coverage."
+    },
+    {
+      "decision": "Leave implementation sources unchanged during this rerun.",
+      "why": "All 46 tasks are complete, the all-bugfix consistency verification passed, and no executable task remains.",
+      "rejected": "Reopening completed tasks or rerunning implementation work without a specification gap."
     }
   ],
   "step_summaries": {
@@ -1354,12 +1684,12 @@
       "summary": "31 tasks across Setup, Foundational, four user-story phases, and Polish; explicit waves, fail-first tests, and single-owner validation"
     },
     "implement": {
-      "summary": "Implemented BUG-004 end to end: CommandContent now has one real behavior oneof, domain/session mappings enforce one variant, and master authoring uses one three-mode selector with durable inactive-config cleanup.",
-      "key_finding": "JSON-v1 compatibility is preserved by retaining the two known pointer fields at the JSON boundary while exposing and validating a single semantic behavior discriminant.",
-      "risks": "No open implementation risks; protobuf field numbers and JSON names are unchanged and full automated plus native packaged gates passed."
+      "summary": "Closed convergence tasks T045 and T046 by aligning exact master-request assertions and routing CRT ordinary-command coverage through private approval; all repository and browser gates pass.",
+      "key_finding": "The remaining failures were stale browser expectations and fixture flow, not production behavior.",
+      "risks": "None identified; production and protobuf sources were unchanged."
     }
   },
-  "currentTask": "T031",
+  "currentTask": "T046",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1450,7 +1780,7 @@
     },
     "T012": {
       "status": "DONE",
-      "did": "Added fail-first coordinator coverage for controller-linked commands, exact-one pending, 20 replays, conflicts, reject/approve, stale targets, and atomic route activation",
+      "did": "Extended coordinator regressions to require one universal pending request across ordinary, initial/completed state-change, and transition commands with replay and pre-effect guards.",
       "files": [
         "internal/control/service_test.go"
       ]
@@ -1465,7 +1795,7 @@
     },
     "T014": {
       "status": "DONE",
-      "did": "Intercepted authorized linked commands after replay checks, enforced one pending/conflict semantics, and added fresh-catalog atomic forward approve/reject without manual switch",
+      "did": "Moved command interception ahead of behavior dispatch while preserving invalid/stale transition preflight and the single pending invariant.",
       "files": [
         "internal/control/service.go"
       ]
@@ -1482,9 +1812,12 @@
     },
     "T016": {
       "status": "DONE",
-      "did": "Generalized the full-screen terminal-navigation request renderer and input lock to return pending while suppressing notice overlays",
+      "did": "Verified ordinary, initial/completed state-change, forward, and return pending states use the same inert full-screen player surface.",
       "files": [
-        "client/client.js"
+        "client/client.js",
+        "client/client.css",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T017": {
@@ -1498,13 +1831,14 @@
     },
     "T018": {
       "status": "DONE",
-      "did": "Regenerated the 34-method Wails allowlist and completed deterministic browser fixture/server wiring for link authoring and exact approve/reject dialogs",
+      "did": "Regenerated additive private protobuf and Wails bindings and carried exact command mode through browser fixtures.",
       "files": [
-        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/desktopservice.js",
-        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js",
-        "tests/browser/fixture-server/main.go",
-        "tests/browser/fixtures/desktop-bindings.js",
-        "scripts/wails-bindings-check.sh"
+        "proto/fallout/terminal/private/v1/coordination.proto",
+        "proto/schema-revision.txt",
+        "internal/gen/fallout/terminal/private/v1/coordination.pb.go",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/internal/domain/models.js",
+        "frontend/bindings/github.com/obalunenko/Fallout-Terminal/internal/domain/index.js",
+        "tests/browser/fixture-server/main.go"
       ]
     },
     "T019": {
@@ -1564,33 +1898,29 @@
     },
     "T026": {
       "status": "DONE",
-      "did": "Added authority, concurrent-request, reconnect snapshot, stale edit, lifecycle clearing, exact private bridge, and public capability-separation coverage",
+      "did": "Covered cross-mode pending exclusivity, secret-free public projection, reconnect snapshots, and private exact command identity.",
       "files": [
         "internal/control/service_test.go",
-        "internal/player/adapter_test.go",
-        "internal/player/public_stream_test.go",
-        "app_test.go",
-        "app_contract_test.go",
-        "wails_host_test.go"
+        "internal/player/public_stream_test.go"
       ]
     },
     "T027": {
       "status": "DONE",
-      "did": "Proved the return-pending surface and input lock converge for the controller, two observers, and a reconnecting observer across all decisions",
+      "did": "Proved controller, two observers, and a reconnected player converge on the same universal pending screen with shared actions blocked.",
       "files": [
-        "tests/browser/terminal-navigation.spec.mjs"
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixture-server/main.go"
       ]
     },
     "T028": {
       "status": "DONE",
-      "did": "Completed revisioned reconnect projection, typed master notices, safe navigation result normalization, and route/pending/notice clearing at every lifecycle boundary",
+      "did": "Published exact private command identity and mode with one secret-free public pending phase across controller, observers, and reconnect.",
       "files": [
         "internal/control/service.go",
-        "internal/player/adapter.go",
-        "app.go",
-        "frontend/src/master.js",
-        "frontend/src/desktop-api.js",
-        "client/client.js"
+        "app_contract.go",
+        "internal/player/public_stream_test.go",
+        "frontend/src/master.js"
       ]
     },
     "T029": {
@@ -1604,20 +1934,21 @@
     },
     "T030": {
       "status": "DONE",
-      "did": "Passed the complete SC-012 validation: focused domain/session/nav tests, control/live/player race tests, go test ./..., frontend and client production builds, all 13 terminal-navigation Playwright tests, and aggregate make check including vet, full race, proto, breaking, and bindings gates.",
+      "did": "Passed domain/session/nav tests, race tests, full Go suite, frontend and player builds, 15/15 terminal-navigation browser tests, 22/22 frontend browser tests, and make check.",
       "files": [
         "specs/010-terminal-navigation/spec.md",
         "Makefile",
         "frontend/package.json",
         "client/package.json",
-        "tests/browser/package.json",
-        "internal/platform/assets_test.go"
+        "tests/browser/package.json"
       ]
     },
     "T031": {
       "status": "DONE",
-      "did": "Built and verified signed arm64 bundle (manifest 95ac50bb16b0371199293633a5a1df62eecd842410797931e2a12ac5b43e55f5), opened the real demo, then used an isolated copy for accepted native ordinary→state-change→terminal-transition save cycles. Durable JSON contained zero configs in ordinary, exactly stateChange in state-change, exactly terminalTransition targeting t_demo2 after the final switch, and restart/reopen restored the transition selector and target. Prior accepted native master/controller/two-observer navigation evidence remains unchanged; sessions/demo.json stayed untouched.",
+      "did": "Accepted signed Wails package passed native master plus controller and two observers for ordinary, initial/completed state-change, transition and return approve/reject/close; reconnect pending, real demo durability, ten no-rehack revisits, and shutdown were verified.",
       "files": [
+        "frontend/src/master.js",
+        "tests/browser/terminal-navigation.spec.mjs",
         "build/bin/Fallout Terminal.app",
         "sessions/demo.json",
         "specs/010-terminal-navigation/spec.md"
@@ -1662,18 +1993,22 @@
     },
     "T036": {
       "status": "DONE",
-      "did": "Passed the packaged native acceptance delta for SC-010 and SC-011 across controller, two observers, reconnect, approve and close decisions while retaining the previously accepted full navigation journey and shutdown coverage",
+      "did": "Full packaged-runtime gate passed: exact private requests and inert waiting surface across four modes, controller/two observers/reconnect, zero-effect reject/close, single approve effects, ten revisit loops, three-terminal A-B-C LIFO unwind, and clean process shutdown.",
       "files": [
         "build/bin/Fallout Terminal.app",
-        "client/client.js",
+        "sessions/demo.json",
+        "specs/010-terminal-navigation/.spec-context.json",
+        "frontend/src/master.js",
         "tests/browser/terminal-navigation.spec.mjs"
       ]
     },
     "T037": {
       "status": "DONE",
-      "did": "Added controller, two-observer, reconnect, input-lock, approve/reject/close regression; confirmed it fails because the record surface stays hidden",
+      "did": "Added controller, two-observer, and reconnect browser regressions for the shared full-screen pending command surface.",
       "files": [
-        "tests/browser/terminal-navigation.spec.mjs"
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/fixture-server/main.go"
       ]
     },
     "T038": {
@@ -1695,6 +2030,68 @@
       "did": "Added a fail-first Playwright regression for one exclusive command behavior selector and all three modes; confirmed it fails because the selector is absent.",
       "files": [
         "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Added the universal cross-mode approval regression matrix, replaced ordinary/completed no-request expectations, and covered shared pending projection across controller, observers, and reconnect.",
+      "files": [
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Implemented behavior-independent command approval with explicit private mode, exact approve/reject routing, zero-write ordinary/completed outcomes, persist-once initial state changes, and existing atomic transitions.",
+      "files": [
+        "internal/domain/model.go",
+        "internal/control/service.go",
+        "app.go",
+        "app_contract.go",
+        "proto/fallout/terminal/private/v1/coordination.proto",
+        "frontend/src/master.js"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Routed every command-mode pending projection through the shared record-description waiting renderer and authoritative input lock without optimistic results.",
+      "files": [
+        "client/client.js",
+        "client/client.css",
+        "internal/player/public_stream_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Verified exact cross-mode pending identity, 20 replay deduplication, approve/reject/close convergence, zero-write ordinary/completed outcomes, one-write initial state change, and atomic transitions.",
+      "files": [
+        "internal/control/service_test.go",
+        "internal/live/service_test.go",
+        "internal/player/public_stream_test.go",
+        "tests/browser/state-changing-command-approval.spec.mjs",
+        "tests/browser/terminal-navigation.spec.mjs",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Aligned state-changing sync master-dialog assertions with the fixture-authoritative request ID, state-change mode, and command name; all three isolated lifecycle journeys pass.",
+      "files": [
+        "tests/browser/state-changing-command-sync.spec.mjs"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Routed CRT ordinary-command fixtures through explicit private approval, retained separate full-screen pending and input-lock checks, and restored viewport, reveal/pagination, CRT, and full browser coverage (115 passed, 2 skipped).",
+      "files": [
+        "tests/browser/crt-rendering.spec.mjs",
+        "tests/browser/fixture-server/main.go"
       ]
     }
   },
@@ -1918,6 +2315,78 @@
       "warnings": [
         "Used an isolated copy for mutations; the real sessions/demo.json was opened and remained unchanged"
       ]
+    },
+    {
+      "what": "BUG-005 focused and full automated verification",
+      "result": "PASS",
+      "command": "go test ./...; make check; npm test --prefix frontend; npm test --prefix tests/browser -- terminal-navigation.spec.mjs; frontend/client builds",
+      "warnings": "none"
+    },
+    {
+      "what": "Signed packaged native BUG-005 acceptance",
+      "result": "PASS",
+      "command": "make package; scripts/verify-macos-app.sh; packaged Wails master plus controller, observer, and reconnect mode matrix",
+      "warnings": "Native WebView modal controls are absent from the macOS AX tree; exact dialog identity was verified by screenshot and close/reject semantics by Escape, while the explicit reject button is covered by the browser suite."
+    },
+    {
+      "what": "Signed packaged Wails universal-approval acceptance",
+      "result": "PASS: native master plus controller and two observers covered ordinary, initial/completed state-change, transition and return approve/reject/close; observer reconnect stayed on the inert pending screen; 10 revisits avoided re-hack; A-B-C unwound LIFO; shutdown left no process.",
+      "command": "accepted build/bin/Fallout Terminal.app via Computer Use and three isolated Chrome player origins"
+    },
+    {
+      "what": "Automated implementation gate",
+      "result": "PASS: make check; go test ./...; frontend 22/22; terminal-navigation 15/15; git diff --check.",
+      "command": "make check; go test ./...; npm test --prefix frontend; npm test --prefix tests/browser -- terminal-navigation.spec.mjs; git diff --check"
+    },
+    {
+      "what": "Packaged artifact and demo integrity",
+      "result": "PASS: bundle satisfies codesign designated requirement; sessions/demo.json remained byte-identical at SHA-256 4dcf13030c3894a3472bae10123f00b2cdfe7e1bbe16077f0fe496388e7fbea9.",
+      "command": "codesign --verify --deep --strict --verbose=2 build/bin/Fallout Terminal.app; shasum -a 256 sessions/demo.json"
+    },
+    {
+      "what": "T045 focused state-changing command sync lifecycle suite",
+      "command": "npm test --prefix tests/browser -- state-changing-command-sync.spec.mjs",
+      "result": "3 passed",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "T046 focused CRT approval matrix",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs --grep \"all nine presentation states|record reveal skips\"",
+      "result": "4 passed",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Complete CRT rendering suite",
+      "command": "npm test --prefix tests/browser -- crt-rendering.spec.mjs",
+      "result": "30 passed",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Full browser acceptance gate",
+      "command": "npm test --prefix tests/browser",
+      "result": "115 passed, 2 intentionally skipped authenticated-ngrok cases",
+      "warnings": [
+        "NO_COLOR ignored because FORCE_COLOR is set",
+        "authenticated ngrok cases require an external endpoint and remained intentionally skipped"
+      ]
+    },
+    {
+      "what": "Repository check gate",
+      "command": "make check",
+      "result": "passed: go vet, race tests, frontend build, protobuf checks, breaking fixtures, and Wails bindings",
+      "warnings": []
+    },
+    {
+      "what": "Idempotent implement reconciliation after all bugfix patches",
+      "command": "task/context coverage inspection plus git diff --check",
+      "result": "46/46 tasks DONE, FR-033 through FR-036 and SC-013 through SC-014 mapped, feature remains completed, diff check clean",
+      "warnings": []
     }
   ],
   "concerns": [
@@ -1934,7 +2403,12 @@
       "note": "The packaged app can open sessions/demo.json after the Darwin filter fix, but automatic loading of its playerConfig reference remained stuck on the roster-loading state; explicit selection of the same sessions/demo-players.json succeeds. This is separate from BUG-003 terminal-navigation presentation.",
       "step": "implement",
       "kind": "follow-up"
+    },
+    {
+      "note": "The packaged Wails modal is visually correct but its internal buttons are not exposed in the macOS accessibility tree while open; accessibility automation could approve the default action and invoke close-as-reject, but could not directly target the explicit Reject button.",
+      "step": "implement",
+      "kind": "manual-gate"
     }
   ],
-  "summary": "BUG-004 implemented and verified: shared protobuf behavior oneof, single master command-mode selector, full automated gates, and accepted packaged save/reopen smoke."
+  "summary": "BUG-005 implementation and automated verification are complete; T031/T036 remain pending until the required packaged controller + two-observer approve/reject/close acceptance evidence is recorded."
 }

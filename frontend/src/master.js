@@ -129,6 +129,7 @@ let publicAccessCommandPending = false;
 let sessionStateCommandPending = false;
 let commandExecutionDialogRequestID = null;
 let commandExecutionDecisionRequestID = null;
+let commandExecutionDialogMode = null;
 let commandExecutionDialogEpoch = 0;
 const resolvedCommandExecutionRequestIDs = new Set();
 let terminalNavigationDialogRequestID = null;
@@ -1173,6 +1174,7 @@ function hideCommandExecutionDialog() {
   commandExecutionDialogEpoch += 1;
   commandExecutionDecisionRequestID = null;
   commandExecutionDialogRequestID = null;
+  commandExecutionDialogMode = null;
   commandExecutionDialog.hidden = true;
   if (typeof commandExecutionDialog.close === 'function' && commandExecutionDialog.open) {
     commandExecutionDialog.close();
@@ -1190,10 +1192,16 @@ function showCommandExecutionDialog(pending) {
   commandExecutionDialogEpoch += 1;
   commandExecutionDecisionRequestID = null;
   commandExecutionDialogRequestID = pending.requestId;
+  commandExecutionDialogMode = pending.mode || null;
   commandExecutionDialogDescription.textContent = pending.confirmationText;
-  commandExecutionDialogStatus.textContent = pending.commandName
-    ? `КОМАНДА: ${pending.commandName}`
-    : 'КОМАНДА ОЖИДАЕТ РЕШЕНИЯ';
+  const modeLabels = {
+    ordinary: 'ОБЫЧНАЯ',
+    'state-change': 'ИЗМЕНЕНИЕ СОСТОЯНИЯ',
+    'completed-state-change': 'ЗАВЕРШЁННОЕ ИЗМЕНЕНИЕ СОСТОЯНИЯ',
+  };
+  const mode = modeLabels[pending.mode] || pending.mode || 'НЕИЗВЕСТЕН';
+  const commandName = pending.commandName || pending.commandId || '—';
+  commandExecutionDialogStatus.textContent = `ЗАПРОС: ${pending.requestId} · РЕЖИМ: ${mode} · КОМАНДА: ${commandName}`;
   commandExecutionDialogError.textContent = '';
   commandExecutionDialogError.hidden = true;
   btnApproveCommandExecution.disabled = false;
@@ -1248,6 +1256,7 @@ function showTerminalNavigationDialog(pending) {
   terminalNavigationDialogRequestID = pending.requestId;
   const direction = pending.direction === 'return' ? 'ВОЗВРАТ' : 'ПЕРЕХОД';
   terminalNavigationSummary.innerHTML = `
+    <div>ЗАПРОС: ${escHtml(pending.requestId)}</div>
     <div class="terminal-navigation-direction">${direction}</div>
     <div>ИЗ: ${escHtml(pending.sourceTerminalName || pending.sourceTerminalId || '—')}</div>
     <div>КОМАНДА: ${escHtml(pending.commandName || pending.commandId || '—')}</div>
@@ -1337,6 +1346,15 @@ async function resolveTerminalNavigation(decision) {
 
 btnApproveTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('approve'); });
 btnRejectTerminalNavigation.addEventListener('click', () => { void resolveTerminalNavigation('reject'); });
+terminalNavigationDialog.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    btnApproveTerminalNavigation.focus();
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    btnRejectTerminalNavigation.focus();
+  }
+});
 terminalNavigationDialog.addEventListener('cancel', (event) => {
   event.preventDefault();
   void resolveTerminalNavigation('reject');
@@ -1346,13 +1364,14 @@ async function resolveCommandExecution(decision) {
   const requestID = commandExecutionDialogRequestID;
   if (!requestID || commandExecutionDecisionRequestID) return null;
 
+  const commandMode = commandExecutionDialogMode;
   commandExecutionDecisionRequestID = requestID;
   const epoch = commandExecutionDialogEpoch;
   const startingRevision = coordinationRevision(state.coordination);
   btnApproveCommandExecution.disabled = true;
   btnRejectCommandExecution.disabled = true;
   commandExecutionDialogStatus.textContent = decision === 'approve'
-    ? 'СОХРАНЕНИЕ И ВЫПОЛНЕНИЕ...'
+    ? (commandMode === 'state-change' ? 'СОХРАНЕНИЕ И ВЫПОЛНЕНИЕ...' : 'ВЫПОЛНЕНИЕ КОМАНДЫ...')
     : 'ОТКЛОНЕНИЕ ЗАПРОСА...';
   commandExecutionDialogError.textContent = '';
   commandExecutionDialogError.hidden = true;
@@ -1384,7 +1403,9 @@ async function resolveCommandExecution(decision) {
   if (!result?.ok) {
     setCoordinationStatus(result?.error || 'СОСТОЯНИЕ КОМАНДЫ НЕ УДАЛОСЬ СОХРАНИТЬ', true);
   } else if (decision === 'approve') {
-    setCoordinationStatus('КОМАНДА ВЫПОЛНЕНА И СОХРАНЕНА');
+    setCoordinationStatus(commandMode === 'state-change'
+      ? 'КОМАНДА ВЫПОЛНЕНА И СОХРАНЕНА'
+      : 'КОМАНДА ВЫПОЛНЕНА');
   } else {
     setCoordinationStatus('ЗАПРОС ОТКЛОНЁН');
   }
@@ -1397,6 +1418,15 @@ btnApproveCommandExecution.addEventListener('click', () => {
 });
 btnRejectCommandExecution.addEventListener('click', () => {
   void resolveCommandExecution('reject');
+});
+commandExecutionDialog.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    btnApproveCommandExecution.focus();
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    btnRejectCommandExecution.focus();
+  }
 });
 commandExecutionDialog.addEventListener('cancel', (event) => {
   event.preventDefault();

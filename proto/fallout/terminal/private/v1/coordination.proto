@@ -93,6 +93,7 @@ message PendingCommandExecution {
   string command_id = 4;
   string command_name = 5;
   string confirmation_text = 6;
+  string command_mode = 7;
 }
 
 message PendingTerminalNavigation {

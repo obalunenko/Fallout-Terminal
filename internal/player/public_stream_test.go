@@ -53,7 +53,9 @@ func TestFirstPublicSnapshotRestoresPendingRejectedAndCompletedCommandState(t *t
 		wantResult    string
 		wantCommandID bool
 	}{
-		{name: "pending", phase: domain.CommandExecutionPhasePending, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, wantName: "Open doors", wantResult: "Doors opened"},
+		{name: "ordinary pending", phase: domain.CommandExecutionPhasePending, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, wantName: "Open doors", wantResult: "Doors opened"},
+		{name: "initial state-changing pending", phase: domain.CommandExecutionPhasePending, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, wantName: "Open doors", wantResult: "Doors opened"},
+		{name: "completed state-changing pending", phase: domain.CommandExecutionPhasePending, completed: true, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_PENDING, wantName: "Doors open", wantResult: "Doors opened"},
 		{name: "rejected", phase: domain.CommandExecutionPhaseRejected, wantPhase: playerv1.CommandExecutionPhase_COMMAND_EXECUTION_PHASE_REJECTED, wantName: "Open doors", wantResult: "Doors opened"},
 		{name: "completed", completed: true, wantName: "Doors open", wantResult: "Doors opened", wantCommandID: true},
 	} {
@@ -87,7 +89,7 @@ func TestFirstPublicSnapshotRestoresPendingRejectedAndCompletedCommandState(t *t
 			require.Equal(t, commandID, command.GetId())
 			require.Equal(t, test.wantName, command.GetName())
 			require.Equal(t, test.wantResult, command.GetCommand().GetText())
-			if test.completed {
+			if test.phase == "" && test.completed {
 				require.Nil(t, terminal.GetCommandExecution())
 				if test.wantCommandID {
 					require.Equal(t, commandID, terminal.GetNavigation().GetCommandNodeId())
@@ -96,6 +98,7 @@ func TestFirstPublicSnapshotRestoresPendingRejectedAndCompletedCommandState(t *t
 				require.Equal(t, test.wantPhase, terminal.GetCommandExecution().GetPhase())
 				require.Equal(t, commandID, terminal.GetCommandExecution().GetCommandNodeId())
 				require.Empty(t, terminal.GetNavigation().GetCommandNodeId())
+				require.Nil(t, terminal.GetCommandExecution().ProtoReflect().Descriptor().Fields().ByName("request_id"))
 			}
 		})
 	}
@@ -149,10 +152,10 @@ func commandLifecycleLiveState(phase domain.CommandExecutionPhase, completed boo
 		}}},
 		Nav: domain.NavState{Path: []string{"root"}, Mode: "list"},
 	}
-	if completed {
-		live.Nav.CommandNodeID = pointerTo(commandID)
-	} else {
+	if phase != "" {
 		live.CommandExecution = &domain.CommandExecutionPresentation{Phase: phase, CommandID: commandID}
+	} else if completed {
+		live.Nav.CommandNodeID = pointerTo(commandID)
 	}
 	return live
 }
