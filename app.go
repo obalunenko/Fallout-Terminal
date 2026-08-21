@@ -16,6 +16,7 @@ import (
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
+	"github.com/obalunenko/logger"
 )
 
 const (
@@ -198,6 +199,7 @@ type AppDependencies struct {
 	PublicSecrets   tunnelservice.SecretStore
 	PublicAccess    PublicAccessCore
 	PasswordEntropy io.Reader
+	Logger          logger.Logger
 	StartupTimeout  time.Duration
 	ShutdownTimeout time.Duration
 }
@@ -445,6 +447,7 @@ type App struct {
 
 	deps AppDependencies
 	ctx  context.Context
+	log  logger.Logger
 
 	phase                    string
 	serverInfo               *domain.ServerInfo
@@ -488,8 +491,12 @@ func NewApp() *App {
 // NewAppWithDependencies constructs a testable composition root.
 func NewAppWithDependencies(deps AppDependencies) *App {
 	preferences := tunnelservice.DefaultPublicAccessPreferences()
+	applicationLogger := deps.Logger
+	if applicationLogger == nil {
+		applicationLogger = logger.FromContext(nil)
+	}
 	app := &App{
-		deps: deps, phase: "constructed", saveState: string(sessionservice.SaveStateIdle),
+		deps: deps, log: applicationLogger, phase: "constructed", saveState: string(sessionservice.SaveStateIdle),
 		publicAccessPreferences: preferences,
 		providerTokenPresence:   tunnelservice.SecretUnknown,
 		playerPasswordPresence:  tunnelservice.SecretUnknown,
@@ -501,6 +508,52 @@ func NewAppWithDependencies(deps AppDependencies) *App {
 		app.coordinationState = domain.CloneMasterCoordinationState(deps.Coordination.Snapshot())
 	}
 	return app
+}
+
+func (app *App) recordOperation(operation, outcome string, fields logger.Fields) {
+	if app == nil || app.log == nil {
+		return
+	}
+	entry := app.log.WithFields(fields).WithFields(logger.Fields{
+		"operation": operation,
+		"outcome":   outcome,
+	})
+	switch outcome {
+	case "failed", "rejected":
+		entry.Warn("application operation completed")
+	default:
+		entry.Info("application operation completed")
+	}
+}
+
+func operationOutcome(ok, canceled bool) string {
+	if ok {
+		return "succeeded"
+	}
+	if canceled {
+		return "cancelled"
+	}
+	return "failed"
+}
+
+func publicAccessLogFields(snapshot PublicAccessSnapshot) logger.Fields {
+	fields := logger.Fields{
+		"state":    snapshot.Status.State,
+		"revision": snapshot.Status.SettingsRevision,
+	}
+	if snapshot.Status.ErrorCategory != "" {
+		fields["error_category"] = snapshot.Status.ErrorCategory
+	}
+	return fields
+}
+
+func (app *App) emitEvent(name string, payload any) {
+	if app == nil || app.deps.Events == nil {
+		return
+	}
+	if err := app.deps.Events.Emit(name, payload); err != nil && app.log != nil {
+		app.log.WithError(err).WithField("event", name).Error("desktop event delivery failed")
+	}
 }
 
 // GetPublicAccess returns only reconciled presence and non-secret settings.
@@ -518,7 +571,10 @@ func (app *App) GetPublicAccess() PublicAccessSnapshot {
 
 // SavePublicAccessSettings validates the complete proposed revision before
 // applying scoped Keychain changes and then the atomic non-secret file write.
-func (app *App) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload) PublicAccessCommandResult {
+func (app *App) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload) (result PublicAccessCommandResult) {
+	defer func() {
+		app.recordOperation("public-access.settings", operationOutcome(result.OK, false), publicAccessLogFields(result.Snapshot))
+	}()
 	app.publicAccessCommandMu.Lock()
 	defer app.publicAccessCommandMu.Unlock()
 	ctx := app.contextSnapshot()
@@ -614,7 +670,10 @@ func (app *App) SavePublicAccessSettings(payload SavePublicAccessSettingsPayload
 	return app.publicAccessSuccessLocked()
 }
 
-func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) GeneratedPlayerPasswordResult {
+func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) (result GeneratedPlayerPasswordResult) {
+	defer func() {
+		app.recordOperation("public-access.password", operationOutcome(result.OK, false), logger.Fields{"revision": result.SettingsRevision})
+	}()
 	app.publicAccessCommandMu.Lock()
 	defer app.publicAccessCommandMu.Unlock()
 	ctx := app.contextSnapshot()
@@ -694,7 +753,10 @@ func savePublicAccessMutationSettings(settings PublicAccessSettingsStore, prefer
 	return settings.Save(preferences)
 }
 
-func (app *App) StartPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+func (app *App) StartPublicAccess(payload PublicAccessCommandPayload) (result PublicAccessCommandResult) {
+	defer func() {
+		app.recordOperation("public-access.start", operationOutcome(result.OK, false), publicAccessLogFields(result.Snapshot))
+	}()
 	app.publicAccessCommandMu.Lock()
 	defer app.publicAccessCommandMu.Unlock()
 	if app.deps.PublicAccess != nil {
@@ -711,7 +773,10 @@ func (app *App) StartPublicAccess(payload PublicAccessCommandPayload) PublicAcce
 	return app.publicAccessFailureLocked(tunnelservice.ErrorProviderFailure, "Public access is not available yet; local access remains available.")
 }
 
-func (app *App) StopPublicAccess(payload PublicAccessCommandPayload) PublicAccessCommandResult {
+func (app *App) StopPublicAccess(payload PublicAccessCommandPayload) (result PublicAccessCommandResult) {
+	defer func() {
+		app.recordOperation("public-access.stop", operationOutcome(result.OK, false), publicAccessLogFields(result.Snapshot))
+	}()
 	app.publicAccessCommandMu.Lock()
 	defer app.publicAccessCommandMu.Unlock()
 	if app.deps.PublicAccess != nil {
@@ -835,7 +900,7 @@ func publicAccessSecretCategory(err error) tunnelservice.ErrorCategory {
 
 func (app *App) emitPublicAccessStatusLocked() {
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(publicAccessStatusEvent, app.publicAccessSnapshotLocked())
+		app.emitEvent(publicAccessStatusEvent, app.publicAccessSnapshotLocked())
 	}
 }
 
@@ -875,9 +940,9 @@ func (app *App) acceptPublicAccessSnapshot(snapshot tunnelservice.PublicAccessSn
 	app.mu.Unlock()
 	if emit && app.deps.Events != nil {
 		if serverInfoChanged && serverInfo != nil {
-			_ = app.deps.Events.Emit(serverInfoEvent, routeServerInfoEvent(*serverInfo))
+			app.emitEvent(serverInfoEvent, routeServerInfoEvent(*serverInfo))
 		}
-		_ = app.deps.Events.Emit(publicAccessStatusEvent, routePublicAccessSnapshot(snapshot))
+		app.emitEvent(publicAccessStatusEvent, routePublicAccessSnapshot(snapshot))
 	}
 }
 
@@ -908,6 +973,9 @@ func (app *App) Start(ctx context.Context) error {
 	app.mu.RUnlock()
 	if alreadyStarted {
 		return nil
+	}
+	if app.log != nil {
+		app.log.WithField("phase", "starting").Info("application startup started")
 	}
 	if app.deps.Player == nil {
 		return app.failLocked(errors.New("player server is not configured"))
@@ -941,6 +1009,9 @@ func (app *App) Start(ctx context.Context) error {
 	app.playerStarted = true
 	app.serverInfo = cloneServerInfo(info)
 	app.mu.Unlock()
+	if app.log != nil {
+		app.log.WithField("port", info.Port).Info("player server ready")
+	}
 	if app.deps.PublicAccess != nil {
 		app.acceptPublicAccessSnapshot(app.deps.PublicAccess.Initialize(ctx), false)
 	}
@@ -959,8 +1030,14 @@ func (app *App) Start(ctx context.Context) error {
 		app.mu.Lock()
 		app.desktopReady = true
 		app.mu.Unlock()
+		if app.log != nil {
+			app.log.Info("desktop runtime ready")
+		}
 	}
 	app.setPhase("ready-local")
+	if app.log != nil {
+		app.log.WithField("phase", "ready-local").Info("application ready")
+	}
 	if app.deps.PublicAccess != nil || app.deps.PublicSettings != nil || app.deps.PublicSecrets != nil {
 		app.publicAccessCommandMu.Lock()
 		app.emitPublicAccessStatusLocked()
@@ -975,7 +1052,20 @@ func (app *App) Start(ctx context.Context) error {
 func (app *App) Shutdown(ctx context.Context) error {
 	app.lifecycleMu.Lock()
 	defer app.lifecycleMu.Unlock()
-	return app.shutdownLocked(ctx, false)
+	app.mu.RLock()
+	alreadyStopped := app.stopped
+	app.mu.RUnlock()
+	if alreadyStopped {
+		return nil
+	}
+	if app.log != nil {
+		app.log.WithField("phase", "stopping").Info("application shutdown started")
+	}
+	err := app.shutdownLocked(ctx, false)
+	if err == nil && app.log != nil {
+		app.log.WithField("phase", "stopped").Info("application shutdown completed")
+	}
+	return err
 }
 
 // GetRuntimeStatus returns a detached status snapshot.
@@ -1009,7 +1099,10 @@ func (app *App) GetRuntimeStatus() RuntimeStatus {
 
 // NewSession opens the native destination dialog and creates a validated
 // starter session.
-func (app *App) NewSession() sessionservice.SessionResult {
+func (app *App) NewSession() (result sessionservice.SessionResult) {
+	defer func() {
+		app.recordOperation("session.create", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 
@@ -1017,17 +1110,20 @@ func (app *App) NewSession() sessionservice.SessionResult {
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
-	result := commands.Create(app.contextSnapshot())
+	commandResult := commands.Create(app.contextSnapshot())
 	app.captureSessionStatus(commands)
-	if result.OK {
+	if commandResult.OK {
 		app.resetSessionStateOrdering()
 	}
-	app.resetPlayerConfigForSession(result)
-	return routeSessionOperationResult(result)
+	app.resetPlayerConfigForSession(commandResult)
+	return routeSessionOperationResult(commandResult)
 }
 
 // OpenSession opens and validates an existing version-1 session.
-func (app *App) OpenSession() sessionservice.SessionResult {
+func (app *App) OpenSession() (result sessionservice.SessionResult) {
+	defer func() {
+		app.recordOperation("session.open", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 
@@ -1035,17 +1131,20 @@ func (app *App) OpenSession() sessionservice.SessionResult {
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
-	result := commands.Open(app.contextSnapshot())
+	commandResult := commands.Open(app.contextSnapshot())
 	app.captureSessionStatus(commands)
-	if result.OK {
+	if commandResult.OK {
 		app.resetSessionStateOrdering()
 	}
-	app.resetPlayerConfigForSession(result)
-	return routeSessionOperationResult(result)
+	app.resetPlayerConfigForSession(commandResult)
+	return routeSessionOperationResult(commandResult)
 }
 
 // CopyDemo creates an explicit writable copy of the bundled demo.
-func (app *App) CopyDemo() sessionservice.SessionResult {
+func (app *App) CopyDemo() (result sessionservice.SessionResult) {
+	defer func() {
+		app.recordOperation("session.copy-demo", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 
@@ -1053,18 +1152,21 @@ func (app *App) CopyDemo() sessionservice.SessionResult {
 	if !ok {
 		return sessionservice.SessionResult{Error: "session service is unavailable"}
 	}
-	result := commands.CopyDemo(app.contextSnapshot())
+	commandResult := commands.CopyDemo(app.contextSnapshot())
 	app.captureSessionStatus(commands)
-	if result.OK {
+	if commandResult.OK {
 		app.resetSessionStateOrdering()
 	}
-	app.resetPlayerConfigForSession(result)
-	return routeSessionOperationResult(result)
+	app.resetPlayerConfigForSession(commandResult)
+	return routeSessionOperationResult(commandResult)
 }
 
 // SaveSession assigns a monotonic revision and waits until it or a newer
 // accepted revision is durably replaced.
-func (app *App) SaveSession(session domain.Session) sessionservice.SaveResult {
+func (app *App) SaveSession(session domain.Session) (result sessionservice.SaveResult) {
+	defer func() {
+		app.recordOperation("session.save", operationOutcome(result.OK, false), logger.Fields{"revision": result.RequestedRevision})
+	}()
 	commands, ok := app.deps.Sessions.(sessionCommands)
 	if !ok {
 		return sessionservice.SaveResult{Error: "session service is unavailable"}
@@ -1075,24 +1177,27 @@ func (app *App) SaveSession(session domain.Session) sessionservice.SaveResult {
 	app.saveState = string(sessionservice.SaveStateSaving)
 	app.mu.Unlock()
 
-	result := commands.Save(app.contextSnapshot(), session, revision)
+	commandResult := commands.Save(app.contextSnapshot(), session, revision)
 	app.mu.Lock()
-	if result.SavedRevision > app.savedRevision {
-		app.savedRevision = result.SavedRevision
+	if commandResult.SavedRevision > app.savedRevision {
+		app.savedRevision = commandResult.SavedRevision
 	}
 	if revision == app.requestedRevision {
-		if result.OK {
+		if commandResult.OK {
 			app.saveState = string(sessionservice.SaveStateSaved)
 		} else {
 			app.saveState = string(sessionservice.SaveStateFailed)
 		}
 	}
 	app.mu.Unlock()
-	return routeSaveSessionResult(result)
+	return routeSaveSessionResult(commandResult)
 }
 
 // LoadReferencedPlayerConfig reloads the active session's durable roster.
-func (app *App) LoadReferencedPlayerConfig() PlayerConfigCommandResult {
+func (app *App) LoadReferencedPlayerConfig() (result PlayerConfigCommandResult) {
+	defer func() {
+		app.recordOperation("player-config.load-referenced", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 	sessions, ok := app.deps.Sessions.(sessionPlayerConfigCommands)
@@ -1111,7 +1216,10 @@ func (app *App) LoadReferencedPlayerConfig() PlayerConfigCommandResult {
 }
 
 // NewPlayerConfig creates, associates, and installs one empty durable roster.
-func (app *App) NewPlayerConfig() PlayerConfigCommandResult {
+func (app *App) NewPlayerConfig() (result PlayerConfigCommandResult) {
+	defer func() {
+		app.recordOperation("player-config.create", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 	if app.deps.PlayerConfigs == nil {
@@ -1124,7 +1232,10 @@ func (app *App) NewPlayerConfig() PlayerConfigCommandResult {
 }
 
 // OpenPlayerConfig selects, associates, and installs an existing durable roster.
-func (app *App) OpenPlayerConfig() PlayerConfigCommandResult {
+func (app *App) OpenPlayerConfig() (result PlayerConfigCommandResult) {
+	defer func() {
+		app.recordOperation("player-config.open", operationOutcome(result.OK, result.Canceled), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 	if app.deps.PlayerConfigs == nil {
@@ -1393,7 +1504,10 @@ func (app *App) SetActiveController(sessionID string) CoordinationCommandResult 
 }
 
 // StartBroadcast creates a fresh broadcast epoch through the coordinator.
-func (app *App) StartBroadcast() CoordinationCommandResult {
+func (app *App) StartBroadcast() (result CoordinationCommandResult) {
+	defer func() {
+		app.recordOperation("broadcast.start", operationOutcome(result.OK, false), nil)
+	}()
 	app.coordinationCommandMu.Lock()
 	defer app.coordinationCommandMu.Unlock()
 	if app.deps.Coordination == nil {
@@ -1412,7 +1526,10 @@ func (app *App) StartBroadcast() CoordinationCommandResult {
 
 // EndBroadcast ends only the process-local broadcast epoch. Authored durable
 // terminals and the active session document remain outside this boundary.
-func (app *App) EndBroadcast() CoordinationCommandResult {
+func (app *App) EndBroadcast() (result CoordinationCommandResult) {
+	defer func() {
+		app.recordOperation("broadcast.end", operationOutcome(result.OK, false), nil)
+	}()
 	coordination, ok := app.deps.Coordination.(coordinationBroadcastLifecycleService)
 	if !ok {
 		return app.coordinationFailure("coordination service is unavailable")
@@ -1589,7 +1706,7 @@ func (app *App) publishCoordinationStateIfNewer(state *domain.MasterCoordination
 	app.coordinationState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
+		app.emitEvent(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
 	}
 }
 
@@ -1847,7 +1964,7 @@ func (app *App) publishSessionState(event SessionStateEvent) {
 	app.publishedSessionRevision = event.Revision
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(sessionStateEvent, routeSessionStateEvent(event))
+		app.emitEvent(sessionStateEvent, routeSessionStateEvent(event))
 	}
 }
 
@@ -2050,7 +2167,7 @@ func (app *App) updateHackState(state *domain.PublicHackState) {
 	app.hackState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(hackStateEvent, routeHackStateEvent(clonePublicHackState(clone)))
+		app.emitEvent(hackStateEvent, routeHackStateEvent(clonePublicHackState(clone)))
 	}
 }
 
@@ -2062,7 +2179,7 @@ func (app *App) updateClientCount(count int) {
 	app.clientCount = count
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(clientCountEvent, routeClientCountEvent(count))
+		app.emitEvent(clientCountEvent, routeClientCountEvent(count))
 	}
 }
 
@@ -2076,7 +2193,7 @@ func (app *App) publishCoordinationState(state *domain.MasterCoordinationState) 
 	app.coordinationState = clone
 	app.mu.Unlock()
 	if app.deps.Events != nil {
-		_ = app.deps.Events.Emit(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
+		app.emitEvent(coordinationStateEvent, routeCoordinationEvent(domain.CloneMasterCoordinationState(clone)))
 	}
 }
 

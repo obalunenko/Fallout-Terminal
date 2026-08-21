@@ -1,0 +1,527 @@
+{
+  "workflow": "companion",
+  "specName": "application logging",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T08:29:09.962Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T08:32:44.220Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T08:33:14.175Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:34:12.531Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:34:33.536Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T08:34:51.610Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T08:35:12.089Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:36:02.433Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T08:36:04.191Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T08:36:13.776Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:36:27.990Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:36:58.102Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:37:28.756Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:37:48.749Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:38:45.357Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:39:01.514Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:39:24.051Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:39:48.002Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:40:17.689Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:40:35.717Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:41:07.916Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:43:19.219Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:48:01.847Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:53:57.217Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T08:53:57.277Z"
+    }
+  ],
+  "unattended": true,
+  "coverage": {
+    "FR-001": {
+      "title": "The application MUST emit structured records for startup beginning, local player availability, application readiness, shutdown beginning, and successful shutdown completion.",
+      "tasks": [
+        "T005",
+        "T008",
+        "T009"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationLifecycleEmitsStructuredOperationalLogs"
+      ]
+    },
+    "FR-002": {
+      "title": "The application MUST emit an error record for a startup failure that the desktop host absorbs so the existing user-visible failure status can remain available.",
+      "tasks": [
+        "T006",
+        "T010"
+      ],
+      "tests": [
+        "wails_host_test.go::TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce"
+      ]
+    },
+    "FR-003": {
+      "title": "The player service MUST emit an error record when its background serving operation exits unexpectedly, while normal server closure MUST remain silent.",
+      "tasks": [
+        "T007",
+        "T011"
+      ],
+      "tests": [
+        "internal/player/server_test.go::TestServerRecordsOnlyUnexpectedServeExit"
+      ]
+    },
+    "FR-004": {
+      "title": "The application MUST emit outcome records for session creation, session opening, demo copying, session saving, player-configuration loading, broadcast lifecycle commands, and public-access lifecycle or configuration commands.",
+      "tasks": [
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors"
+      ]
+    },
+    "FR-005": {
+      "title": "User-cancelled operations MUST be recorded as cancellations rather than failures, and expected validation rejections MUST not be escalated to fatal process errors.",
+      "tasks": [
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors"
+      ]
+    },
+    "FR-006": {
+      "title": "Event-delivery errors that are intentionally not returned to callers MUST be recorded with the affected event name.",
+      "tasks": [
+        "T012",
+        "T013"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors"
+      ]
+    },
+    "FR-007": {
+      "title": "Records MUST use severity and structured fields to identify the operation, outcome, safe lifecycle state, revision, count, or error as applicable.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T009",
+        "T011",
+        "T013"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationLifecycleEmitsStructuredOperationalLogs",
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors",
+        "internal/player/server_test.go::TestServerRecordsOnlyUnexpectedServeExit"
+      ]
+    },
+    "FR-008": {
+      "title": "Records MUST NOT contain provider tokens, player passwords, generated passwords, session content, terminal content, character names, or unredacted secret-store and provider error details.",
+      "tasks": [
+        "T012",
+        "T013",
+        "T014"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors",
+        "wails_host_test.go::TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce"
+      ]
+    },
+    "FR-009": {
+      "title": "Logging MUST be initialized exactly once for the production application and MUST remain available throughout startup and shutdown.",
+      "tasks": [
+        "T001",
+        "T008"
+      ],
+      "tests": [
+        "app_test.go::TestProductionLoggingUsesRequiredLoggerInitializedOnce"
+      ]
+    },
+    "FR-010": {
+      "title": "Logging MUST NOT change existing command results, runtime status, lifecycle ordering, resource cleanup, public/private capability boundaries, or persistence behavior.",
+      "tasks": [
+        "T005",
+        "T006",
+        "T007",
+        "T012",
+        "T014"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationLifecycleEmitsStructuredOperationalLogs",
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors"
+      ]
+    },
+    "FR-011": {
+      "title": "Automated tests MUST verify representative lifecycle, command-outcome, unexpected-serving, swallowed-event-error, and secret-redaction records.",
+      "tasks": [
+        "T002",
+        "T005",
+        "T006",
+        "T007",
+        "T012",
+        "T014"
+      ],
+      "tests": [
+        "app_test.go::TestApplicationLifecycleEmitsStructuredOperationalLogs",
+        "app_test.go::TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors",
+        "wails_host_test.go::TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce",
+        "internal/player/server_test.go::TestServerRecordsOnlyUnexpectedServeExit"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 9,
+    "projectedTasks": 14,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: root application lifecycle and desktop boundary",
+    "area: player HTTP server lifecycle",
+    "constraint: never log public-access secrets or user-authored gameplay content",
+    "constraint: github.com/obalunenko/logger is the required logging package"
+  ],
+  "intent": "Provide safe structured operational diagnostics across the application lifecycle and important Overseer actions.",
+  "expectations": [
+    "No runtime log-file persistence, rotation, or logging settings UI.",
+    "Repository build tooling and browser-test fixture output are outside the logging migration."
+  ],
+  "approach": "Initialize one structured logger at process startup, inject it into the root App and player server, and emit safe operational records only at lifecycle and trusted application boundaries. Use a shared test logger to verify fields, severity, swallowed errors, and redaction without mutating global state.",
+  "decisions": [
+    {
+      "decision": "Pin github.com/obalunenko/logger v1.2.0 as a production dependency",
+      "why": "It is the user-selected latest stable package and exposes context and structured fields",
+      "rejected": "standard-library log and alternative logging libraries"
+    },
+    {
+      "decision": "Inject logger.Logger into App and player.Server",
+      "why": "Deterministic parallel-safe tests without global logger mutation",
+      "rejected": "global-only package calls"
+    },
+    {
+      "decision": "Log safe outcomes at operational boundaries",
+      "why": "Preserves domain independence and avoids payload or credential disclosure",
+      "rejected": "logging every domain method or complete request/result payloads"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Pinned logger integration at root lifecycle, command, event, and player-server boundaries with deterministic redaction tests",
+      "key_finding": "Logger injection is required to keep parallel tests deterministic while package-global logging remains available for process startup"
+    },
+    "tasks": {
+      "summary": "14 tasks across dependency setup, logging infrastructure, lifecycle diagnostics, command outcomes, and full validation"
+    },
+    "implement": {
+      "summary": "Integrated github.com/obalunenko/logger across application lifecycle, operator commands, Wails startup handling, and player serving with safe structured fields and deterministic tests.",
+      "key_finding": "Dependency injection plus narrow safe-field helpers preserved behavior while preventing credentials and user-authored content from entering records.",
+      "risks": "No known implementation risks; native linker deployment-target warnings remain pre-existing."
+    }
+  },
+  "currentTask": "T014",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Pinned github.com/obalunenko/logger v1.2.0 in the production Go module",
+      "files": [
+        "go.mod",
+        "go.sum"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added a concurrency-safe structured recording logger for deterministic Go tests",
+      "files": [
+        "internal/testutil/logger.go"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added injected App logger ownership plus safe operation and swallowed-event helpers",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added injected player-server logger ownership with a package-default fallback",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added a failing lifecycle logging test for startup, readiness, shutdown, fields, and unchanged ordering",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added a failing Wails lifecycle test for exactly-once recording of an absorbed startup error",
+      "files": [
+        "wails_host_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added a failing player-server test distinguishing expected HTTP shutdown from unexpected serving failure",
+      "files": [
+        "internal/player/server_test.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Initialized the production logger once, injected it into runtime owners, and replaced standard-library fatal logging",
+      "files": [
+        "main.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added safe root application startup, readiness, and shutdown milestone records",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Recorded startup errors intentionally absorbed by the Wails lifecycle adapter",
+      "files": [
+        "wails_host.go"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Recorded unexpected player HTTP serving exits while keeping normal shutdown silent",
+      "files": [
+        "internal/player/server.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added failing safe-outcome tests for session, player config, broadcast, public access, event errors, and forbidden-value redaction",
+      "files": [
+        "app_test.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Added safe structured outcomes for session, player config, broadcast, public access, and swallowed desktop event errors",
+      "files": [
+        "app.go"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Formatted the implementation and passed vet, full tests, race tests, secret-leak checks, and diff validation",
+      "files": [
+        "app.go",
+        "app_test.go",
+        "main.go",
+        "wails_host.go",
+        "wails_host_test.go",
+        "internal/player/server.go",
+        "internal/player/server_test.go",
+        "internal/testutil/logger.go",
+        "go.mod",
+        "go.sum",
+        "scripts/secret-leak-check.sh"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Go formatting",
+      "result": "passed",
+      "command": "gofmt -l ."
+    },
+    {
+      "what": "Go static analysis",
+      "result": "passed",
+      "command": "go vet ./..."
+    },
+    {
+      "what": "Full Go test suite",
+      "result": "passed",
+      "command": "go test ./...",
+      "warnings": "macOS linker emitted deployment-target warnings for prebuilt native objects"
+    },
+    {
+      "what": "Full Go race suite",
+      "result": "passed",
+      "command": "go test -race ./...",
+      "warnings": "one transient opt-in ngrok 404 resolved on immediate package rerun; full suite then passed; macOS linker emitted deployment-target warnings"
+    },
+    {
+      "what": "Secret leak validation",
+      "result": "passed",
+      "command": "scripts/secret-leak-check.sh"
+    },
+    {
+      "what": "Patch whitespace validation",
+      "result": "passed",
+      "command": "git diff --check"
+    }
+  ],
+  "last_action": "Completed implementation and all validation gates for structured application logging"
+}

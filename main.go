@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -23,6 +22,7 @@ import (
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
+	"github.com/obalunenko/logger"
 )
 
 // The repository-owned Go build command prepares the frontend before production
@@ -39,24 +39,28 @@ var overseerSource embed.FS
 var clientSource embed.FS
 
 func main() {
+	rootContext := context.Background()
+	applicationLogger := logger.Init(rootContext, logger.Params{Level: "info", Format: "text"})
+	rootContext = logger.ContextWithLogger(rootContext, applicationLogger)
+
 	overseerAssets, err := fs.Sub(overseerSource, "frontend/overseer/dist")
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("prepare Overseer assets")
 	}
 	clientAssets, err := fs.Sub(clientSource, "frontend/client/dist")
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("prepare player assets")
 	}
 
 	host := newWailsApplication(overseerAssets)
 	core, err := composeApplication(host, clientAssets)
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("compose application")
 	}
 	registerWailsServices(host, core)
 	newOverseerWindow(host)
 	if err := host.Run(); err != nil {
-		log.Fatal(err)
+		logger.WithField(rootContext, "operation", "application.run").Fatal("application host stopped with an error")
 	}
 }
 
@@ -102,6 +106,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 	playerConfig := playerserver.Config{
 		Address: runtimeConfig.PlayerServer.Address,
 		Assets:  clientAssets,
+		Logger:  logger.FromContext(nil),
 	}
 	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
 		Coordinator: coordination,
@@ -153,6 +158,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 		PublicSettings:  effectivePublicSettings,
 		PublicSecrets:   effectivePublicSecrets,
 		PublicAccess:    publicAccess,
+		Logger:          logger.FromContext(nil),
 		StartupTimeout:  time.Duration(runtimeConfig.Startup.TimeoutMilliseconds) * time.Millisecond,
 		ShutdownTimeout: time.Duration(runtimeConfig.Shutdown.TimeoutMilliseconds) * time.Millisecond,
 	})

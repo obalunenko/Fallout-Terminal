@@ -6,6 +6,7 @@ require (
 	connectrpc.com/connect v1.20.0
 	github.com/google/go-cmp v0.7.0
 	github.com/keybase/go-keychain v0.0.1
+	github.com/obalunenko/logger v1.2.0
 	github.com/stretchr/testify v1.11.1
 	github.com/wailsapp/wails/v3 v3.0.0-beta.10
 	golang.ngrok.com/ngrok/v2 v2.1.4
