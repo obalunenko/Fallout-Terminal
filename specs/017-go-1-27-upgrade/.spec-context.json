@@ -1,0 +1,479 @@
+{
+  "workflow": "companion",
+  "specName": "go 1 27 upgrade",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T09:52:04.142Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T09:53:49.683Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T09:54:09.508Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:54:49.583Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:55:21.572Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T09:55:22.605Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T09:55:42.078Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:56:25.028Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T09:56:26.660Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T09:56:33.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:56:41.568Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:56:53.235Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:57:24.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T09:57:24.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:22:08.482Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:22:32.123Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:22:32.418Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:28:20.737Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:28:40.825Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T10:28:40.978Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T10:54:50.792Z"
+    }
+  ],
+  "unattended": true,
+  "last_action": "BUG-001 fixed — fresh-cache canonical Go 1.27 tests pass with zero linker warnings",
+  "coverage": {
+    "FR-001": {
+      "title": "The root application module MUST declare Go 1.27.0 as its minimum language and toolchain baseline.",
+      "tasks": [
+        "T001",
+        "T005"
+      ],
+      "tests": [
+        "internal/platform/startup_test.go::TestWailsV3GoToolsAreIsolatedFromApplicationModule",
+        "scripts/tool-modules-check.sh"
+      ]
+    },
+    "FR-002": {
+      "title": "Every repository-owned isolated Go tool module MUST declare Go 1.27.0 as its minimum language and toolchain baseline.",
+      "tasks": [
+        "T002",
+        "T005"
+      ],
+      "tests": [
+        "internal/platform/startup_test.go::TestWailsV3GoToolsAreIsolatedFromApplicationModule",
+        "scripts/tool-modules-check.sh"
+      ]
+    },
+    "FR-003": {
+      "title": "Continuous integration MUST select the latest stable Go 1.27 patch release.",
+      "tasks": [
+        "T006",
+        "T008"
+      ],
+      "tests": [
+        "internal/platform/startup_test.go::TestCIRunsOnlyMinimalLintTestProtobufAndApplicationBuild",
+        "make check"
+      ]
+    },
+    "FR-004": {
+      "title": "The macOS release preflight MUST accept stable Go 1.27 patch releases and reject other Go release lines.",
+      "tasks": [
+        "T006",
+        "T008"
+      ],
+      "tests": [
+        "scripts/build-macos.sh::Go 1.27 stable-pattern check"
+      ]
+    },
+    "FR-005": {
+      "title": "Active validation fixtures and assertions MUST create and expect Go 1.27 module declarations consistently.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T008"
+      ],
+      "tests": [
+        "scripts/tool-modules-check.sh --self-test",
+        "scripts/wails-v3-contract-check.sh --self-test",
+        "scripts/wails-v3-cutover-check.sh --self-test"
+      ]
+    },
+    "FR-006": {
+      "title": "Active contributor guidance, planning templates, and project governance MUST identify Go 1.27 as the supported baseline.",
+      "tasks": [
+        "T007",
+        "T008"
+      ],
+      "tests": [
+        "active Go 1.26 requirement scan"
+      ]
+    },
+    "FR-007": {
+      "title": "Historical specifications, completed migration records, and dated evidence MUST remain unchanged.",
+      "tasks": [
+        "T007",
+        "T009"
+      ],
+      "tests": [
+        "historical-path diff scan",
+        "internal/platform/assets_test.go::TestActiveWailsV3DocumentsStaySeparateFromHistoricalEvidence"
+      ]
+    },
+    "FR-008": {
+      "title": "The upgrade MUST preserve existing dependency versions, generated outputs, module ownership boundaries, and application behavior except for changes produced deterministically by Go 1.27 module maintenance.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T004",
+        "T005",
+        "T008",
+        "T009"
+      ],
+      "tests": [
+        "scripts/reproducible-build-check.sh",
+        "generated-and-sum diff scan"
+      ]
+    },
+    "FR-009": {
+      "title": "The root and isolated module graphs, repository quality checks, and application package build MUST succeed with Go 1.27.",
+      "tasks": [
+        "T005",
+        "T008",
+        "T009"
+      ],
+      "tests": [
+        "make check",
+        "scripts/reproducible-build-check.sh",
+        "scripts/verify-macos-app.sh"
+      ]
+    },
+    "FR-010": {
+      "title": "Canonical local and CI Go validation on macOS MUST use the repository-governed macOS 13 deployment target and matching CGO flags without emitting linker target-version warnings.",
+      "tasks": [
+        "T010"
+      ],
+      "tests": [
+        "fresh-cache make test::zero ld warning assertion"
+      ]
+    }
+  },
+  "size": "normal",
+  "classification": {
+    "projectedFiles": 14,
+    "projectedTasks": 7,
+    "scopeSignal": "none",
+    "verdict": "normal"
+  },
+  "context": [
+    "area: root and isolated Go module declarations",
+    "area: CI, release, and validation toolchain gates",
+    "constraint: preserve completed specifications and historical evidence"
+  ],
+  "intent": "Adopt Go 1.27 consistently across active modules, automation, validation, guidance, and governance.",
+  "expectations": [
+    "No application behavior or serialized contract changes.",
+    "No unrelated dependency or generated-source upgrades.",
+    "Do not rewrite dated historical specifications or migration evidence."
+  ],
+  "approach": "Raise all five module directives to Go 1.27.0, align active automation and guidance, preserve historical evidence, and validate without dependency or generated-output drift.",
+  "decisions": [
+    {
+      "decision": "Use Go 1.27.0 in every active module",
+      "why": "It is the installed stable patch baseline and prevents application/tool-module language drift",
+      "rejected": "Keep patch-specific root and minor-only tool declarations"
+    },
+    {
+      "decision": "Keep CI on 1.27.x and release preflight on stable go1.27 patch output",
+      "why": "CI receives patch fixes while packaging rejects prerelease and other release lines",
+      "rejected": "Pin CI forever to 1.27.0 or accept any go1.27 prefix"
+    },
+    {
+      "decision": "Update only active version owners",
+      "why": "Current tooling must agree while dated migration evidence must remain historically accurate",
+      "rejected": "Repository-wide textual replacement"
+    },
+    {
+      "decision": "Preserve dependency and generated-output state",
+      "why": "The feature changes only the Go baseline and existing checks can prove compatibility",
+      "rejected": "Bundle unrelated dependency upgrades"
+    },
+    {
+      "decision": "Accept Go 1.27 tidy classification of tool parent modules as indirect",
+      "why": "Go 1.27 deterministically classifies dependencies used only through tool directives as indirect while retaining exact pins",
+      "rejected": "Fight go mod tidy by restoring obsolete single-line direct requirements"
+    },
+    {
+      "decision": "Repair stale validation prerequisites and reviewed hashes",
+      "why": "Clean develop could not run make check or the Wails contract guard after already-reviewed repository changes",
+      "rejected": "Skip canonical gates or alter runtime/generated content"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Planned a 14-file Go 1.27 baseline upgrade across modules, automation, tests, guidance, and governance.",
+      "key_finding": "All five Go modules and nine active enforcement or documentation surfaces must move together while historical records stay untouched."
+    },
+    "tasks": {
+      "summary": "Nine tasks across module declarations, active enforcement, automation/guidance, full validation, and package verification."
+    },
+    "implement": {
+      "summary": "Upgraded all active Go modules and enforcement surfaces to Go 1.27, repaired stale validation baselines, and produced a verified reproducible macOS package."
+    }
+  },
+  "currentTask": "T010",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Set the root application module baseline to Go 1.27.0 without changing dependency pins",
+      "files": [
+        "go.mod"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Aligned all four isolated Go development-tool modules on the Go 1.27.0 baseline",
+      "files": [
+        "tools/buf/go.mod",
+        "tools/protoc-gen-connect-go/go.mod",
+        "tools/protoc-gen-go/go.mod",
+        "tools/wails/go.mod"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Updated the tool-module acceptance test to require the Go 1.27.0 declaration",
+      "files": [
+        "internal/platform/startup_test.go"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Aligned active module fixtures with Go 1.27.0 while preserving their negative-test behavior",
+      "files": [
+        "scripts/tool-modules-check.sh",
+        "scripts/wails-v3-contract-check.sh",
+        "scripts/wails-v3-cutover-check.sh"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Tidied all five Go 1.27 modules, accepted the deterministic tool-requirement layout, and passed isolated-module ownership checks",
+      "files": [
+        "go.mod",
+        "tools/buf/go.mod",
+        "tools/protoc-gen-connect-go/go.mod",
+        "tools/protoc-gen-go/go.mod",
+        "tools/wails/go.mod",
+        "internal/platform/startup_test.go",
+        "scripts/tool-modules-check.sh"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Moved CI to the Go 1.27 patch line and release preflight to stable go1.27 patch output",
+      "files": [
+        ".github/workflows/wails-macos.yml",
+        "scripts/build-macos.sh"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Updated active contributor guidance, planning defaults, and constitution governance to Go 1.27",
+      "files": [
+        "README.md",
+        ".specify/templates/plan-template.md",
+        ".specify/memory/constitution.md"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Repaired stale quality-gate prerequisites and reviewed hashes, then passed the full Go 1.27 quality, contract, generation, binding, cutover, and reproducibility graph",
+      "files": [
+        "Makefile",
+        "scripts/wails-v3-contract-check.sh",
+        "README.md",
+        "repository validation surfaces"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Verified the reproducible Go 1.27 macOS package and confirmed zero dependency-sum, generated-source, historical-evidence, or whitespace drift",
+      "files": [
+        "build/bin/Fallout Terminal.app",
+        "repository diff"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Verified a fresh-cache canonical Go 1.27 test run passes under the governed macOS 13 environment with zero linker warnings",
+      "files": [
+        "Makefile",
+        "specs/017-go-1-27-upgrade/bugs/BUG-001.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Go 1.27 module declarations and isolated tool ownership",
+      "command": "go mod tidy across all five modules; scripts/tool-modules-check.sh --self-test; scripts/tool-modules-check.sh; go test ./internal/platform",
+      "result": "PASS: five modules at go 1.27.0 with exact pins and no checksum ownership drift",
+      "warnings": [
+        "focused macOS links emitted deployment-target warnings; tests passed"
+      ]
+    },
+    {
+      "what": "Canonical repository quality graph",
+      "command": "make check",
+      "result": "PASS: fmt, vet, race tests, protobuf generation/build, breaking fixtures, and Wails bindings",
+      "warnings": []
+    },
+    {
+      "what": "Wails and reproducible-build validation",
+      "command": "scripts/wails-v3-contract-check.sh; scripts/wails-v3-cutover-check.sh; scripts/reproducible-build-check.sh",
+      "result": "PASS: contract/cutover checks and two byte-reproducible package builds",
+      "warnings": []
+    },
+    {
+      "what": "Final Go 1.27 package and diff",
+      "command": "scripts/verify-macos-app.sh build/bin/Fallout Terminal.app; git diff --check; scoped drift scan",
+      "result": "PASS: arm64 macOS 13 package verified with manifest f689ba2c743b07e5c837d7b1edf77270feea8f40bace38d99f8cbe3d608bd94b and no unrelated drift",
+      "warnings": []
+    },
+    {
+      "what": "BUG-001 warning-free macOS regression",
+      "command": "fresh GOCACHE make test with automated ld-warning assertion",
+      "result": "PASS: all packages pass and output contains zero ld: warning lines",
+      "warnings": []
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Focused macOS Go test links emit deployment-target warnings from mixed cached/toolchain objects; the full race suite, two reproducible package builds, signing verification, and app inspection all pass.",
+      "step": "implement"
+    }
+  ]
+}

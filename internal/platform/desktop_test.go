@@ -167,7 +167,8 @@ func TestDesktopBrowserAdapterAllowsOnlyAbsoluteHTTPAndHTTPS(t *testing.T) {
 func TestDesktopAdaptersRejectUseOutsideApplicationLifetime(t *testing.T) {
 	t.Parallel()
 
-	desktop := NewDesktopWithManagers(nil, &recordingDialogs{}, &recordingBrowser{})
+	desktop := NewDesktopWithManagers(t.Context(), &recordingDialogs{}, &recordingBrowser{})
+	require.NoError(t, desktop.Close(t.Context()))
 	_, err := desktop.OpenFile("")
 	require.ErrorIs(t, err, errDesktopNotReady)
 	_, err = desktop.SaveFile("")

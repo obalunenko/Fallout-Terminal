@@ -17,6 +17,11 @@ import (
 
 const publicIngressRealm = `Basic realm="Fallout Terminal Players"`
 
+var (
+	errPublicIngressContextRequired = errors.New("public ingress context is required")
+	errPublicIngressClosed          = errors.New("public ingress closed")
+)
+
 // PublicIngress is the application-owned public admission boundary. It has no
 // game state and forwards accepted requests to the sole player service.
 type PublicIngress interface {
@@ -44,6 +49,8 @@ type loopbackPublicIngress struct {
 	server   *http.Server
 	url      *url.URL
 	policy   atomic.Pointer[ingressAuthorization]
+	context  context.Context
+	cancel   context.CancelCauseFunc
 
 	closeMu  sync.Mutex
 	closed   bool
@@ -57,7 +64,7 @@ func NewPublicIngressFactory() PublicIngressFactory {
 
 func (loopbackPublicIngressFactory) Start(ctx context.Context, rawUpstream string) (PublicIngress, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		return nil, errPublicIngressContextRequired
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -80,15 +87,19 @@ func (loopbackPublicIngressFactory) Start(ctx context.Context, rawUpstream strin
 		_ = listener.Close()
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
 	}
-	ingress := &loopbackPublicIngress{listener: listener, url: ingressURL}
+	lifetimeContext, cancel := context.WithCancelCause(context.WithoutCancel(ctx))
+	ingress := &loopbackPublicIngress{listener: listener, url: ingressURL, context: lifetimeContext, cancel: cancel}
 	proxy := httputil.NewSingleHostReverseProxy(upstream)
 	proxy.FlushInterval = -1
 	proxy.ErrorHandler = func(response http.ResponseWriter, _ *http.Request, _ error) {
 		http.Error(response, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
-	ingress.server = &http.Server{Handler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		ingress.serve(proxy, response, request)
-	})}
+	ingress.server = &http.Server{
+		Handler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			ingress.serve(proxy, response, request)
+		}),
+		BaseContext: func(net.Listener) context.Context { return lifetimeContext },
+	}
 	go func() { _ = ingress.server.Serve(listener) }()
 	return ingress, nil
 }
@@ -133,7 +144,7 @@ func (ingress *loopbackPublicIngress) Close(ctx context.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return errPublicIngressContextRequired
 	}
 	ingress.Deny()
 	for {
@@ -167,6 +178,11 @@ func (ingress *loopbackPublicIngress) Close(ctx context.Context) error {
 		ingress.closing = nil
 		close(done)
 		ingress.closeMu.Unlock()
+		if err != nil {
+			ingress.cancel(err)
+		} else {
+			ingress.cancel(errPublicIngressClosed)
+		}
 		return err
 	}
 }

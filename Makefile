@@ -12,6 +12,7 @@ CGO_LDFLAGS ?= -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
 export MACOSX_DEPLOYMENT_TARGET CGO_CFLAGS CGO_LDFLAGS
 
 BUILD_TOOL := $(GO) run ./cmd/build
+GOLANGCI_LINT := $(GO) run -modfile=tools/golangci-lint/go.mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 SPECKIT_INSTALL := scripts/install-speckit.sh
 SPECKIT_UPDATE_CHECK := scripts/check-speckit-updates.py
 
@@ -31,7 +32,7 @@ SPECKIT_VERSION_ENV = \
 .PHONY: help dev run prepare build package \
 	deps deps-frontend deps-browser \
 	speckit-install speckit-update-check \
-	fmt fmt-check vet test test-race check \
+	fmt fmt-check vet lint test test-race check \
 	proto-generate proto-check proto-breaking bindings-check browser-test \
 	release-preflight release
 
@@ -80,16 +81,19 @@ fmt-check: ## Fail when a Go source is not formatted.
 vet: ## Run Go static analysis.
 	$(GO) vet ./...
 
+lint: ## Run the pinned golangci-lint tool.
+	$(GOLANGCI_LINT) run
+
 test: ## Run the Go test suite.
 	$(GO) test ./...
 
 test-race: ## Run the Go test suite with the race detector.
 	$(GO) test -race ./...
 
-proto-generate: deps-client ## Regenerate protobuf code and update the reviewed revision.
+proto-generate: deps-frontend ## Regenerate protobuf code and update the reviewed revision.
 	scripts/proto-generate.sh --sync-revision
 
-proto-check: deps-client ## Verify protobuf formatting, generation, and generated clients.
+proto-check: deps-frontend ## Verify protobuf formatting, generation, and generated clients.
 	scripts/proto-check.sh
 
 proto-breaking: ## Verify protobuf compatibility and negative fixtures.
@@ -98,11 +102,11 @@ proto-breaking: ## Verify protobuf compatibility and negative fixtures.
 bindings-check: ## Verify deterministic Wails bindings and their public surface.
 	scripts/wails-bindings-check.sh
 
-browser-test: deps-client deps-browser ## Install Chromium and run Playwright journeys.
+browser-test: deps-frontend deps-browser ## Install Chromium and run Playwright journeys.
 	$(NPM) exec --prefix tests/browser -- playwright install chromium
 	$(NPM) test --prefix tests/browser
 
-check: fmt-check vet test-race proto-check proto-breaking bindings-check ## Run the main local quality gates.
+check: fmt-check vet lint test-race proto-check proto-breaking bindings-check ## Run the main local quality gates.
 
 release-preflight: ## Validate Developer ID and notarization prerequisites.
 	scripts/build-macos.sh --preflight

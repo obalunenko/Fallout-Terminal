@@ -11,7 +11,10 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-var errDesktopNotReady = errors.New("desktop runtime is not ready")
+var (
+	errDesktopNotReady        = errors.New("desktop runtime is not ready")
+	errDesktopContextRequired = errors.New("desktop context is required")
+)
 
 // Desktop is the narrow Wails-backed implementation used for native session
 // dialogs and external HTTP(S) links. It retains only the Wails application
@@ -127,13 +130,16 @@ func NewDesktop(ctx context.Context, dialogs *application.DialogManager, browser
 }
 
 func NewDesktopWithManagers(ctx context.Context, dialogs DialogManager, browser BrowserManager) *Desktop {
+	if ctx == nil {
+		panic(errDesktopContextRequired)
+	}
 	return &Desktop{ctx: ctx, dialogs: dialogs, browser: browser}
 }
 
 // Ready installs the Wails application context.
 func (desktop *Desktop) Ready(ctx context.Context) error {
 	if ctx == nil {
-		return errDesktopNotReady
+		return errDesktopContextRequired
 	}
 	desktop.mu.Lock()
 	desktop.ctx = ctx
@@ -142,7 +148,10 @@ func (desktop *Desktop) Ready(ctx context.Context) error {
 }
 
 // Close releases the retained desktop context. It is idempotent.
-func (desktop *Desktop) Close(context.Context) error {
+func (desktop *Desktop) Close(ctx context.Context) error {
+	if ctx == nil {
+		return errDesktopContextRequired
+	}
 	desktop.mu.Lock()
 	desktop.ctx = nil
 	desktop.mu.Unlock()

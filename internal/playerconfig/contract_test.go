@@ -50,21 +50,21 @@ func TestPlayerConfigContractAppliesDefaultsOnlyToAbsentOptionalProfileFields(t 
 		{
 			name: "explicit minimum and false",
 			entry: &persistencev1.RosterEntry{
-				Id: "mara", Name: "Mara", Intelligence: proto.Int32(1), HackerPerkAvailable: proto.Bool(false),
+				Id: "mara", Name: "Mara", Intelligence: proto.Int32(1), HackerPerkAvailable: new(false),
 			},
 			want: domain.CharacterRosterEntry{ID: "mara", Name: "Mara", Intelligence: 1, HackerPerkAvailable: false},
 		},
 		{
 			name: "explicit maximum and true",
 			entry: &persistencev1.RosterEntry{
-				Id: "mara", Name: "Mara", Intelligence: proto.Int32(10), HackerPerkAvailable: proto.Bool(true),
+				Id: "mara", Name: "Mara", Intelligence: proto.Int32(10), HackerPerkAvailable: new(true),
 			},
 			want: domain.CharacterRosterEntry{ID: "mara", Name: "Mara", Intelligence: 10, HackerPerkAvailable: true},
 		},
 		{
 			name: "present invalid intelligence is not defaulted",
 			entry: &persistencev1.RosterEntry{
-				Id: "mara", Name: "Mara", Intelligence: proto.Int32(0), HackerPerkAvailable: proto.Bool(false),
+				Id: "mara", Name: "Mara", Intelligence: proto.Int32(0), HackerPerkAvailable: new(false),
 			},
 			wantErr: true,
 		},

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -492,7 +493,7 @@ func (store *fixtureCommandStateStore) failNextSave() {
 	store.failNext = true
 }
 
-func (store *fixtureCommandStateStore) ExecuteCommandState(terminalID, commandID string) (control.CommandStateMutation, error) {
+func (store *fixtureCommandStateStore) ExecuteCommandState(_ context.Context, terminalID, commandID string) (control.CommandStateMutation, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if store.failNext {
@@ -518,7 +519,7 @@ func (store *fixtureCommandStateStore) ExecuteCommandState(terminalID, commandID
 	return store.mutationLocked(changed), nil
 }
 
-func (store *fixtureCommandStateStore) ResetCommandState(terminalID, commandID string) (control.CommandStateMutation, error) {
+func (store *fixtureCommandStateStore) ResetCommandState(_ context.Context, terminalID, commandID string) (control.CommandStateMutation, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if terminalID != "terminal-stateful" || commandID != "doors" {
@@ -532,7 +533,7 @@ func (store *fixtureCommandStateStore) ResetCommandState(terminalID, commandID s
 	return store.mutationLocked(changed), nil
 }
 
-func (store *fixtureCommandStateStore) ResetTerminalCommandStates(terminalID string) (control.CommandStateMutation, error) {
+func (store *fixtureCommandStateStore) ResetTerminalCommandStates(_ context.Context, terminalID string) (control.CommandStateMutation, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if terminalID != "terminal-stateful" {
@@ -800,13 +801,19 @@ func restartStateChangingBroadcast(service *control.Service, target domain.Termi
 }
 
 func main() {
-	if err := run(); err != nil {
+	rootContext := context.Background()
+	ctx, stop := signal.NotifyContext(rootContext, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("fixture context is required")
+	}
 	playerAssets, err := fs.Sub(os.DirFS("../../frontend/client"), "dist")
 	if err != nil {
 		return fmt.Errorf("open built player assets: %w", err)
@@ -1093,7 +1100,7 @@ func run() error {
 			navigationProjectionRevision.Add(1)
 			state = service.Snapshot()
 		} else if pending := service.Snapshot().PendingCommandExecution; pending != nil && pending.RequestID == payload.RequestID {
-			resolved, _, resolveErr := service.ResolveCommandExecution(payload.RequestID, domain.CommandExecutionDecision(payload.Decision))
+			resolved, _, resolveErr := service.ResolveCommandExecution(request.Context(), payload.RequestID, domain.CommandExecutionDecision(payload.Decision))
 			if resolveErr != nil {
 				response.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(response).Encode(map[string]any{"ok": false, "error": resolveErr.Error(), "state": resolved})
@@ -1268,7 +1275,7 @@ func run() error {
 				requestID = current.RequestID
 			}
 		}
-		state, _, resolveErr := service.ResolveCommandExecution(requestID, domain.CommandExecutionDecision(payload.Decision))
+		state, _, resolveErr := service.ResolveCommandExecution(request.Context(), requestID, domain.CommandExecutionDecision(payload.Decision))
 		result := map[string]any{"ok": resolveErr == nil, "state": state}
 		if resolveErr != nil {
 			result["error"] = resolveErr.Error()
@@ -1322,7 +1329,7 @@ func run() error {
 				requestID = current.RequestID
 			}
 		}
-		state, _, resolveErr := service.ResolveCommandExecution(requestID, domain.CommandExecutionDecision(payload.Decision))
+		state, _, resolveErr := service.ResolveCommandExecution(request.Context(), requestID, domain.CommandExecutionDecision(payload.Decision))
 		result := map[string]any{"ok": resolveErr == nil, "state": state}
 		if resolveErr != nil {
 			result["error"] = resolveErr.Error()
@@ -1417,13 +1424,13 @@ func run() error {
 	mux.HandleFunc("POST /__fixture/local/hacking", func(response http.ResponseWriter, _ *http.Request) {
 		edge.activateHacking(response)
 	})
-	mux.HandleFunc("POST /__fixture/local/crt/approve-command", func(response http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /__fixture/local/crt/approve-command", func(response http.ResponseWriter, request *http.Request) {
 		pending := service.Snapshot().PendingCommandExecution
 		if pending == nil {
 			http.Error(response, "CRT command approval is not pending", http.StatusConflict)
 			return
 		}
-		if _, _, err := service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove); err != nil {
+		if _, _, err := service.ResolveCommandExecution(request.Context(), pending.RequestID, domain.CommandExecutionApprove); err != nil {
 			http.Error(response, err.Error(), http.StatusConflict)
 			return
 		}
@@ -1540,7 +1547,7 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", fixtureAddress, err)
 	}
-	ingress, err := tunnel.NewPublicIngressFactory().Start(context.Background(), "http://"+fixtureAddress)
+	ingress, err := tunnel.NewPublicIngressFactory().Start(ctx, "http://"+fixtureAddress)
 	if err != nil {
 		_ = listener.Close()
 		return fmt.Errorf("start fixture public ingress: %w", err)
@@ -1548,7 +1555,7 @@ func run() error {
 	edge.ingress = ingress
 	edge.publicURL = ingress.URL().String()
 	if err := edge.reset(); err != nil {
-		_ = ingress.Close(context.Background())
+		_ = ingress.Close(ctx)
 		_ = listener.Close()
 		return fmt.Errorf("activate fixture public ingress: %w", err)
 	}
@@ -1558,8 +1565,6 @@ func run() error {
 		serveErrors <- httpServer.Serve(listener)
 	}()
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	select {
 	case <-ctx.Done():
 	case err := <-serveErrors:
@@ -1569,8 +1574,12 @@ func run() error {
 		return nil
 	}
 
-	shutdownContext, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	shutdownDeadline, stopShutdownDeadline := context.WithTimeoutCause(context.WithoutCancel(ctx), 3*time.Second, errors.New("fixture shutdown timed out"))
+	shutdownContext, cancelShutdown := context.WithCancelCause(shutdownDeadline)
+	defer func() {
+		cancelShutdown(errors.New("fixture shutdown complete"))
+		stopShutdownDeadline()
+	}()
 	ingress.Deny()
 	return errors.Join(ingress.Close(shutdownContext), httpServer.Shutdown(shutdownContext))
 }
@@ -1744,9 +1753,7 @@ func cloneFixtureCommandStates(states map[string]domain.CommandExecutionState) m
 		return nil
 	}
 	clone := make(map[string]domain.CommandExecutionState, len(states))
-	for commandID, state := range states {
-		clone[commandID] = state
-	}
+	maps.Copy(clone, states)
 	return clone
 }
 

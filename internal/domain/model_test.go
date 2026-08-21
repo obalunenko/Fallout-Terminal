@@ -377,7 +377,6 @@ func TestRuntimeCoordinationProjectionClonesDetachDeeply(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -504,8 +503,7 @@ func mutateProjectionReferences(value reflect.Value, behindReference bool) bool 
 			return mutateProjectionReferences(value.Elem(), true)
 		}
 	case reflect.Struct:
-		for index := 0; index < value.NumField(); index++ {
-			field := value.Field(index)
+		for _, field := range value.Fields() {
 			if field.CanSet() && mutateProjectionReferences(field, behindReference) {
 				mutated = true
 			}
@@ -723,7 +721,6 @@ func TestPlayerConfigV1StrictValidationAndStableEncoding(t *testing.T) {
 		{name: "null hacker perk", raw: `{"version":1,"name":"Players","roster":[{"id":"mara","name":"Mara","intelligence":5,"hackerPerkAvailable":null}]}`},
 	}
 	for _, test := range invalid {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := DecodePlayerConfig([]byte(test.raw))

@@ -8,11 +8,18 @@ import (
 	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/logger"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 const wailsShutdownTimeout = 5 * time.Second
+
+var (
+	errWailsContextRequired  = errors.New("wails lifecycle context is required")
+	errWailsShutdownComplete = errors.New("wails lifecycle shutdown complete")
+	errWailsShutdownTimeout  = errors.New("wails lifecycle shutdown timed out")
+)
 
 func init() {
 	application.RegisterEvent[domain.ServerInfo](serverInfoEvent)
@@ -29,8 +36,9 @@ func newWailsApplication(overseerAssets fs.FS) *application.App {
 
 func wailsApplicationOptions(overseerAssets fs.FS) application.Options {
 	return application.Options{
-		Name:        "Fallout Terminal",
-		Description: "Fallout Terminal — Overseer Control",
+		Name:                        "Fallout Terminal",
+		Description:                 "Fallout Terminal — Overseer Control",
+		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(overseerAssets),
 		},
@@ -90,6 +98,7 @@ func overseerWindowOptions() application.WebviewWindowOptions {
 // never registered as a frontend service.
 type wailsServiceRegistrar interface {
 	RegisterService(application.Service)
+	Quit()
 }
 
 type coreLifecycle interface {
@@ -111,7 +120,7 @@ func newWailsEventSink(events wailsEventEmitter) *wailsEventSink {
 
 func (sink *wailsEventSink) Emit(name string, payload any) error {
 	if sink == nil || sink.events == nil {
-		return errors.New("Wails event manager is unavailable")
+		return errors.New("wails event manager is unavailable")
 	}
 	sink.events.Emit(name, payload)
 	return nil
@@ -120,28 +129,62 @@ func (sink *wailsEventSink) Emit(name string, payload any) error {
 // wailsLifecycleService adapts framework lifecycle callbacks to the unbound
 // core. Its method names are Wails lifecycle hooks, not authored bridge calls.
 type wailsLifecycleService struct {
-	core coreLifecycle
+	root                context.Context
+	core                coreLifecycle
+	quit                func()
+	runtimeCancel       context.CancelCauseFunc
+	stopRootPropagation func() bool
+	log                 logger.Logger
 }
 
-func newWailsLifecycleService(core coreLifecycle) *wailsLifecycleService {
-	return &wailsLifecycleService{core: core}
+func newWailsLifecycleService(ctx context.Context, core coreLifecycle, quit func(), logs ...logger.Logger) *wailsLifecycleService {
+	if ctx == nil {
+		panic(errWailsContextRequired)
+	}
+	applicationLogger := logger.FromContext(ctx)
+	if len(logs) > 0 && logs[0] != nil {
+		applicationLogger = logs[0]
+	}
+	return &wailsLifecycleService{root: ctx, core: core, quit: quit, log: applicationLogger}
 }
 
 func (service *wailsLifecycleService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
+	if ctx == nil {
+		return errWailsContextRequired
+	}
+	runtimeContext, cancel := context.WithCancelCause(ctx)
+	service.runtimeCancel = cancel
+	service.stopRootPropagation = context.AfterFunc(service.root, func() {
+		cancel(context.Cause(service.root))
+		if service.quit != nil {
+			service.quit()
+		}
+	})
 	// Application-owned failures are recorded by the core in RuntimeStatus and
 	// leave the Overseer window available to explain the failure. Returning them
 	// here would make Wails abort before that status can be presented.
-	_ = service.core.Start(ctx)
+	if err := service.core.Start(runtimeContext); err != nil {
+		service.log.WithFields(logger.Fields{
+			"operation": "application.start",
+			"outcome":   "failed",
+		}).Error("application startup failed")
+	}
 	return nil
 }
 
 func (service *wailsLifecycleService) ServiceShutdown() error {
-	ctx, cancel := context.WithTimeout(context.Background(), wailsShutdownTimeout)
-	defer cancel()
+	if service.stopRootPropagation != nil {
+		service.stopRootPropagation()
+	}
+	if service.runtimeCancel != nil {
+		defer service.runtimeCancel(errWailsShutdownComplete)
+	}
+	ctx, cancel := boundedCleanupContext(service.root, wailsShutdownTimeout, errWailsShutdownTimeout)
+	defer cancel(errWailsShutdownComplete)
 	return service.core.Shutdown(ctx)
 }
 
-func registerWailsServices(host wailsServiceRegistrar, core *App) {
-	host.RegisterService(application.NewService(newWailsLifecycleService(core)))
+func registerWailsServices(ctx context.Context, host wailsServiceRegistrar, core *App) {
+	host.RegisterService(application.NewService(newWailsLifecycleService(ctx, core, host.Quit)))
 	host.RegisterService(application.NewService(newDesktopService(core)))
 }

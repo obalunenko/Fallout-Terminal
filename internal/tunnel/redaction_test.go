@@ -53,7 +53,7 @@ func TestRedactedPublicAccessFailureMapsStableCategoriesWithoutSDKDiagnostics(t 
 			} else {
 				assert.Contains(t, message, test.code)
 			}
-			for _, marker := range strings.Fields(canary) {
+			for marker := range strings.FieldsSeq(canary) {
 				assert.NotContains(t, message, marker)
 			}
 		})
@@ -68,13 +68,11 @@ func TestRedactedPublicAccessFailureDropsLongCanariesAndIsConcurrent(t *testing.
 	failure := codedProviderError{code: "ERR_NGROK_320", diagnostic: diagnostic}
 	results := make(chan string, 100)
 	var workers sync.WaitGroup
-	for worker := 0; worker < 100; worker++ {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
+	for range 100 {
+		workers.Go(func() {
 			category, message := redactedPublicAccessFailure(failure)
 			results <- fmt.Sprintf("%d:%s", category, message)
-		}()
+		})
 	}
 	workers.Wait()
 	close(results)

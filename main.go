@@ -6,10 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -23,6 +24,7 @@ import (
 	playerconfigservice "github.com/obalunenko/Fallout-Terminal/internal/playerconfig"
 	sessionservice "github.com/obalunenko/Fallout-Terminal/internal/session"
 	tunnelservice "github.com/obalunenko/Fallout-Terminal/internal/tunnel"
+	"github.com/obalunenko/logger"
 )
 
 // The repository-owned Go build command prepares the frontend before production
@@ -38,29 +40,43 @@ var overseerSource embed.FS
 //go:embed all:frontend/client/dist
 var clientSource embed.FS
 
+var errApplicationProcessComplete = errors.New("application process complete")
+
 func main() {
+	signalContext, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	rootContext, cancelRoot := context.WithCancelCause(signalContext)
+	defer stopSignals()
+	defer cancelRoot(errApplicationProcessComplete)
+	stopSignalDiversion := context.AfterFunc(rootContext, stopSignals)
+	defer stopSignalDiversion()
+	applicationLogger := logger.Init(rootContext, logger.Params{Level: "info", Format: "text"})
+	rootContext = logger.ContextWithLogger(rootContext, applicationLogger)
+
 	overseerAssets, err := fs.Sub(overseerSource, "frontend/overseer/dist")
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("prepare Overseer assets")
 	}
 	clientAssets, err := fs.Sub(clientSource, "frontend/client/dist")
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("prepare player assets")
 	}
 
 	host := newWailsApplication(overseerAssets)
-	core, err := composeApplication(host, clientAssets)
+	core, err := composeApplication(rootContext, host, clientAssets)
 	if err != nil {
-		log.Fatal(err)
+		logger.WithError(rootContext, err).Fatal("compose application")
 	}
-	registerWailsServices(host, core)
+	registerWailsServices(rootContext, host, core)
 	newOverseerWindow(host)
 	if err := host.Run(); err != nil {
-		log.Fatal(err)
+		logger.WithField(rootContext, "operation", "application.run").Fatal("application host stopped with an error")
 	}
 }
 
-func composeApplication(host *application.App, clientAssets fs.FS) (*App, error) {
+func composeApplication(ctx context.Context, host *application.App, clientAssets fs.FS) (*App, error) {
+	if ctx == nil {
+		return nil, errors.New("application composition context is required")
+	}
 	locations, err := platform.DefaultSessionLocations(applicationResourceRoot())
 	if err != nil {
 		return nil, err
@@ -73,7 +89,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 		return nil, fmt.Errorf("resolve public-access settings path: %w", err)
 	}
 	runtimeConfig := defaultApplicationConfig(locations)
-	desktop := platform.NewDesktop(nil, host.Dialog, host.Browser)
+	desktop := platform.NewDesktop(ctx, host.Dialog, host.Browser)
 	events := newWailsEventSink(host.Event)
 	live := liveservice.New(nil, nil)
 	playerConfigs := playerconfigservice.NewService(
@@ -102,6 +118,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 	playerConfig := playerserver.Config{
 		Address: runtimeConfig.PlayerServer.Address,
 		Assets:  clientAssets,
+		Logger:  logger.FromContext(ctx),
 	}
 	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
 		Coordinator: coordination,
@@ -117,7 +134,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 		return nil, fmt.Errorf("construct Connect player service: %w", err)
 	}
 	playerConfig.Connect = connectPlayer
-	player, err := playerserver.NewServer(playerConfig)
+	player, err := playerserver.NewServer(ctx, playerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("construct player server: %w", err)
 	}
@@ -141,7 +158,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 	if err != nil {
 		return nil, fmt.Errorf("construct embedded public access: %w", err)
 	}
-	app = NewAppWithDependencies(AppDependencies{
+	app = NewAppWithDependencies(ctx, AppDependencies{
 		Sessions:        sessions,
 		PlayerConfigs:   playerConfigs,
 		Live:            live,
@@ -153,6 +170,7 @@ func composeApplication(host *application.App, clientAssets fs.FS) (*App, error)
 		PublicSettings:  effectivePublicSettings,
 		PublicSecrets:   effectivePublicSecrets,
 		PublicAccess:    publicAccess,
+		Logger:          logger.FromContext(ctx),
 		StartupTimeout:  time.Duration(runtimeConfig.Startup.TimeoutMilliseconds) * time.Millisecond,
 		ShutdownTimeout: time.Duration(runtimeConfig.Shutdown.TimeoutMilliseconds) * time.Millisecond,
 	})
@@ -168,25 +186,25 @@ type sessionCommandStateStore struct {
 
 var _ controlservice.CommandStateStore = (*sessionCommandStateStore)(nil)
 
-func (store *sessionCommandStateStore) ExecuteCommandState(terminalID, commandID string) (controlservice.CommandStateMutation, error) {
+func (store *sessionCommandStateStore) ExecuteCommandState(ctx context.Context, terminalID, commandID string) (controlservice.CommandStateMutation, error) {
 	if store == nil || store.service == nil {
 		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
 	}
-	return commandStateMutation(store.service.ExecuteCommandState(context.Background(), terminalID, commandID))
+	return commandStateMutation(store.service.ExecuteCommandState(ctx, terminalID, commandID))
 }
 
-func (store *sessionCommandStateStore) ResetCommandState(terminalID, commandID string) (controlservice.CommandStateMutation, error) {
+func (store *sessionCommandStateStore) ResetCommandState(ctx context.Context, terminalID, commandID string) (controlservice.CommandStateMutation, error) {
 	if store == nil || store.service == nil {
 		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
 	}
-	return commandStateMutation(store.service.ResetCommandState(context.Background(), terminalID, commandID))
+	return commandStateMutation(store.service.ResetCommandState(ctx, terminalID, commandID))
 }
 
-func (store *sessionCommandStateStore) ResetTerminalCommandStates(terminalID string) (controlservice.CommandStateMutation, error) {
+func (store *sessionCommandStateStore) ResetTerminalCommandStates(ctx context.Context, terminalID string) (controlservice.CommandStateMutation, error) {
 	if store == nil || store.service == nil {
 		return controlservice.CommandStateMutation{}, errors.New("session command-state store is unavailable")
 	}
-	return commandStateMutation(store.service.ResetTerminalCommandStates(context.Background(), terminalID))
+	return commandStateMutation(store.service.ResetTerminalCommandStates(ctx, terminalID))
 }
 
 func commandStateMutation(result sessionservice.CommandStateResult) (controlservice.CommandStateMutation, error) {
@@ -320,6 +338,9 @@ func (router *coordinationEffectRouter) Enqueue(effect controlservice.Effect) {
 
 func applicationResourceRoot() string {
 	executable, err := os.Executable()
+	if err != nil {
+		executable = ""
+	}
 	workingDirectory, err := os.Getwd()
 	if err != nil {
 		workingDirectory = ""

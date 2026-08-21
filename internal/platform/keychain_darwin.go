@@ -18,7 +18,7 @@ func newDarwinKeychainSecretStoreWithService(service string) *KeychainSecretStor
 }
 
 func (darwinCredentialBackend) Presence(ctx context.Context, service, account string) (bool, error) {
-	if err := contextError(ctx); err != nil {
+	if err := credentialContextError(ctx); err != nil {
 		return false, err
 	}
 	query := genericPasswordQuery(service, account)
@@ -31,7 +31,7 @@ func (darwinCredentialBackend) Presence(ctx context.Context, service, account st
 }
 
 func (darwinCredentialBackend) Update(ctx context.Context, service, account string, value []byte) error {
-	if err := contextError(ctx); err != nil {
+	if err := credentialContextError(ctx); err != nil {
 		return err
 	}
 	query := genericPasswordQuery(service, account)
@@ -41,7 +41,7 @@ func (darwinCredentialBackend) Update(ctx context.Context, service, account stri
 }
 
 func (darwinCredentialBackend) Add(ctx context.Context, service, account string, value []byte) error {
-	if err := contextError(ctx); err != nil {
+	if err := credentialContextError(ctx); err != nil {
 		return err
 	}
 	item := keychain.NewGenericPassword(service, account, "Fallout Terminal public access", value, "")
@@ -50,14 +50,14 @@ func (darwinCredentialBackend) Add(ctx context.Context, service, account string,
 }
 
 func (darwinCredentialBackend) Delete(ctx context.Context, service, account string) error {
-	if err := contextError(ctx); err != nil {
+	if err := credentialContextError(ctx); err != nil {
 		return err
 	}
 	return translateDarwinCredentialError(keychain.DeleteItem(genericPasswordQuery(service, account)))
 }
 
 func (darwinCredentialBackend) Read(ctx context.Context, service, account string) ([]byte, error) {
-	if err := contextError(ctx); err != nil {
+	if err := credentialContextError(ctx); err != nil {
 		return nil, err
 	}
 	query := genericPasswordQuery(service, account)
@@ -98,13 +98,6 @@ func translateDarwinCredentialError(err error) error {
 	default:
 		return errCredentialUnavailable
 	}
-}
-
-func contextError(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Err()
 }
 
 var _ credentialBackend = darwinCredentialBackend{}

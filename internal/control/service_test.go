@@ -1,9 +1,11 @@
 package control
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -300,11 +302,11 @@ func TestCommitEnqueuesBeforeUnlocking(t *testing.T) {
 func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 	service := newUS1Service()
 
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	require.Falsef(t, err != nil,
 		"AddCharacter(Mara) error = %v", err)
 
-	state, err = addCharacter(service, "Boone")
+	state, err := addCharacter(service, "Boone")
 	require.Falsef(t, err != nil,
 		"AddCharacter(Boone) error = %v", err)
 	require.Falsef(t, len(state.Roster) != 2 || state.Roster[0].Name != "Mara" || state.Roster[1].Name != "Boone",
@@ -351,13 +353,13 @@ func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 }
 
 func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		service := newUS1Service()
-		state, err := addCharacter(service, "Mara")
+		_, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter() error = %v", trial, err)
 
-		state, err = service.StartBroadcast()
+		state, err := service.StartBroadcast()
 		require.Falsef(t, err != nil,
 			"trial %d StartBroadcast() error = %v", trial, err)
 
@@ -403,17 +405,17 @@ func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testi
 }
 
 func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100Trials(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		service := newUS1Service()
-		state, err := addCharacter(service, "Mara")
+		_, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter(Mara) error = %v", trial, err)
 
-		state, err = addCharacter(service, "Boone")
+		_, err = addCharacter(service, "Boone")
 		require.Falsef(t, err != nil,
 			"trial %d AddCharacter(Boone) error = %v", trial, err)
 
-		state, err = service.StartBroadcast()
+		state, err := service.StartBroadcast()
 		require.Falsef(t, err != nil,
 			"trial %d StartBroadcast() error = %v", trial, err)
 
@@ -456,15 +458,15 @@ func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100T
 
 func TestSessionCannotClaimTwoCharactersAndCharacterCannotHaveTwoSessions(t *testing.T) {
 	service := newUS1Service()
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = addCharacter(service, "Boone")
+	_, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -725,7 +727,7 @@ func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpo
 	})
 	beforeRevision := fixture.service.Revision()
 
-	for index := 0; index < 257; index++ {
+	for index := range 257 {
 		requestID := domain.RequestID(fmt.Sprintf("request-%03d", index))
 		result := fixture.service.SelectCharacter(CharacterSelection{
 			ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: requestID,
@@ -785,7 +787,7 @@ func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpo
 }
 
 func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequenceAcross100Races(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		random := &controlCountingRandom{}
 		liveRuntime := live.New(random, controlFixedWords{})
 		effects := testutil.NewFakeOrderedEffectSink[Effect]()
@@ -830,8 +832,7 @@ func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequence
 
 		start := make(chan struct{})
 		results := make(chan domain.ActionResult, 2)
-		for contender := 0; contender < 2; contender++ {
-			contender := contender
+		for contender := range 2 {
 			go func() {
 				<-start
 				results <- service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
@@ -985,7 +986,7 @@ func TestSetActiveControllerRejectsEveryIneligibleTargetWithoutMutation(t *testi
 }
 
 func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavings(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		t.Run(fmt.Sprintf("trial-%03d", trial), func(t *testing.T) {
 			actionFirst := trial%2 == 0
 			runtime := &recordingTerminalRuntime{}
@@ -1357,7 +1358,7 @@ func TestOrdinaryAndCompletedCommandDecisionsPreserveModeSpecificEffects(t *test
 			pending := fixture.service.Snapshot().PendingCommandExecution
 			require.NotNil(t, pending)
 
-			state, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, test.decision)
+			state, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, test.decision)
 			require.NoError(t, err)
 			require.Nil(t, mutation)
 			require.Nil(t, state.PendingCommandExecution)
@@ -1424,11 +1425,13 @@ func TestCompletedStateChangingCommandRequiresFreshApprovalWithoutSecondDurableE
 	pending := fixture.service.Snapshot().PendingCommandExecution
 	require.NotNil(t, pending)
 
-	approved, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	operationContext := context.WithValue(t.Context(), commandStateContextKey{}, "durable-operation")
+	approved, mutation, err := fixture.service.ResolveCommandExecution(operationContext, pending.RequestID, domain.CommandExecutionApprove)
 	require.NoError(t, err)
 	require.NotNil(t, mutation)
 	require.Nil(t, approved.PendingCommandExecution)
 	require.Equal(t, 1, store.ExecuteCalls())
+	require.Equal(t, "durable-operation", store.ExecuteContexts()[0].Value(commandStateContextKey{}))
 	require.Equal(t, 0, fixture.runtime.Calls())
 
 	beforeRepeat := canonicalTerminal(t, fixture.service, fixture.terminalID)
@@ -1470,7 +1473,7 @@ func TestApproveCommandExecutionWaitsForDurabilityBeforePublishingSuccess(t *tes
 	}
 	resolved := make(chan resolution, 1)
 	go func() {
-		state, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+		state, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 		resolved <- resolution{state: state, mutation: mutation, err: err}
 	}()
 
@@ -1508,7 +1511,7 @@ func TestApproveCommandExecutionPersistenceFailureClearsPendingWithoutSuccess(t 
 		revisionBefore := fixture.service.Revision()
 		effectsBefore := len(fixture.effects.Values())
 
-		state, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+		state, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 		require.Error(t, err, "failure attempt %d", attempt)
 		require.NotContains(t, err.Error(), "private disk path", "failure attempt %d", attempt)
 		require.Nil(t, mutation, "failure attempt %d", attempt)
@@ -1549,7 +1552,7 @@ func TestRejectAndDialogCloseResolvePendingWithoutPersistence(t *testing.T) {
 				require.NotNil(t, pending)
 				revisionBefore := fixture.service.Revision()
 
-				state, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionReject)
+				state, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionReject)
 				require.NoError(t, err)
 				require.Nil(t, mutation)
 				require.NotNil(t, state)
@@ -1571,20 +1574,20 @@ func TestCommandExecutionResolutionRejectsStaleAndDuplicateRequestIDs(t *testing
 	require.NotNil(t, pending)
 	before := fixture.service.Snapshot()
 
-	staleState, staleMutation, staleErr := fixture.service.ResolveCommandExecution("stale-server-request", domain.CommandExecutionApprove)
+	staleState, staleMutation, staleErr := fixture.service.ResolveCommandExecution(t.Context(), "stale-server-request", domain.CommandExecutionApprove)
 	require.Error(t, staleErr)
 	require.Nil(t, staleMutation)
 	require.Equal(t, before, staleState)
 	require.Equal(t, before, fixture.service.Snapshot())
 	require.Equal(t, 0, store.ExecuteCalls())
 
-	acceptedState, acceptedMutation, acceptedErr := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	acceptedState, acceptedMutation, acceptedErr := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 	require.NoError(t, acceptedErr)
 	require.NotNil(t, acceptedMutation)
 	require.Nil(t, acceptedState.PendingCommandExecution)
 	revisionAfterApprove := fixture.service.Revision()
 
-	duplicateState, duplicateMutation, duplicateErr := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	duplicateState, duplicateMutation, duplicateErr := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 	require.Error(t, duplicateErr)
 	require.Nil(t, duplicateMutation)
 	require.Equal(t, revisionAfterApprove, duplicateState.Revision)
@@ -1655,7 +1658,7 @@ func TestControllerDisconnectRetainsPendingCommandExecutionForMasterResolution(t
 	require.False(t, masterSession(t, disconnected, controllerSessionID).Connected)
 	require.Equal(t, 0, store.ExecuteCalls())
 
-	resolved, mutation, err := fixture.service.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	resolved, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 	require.NoError(t, err)
 	require.NotNil(t, mutation)
 	require.Nil(t, resolved.PendingCommandExecution)
@@ -1694,7 +1697,7 @@ func TestControllerDisconnectAndCommandApprovalRaceSerializesExactlyOnce(t *test
 		go func() {
 			defer group.Done()
 			<-start
-			state, mutation, err := fixture.service.ResolveCommandExecution(requestID, domain.CommandExecutionApprove)
+			state, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), requestID, domain.CommandExecutionApprove)
 			if err == nil && (state == nil || state.PendingCommandExecution != nil || mutation == nil) {
 				err = fmt.Errorf("incomplete approval result: state=%#v mutation=%#v", state, mutation)
 			}
@@ -1745,7 +1748,7 @@ func TestCommandExecutionLifecycleBoundariesClearPendingAndRejectedWithoutPersis
 				requestID := pending.RequestID
 
 				if phase == domain.CommandExecutionPhaseRejected {
-					rejected, mutation, err := fixture.service.ResolveCommandExecution(requestID, domain.CommandExecutionReject)
+					rejected, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), requestID, domain.CommandExecutionReject)
 					require.NoError(t, err)
 					require.Nil(t, mutation)
 					require.Nil(t, rejected.PendingCommandExecution)
@@ -1782,7 +1785,7 @@ func TestCommandExecutionLifecycleBoundariesClearPendingAndRejectedWithoutPersis
 
 				require.Equal(t, 0, store.ExecuteCalls(), "lifecycle cancellation must not persist command state")
 				beforeLateCallback := fixture.service.Snapshot()
-				stale, mutation, err := fixture.service.ResolveCommandExecution(requestID, domain.CommandExecutionApprove)
+				stale, mutation, err := fixture.service.ResolveCommandExecution(t.Context(), requestID, domain.CommandExecutionApprove)
 				require.Error(t, err)
 				require.Nil(t, mutation)
 				require.Equal(t, beforeLateCallback, stale)
@@ -1845,11 +1848,11 @@ func TestKnownTokenReusesStableSessionAcrossFirstAndLastPresenceTransitions(t *t
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue})
 	firstConnection := domain.ConnectionID("connection-first")
 	token, initial := service.AttachConnection(firstConnection, "")
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1925,11 +1928,11 @@ func TestUnrecognizedSessionAttachmentDoesNotReleaseExistingClaim(t *testing.T) 
 	service := New(Config{IDs: &counterIDSource{}})
 	ownerConnection := domain.ConnectionID("connection-owner")
 	ownerToken, owner := service.AttachConnection(ownerConnection, "")
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2542,11 +2545,11 @@ func TestResetFailedHackSerializesConcurrentDuplicateRequests(t *testing.T) {
 func TestCurrentLiveForSessionResumesCoordinatorOwnedRuntimeWithoutRegeneration(t *testing.T) {
 	liveService := live.New(nil, nil)
 	service := New(Config{IDs: &counterIDSource{}, Runtime: liveService, Terminals: liveService})
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -2598,11 +2601,11 @@ func TestForceHackSuccessMutatesOnlyCoordinatorOwnedActiveRuntime(t *testing.T) 
 		IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: liveService,
 		Terminals: liveService, TrustedHack: liveService,
 	})
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -3174,7 +3177,7 @@ func TestOverseerRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 		return updateErr
 	})
 
-	state, err = service.StartBroadcast()
+	_, err = service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -3478,7 +3481,6 @@ func TestConcurrentLinkedRequestsCreateExactlyOnePendingDecision(t *testing.T) {
 	start := make(chan struct{})
 	results := make(chan domain.ActionResult, 2)
 	for _, requestID := range []string{"concurrent-a", "concurrent-b"} {
-		requestID := requestID
 		go func() {
 			<-start
 			results <- fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
@@ -3792,14 +3794,18 @@ type recordingCommandStateStore struct {
 	mutation  CommandStateMutation
 	err       error
 	executes  [][2]string
+	contexts  []context.Context
 	started   chan struct{}
 	release   chan struct{}
 	startOnce sync.Once
 }
 
-func (store *recordingCommandStateStore) ExecuteCommandState(terminalID, commandID string) (CommandStateMutation, error) {
+type commandStateContextKey struct{}
+
+func (store *recordingCommandStateStore) ExecuteCommandState(ctx context.Context, terminalID, commandID string) (CommandStateMutation, error) {
 	store.mu.Lock()
 	store.executes = append(store.executes, [2]string{terminalID, commandID})
+	store.contexts = append(store.contexts, ctx)
 	started := store.started
 	release := store.release
 	mutation := store.mutation
@@ -3814,11 +3820,11 @@ func (store *recordingCommandStateStore) ExecuteCommandState(terminalID, command
 	return mutation, err
 }
 
-func (store *recordingCommandStateStore) ResetCommandState(string, string) (CommandStateMutation, error) {
+func (store *recordingCommandStateStore) ResetCommandState(context.Context, string, string) (CommandStateMutation, error) {
 	return CommandStateMutation{}, errors.New("unexpected reset-one call")
 }
 
-func (store *recordingCommandStateStore) ResetTerminalCommandStates(string) (CommandStateMutation, error) {
+func (store *recordingCommandStateStore) ResetTerminalCommandStates(context.Context, string) (CommandStateMutation, error) {
 	return CommandStateMutation{}, errors.New("unexpected reset-terminal call")
 }
 
@@ -3832,6 +3838,12 @@ func (store *recordingCommandStateStore) ExecuteArguments() [][2]string {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	return append([][2]string(nil), store.executes...)
+}
+
+func (store *recordingCommandStateStore) ExecuteContexts() []context.Context {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	return append([]context.Context(nil), store.contexts...)
 }
 
 func commandExecutionSession(completed bool) domain.Session {
@@ -3860,15 +3872,15 @@ func newUS2Fixture(t *testing.T, runtime *recordingTerminalRuntime) us2Fixture {
 	t.Helper()
 	effects := testutil.NewFakeOrderedEffectSink[Effect]()
 	service := New(Config{IDs: &counterIDSource{}, Enqueue: effects.Enqueue, Runtime: runtime})
-	state, err := addCharacter(service, "Mara")
+	_, err := addCharacter(service, "Mara")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = addCharacter(service, "Boone")
+	_, err = addCharacter(service, "Boone")
 	if err != nil {
 		require.NoError(t, err)
 	}
-	state, err = service.StartBroadcast()
+	state, err := service.StartBroadcast()
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -3967,9 +3979,9 @@ func (runtime *recordingTerminalRuntime) RandomCalls() int {
 func actionResultForRequest(t *testing.T, effects *testutil.FakeOrderedEffectSink[Effect], requestID string) domain.ActionResult {
 	t.Helper()
 	recorded := effects.Values()
-	for index := len(recorded) - 1; index >= 0; index-- {
-		if recorded[index].Result != nil && recorded[index].Result.RequestID == requestID {
-			return *recorded[index].Result
+	for _, r := range slices.Backward(recorded) {
+		if r.Result != nil && r.Result.RequestID == requestID {
+			return *r.Result
 		}
 	}
 	assert.FailNowf(t, "assertion failed", "no action result effect for request %q", requestID)
@@ -4004,16 +4016,30 @@ func canonicalTerminalBytes(t *testing.T, service *Service, terminalID string) [
 			SecretWord: hackState.SecretWord, WordsByID: hackState.WordsByID, UsedPatterns: usedPatterns,
 			Solved: hackState.Solved, Failed: hackState.Failed, Log: hackState.Log, Columns: hackState.Columns,
 		}
-		terminal.Hack = nil
 	}
-	encoded, err := json.Marshal(struct {
-		Runtime *domain.TerminalRuntime
-		Hack    *canonicalHackSnapshot
-	}{Runtime: terminal, Hack: privateHack})
+	encoded, err := json.Marshal(canonicalTerminalSnapshot{
+		TerminalID: terminal.TerminalID, TerminalName: terminal.TerminalName,
+		Tree: terminal.Tree, CommandStates: terminal.CommandStates, CommandExecution: terminal.CommandExecution,
+		HackLevel: terminal.HackLevel, IntroText: terminal.IntroText, Nav: terminal.Nav,
+		Hack: privateHack, Lifecycle: terminal.Lifecycle,
+	})
 	if err != nil {
 		require.NoError(t, err)
 	}
 	return encoded
+}
+
+type canonicalTerminalSnapshot struct {
+	TerminalID       string
+	TerminalName     string
+	Tree             domain.ContentNode
+	CommandStates    map[string]domain.CommandExecutionState
+	CommandExecution *domain.CommandExecutionPresentation
+	HackLevel        int
+	IntroText        string
+	Nav              domain.NavState
+	Hack             *canonicalHackSnapshot
+	Lifecycle        domain.TerminalLifecycle
 }
 
 type canonicalHackSnapshot struct {

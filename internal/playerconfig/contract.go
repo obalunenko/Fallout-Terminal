@@ -5,7 +5,6 @@ import (
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
 	persistencev1 "github.com/obalunenko/Fallout-Terminal/internal/gen/fallout/terminal/persistence/v1"
-	"google.golang.org/protobuf/proto"
 )
 
 func PlayerConfigToProto(value domain.PlayerConfig) (*persistencev1.PlayerConfig, error) {
@@ -17,8 +16,8 @@ func PlayerConfigToProto(value domain.PlayerConfig) (*persistencev1.PlayerConfig
 		result.Roster = append(result.Roster, &persistencev1.RosterEntry{
 			Id:                  string(entry.ID),
 			Name:                entry.Name,
-			Intelligence:        proto.Int32(int32(entry.Intelligence)),
-			HackerPerkAvailable: proto.Bool(entry.HackerPerkAvailable),
+			Intelligence:        new(int32(entry.Intelligence)),
+			HackerPerkAvailable: new(entry.HackerPerkAvailable),
 		})
 	}
 	return result, nil

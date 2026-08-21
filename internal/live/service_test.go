@@ -2,6 +2,7 @@ package live
 
 import (
 	"encoding/json"
+	"maps"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -138,11 +139,11 @@ func TestConcurrentTransitionsAndSnapshots(t *testing.T) {
 	service.Set("terminal-1", "Overseer", testTree(), 1, "WELCOME")
 
 	var workers sync.WaitGroup
-	for worker := 0; worker < 8; worker++ {
+	for worker := range 8 {
 		workers.Add(1)
 		go func(worker int) {
 			defer workers.Done()
-			for iteration := 0; iteration < 100; iteration++ {
+			for range 100 {
 				switch worker % 4 {
 				case 0:
 					service.ApplyNav("enter", "docs")
@@ -182,13 +183,11 @@ func TestConcurrentPatternUseAppliesOnceAndFreshSetResetsUsage(t *testing.T) {
 	var accepted atomic.Int32
 	var workers sync.WaitGroup
 	for range 16 {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
+		workers.Go(func() {
 			if service.ApplyHackPattern(patternID, nil) {
 				accepted.Add(1)
 			}
-		}()
+		})
 	}
 	workers.Wait()
 	require.Falsef(t, accepted.Load() != 1,
@@ -427,7 +426,6 @@ func TestTerminalRuntimeReactivationRetainsSolvedUnfinishedAndFailedHackAcrossTe
 		{name: "unfinished"},
 		{name: "failed", failed: true},
 	} {
-		outcome := outcome
 		t.Run(outcome.name, func(t *testing.T) {
 			t.Parallel()
 			service := New(&constantRandom{}, fixedWords{})
@@ -532,9 +530,7 @@ func cloneHackForLifecycleTest(state *domain.HackState) *domain.HackState {
 	}
 	clone := *state
 	clone.WordsByID = make(map[string]domain.HackCandidate, len(state.WordsByID))
-	for id, candidate := range state.WordsByID {
-		clone.WordsByID[id] = candidate
-	}
+	maps.Copy(clone.WordsByID, state.WordsByID)
 	clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(state.UsedPatterns))
 	for identity := range state.UsedPatterns {
 		clone.UsedPatterns[identity] = struct{}{}
@@ -914,9 +910,7 @@ func cloneTerminalRuntimeForTest(runtime *domain.TerminalRuntime) *domain.Termin
 	}
 	if runtime.CommandStates != nil {
 		clone.CommandStates = make(map[string]domain.CommandExecutionState, len(runtime.CommandStates))
-		for commandID, state := range runtime.CommandStates {
-			clone.CommandStates[commandID] = state
-		}
+		maps.Copy(clone.CommandStates, runtime.CommandStates)
 	}
 	return &clone
 }

@@ -1,10 +1,8 @@
 module github.com/obalunenko/Fallout-Terminal/tools/wails
 
-go 1.26
+go 1.27.0
 
 tool github.com/wailsapp/wails/v3/cmd/wails3
-
-require github.com/wailsapp/wails/v3 v3.0.0-beta.10 // indirect
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
@@ -122,6 +120,7 @@ require (
 	github.com/tc-hib/winres v0.3.1 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/wailsapp/task/v3 v3.40.1-patched3 // indirect
+	github.com/wailsapp/wails/v3 v3.0.0-beta.10 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect

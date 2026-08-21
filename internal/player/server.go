@@ -12,9 +12,15 @@ import (
 
 	"github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/logger"
 )
 
 const defaultAddress = "0.0.0.0:3690"
+
+var (
+	errPlayerContextRequired = errors.New("player context is required")
+	errPlayerServerStopped   = errors.New("player server stopped")
+)
 
 // Config contains the generated Connect player server's process-local
 // dependencies. Assets are the complete built player application.
@@ -22,17 +28,21 @@ type Config struct {
 	Address string
 	Assets  fs.FS
 	Connect *ConnectService
+	Logger  logger.Logger
 }
 
 // Server owns the LAN HTTP listener and generated Connect stream lifecycle.
 type Server struct {
 	config Config
+	log    logger.Logger
+	root   context.Context
 
 	mu         sync.Mutex
 	listener   net.Listener
 	httpServer *http.Server
 	info       domain.ServerInfo
-	cancel     context.CancelFunc
+	context    context.Context
+	cancel     context.CancelCauseFunc
 	started    bool
 	stopping   bool
 	stopped    bool
@@ -43,7 +53,10 @@ type Server struct {
 
 // NewServer validates construction-only dependencies without acquiring a
 // listener. A generated handler is mandatory: there is no legacy fallback.
-func NewServer(config Config) (*Server, error) {
+func NewServer(ctx context.Context, config Config) (*Server, error) {
+	if ctx == nil {
+		return nil, errPlayerContextRequired
+	}
 	if config.Address == "" {
 		config.Address = defaultAddress
 	}
@@ -53,11 +66,24 @@ func NewServer(config Config) (*Server, error) {
 	if config.Connect == nil {
 		return nil, errors.New("generated Connect player service is not configured")
 	}
-	return &Server{config: config}, nil
+	serverLogger := config.Logger
+	if serverLogger == nil {
+		serverLogger = logger.FromContext(ctx)
+	}
+	return &Server{config: config, log: serverLogger, root: ctx}, nil
 }
 
 // Start acquires the listener before returning its usable local address.
-func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
+func (server *Server) Start(ctx context.Context) (domain.ServerInfo, error) {
+	if ctx == nil {
+		return domain.ServerInfo{}, errPlayerContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return domain.ServerInfo{}, err
+	}
+	if err := server.root.Err(); err != nil {
+		return domain.ServerInfo{}, err
+	}
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	if server.started {
@@ -71,8 +97,17 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 	if err != nil {
 		return domain.ServerInfo{}, fmt.Errorf("listen on %s: %w", server.config.Address, err)
 	}
-	serverContext, cancel := context.WithCancel(context.Background())
+	if err := ctx.Err(); err != nil {
+		_ = listener.Close()
+		return domain.ServerInfo{}, err
+	}
+	if err := server.root.Err(); err != nil {
+		_ = listener.Close()
+		return domain.ServerInfo{}, err
+	}
+	serverContext, cancel := context.WithCancelCause(server.root)
 	server.listener = listener
+	server.context = serverContext
 	server.cancel = cancel
 	server.info = listenerInfo(listener, server.config.Address)
 	server.started = true
@@ -89,9 +124,24 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 	server.workers.Add(1)
 	go func(httpServer *http.Server, activeListener net.Listener) {
 		defer server.workers.Done()
-		_ = httpServer.Serve(activeListener)
+		server.recordServeExit(httpServer.Serve(activeListener))
 	}(server.httpServer, listener)
 	return server.info, nil
+}
+
+func (server *Server) recordServeExit(err error) {
+	if server == nil || err == nil || errors.Is(err, http.ErrServerClosed) {
+		return
+	}
+	server.mu.Lock()
+	cancel := server.cancel
+	server.mu.Unlock()
+	if cancel != nil {
+		cancel(err)
+	}
+	if server.log != nil {
+		server.log.WithError(err).WithField("operation", "player.serve").Error("player server stopped unexpectedly")
+	}
 }
 
 // Info returns the detached address acquired by Start.
@@ -119,7 +169,7 @@ func (server *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return errPlayerContextRequired
 	}
 
 	server.mu.Lock()
@@ -153,7 +203,7 @@ func (server *Server) Stop(ctx context.Context) error {
 	server.mu.Unlock()
 
 	if cancel != nil {
-		cancel()
+		cancel(errPlayerServerStopped)
 	}
 	server.config.Connect.CloseSubscriptions()
 	var shutdownErr error

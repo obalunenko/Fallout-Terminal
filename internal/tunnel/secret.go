@@ -17,10 +17,10 @@ const (
 )
 
 var (
-	ErrSecretStoreLocked        = errors.New("Keychain is locked")
-	ErrSecretStoreDenied        = errors.New("Keychain access was denied")
-	ErrSecretStoreUnavailable   = errors.New("Keychain is unavailable")
-	ErrSecretStoreUserCancelled = errors.New("Keychain access was cancelled")
+	ErrSecretStoreLocked        = errors.New("keychain is locked")
+	ErrSecretStoreDenied        = errors.New("keychain access was denied")
+	ErrSecretStoreUnavailable   = errors.New("keychain is unavailable")
+	ErrSecretStoreUserCancelled = errors.New("keychain access was cancelled")
 )
 
 type SecretRef uint8

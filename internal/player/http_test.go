@@ -314,7 +314,7 @@ func TestHTTPHandlerSetsPlayerSecurityHeaders(t *testing.T) {
 			}
 
 			policy := recorder.Header().Get("Content-Security-Policy")
-			for _, directive := range []string{"default-src 'self'", "connect-src 'self'", "media-src 'self'", "object-src 'none'"} {
+			for _, directive := range []string{"default-src 'self'", "connect-src 'self'", "media-src 'self'", "object-src 'none'", "frame-ancestors 'none'"} {
 				assert.Falsef(t, !strings.Contains(policy, directive),
 					"Content-Security-Policy = %q, want directive %q", policy, directive)
 

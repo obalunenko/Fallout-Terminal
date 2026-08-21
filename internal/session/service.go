@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ const (
 	SaveStateSaved  SaveState = "saved"
 	SaveStateFailed SaveState = "failed"
 )
+
+var errContextRequired = errors.New("session context is required")
 
 // Locations separates user session suggestions, the immutable bundled demo,
 // and application-owned metadata. Session content is never written to
@@ -663,7 +666,7 @@ func (service *Service) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return errContextRequired
 	}
 	service.mu.Lock()
 	service.closed = true
@@ -869,7 +872,7 @@ func samePath(left, right string) bool {
 
 func contextError(ctx context.Context) error {
 	if ctx == nil {
-		return nil
+		return errContextRequired
 	}
 	return ctx.Err()
 }
@@ -909,9 +912,7 @@ func cloneSession(session domain.Session) domain.Session {
 		copy.Terminals[index].Root = cloneNode(terminal.Root)
 		if terminal.CommandStates != nil {
 			copy.Terminals[index].CommandStates = make(map[string]domain.CommandExecutionState, len(terminal.CommandStates))
-			for commandID, state := range terminal.CommandStates {
-				copy.Terminals[index].CommandStates[commandID] = state
-			}
+			maps.Copy(copy.Terminals[index].CommandStates, terminal.CommandStates)
 		}
 	}
 	return copy

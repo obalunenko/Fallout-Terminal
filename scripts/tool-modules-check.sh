@@ -34,7 +34,7 @@ check_tool_module() {
     fail "tools/$directory/go.mod does not own $command_package"
     return 1
   }
-  grep -Eq "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}([[:space:]]+// indirect)?$" "$module_file" || {
+  grep -Eq "^[[:space:]]*(require[[:space:]]+)?${parent_module//\//\\/}[[:space:]]+${version//./\\.}([[:space:]]+// indirect)?$" "$module_file" || {
     fail "tools/$directory/go.mod does not pin $parent_module $version"
     return 1
   }
@@ -45,7 +45,7 @@ check_root_module() {
   local root_module="$scan_root/go.mod"
 
   [[ -f "$root_module" ]] || { fail 'root go.mod is missing'; return 1; }
-  if grep -En '^tool[[:space:]]*(\(|[^[:space:]])|github\.com/bufbuild/buf|github\.com/wailsapp/wails/v3/cmd/wails3|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go' "$root_module"; then
+  if grep -En '^tool[[:space:]]*(\(|[^[:space:]])|github\.com/bufbuild/buf|github\.com/golangci/golangci-lint|github\.com/wailsapp/wails/v3/cmd/wails3|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go' "$root_module"; then
     fail 'root application go.mod contains a tool declaration or tool-only dependency'
     return 1
   fi
@@ -67,7 +67,7 @@ check_active_commands() {
   local relative_file
   local file_matches
   local matches=''
-  local forbidden_pattern='(go[[:space:]]+install[[:space:]]+(github\.com/wailsapp/wails|github\.com/bufbuild/buf/cmd/buf|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)|go[[:space:]]+tool[[:space:]]+(wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)|(^|[[:space:]`;&|])(wails3|buf)[[:space:]]+(dev|build|package|generate|format|lint|breaking)([[:space:]]|$))'
+  local forbidden_pattern='(go[[:space:]]+install[[:space:]]+(github\.com/wailsapp/wails|github\.com/bufbuild/buf/cmd/buf|github\.com/golangci/golangci-lint/v2/cmd/golangci-lint|google\.golang\.org/protobuf/cmd/protoc-gen-go|connectrpc\.com/connect/cmd/protoc-gen-connect-go)|go[[:space:]]+run[[:space:]]+github\.com/golangci/golangci-lint/v2/cmd/golangci-lint|go[[:space:]]+tool[[:space:]]+(wails3|buf|golangci-lint|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)|(^|[[:space:]`;&|])(wails3|buf|golangci-lint)[[:space:]]+(dev|build|package|generate|format|lint|breaking|run)([[:space:]]|$))'
   local allowed_pattern='go tool -modfile=tools/(wails|buf|protoc-gen-go|protoc-gen-connect-go)/go\.mod (wails3|buf|protoc-gen-go|protoc-gen-connect-go)([[:space:]]|$)'
 
   while IFS= read -r -d '' file; do
@@ -103,6 +103,7 @@ check_tree() {
 
   check_tool_module "$scan_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.10 || return
   check_tool_module "$scan_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0 || return
+  check_tool_module "$scan_root" golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint github.com/golangci/golangci-lint/v2 v2.13.1 || return
   check_tool_module "$scan_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11 || return
   check_tool_module "$scan_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0 || return
   check_root_module "$scan_root" || return
@@ -117,7 +118,7 @@ write_fixture_module() {
   local version="$5"
 
   mkdir -p "$scan_root/tools/$directory"
-  printf 'module example.test/tools/%s\n\ngo 1.26\n\ntool %s\n\nrequire %s %s\n' \
+  printf 'module example.test/tools/%s\n\ngo 1.27.0\n\ntool %s\n\nrequire %s %s\n' \
     "$directory" "$command_package" "$parent_module" "$version" >"$scan_root/tools/$directory/go.mod"
   printf '%s %s/go.mod h1:fixture\n' "$parent_module" "$version" >"$scan_root/tools/$directory/go.sum"
 }
@@ -127,11 +128,13 @@ self_test() {
   fixture_root="$(mktemp -d)"
   trap 'rm -rf "$fixture_root"' RETURN
 
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
   mkdir -p "$fixture_root/docs"
   printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
+  printf 'go run -modfile=tools/golangci-lint/go.mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint run\n' >>"$fixture_root/docs/commands.md"
   write_fixture_module "$fixture_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.10
   write_fixture_module "$fixture_root" buf github.com/bufbuild/buf/cmd/buf github.com/bufbuild/buf v1.72.0
+  write_fixture_module "$fixture_root" golangci-lint github.com/golangci/golangci-lint/v2/cmd/golangci-lint github.com/golangci/golangci-lint/v2 v2.13.1
   write_fixture_module "$fixture_root" protoc-gen-go google.golang.org/protobuf/cmd/protoc-gen-go google.golang.org/protobuf v1.36.11
   write_fixture_module "$fixture_root" protoc-gen-connect-go connectrpc.com/connect/cmd/protoc-gen-connect-go connectrpc.com/connect v1.20.0
   check_tree "$fixture_root"
@@ -140,7 +143,12 @@ self_test() {
   if check_tree "$fixture_root" >/dev/null 2>&1; then
     fail 'self-test accepted a root tool declaration'
   fi
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
+
+  printf 'go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint run\n' >"$fixture_root/docs/commands.md"
+  if check_tree "$fixture_root" >/dev/null 2>&1; then
+    fail 'self-test accepted an unpinned golangci-lint invocation'
+  fi
 
   printf 'go install github.com/wailsapp/wails/v3/cmd/wails3@latest\n' >"$fixture_root/docs/commands.md"
   if check_tree "$fixture_root" >/dev/null 2>&1; then
@@ -148,6 +156,7 @@ self_test() {
   fi
 
   printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
+  printf 'go run -modfile=tools/golangci-lint/go.mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint run\n' >>"$fixture_root/docs/commands.md"
   printf '\ntool example.test/second-tool\n' >>"$fixture_root/tools/wails/go.mod"
   if check_tree "$fixture_root" >/dev/null 2>&1; then
     fail 'self-test accepted multiple tools in one module'

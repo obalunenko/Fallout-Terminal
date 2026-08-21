@@ -35,7 +35,7 @@ func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
 	}
 	events := &recordingEventSink{recorder: recorder}
 	desktop := &recordingDesktop{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Player:  player,
 		Events:  events,
 		Desktop: desktop,
@@ -59,25 +59,259 @@ func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
 
 }
 
+func TestApplicationLifecycleEmitsStructuredOperationalLogs(t *testing.T) {
+	t.Parallel()
+
+	logs := testutil.NewRecordingLogger()
+	recorder := &callRecorder{}
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
+		Logger: logs,
+		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
+			IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
+		}},
+		Events:  &recordingEventSink{recorder: recorder},
+		Desktop: &recordingDesktop{recorder: recorder},
+	})
+
+	require.NoError(t, app.Start(t.Context()))
+	require.NoError(t, app.Shutdown(t.Context()))
+
+	records := logs.Records()
+	for _, message := range []string{
+		"application startup started",
+		"player server ready",
+		"desktop runtime ready",
+		"application ready",
+		"application shutdown started",
+		"application shutdown completed",
+	} {
+		requireLogRecord(t, records, message)
+	}
+	ready := requireLogRecord(t, records, "application ready")
+	require.Equal(t, "ready-local", ready.Fields["phase"])
+	player := requireLogRecord(t, records, "player server ready")
+	require.Equal(t, 3690, player.Fields["port"])
+	require.Equal(t, []string{
+		"player:start", "event:server-info", "desktop:ready", "player:stop", "desktop:close",
+	}, recorder.Calls())
+}
+
+func TestProductionLoggingUsesRequiredLoggerInitializedOnce(t *testing.T) {
+	t.Parallel()
+
+	mainSource, err := os.ReadFile("main.go")
+	require.NoError(t, err)
+	moduleSource, err := os.ReadFile("go.mod")
+	require.NoError(t, err)
+
+	require.Equal(t, 1, strings.Count(string(mainSource), "logger.Init("))
+	require.Contains(t, string(mainSource), `"github.com/obalunenko/logger"`)
+	require.NotContains(t, string(mainSource), `"log"`)
+	require.Contains(t, string(moduleSource), "github.com/obalunenko/logger v1.2.0")
+}
+
+func requireLogRecord(t *testing.T, records []testutil.LogRecord, message string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "message "+message, func(record testutil.LogRecord) bool {
+		return record.Message == message
+	})
+}
+
+func TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors(t *testing.T) {
+	t.Parallel()
+
+	const (
+		providerCanary  = "PROVIDER-SECRET-CANARY-0123456789"
+		passwordCanary  = "PLAYER-PASSWORD-CANARY"
+		contentCanary   = "SESSION-CONTENT-CANARY"
+		characterCanary = "CHARACTER-NAME-CANARY"
+	)
+
+	t.Run("session outcomes", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		sessions := &loggingSessionCommands{
+			createResult: sessionservice.SessionResult{OK: true, Session: &domain.Session{Version: 1, Name: contentCanary}},
+			openResult:   sessionservice.SessionResult{Canceled: true},
+			copyResult:   sessionservice.SessionResult{Error: contentCanary},
+			saveResult:   sessionservice.SaveResult{Error: contentCanary, RequestedRevision: 1},
+		}
+		app := NewAppWithDependencies(t.Context(), AppDependencies{Logger: logs, Sessions: sessions})
+
+		require.True(t, app.NewSession().OK)
+		require.True(t, app.OpenSession().Canceled)
+		require.False(t, app.CopyDemo().OK)
+		require.False(t, app.SaveSession(domain.Session{Version: 1, Name: contentCanary}).OK)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "session.create", "succeeded")
+		requireOperationRecord(t, records, "session.open", "cancelled")
+		requireOperationRecord(t, records, "session.copy-demo", "failed")
+		save := requireOperationRecord(t, records, "session.save", "failed")
+		require.Equal(t, uint64(1), save.Fields["revision"])
+		require.NotContains(t, fmt.Sprintf("%#v", records), contentCanary)
+	})
+
+	t.Run("player config and broadcast outcomes", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		sessions := &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{
+			Path: "/Campaigns/game.json",
+			Session: &domain.Session{
+				Version: 1, Name: contentCanary, Terminals: []domain.Terminal{},
+			},
+		}}
+		configs := &recordingPlayerConfigService{next: playerconfigservice.Result{
+			OK: true, FilePath: "/Campaigns/players/private.json", ContentDigest: "digest",
+			Config: &domain.PlayerConfig{Version: 1, Name: contentCanary, Roster: []domain.CharacterRosterEntry{{
+				ID: "private-character", Name: characterCanary,
+			}}},
+		}}
+		coordination := &loggingPlayerConfigBroadcastCoordination{
+			state:      &domain.MasterCoordinationState{Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}},
+			startState: &domain.MasterCoordinationState{Revision: 1, Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}, Broadcast: &domain.MasterBroadcastState{}},
+			endState:   &domain.MasterCoordinationState{Revision: 2, Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}},
+		}
+		app := NewAppWithDependencies(t.Context(), AppDependencies{
+			Logger: logs, Sessions: sessions, PlayerConfigs: configs, Coordination: coordination,
+		})
+
+		require.True(t, app.OpenPlayerConfig().OK)
+		require.True(t, app.StartBroadcast().OK)
+		require.True(t, app.EndBroadcast().OK)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "player-config.open", "succeeded")
+		requireOperationRecord(t, records, "broadcast.start", "succeeded")
+		requireOperationRecord(t, records, "broadcast.end", "succeeded")
+		captured := fmt.Sprintf("%#v", records)
+		require.NotContains(t, captured, contentCanary)
+		require.NotContains(t, captured, characterCanary)
+		require.NotContains(t, captured, "/Campaigns")
+	})
+
+	t.Run("public access and event delivery", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		recorder := &callRecorder{}
+		preferences := tunnelservice.DefaultPublicAccessPreferences()
+		preferences.Revision = 7
+		disabled := tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences,
+			Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: 7},
+		}
+		preferences8 := preferences
+		preferences8.Revision = 8
+		failed := tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences8,
+			Status: tunnelservice.PublicAccessStatus{
+				State: tunnelservice.LifecycleFailed, Generation: 2, SettingsRevision: 8,
+				ErrorCategory: tunnelservice.ErrorProviderAuthentication,
+				ErrorMessage:  tunnelservice.ErrorProviderAuthentication.SafeMessage(),
+			},
+		}
+		core := &recordingPublicAccessCore{
+			recorder: recorder, snapshot: disabled,
+			reconfigureResults: []tunnelservice.PublicAccessResult{{
+				OK: true, Snapshot: tunnelservice.PublicAccessSnapshot{
+					Preferences: preferences8,
+					Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: 8},
+				},
+			}},
+			start: tunnelservice.PublicAccessResult{Error: tunnelservice.ErrorProviderAuthentication.SafeMessage(), Snapshot: failed},
+			stop: tunnelservice.PublicAccessResult{OK: true, Snapshot: tunnelservice.PublicAccessSnapshot{
+				Preferences: preferences8,
+				Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: 3, SettingsRevision: 8},
+			}},
+		}
+		eventErr := errors.New("event transport unavailable")
+		app := NewAppWithDependencies(t.Context(), AppDependencies{
+			Logger: logs, PublicAccess: core,
+			Events: &recordingEventSink{recorder: recorder, err: eventErr},
+		})
+
+		saved := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+			ExpectedRevision: 7, EnabledPreference: true, ReservedDomain: "private.example", Username: "private-user",
+			ReplacementProviderToken: providerCanary, ReplacementPlayerPassword: passwordCanary,
+		})
+		require.True(t, saved.OK)
+		require.False(t, app.StartPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 8}).OK)
+		require.True(t, app.StopPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 8}).OK)
+		app.updateClientCount(3)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "public-access.settings", "succeeded")
+		started := requireOperationRecord(t, records, "public-access.start", "failed")
+		require.Equal(t, "error", started.Fields["state"])
+		require.Equal(t, "provider_authentication", started.Fields["error_category"])
+		requireOperationRecord(t, records, "public-access.stop", "succeeded")
+		eventRecord := requireEventLogRecord(t, records, clientCountEvent)
+		require.ErrorIs(t, eventRecord.Fields["error"].(error), eventErr)
+
+		captured := fmt.Sprintf("%#v", records)
+		for _, forbidden := range []string{providerCanary, passwordCanary, "private.example", "private-user"} {
+			require.NotContains(t, captured, forbidden)
+		}
+	})
+}
+
+func requireOperationRecord(t *testing.T, records []testutil.LogRecord, operation, outcome string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "operation "+operation+" with outcome "+outcome, func(record testutil.LogRecord) bool {
+		return record.Fields["operation"] == operation && record.Fields["outcome"] == outcome
+	})
+}
+
+func requireEventLogRecord(t *testing.T, records []testutil.LogRecord, event string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "failed event delivery for "+event, func(record testutil.LogRecord) bool {
+		return record.Message == "desktop event delivery failed" && record.Fields["event"] == event
+	})
+}
+
+func requireMatchingLogRecord(
+	t *testing.T,
+	records []testutil.LogRecord,
+	description string,
+	matches func(testutil.LogRecord) bool,
+) testutil.LogRecord {
+	t.Helper()
+	var match *testutil.LogRecord
+	for index := range records {
+		if matches(records[index]) {
+			match = &records[index]
+			break
+		}
+	}
+	require.NotNilf(t, match, "matching log record: %s; records=%#v", description, records)
+	return *match
+}
+
 func TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild(t *testing.T) {
 	t.Parallel()
 
+	composition := context.WithValue(t.Context(), lifecycleContextKey{}, "composition")
 	lifetime := context.WithValue(t.Context(), lifecycleContextKey{}, "lifetime")
 	player := &contextCapturingPlayer{info: domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"}}
 	desktop := &contextCapturingDesktop{}
 	events := &contextCapturingEvents{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(composition, AppDependencies{
 		Player: player, Desktop: desktop, Events: events, StartupTimeout: time.Minute,
 	})
+	require.Equal(t, "composition", app.contextSnapshot().Value(lifecycleContextKey{}))
 
 	require.NoError(t, app.Start(lifetime))
-	require.Same(t, lifetime, app.contextSnapshot())
-	require.Same(t, lifetime, desktop.readyContext)
-	require.Same(t, lifetime, events.context)
+	require.Equal(t, "lifetime", app.contextSnapshot().Value(lifecycleContextKey{}))
+	require.Equal(t, "lifetime", desktop.readyContext.Value(lifecycleContextKey{}))
+	require.Equal(t, "lifetime", events.context.Value(lifecycleContextKey{}))
 	require.Equal(t, "lifetime", player.startContext.Value(lifecycleContextKey{}))
 	require.NoError(t, player.contextErrAtStart)
 	_, bounded := player.startContext.Deadline()
 	require.True(t, bounded, "player acquisition must receive the startup-timeout child")
+	require.ErrorIs(t, context.Cause(player.startContext), errApplicationStartupComplete)
+	require.NoError(t, app.contextSnapshot().Err(), "successful acquisition completion must not cancel the application lifetime")
+	require.NoError(t, app.Shutdown(t.Context()))
+	require.ErrorIs(t, context.Cause(app.contextSnapshot()), errApplicationShutdown)
 }
 
 func TestLifecyclePhaseStaysGoOnlyWhileStatusProjectsActionableState(t *testing.T) {
@@ -85,7 +319,7 @@ func TestLifecyclePhaseStaysGoOnlyWhileStatusProjectsActionableState(t *testing.
 
 	t.Run("local ready", func(t *testing.T) {
 		t.Parallel()
-		app := NewAppWithDependencies(AppDependencies{
+		app := NewAppWithDependencies(t.Context(), AppDependencies{
 			Player: &recordingPlayerServer{recorder: &callRecorder{}, info: domain.ServerInfo{
 				IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
 			}},
@@ -107,7 +341,7 @@ func TestLifecyclePhaseStaysGoOnlyWhileStatusProjectsActionableState(t *testing.
 
 	t.Run("failed startup", func(t *testing.T) {
 		t.Parallel()
-		app := NewAppWithDependencies(AppDependencies{
+		app := NewAppWithDependencies(t.Context(), AppDependencies{
 			Player: &recordingPlayerServer{recorder: &callRecorder{}, startErr: errors.New("listener occupied")},
 		})
 		require.Error(t, app.Start(t.Context()))
@@ -125,13 +359,13 @@ func TestLifecyclePhaseStaysGoOnlyWhileStatusProjectsActionableState(t *testing.
 func TestPlayerConfigCommandsAssociateBeforeInstallingRoster(t *testing.T) {
 	t.Parallel()
 
-	coordination := &recordingPlayerConfigCoordination{recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}}}}
+	coordination := &recordingPlayerConfigCoordination{state: &domain.MasterCoordinationState{Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}}}
 	sessions := &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{Path: "/Campaigns/game.json", Session: &domain.Session{Version: 1, Name: "Game", Terminals: []domain.Terminal{}}}}
 	configs := &recordingPlayerConfigService{next: playerconfigservice.Result{
 		OK: true, FilePath: "/Campaigns/players/shared.json",
 		Config: &domain.PlayerConfig{Version: 1, Name: "Shared", Roster: []domain.CharacterRosterEntry{{ID: "mara", Name: "Mara"}}},
 	}}
-	app := NewAppWithDependencies(AppDependencies{Sessions: sessions, PlayerConfigs: configs, Coordination: coordination})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Sessions: sessions, PlayerConfigs: configs, Coordination: coordination})
 
 	result := app.OpenPlayerConfig()
 	require.Falsef(t, !result.OK || result.Config == nil || result.State == nil || len(result.State.Roster) != 1,
@@ -170,7 +404,7 @@ func TestNewPlayerConfigInstallsEmptyRosterAndPersistsFirstCharacter(t *testing.
 			Terminals: []domain.Terminal{},
 		},
 	}}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions:      sessions,
 		PlayerConfigs: configs,
 		Coordination:  coordination,
@@ -270,7 +504,7 @@ func TestRosterMutationConflictReturnsAuthoritativeReselectionGuidance(t *testin
 				"/Campaigns",
 			)
 			coordination := controlservice.New(controlservice.Config{RosterStore: configs})
-			app := NewAppWithDependencies(AppDependencies{
+			app := NewAppWithDependencies(t.Context(), AppDependencies{
 				Sessions: &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{
 					Path: "/Campaigns/game.json",
 					Session: &domain.Session{
@@ -341,7 +575,7 @@ func TestDesktopSessionFacadePreservesExplicitPathUnknownFieldsAndNewestRevision
 		},
 	)
 	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
-	app := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Sessions: sessions})
 
 	opened := app.OpenSession()
 	require.True(t, opened.OK)
@@ -386,7 +620,7 @@ func TestDesktopSessionFacadeSavesRealDemoCrossTerminalLinkAndReopensIt(t *testi
 		},
 	)
 	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
-	app := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Sessions: sessions})
 
 	opened := app.OpenSession()
 	require.True(t, opened.OK, "OpenSession() = %#v", opened)
@@ -421,12 +655,12 @@ func TestTerminalActivationValidatesRealDemoLinkAgainstCompleteActiveSession(t *
 	)
 	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision:  1,
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-demo-activation"},
-		}},
+		},
 	}
-	app := NewAppWithDependencies(AppDependencies{Sessions: sessions, Coordination: coordination})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Sessions: sessions, Coordination: coordination})
 
 	opened := app.OpenSession()
 	require.True(t, opened.OK, "OpenSession() = %#v", opened)
@@ -447,7 +681,7 @@ func TestApplicationUnwindsPartialStartup(t *testing.T) {
 		recorder: recorder,
 		info:     domain.ServerInfo{IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690"},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Player: player,
 		Events: &recordingEventSink{recorder: recorder, err: errors.New("bridge unavailable")},
 		Desktop: &recordingDesktop{
@@ -473,7 +707,7 @@ func TestApplicationUnwindsPartialStartup(t *testing.T) {
 
 func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
 	recorder := &callRecorder{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: &recordingSessionService{recorder: recorder},
 		Player: &recordingPlayerServer{
 			recorder: recorder,
@@ -511,7 +745,7 @@ func TestApplicationShutdownIsReverseOrderedAndIdempotent(t *testing.T) {
 
 func TestApplicationPlayerStartFailureNeverReportsReady(t *testing.T) {
 	recorder := &callRecorder{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Player:  &recordingPlayerServer{recorder: recorder, startErr: errors.New("port 3690 is already in use")},
 		Events:  &recordingEventSink{recorder: recorder},
 		Desktop: &recordingDesktop{recorder: recorder},
@@ -537,11 +771,11 @@ func TestApplicationPlayerStartFailureNeverReportsReady(t *testing.T) {
 
 func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 1, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1"},
-		}},
+		},
 	}
-	app := NewAppWithDependencies(AppDependencies{Coordination: coordination})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: coordination})
 
 	activationResult := app.RequestTerminalActivation(LiveTerminalPayload{
 		TerminalID:   "terminal-1",
@@ -565,7 +799,7 @@ func TestBridgeRejectsInvalidLivePayloadsBeforeMutation(t *testing.T) {
 }
 
 func TestRuntimeStatusReturnsCompleteDetachedSnapshot(t *testing.T) {
-	app := NewAppWithDependencies(AppDependencies{})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{})
 	app.serverInfo = &domain.ServerInfo{
 		IP: "192.0.2.10", Port: 3690, URL: "http://192.0.2.10:3690",
 	}
@@ -614,7 +848,7 @@ func TestCoordinationBridgeAddsCharacterStartsBroadcastAndReplaysDetachedState(t
 			},
 		},
 	}
-	app := NewAppWithDependencies(AppDependencies{Coordination: service, Events: events})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: service, Events: events})
 
 	initial := app.GetRuntimeStatus()
 	require.Falsef(t, initial.CoordinationState == nil || initial.CoordinationState.Revision != 4,
@@ -671,7 +905,7 @@ func TestCoordinationBridgeRejectsInvalidOrFailedCommandsWithoutPartialState(t *
 		addErr:   errors.New("roster unavailable"),
 		startErr: errors.New("broadcast already active"),
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: service,
 		Events:       &recordingEventSink{recorder: recorder},
 	})
@@ -716,10 +950,10 @@ func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMut
 	recorder := &callRecorder{}
 	activeID := "terminal-1"
 	coordination := &recordingBroadcastLifecycleService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 80, Roster: []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara"}},
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeID},
-		}},
+		},
 		endState: &domain.MasterCoordinationState{Revision: 81, Roster: []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara"}}},
 	}
 	coordination.startState = &domain.MasterCoordinationState{
@@ -727,7 +961,7 @@ func TestBroadcastLifecycleBridgeEndsRestartsReplaysAndDisposesWithoutDurableMut
 		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-2"},
 	}
 	durable := &recordingSessionService{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination, Sessions: durable, Events: &recordingEventSink{recorder: recorder},
 	})
 
@@ -774,10 +1008,10 @@ func TestCoordinationBridgeValidatesSessionAndAssignmentCorrections(t *testing.T
 		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1"},
 	}
 	service := &recordingCorrectionCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial},
+		state: initial,
 	}
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: service,
 		Sessions:     &recordingSessionService{recorder: recorder},
 		Events:       events,
@@ -874,15 +1108,15 @@ func TestCoordinationBridgeValidatesSessionAndAssignmentCorrections(t *testing.T
 func TestCoordinationBridgeRoutesCompleteUpdateAndDeletePayloads(t *testing.T) {
 	recorder := &callRecorder{}
 	service := &recordingCorrectionCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 20,
 			Roster: []domain.MasterRosterEntry{
 				{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true},
 				{ID: "character-2", Name: "Boone", Intelligence: 3},
 			},
-		}},
+		},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: service,
 		Events:       &recordingEventSink{recorder: recorder},
 	})
@@ -922,12 +1156,12 @@ func TestCoordinationBridgeRoutesCompleteUpdateAndDeletePayloads(t *testing.T) {
 
 func TestCoordinationBridgeRejectsInvalidCompleteRosterMutationsBeforeCoordinator(t *testing.T) {
 	service := &recordingCorrectionCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 20,
 			Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
-		}},
+		},
 	}
-	app := NewAppWithDependencies(AppDependencies{Coordination: service})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: service})
 	hackerAvailable := true
 
 	invalid := []CoordinationCommandResult{
@@ -956,11 +1190,11 @@ func TestCoordinationBridgeRosterMutationFailureReturnsAuthoritativeState(t *tes
 		Roster:   []domain.MasterRosterEntry{{ID: "character-1", Name: "Mara", Intelligence: 8, HackerPerkAvailable: true}},
 	}
 	service := &recordingCorrectionCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: canonical},
-		failCommand:                  "update-character",
-		commandErr:                   errors.New("player config changed on disk"),
+		state:       canonical,
+		failCommand: "update-character",
+		commandErr:  errors.New("player config changed on disk"),
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: service,
 		Events:       &recordingEventSink{recorder: recorder},
 	})
@@ -982,18 +1216,18 @@ func TestCoordinationBridgeValidatesAndPublishesActiveControllerReassignment(t *
 	firstID := domain.LogicalSessionID("session-1")
 	secondID := domain.LogicalSessionID("session-2")
 	service := &recordingCorrectionCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 30,
 			Sessions: []domain.MasterSessionEntry{
 				{ID: firstID, FallbackName: "DEVICE 1", Connected: true, Character: &domain.PlayerCharacter{ID: "character-1", Name: "Mara"}, Role: domain.PlayerRoleActive},
 				{ID: secondID, FallbackName: "DEVICE 2", Connected: true, Character: &domain.PlayerCharacter{ID: "character-2", Name: "Boone"}, Role: domain.PlayerRoleObserver},
 			},
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &firstID},
-		}},
+		},
 		order: order,
 	}
 	events := &recordingEventSink{recorder: order}
-	app := NewAppWithDependencies(AppDependencies{Coordination: service, Events: events})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: service, Events: events})
 
 	result := app.SetActiveController(string(secondID))
 	require.Falsef(t, !result.OK || result.Error != "" || result.State == nil || result.State.Revision != 31,
@@ -1059,7 +1293,7 @@ func TestCoordinationStatusReplaysDisconnectedControllerWithoutChangingClaimOrRo
 	}
 	events := &recordingEventSink{recorder: &callRecorder{}}
 	service := &recordingCoordinationService{state: state}
-	app := NewAppWithDependencies(AppDependencies{Coordination: service, Events: events})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: service, Events: events})
 
 	initial := app.GetRuntimeStatus().CoordinationState
 	assertDisconnectedControllerSnapshot(t, initial, controllerID, characterID)
@@ -1108,13 +1342,13 @@ func TestCoordinationBridgeOrdersTerminalActivationClearAndUpdateWithoutLegacyMu
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{Revision: 40, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-terminal-bridge"}}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial},
-		order:                        recorder,
+		state: initial,
+		order: recorder,
 	}
 	legacy := &recordingLiveService{
 		setState: &domain.PublicLiveState{TerminalID: "legacy-terminal"}, updateState: &domain.PublicLiveState{TerminalID: "legacy-terminal"},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination, Live: legacy,
 		Player: &recordingPlayerServer{recorder: recorder}, Events: &recordingEventSink{recorder: recorder},
 	})
@@ -1174,10 +1408,10 @@ func TestCoordinationBridgeRejectsInvalidOrFailedTerminalRequestsWithoutOptimist
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{Revision: 50, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-terminal-refusal"}}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial}, order: recorder,
+		state: initial, order: recorder,
 	}
 	legacy := &recordingLiveService{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination, Live: legacy,
 		Player: &recordingPlayerServer{recorder: recorder}, Events: &recordingEventSink{recorder: recorder},
 	})
@@ -1224,13 +1458,13 @@ func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *t
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
 		Revision:  70,
-		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-reset", ActiveTerminalID: appStringPointer("terminal-1")},
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-reset", ActiveTerminalID: new("terminal-1")},
 	}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial}, order: recorder,
+		state: initial, order: recorder,
 	}
 	legacy := &recordingLiveService{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination, Live: legacy, Events: &recordingEventSink{recorder: recorder},
 	})
 	tree := domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}}
@@ -1266,8 +1500,8 @@ func TestResetFailedHackValidatesPrivatePayloadAndReturnsAuthoritativeState(t *t
 
 func TestCommandStateResetRejectsBlankStableIDsBeforeMutation(t *testing.T) {
 	recorder := &callRecorder{}
-	sessions := &recordingCommandStateSession{recordingSessionService: recordingSessionService{recorder: recorder}}
-	app := NewAppWithDependencies(AppDependencies{
+	sessions := &recordingCommandStateSession{recorder: recorder}
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions,
 		Events:   &recordingEventSink{recorder: recorder},
 		Player:   &recordingPlayerServer{recorder: recorder},
@@ -1297,23 +1531,23 @@ func TestResetCommandStatePublishesCanonicalSessionAfterDurabilityAndRefreshesAc
 	session := commandStateResetSessionFixture()
 	delete(session.Terminals[0].CommandStates, "command-stable-1")
 	sessions := &recordingCommandStateSession{
-		recordingSessionService: recordingSessionService{recorder: recorder},
+		recorder: recorder,
 		resetOneResult: sessionservice.CommandStateResult{
 			OK: true, Changed: true, Revision: 41, Session: &session,
 		},
 	}
 	activeTerminalID := "terminal-stable-1"
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 9,
 			Broadcast: &domain.MasterBroadcastState{
 				ID: "broadcast-1", ActiveTerminalID: &activeTerminalID,
 			},
-		}},
+		},
 		order: recorder,
 	}
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions, Coordination: coordination, Events: events,
 		Player: &recordingPlayerServer{recorder: recorder},
 	})
@@ -1349,13 +1583,13 @@ func TestResetCommandStateNoOpReturnsCanonicalRevisionWithoutPublication(t *test
 	session := commandStateResetSessionFixture()
 	delete(session.Terminals[0].CommandStates, "command-stable-1")
 	sessions := &recordingCommandStateSession{
-		recordingSessionService: recordingSessionService{recorder: recorder},
+		recorder: recorder,
 		resetOneResult: sessionservice.CommandStateResult{
 			OK: true, Changed: false, Revision: 19, Session: &session,
 		},
 	}
 	activeTerminalID := "terminal-stable-1"
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions,
 		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
@@ -1375,14 +1609,14 @@ func TestResetTerminalCommandStatesUsesOneMutationAndDoesNotRefreshInactiveTermi
 	session := commandStateResetSessionFixture()
 	session.Terminals[0].CommandStates = nil
 	sessions := &recordingCommandStateSession{
-		recordingSessionService: recordingSessionService{recorder: recorder},
+		recorder: recorder,
 		resetTerminalResult: sessionservice.CommandStateResult{
 			OK: true, Changed: true, Revision: 52, Session: &session,
 		},
 	}
 	activeTerminalID := "another-terminal"
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions,
 		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
@@ -1447,14 +1681,14 @@ func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T)
 	require.True(t, shown.Accepted)
 	pending := coordination.Snapshot().PendingCommandExecution
 	require.NotNil(t, pending)
-	_, mutation, err := coordination.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	_, mutation, err := coordination.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 	require.NoError(t, err)
 	require.Nil(t, mutation, "completed command approval must not write durable state")
 	require.NotEmpty(t, effects)
 	var beforeReset *domain.PublicLiveState
-	for index := len(effects) - 1; index >= 0; index-- {
-		if effects[index].Live != nil {
-			beforeReset = effects[index].Live
+	for _, effect := range slices.Backward(effects) {
+		if effect.Live != nil {
+			beforeReset = effect.Live
 			break
 		}
 	}
@@ -1469,7 +1703,7 @@ func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T)
 		},
 	}
 	effects = nil
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions, Coordination: coordination,
 		Events: &recordingEventSink{recorder: &callRecorder{}},
 	})
@@ -1480,9 +1714,9 @@ func TestResetTerminalCommandStatesRefreshesActiveCanonicalRuntime(t *testing.T)
 	require.Empty(t, result.Session.Terminals[0].CommandStates)
 	require.NotEmpty(t, effects)
 	var afterReset *domain.PublicLiveState
-	for index := len(effects) - 1; index >= 0; index-- {
-		if effects[index].Live != nil {
-			afterReset = effects[index].Live
+	for _, effect := range slices.Backward(effects) {
+		if effect.Live != nil {
+			afterReset = effect.Live
 			break
 		}
 	}
@@ -1536,11 +1770,11 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 		Runtime: live, Terminals: live, TrustedHack: live,
 		Enqueue: func(effect controlservice.Effect) { effects = append(effects, effect) },
 	})
-	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
+	_, err = coordination.AddCharacter(domain.CharacterCreatePayload{
 		Name: "Mara", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
 	})
 	require.NoError(t, err)
-	master, err = coordination.AddCharacter(domain.CharacterCreatePayload{
+	master, err := coordination.AddCharacter(domain.CharacterCreatePayload{
 		Name: "Boone", Intelligence: 1, HackerPerkAvailable: false, ExpectedRevision: coordination.Revision(),
 	})
 	require.NoError(t, err)
@@ -1579,12 +1813,12 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 	require.True(t, shown.Accepted)
 	pending := coordination.Snapshot().PendingCommandExecution
 	require.NotNil(t, pending)
-	_, mutation, err := coordination.ResolveCommandExecution(pending.RequestID, domain.CommandExecutionApprove)
+	_, mutation, err := coordination.ResolveCommandExecution(t.Context(), pending.RequestID, domain.CommandExecutionApprove)
 	require.NoError(t, err)
 	require.Nil(t, mutation, "completed command approval must not write durable state")
 
 	effects = nil
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions, Coordination: coordination,
 		Events: &recordingEventSink{recorder: &callRecorder{}},
 	})
@@ -1605,9 +1839,9 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 	require.Equal(t, uint64(1), sessions.Snapshot().SavedRevision)
 
 	var projection *domain.PublicLiveState
-	for index := len(effects) - 1; index >= 0; index-- {
-		if effects[index].Live != nil {
-			projection = effects[index].Live
+	for _, effect := range slices.Backward(effects) {
+		if effect.Live != nil {
+			projection = effect.Live
 			break
 		}
 	}
@@ -1630,11 +1864,11 @@ func TestResetTerminalCommandStatesProductionPathPersistsAndRefreshesActiveTermi
 func TestCommandStateResetFailureDoesNotPublishSessionOrPlayerState(t *testing.T) {
 	recorder := &callRecorder{}
 	sessions := &recordingCommandStateSession{
-		recordingSessionService: recordingSessionService{recorder: recorder},
-		resetOneResult:          sessionservice.CommandStateResult{Error: "could not persist command state"},
+		recorder:       recorder,
+		resetOneResult: sessionservice.CommandStateResult{Error: "could not persist command state"},
 	}
 	activeTerminalID := "terminal-stable-1"
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: sessions,
 		Coordination: &recordingCoordinationService{state: &domain.MasterCoordinationState{
 			Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ActiveTerminalID: &activeTerminalID},
@@ -1654,13 +1888,13 @@ func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *
 	recorder := &callRecorder{}
 	initial := &domain.MasterCoordinationState{
 		Revision:  60,
-		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-decision", ActiveTerminalID: appStringPointer("terminal-1")},
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-decision", ActiveTerminalID: new("terminal-1")},
 	}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial},
-		order:                        recorder, decisionRequired: true, nextSwitchID: "opaque-switch-1",
+		state: initial,
+		order: recorder, decisionRequired: true, nextSwitchID: "opaque-switch-1",
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination, Events: &recordingEventSink{recorder: recorder},
 	})
 	tree := domain.ContentNode{ID: "root", Type: domain.NodeFolder, Name: "ROOT", Children: []domain.ContentNode{}}
@@ -1719,17 +1953,17 @@ func TestTerminalSwitchBridgeReturnsDecisionShapeAndResolvesValidatedChoices(t *
 func TestTerminalSwitchBridgeRejectsInvalidAndStaleDecisionButKeepsTrustedForceSuccessEligible(t *testing.T) {
 	initial := &domain.MasterCoordinationState{
 		Revision:  70,
-		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-decision", ActiveTerminalID: appStringPointer("terminal-1")},
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-decision", ActiveTerminalID: new("terminal-1")},
 		PendingSwitch: &domain.MasterPendingSwitch{
 			SwitchID: "switch-current", BroadcastID: "broadcast-decision", SourceTerminalID: "terminal-1",
 		},
 	}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: initial},
-		commandErr:                   errors.New("terminal switch decision is stale"),
-		forceState:                   &domain.PublicHackState{Level: 2, AttemptsMax: 4, AttemptsLeft: 3},
+		state:      initial,
+		commandErr: errors.New("terminal switch decision is stale"),
+		forceState: &domain.PublicHackState{Level: 2, AttemptsMax: 4, AttemptsLeft: 3},
 	}
-	app := NewAppWithDependencies(AppDependencies{Coordination: coordination})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: coordination})
 
 	invalid := []TerminalSwitchDecisionPayload{
 		{SwitchID: "", Decision: domain.TerminalSwitchPreserve},
@@ -1759,11 +1993,9 @@ func TestTerminalSwitchBridgeRejectsInvalidAndStaleDecisionButKeepsTrustedForceS
 
 }
 
-func appStringPointer(value string) *string { return &value }
-
 func TestOpenURLAllowsOnlyHTTPAndHTTPS(t *testing.T) {
 	browser := &testutil.FakeBrowser{}
-	app := NewAppWithDependencies(AppDependencies{Browser: browser})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Browser: browser})
 
 	for _, rawURL := range []string{
 		"file:///tmp/session.json",
@@ -1804,13 +2036,13 @@ func TestBridgeCoordinatorActivationAndLifecycleCleanup(t *testing.T) {
 	recorder := &callRecorder{}
 	live := &recordingLiveService{}
 	coordination := &recordingTerminalCoordinationService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{
+		state: &domain.MasterCoordinationState{
 			Revision: 1, Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1"},
-		}},
+		},
 		order: recorder,
 	}
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Sessions: &recordingSessionService{recorder: recorder},
 		Player: &recordingPlayerServer{
 			recorder: recorder,
@@ -1862,14 +2094,14 @@ func TestResolveTerminalNavigationUsesOnlyExactPrivateDecisionAndPublishesOneNew
 	controller := domain.LogicalSessionID("controller-1")
 	coordination := &recordingCoordinationService{state: &domain.MasterCoordinationState{
 		Revision:  8,
-		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &controller, ActiveTerminalID: appStringPointer("terminal-a")},
+		Broadcast: &domain.MasterBroadcastState{ID: "broadcast-1", ControllerSessionID: &controller, ActiveTerminalID: new("terminal-a")},
 		PendingTerminalNavigation: &domain.MasterPendingTerminalNavigation{
 			RequestID: "navigation-1", BroadcastID: "broadcast-1", Direction: domain.TerminalNavigationForward,
 			SourceTerminalID: "terminal-a", TargetTerminalID: "terminal-b",
 		},
 	}}
 	events := &recordingEventSink{recorder: &callRecorder{}}
-	app := NewAppWithDependencies(AppDependencies{Coordination: coordination, Events: events})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Coordination: coordination, Events: events})
 
 	result := app.ResolveTerminalNavigation(TerminalNavigationDecisionPayload{RequestID: " navigation-1 ", Decision: domain.TerminalNavigationApprove})
 	require.True(t, result.OK)
@@ -1894,7 +2126,7 @@ func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T
 			Patterns: []domain.PublicHackPattern{{ID: "opaque-generation-pattern", Row: 0, Start: 0, End: 1, Used: false}},
 		},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Live: live, Player: &recordingPlayerServer{recorder: recorder}, Events: events,
 	})
 	{
@@ -1919,7 +2151,7 @@ func TestForceHackSuccessPublishesSolvedStateWithoutSpendingAttempt(t *testing.T
 func TestForceHackSuccessRejectsIneligiblePuzzleWithoutPublication(t *testing.T) {
 	recorder := &callRecorder{}
 	live := &recordingLiveService{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Live: live, Player: &recordingPlayerServer{recorder: recorder}, Events: &recordingEventSink{recorder: recorder},
 	})
 
@@ -1934,14 +2166,14 @@ func TestForceHackSuccessRejectsIneligiblePuzzleWithoutPublication(t *testing.T)
 func TestForceHackSuccessPrefersOrderedCoordinatorAndPublishesHackStatus(t *testing.T) {
 	recorder := &callRecorder{}
 	coordination := &recordingCoordinatedHackService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{Revision: 8}},
+		state: &domain.MasterCoordinationState{Revision: 8},
 		forceState: &domain.PublicHackState{
 			Level: 2, AttemptsMax: 4, AttemptsLeft: 2, Solved: true,
 			Log: []string{"Exact private completion"},
 		},
 	}
 	legacy := &recordingLiveService{forceState: &domain.PublicHackState{Solved: true}}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination,
 		Live:         legacy,
 		Events:       &recordingEventSink{recorder: recorder},
@@ -1968,10 +2200,10 @@ func TestForceHackSuccessPrefersOrderedCoordinatorAndPublishesHackStatus(t *test
 func TestForceHackSuccessDoesNotBypassCoordinatorRejection(t *testing.T) {
 	recorder := &callRecorder{}
 	coordination := &recordingCoordinatedHackService{
-		recordingCoordinationService: recordingCoordinationService{state: &domain.MasterCoordinationState{Revision: 8}},
+		state: &domain.MasterCoordinationState{Revision: 8},
 	}
 	legacy := &recordingLiveService{forceState: &domain.PublicHackState{Solved: true}}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination,
 		Live:         legacy,
 		Events:       &recordingEventSink{recorder: recorder},
@@ -2014,7 +2246,7 @@ func TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime(t *testing.T) {
 	}
 
 	beforeRevision := coordination.Revision()
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Coordination: coordination,
 		Live:         liveService,
 		Events:       &recordingEventSink{recorder: &callRecorder{}},
@@ -2058,7 +2290,7 @@ func TestForceHackSuccessUsesProductionCoordinatorOwnedRuntime(t *testing.T) {
 func TestPlayerCallbacksEmitAndRetainDetachedPublicStatus(t *testing.T) {
 	recorder := &callRecorder{}
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{Events: events})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Events: events})
 	hackState := &domain.PublicHackState{
 		Level: 3, AttemptsMax: 4, AttemptsLeft: 2,
 		Log:      []string{"ENTRY DENIED"},
@@ -2161,6 +2393,36 @@ type recordingSessionService struct {
 	shutdownCalls int
 }
 
+type loggingSessionCommands struct {
+	recordingSessionService
+	createResult sessionservice.SessionResult
+	openResult   sessionservice.SessionResult
+	copyResult   sessionservice.SessionResult
+	saveResult   sessionservice.SaveResult
+	active       sessionservice.ActiveSession
+}
+
+func (service *loggingSessionCommands) Create(context.Context) sessionservice.SessionResult {
+	service.active.Session = service.createResult.Session
+	return service.createResult
+}
+
+func (service *loggingSessionCommands) Open(context.Context) sessionservice.SessionResult {
+	return service.openResult
+}
+
+func (service *loggingSessionCommands) CopyDemo(context.Context) sessionservice.SessionResult {
+	return service.copyResult
+}
+
+func (service *loggingSessionCommands) Save(context.Context, domain.Session, uint64) sessionservice.SaveResult {
+	return service.saveResult
+}
+
+func (service *loggingSessionCommands) Snapshot() sessionservice.ActiveSession {
+	return service.active
+}
+
 type recordingCommandStateSession struct {
 	recordingSessionService
 	resetOneResult      sessionservice.CommandStateResult
@@ -2245,6 +2507,16 @@ func (service *recordingPlayerConfigService) LoadReferenced(string, string) play
 type recordingPlayerConfigCoordination struct {
 	recordingCoordinationService
 	installs []string
+}
+
+type loggingPlayerConfigBroadcastCoordination struct {
+	recordingPlayerConfigCoordination
+	endState *domain.MasterCoordinationState
+}
+
+func (service *loggingPlayerConfigBroadcastCoordination) EndBroadcast() (*domain.MasterCoordinationState, error) {
+	service.state = domain.CloneMasterCoordinationState(service.endState)
+	return domain.CloneMasterCoordinationState(service.state), nil
 }
 
 func (service *recordingPlayerConfigCoordination) InstallPlayerConfig(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) (*domain.MasterCoordinationState, error) {
@@ -2365,7 +2637,7 @@ func (service *recordingTerminalCoordinationService) RequestTerminalActivation(t
 	if service.decisionRequired {
 		state.PendingSwitch = &domain.MasterPendingSwitch{
 			SwitchID: service.nextSwitchID, BroadcastID: state.Broadcast.ID,
-			SourceTerminalID: *state.Broadcast.ActiveTerminalID, TargetTerminalID: appStringPointer(target.TerminalID),
+			SourceTerminalID: *state.Broadcast.ActiveTerminalID, TargetTerminalID: new(target.TerminalID),
 		}
 		service.state = state
 		return domain.CloneMasterCoordinationState(state), nil
@@ -2778,7 +3050,7 @@ func TestEmbeddedPublicAccessIsExplicitAfterLocalReadinessAndPublishesOnlyReadyR
 	}
 	player := &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690}}
 	events := &recordingEventSink{recorder: recorder}
-	app := NewAppWithDependencies(AppDependencies{Player: player, Events: events, PublicAccess: core})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Player: player, Events: events, PublicAccess: core})
 	require.NoError(t, app.Start(t.Context()))
 	assert.Equal(t, 0, core.starts)
 	calls := recorder.Calls()
@@ -2812,7 +3084,7 @@ func TestEmbeddedPublicAccessFailurePreservesAuthoritativeLocalServerInfo(t *tes
 		start:    tunnelservice.PublicAccessResult{Error: tunnelservice.ErrorNetworkUnavailable.SafeMessage(), Snapshot: failed},
 	}
 	local := domain.ServerInfo{URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690}
-	app := NewAppWithDependencies(AppDependencies{Player: &recordingPlayerServer{recorder: recorder, info: local}, Events: &recordingEventSink{recorder: recorder}, PublicAccess: core})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{Player: &recordingPlayerServer{recorder: recorder, info: local}, Events: &recordingEventSink{recorder: recorder}, PublicAccess: core})
 	require.NoError(t, app.Start(t.Context()))
 	result := app.StartPublicAccess(PublicAccessCommandPayload{})
 	require.False(t, result.OK)
@@ -2860,7 +3132,7 @@ func TestEmbeddedPublicAccessFailureMatrixKeepsLocalServerAuthoritative(t *testi
 			local := domain.ServerInfo{
 				URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
 			}
-			app := NewAppWithDependencies(AppDependencies{
+			app := NewAppWithDependencies(t.Context(), AppDependencies{
 				Player: &recordingPlayerServer{recorder: recorder, info: local},
 				Events: &recordingEventSink{recorder: recorder}, PublicAccess: core,
 			})
@@ -3008,7 +3280,7 @@ func TestUnexpectedPublicEndpointFailureRetainsCleanupOwnershipBeforeRetryWithou
 		},
 	})
 	require.NoError(t, err)
-	app = NewAppWithDependencies(AppDependencies{
+	app = NewAppWithDependencies(t.Context(), AppDependencies{
 		Player: &recordingPlayerServer{recorder: recorder, info: local},
 		Events: &recordingEventSink{recorder: recorder}, PublicAccess: manager,
 	})
@@ -3046,7 +3318,7 @@ func TestApplicationShutdownRetriesOnlyFailedPublicCleanupAfterReleasingLaterRes
 		},
 		shutdownErrors: []error{errors.New("synthetic endpoint cleanup failure"), nil},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		PublicAccess: core,
 		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
 			URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
@@ -3116,7 +3388,7 @@ func TestActivePublicAccessMutationsDelegateAsProtectedReconfigureWithoutMixedRe
 			},
 		},
 	}
-	app := NewAppWithDependencies(AppDependencies{PublicAccess: core, Events: events, PasswordEntropy: strings.NewReader(strings.Repeat("g", 32))})
+	app := NewAppWithDependencies(t.Context(), AppDependencies{PublicAccess: core, Events: events, PasswordEntropy: strings.NewReader(strings.Repeat("g", 32))})
 
 	saved := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
 		ExpectedRevision: 7, EnabledPreference: true, ReservedDomain: "after.example", Username: "friends",
@@ -3191,7 +3463,7 @@ func TestPartialPublicAccessMutationFailureUsesReconciledPresenceAndNeverRestart
 				},
 				reconfigureResults: []tunnelservice.PublicAccessResult{{Error: test.category.SafeMessage(), Snapshot: failed}},
 			}
-			app := NewAppWithDependencies(AppDependencies{PublicAccess: core, Events: events})
+			app := NewAppWithDependencies(t.Context(), AppDependencies{PublicAccess: core, Events: events})
 			result := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
 				ExpectedRevision: 7, EnabledPreference: true, Username: "friends",
 				ReplacementProviderToken: "synthetic-provider-rotation", ReplacementPlayerPassword: "synthetic-player-rotation",
@@ -3260,7 +3532,7 @@ func TestPublicAccessEnvironmentOverrideCompositionIsDevelopmentOnlyAndNeverAuto
 	assert.Equal(t, tunnelservice.SecretAbsent, underlyingProvider)
 	assert.Equal(t, tunnelservice.SecretAbsent, underlyingPassword)
 
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		PublicAccess: manager, PasswordEntropy: strings.NewReader(strings.Repeat("g", 32)),
 	})
 	generated := app.GeneratePlayerPassword(PublicAccessCommandPayload{ExpectedRevision: snapshot.Preferences.Revision})

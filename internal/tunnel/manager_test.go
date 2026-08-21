@@ -527,7 +527,7 @@ func TestPublicAccessManagerUnexpectedDonePublishesOnlySafeNgrokCode(t *testing.
 }
 
 func TestPublicAccessManagerConcurrentReconfigureConvergesWithoutEndpointOverlapAcross100Schedules(t *testing.T) {
-	for schedule := 0; schedule < 100; schedule++ {
+	for schedule := range 100 {
 		events := &orderedEvents{}
 		service := newScheduledTunnelService(events)
 		manager, settings := newScheduledManager(t, service, events)
@@ -542,14 +542,14 @@ func TestPublicAccessManagerConcurrentReconfigureConvergesWithoutEndpointOverlap
 		}
 		start := make(chan struct{})
 		results := make(chan tunnel.PublicAccessResult, 4)
-		for contender := 0; contender < 4; contender++ {
+		for range 4 {
 			go func() {
 				<-start
 				results <- manager.Reconfigure(t.Context(), mutation)
 			}()
 		}
 		close(start)
-		for contender := 0; contender < 4; contender++ {
+		for range 4 {
 			<-results
 		}
 
@@ -753,8 +753,12 @@ func TestPublicAccessManagerShutdownBoundsContextIgnoringCloseAndRetainsRetryOwn
 	t.Cleanup(func() { closeGateOnce.Do(func() { close(closeGate) }) })
 	service.setCloseGate(1, closeGate, true)
 
-	shutdownContext, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
-	defer cancel()
+	shutdownDeadline, stopShutdownDeadline := context.WithTimeoutCause(t.Context(), 25*time.Millisecond, errors.New("test manager shutdown timed out"))
+	shutdownContext, cancelShutdown := context.WithCancelCause(shutdownDeadline)
+	defer func() {
+		cancelShutdown(errors.New("test manager shutdown completed"))
+		stopShutdownDeadline()
+	}()
 	finished := make(chan error, 1)
 	go func() { finished <- manager.Shutdown(shutdownContext) }()
 
@@ -782,7 +786,7 @@ func TestPublicAccessManagerShutdownBoundsContextIgnoringCloseAndRetainsRetryOwn
 }
 
 func TestPublicAccessManagerShutdownDoneAndLateStartRacesLeaveZeroEndpointsAcross100Schedules(t *testing.T) {
-	for schedule := 0; schedule < 100; schedule++ {
+	for schedule := range 100 {
 		events := &orderedEvents{}
 		startGate := make(chan struct{})
 		service := newScheduledTunnelService(events, scheduledStart{gate: startGate, ignoreCancellation: true})

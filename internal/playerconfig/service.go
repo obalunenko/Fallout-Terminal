@@ -16,6 +16,7 @@ import (
 var (
 	errStorageUnavailable                 = errors.New("player config storage is unavailable")
 	errActivePlayerConfigNeedsReselection = errors.New("active player configuration is missing, unreadable, or changed; reopen or reselect it")
+	errContextRequired                    = errors.New("player config context is required")
 )
 
 // Dialog is the native trusted file-dialog boundary. Empty paths mean cancel.
@@ -243,7 +244,7 @@ func cloneRoster(roster []domain.CharacterRosterEntry) []domain.CharacterRosterE
 
 func contextError(ctx context.Context) error {
 	if ctx == nil {
-		return nil
+		return errContextRequired
 	}
 	return ctx.Err()
 }

@@ -125,9 +125,12 @@ func (store *PublicAccessSettingsStore) Save(preferences PublicAccessPreferences
 	if err != nil {
 		return errors.New("open public-access settings directory failed")
 	}
-	defer directoryHandle.Close()
 	if err := directoryHandle.Sync(); err != nil {
+		_ = directoryHandle.Close()
 		return errors.New("sync public-access settings directory failed")
+	}
+	if err := directoryHandle.Close(); err != nil {
+		return errors.New("close public-access settings directory failed")
 	}
 	return nil
 }

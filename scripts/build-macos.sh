@@ -46,8 +46,8 @@ for command_name in go npm xcrun security codesign spctl hdiutil ditto lipo shas
 done
 
 case "$(go version)" in
-  *' go1.26.'*) ;;
-  *) fail "Go 1.26.x is required" ;;
+  *' go1.27.'*) ;;
+  *) fail "Go 1.27.x is required" ;;
 esac
 
 xcrun --find notarytool >/dev/null 2>&1 || fail "xcrun could not find notarytool"

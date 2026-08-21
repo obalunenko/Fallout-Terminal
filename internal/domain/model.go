@@ -1,7 +1,10 @@
 // Package domain contains transport-independent Fallout Terminal models.
 package domain
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"maps"
+)
 
 const (
 	// NodeFolder identifies a recursive folder node.
@@ -993,9 +996,7 @@ func CloneSession(session Session) Session {
 		clone.Terminals[index].Root = cloneContentNode(terminal.Root)
 		if terminal.CommandStates != nil {
 			clone.Terminals[index].CommandStates = make(map[string]CommandExecutionState, len(terminal.CommandStates))
-			for id, state := range terminal.CommandStates {
-				clone.Terminals[index].CommandStates[id] = state
-			}
+			maps.Copy(clone.Terminals[index].CommandStates, terminal.CommandStates)
 		}
 	}
 	return clone

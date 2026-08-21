@@ -61,6 +61,60 @@ function typedPlayerRequests(page) {
   return requests;
 }
 
+function trackFirstPartyPageDiagnostics(page) {
+  const consoleEntries = [];
+  const failedResponses = [];
+  const pageErrors = [];
+
+  page.on('console', message => {
+    if (!['warning', 'error'].includes(message.type())) return;
+    consoleEntries.push({
+      type: message.type(),
+      text: message.text(),
+      url: message.location().url,
+    });
+  });
+  page.on('response', response => {
+    if (response.status() < 400) return;
+    failedResponses.push({ status: response.status(), url: response.url() });
+  });
+  page.on('pageerror', error => pageErrors.push(error.message));
+
+  return () => {
+    const documentURL = new URL(page.url());
+    const isFirstParty = rawURL => {
+      if (!rawURL) return true;
+      try {
+        return new URL(rawURL, documentURL).origin === documentURL.origin;
+      } catch {
+        return false;
+      }
+    };
+    return {
+      consoleEntries: consoleEntries.filter(entry => isFirstParty(entry.url)),
+      failedResponses: failedResponses.filter(entry => isFirstParty(entry.url)),
+      pageErrors,
+    };
+  };
+}
+
+test('initial player page has no first-party console or static-request diagnostics', async ({ page }) => {
+  const diagnostics = trackFirstPartyPageDiagnostics(page);
+
+  await openPlayer(page);
+  await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).not.toHaveAttribute('content', /frame-ancestors/);
+  await expect(page.locator('link[rel~="icon"]')).toHaveAttribute('href', 'data:,');
+  await page.evaluate(() => new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+
+  expect(diagnostics()).toEqual({
+    consoleEntries: [],
+    failedResponses: [],
+    pageErrors: [],
+  });
+});
+
 test('selection uses a generated unary procedure and remains pending until its typed result converges with the stream', async ({ page }) => {
   const requests = typedPlayerRequests(page);
   let releaseSelection;
@@ -110,7 +164,10 @@ test('active navigation applies the authoritative compound update while awaiting
 
   await expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible();
   await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
-  expect(requests.map(request => request.procedure)).toContain('Navigate');
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  expect(requests.map(request => request.procedure)).toEqual(expect.arrayContaining([
+    'Subscribe', 'SelectCharacter', 'Navigate',
+  ]));
 });
 
 test('three tabs share one recognition handle and converge after one generated selection', async ({ browser }) => {

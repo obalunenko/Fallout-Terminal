@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -245,7 +246,7 @@ func copyRegularFile(root, source, destination string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer func() { _ = input.Close() }()
 	info, err := input.Stat()
 	if err != nil {
 		return err
@@ -282,9 +283,7 @@ func mergeEnvironment(base []string, overrides map[string]string) []string {
 			values[key] = value
 		}
 	}
-	for key, value := range overrides {
-		values[key] = value
-	}
+	maps.Copy(values, overrides)
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

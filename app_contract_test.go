@@ -514,10 +514,10 @@ func TestDesktopServiceInventoryAndNativeEventsAreExactlyAllowlisted(t *testing.
 		"AddCharacter", "UpdateCharacter", "DeleteCharacter", "RenameLogicalSession", "AssignCharacter", "ReleaseCharacter", "MoveCharacter", "SetActiveController",
 		"StartBroadcast", "EndBroadcast", "OpenURL", "GetPublicAccess", "SavePublicAccessSettings", "GeneratePlayerPassword", "StartPublicAccess", "StopPublicAccess",
 	}
-	serviceType := reflect.TypeOf((*desktopService)(nil))
+	serviceType := reflect.TypeFor[*desktopService]()
 	actualMethods := make([]string, 0, serviceType.NumMethod())
-	for index := range serviceType.NumMethod() {
-		actualMethods = append(actualMethods, serviceType.Method(index).Name)
+	for method := range serviceType.Methods() {
+		actualMethods = append(actualMethods, method.Name)
 	}
 	require.Len(t, actualMethods, 34)
 	require.ElementsMatch(t, requiredMethods, actualMethods)

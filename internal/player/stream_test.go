@@ -2,6 +2,7 @@ package player
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -36,6 +37,7 @@ func TestSubscriptionQueueIsBoundedNonblockingAndRecoversOnlyFromANewSnapshot(t 
 			return false
 		}
 	}, time.Second, time.Millisecond)
+	require.ErrorIs(t, context.Cause(stream.context), errSubscriptionQueueOverflow)
 	require.False(t, stream.Offer(subscriptionUpdate(defaultSubscriptionQueueSize+3)))
 
 	recovered := NewSubscription(t.Context(), "physical-2", "logical-1", subscriptionSnapshot(50), 2)
@@ -45,6 +47,7 @@ func TestSubscriptionQueueIsBoundedNonblockingAndRecoversOnlyFromANewSnapshot(t 
 	case <-time.After(time.Second):
 		assert.FailNow(t, "stale increment did not terminate the physical recovery stream")
 	}
+	require.ErrorIs(t, context.Cause(recovered.context), errSubscriptionRevisionRegressed)
 	fresh := NewSubscription(t.Context(), "physical-3", "logical-1", subscriptionSnapshot(50), 2)
 	require.True(t, fresh.Offer(subscriptionUpdate(51)))
 	require.Equal(t, uint64(51), (<-fresh.Updates()).GetUpdate().GetRevision())
@@ -129,7 +132,8 @@ func commandExecutionTerminalPresentation(phase playerv1.CommandExecutionPhase, 
 		Navigation: &playerv1.NavigationState{Path: []string{"root"}, Mode: playerv1.NavigationMode_NAVIGATION_MODE_LIST},
 	}
 	if completed {
-		live.Navigation.CommandNodeId = pointerTo(commandID)
+		commandNodeID := commandID
+		live.Navigation.CommandNodeId = &commandNodeID
 	} else {
 		live.CommandExecution = &playerv1.CommandExecutionPresentation{Phase: phase, CommandNodeId: commandID}
 	}
@@ -151,12 +155,12 @@ func TestSubscriptionHubIsolatesOverflowingAndCanceledPhysicalSiblings(t *testin
 	hub := NewSubscriptionHub()
 	blocked := NewSubscription(t.Context(), "blocked", "logical-1", subscriptionSnapshot(1), 1)
 	healthy := NewSubscription(t.Context(), "healthy", "logical-1", subscriptionSnapshot(1), 2)
-	canceledContext, cancel := context.WithCancel(t.Context())
+	canceledContext, cancel := context.WithCancelCause(t.Context())
 	canceled := NewSubscription(canceledContext, "canceled", "logical-1", subscriptionSnapshot(1), 1)
 	hub.Register(blocked)
 	hub.Register(healthy)
 	hub.Register(canceled)
-	cancel()
+	cancel(errors.New("test sibling stream canceled"))
 	select {
 	case <-canceled.Done():
 	case <-time.After(time.Second):
@@ -231,7 +235,8 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 	connectPlayer, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator, QueueSize: 1, Hub: hub})
 	require.NoError(t, err)
 	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Player</title>")}}
-	server, err := NewServer(Config{
+	serverRoot := context.WithValue(t.Context(), playerContextKey{}, "player-server")
+	server, err := NewServer(serverRoot, Config{
 		Address: "127.0.0.1:0", Assets: fs.FS(assets), Connect: connectPlayer,
 	})
 	require.NoError(t, err)
@@ -239,15 +244,15 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 	require.NoError(t, err)
 
 	client := playerv1connect.NewPlayerServiceClient(http.DefaultClient, server.Info().LocalURL)
-	blockedContext, cancelBlocked := context.WithCancel(t.Context())
-	defer cancelBlocked()
+	blockedContext, cancelBlocked := context.WithCancelCause(t.Context())
+	defer cancelBlocked(errors.New("test blocked stream closed"))
 	blocked, err := client.Subscribe(blockedContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
 	require.NoError(t, err)
 	require.True(t, blocked.Receive(), "stream error: %v", blocked.Err())
 	snapshot := blocked.Msg().GetSnapshot()
 	require.NotNil(t, snapshot)
 
-	healthyContext, cancelHealthy := context.WithCancel(t.Context())
+	healthyContext, cancelHealthy := context.WithCancelCause(t.Context())
 	healthy, err := client.Subscribe(healthyContext, connect.NewRequest(&playerv1.SubscribeRequest{RecognitionHandle: &snapshot.RecognitionHandle}))
 	require.NoError(t, err)
 	require.True(t, healthy.Receive())
@@ -258,17 +263,23 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 	hub.Offer(domain.LogicalSessionID(sessionID), subscriptionUpdate(healthySnapshot.GetRevision()+1))
 	require.True(t, healthy.Receive())
 
-	cancelHealthy()
+	cancelHealthy(errors.New("test healthy stream closed"))
 	require.Eventually(t, func() bool {
 		hub.mu.Lock()
 		defer hub.mu.Unlock()
 		return len(hub.byID) == 1
 	}, time.Second, time.Millisecond)
 
-	shutdownContext, cancelShutdown := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancelShutdown()
+	shutdownDeadline, stopShutdownDeadline := context.WithTimeoutCause(t.Context(), 5*time.Second, errors.New("test player shutdown timed out"))
+	shutdownContext, cancelShutdown := context.WithCancelCause(shutdownDeadline)
+	defer func() {
+		cancelShutdown(errors.New("test player shutdown completed"))
+		stopShutdownDeadline()
+	}()
 	started := time.Now()
 	require.NoError(t, server.Stop(shutdownContext))
+	require.Equal(t, "player-server", server.context.Value(playerContextKey{}))
+	require.ErrorIs(t, context.Cause(server.context), errPlayerServerStopped)
 	require.Less(t, time.Since(started), 5*time.Second)
 	require.NoError(t, server.Stop(shutdownContext))
 	require.Eventually(t, func() bool {
@@ -277,6 +288,51 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 		return len(hub.byID) == 0
 	}, time.Second, time.Millisecond)
 }
+
+func TestConnectServerLifetimeSurvivesCompletedStartupContext(t *testing.T) {
+	coordinator := newConnectTestCoordinator(t)
+	hub := NewSubscriptionHub()
+	connectPlayer, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator, QueueSize: 1, Hub: hub})
+	require.NoError(t, err)
+	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Player</title>")}}
+	serverRoot := context.WithValue(t.Context(), playerContextKey{}, "player-server")
+	server, err := NewServer(serverRoot, Config{
+		Address: "127.0.0.1:0", Assets: fs.FS(assets), Connect: connectPlayer,
+	})
+	require.NoError(t, err)
+	startupContext, completeStartup := context.WithCancelCause(t.Context())
+	_, err = server.Start(startupContext)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		cleanupContext, cancelCleanup := context.WithTimeoutCause(
+			context.WithoutCancel(t.Context()), time.Second, errors.New("test player cleanup timed out"),
+		)
+		defer cancelCleanup()
+		require.NoError(t, server.Stop(cleanupContext))
+	})
+
+	completeStartup(errors.New("test player startup completed"))
+	require.Never(t, func() bool { return server.context.Err() != nil }, 50*time.Millisecond, time.Millisecond,
+		"completed startup context canceled the committed player server")
+
+	client := playerv1connect.NewPlayerServiceClient(http.DefaultClient, server.Info().LocalURL)
+	streamContext, cancelStream := context.WithCancelCause(t.Context())
+	t.Cleanup(func() { cancelStream(errors.New("test post-start stream closed")) })
+	stream, err := client.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
+	require.NoError(t, err)
+	require.True(t, stream.Receive(), "initial snapshot error: %v", stream.Err())
+	snapshot := stream.Msg().GetSnapshot()
+	require.NotNil(t, snapshot)
+	sessionID := snapshot.GetPlayerState().GetLogicalSessionId()
+	require.NotEmpty(t, sessionID)
+
+	hub.Offer(domain.LogicalSessionID(sessionID), subscriptionUpdate(snapshot.GetRevision()+1))
+	require.True(t, stream.Receive(), "post-start update error: %v", stream.Err())
+	require.Equal(t, snapshot.GetRevision()+1, stream.Msg().GetUpdate().GetRevision())
+	require.NoError(t, server.context.Err())
+}
+
+type playerContextKey struct{}
 
 func subscriptionSnapshot(revision uint64) *playerv1.SubscriptionMessage {
 	return &playerv1.SubscriptionMessage{Payload: &playerv1.SubscriptionMessage_Snapshot{Snapshot: &playerv1.PersonalizedSnapshot{Revision: revision}}}

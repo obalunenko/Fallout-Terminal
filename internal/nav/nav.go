@@ -1,7 +1,11 @@
 // Package nav implements transport-independent shared-navigation transitions.
 package nav
 
-import "github.com/obalunenko/Fallout-Terminal/internal/domain"
+import (
+	"slices"
+
+	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+)
 
 const (
 	modeList  = "list"
@@ -54,7 +58,7 @@ func ApplyAction(state domain.NavState, tree domain.ContentNode, action, nodeID 
 			return next
 		}
 		next.Mode = modeEntry
-		next.ViewEntryID = pointerTo(node.ID)
+		next.ViewEntryID = new(node.ID)
 		next.CommandNodeID = nil
 
 	case "command":
@@ -65,7 +69,7 @@ func ApplyAction(state domain.NavState, tree domain.ContentNode, action, nodeID 
 		if node == nil {
 			return next
 		}
-		next.CommandNodeID = pointerTo(node.ID)
+		next.CommandNodeID = new(node.ID)
 	}
 
 	return next
@@ -85,13 +89,13 @@ func Revalidate(state domain.NavState, tree domain.ContentNode) domain.NavState 
 	if next.Mode != modeEntry {
 		next.Mode = modeList
 	} else if state.ViewEntryID != nil && directChild(folder, *state.ViewEntryID, domain.NodeEntry) != nil {
-		next.ViewEntryID = pointerTo(*state.ViewEntryID)
+		next.ViewEntryID = new(*state.ViewEntryID)
 	} else {
 		next.Mode = modeList
 	}
 
 	if state.CommandNodeID != nil && directChild(folder, *state.CommandNodeID, domain.NodeCommand) != nil {
-		next.CommandNodeID = pointerTo(*state.CommandNodeID)
+		next.CommandNodeID = new(*state.CommandNodeID)
 	}
 
 	return next
@@ -126,8 +130,8 @@ func RestoreFolder(tree domain.ContentNode, folderID string, ancestorFolderIDs [
 	if path, ok := FindFolderPath(tree, folderID); ok {
 		return domain.NavState{Path: path, Mode: modeList}
 	}
-	for index := len(ancestorFolderIDs) - 1; index >= 0; index-- {
-		if path, ok := FindFolderPath(tree, ancestorFolderIDs[index]); ok {
+	for _, ancestorFolderID := range slices.Backward(ancestorFolderIDs) {
+		if path, ok := FindFolderPath(tree, ancestorFolderID); ok {
 			return domain.NavState{Path: path, Mode: modeList}
 		}
 	}
@@ -181,14 +185,10 @@ func cloneState(state domain.NavState) domain.NavState {
 	clone := state
 	clone.Path = append([]string(nil), state.Path...)
 	if state.ViewEntryID != nil {
-		clone.ViewEntryID = pointerTo(*state.ViewEntryID)
+		clone.ViewEntryID = new(*state.ViewEntryID)
 	}
 	if state.CommandNodeID != nil {
-		clone.CommandNodeID = pointerTo(*state.CommandNodeID)
+		clone.CommandNodeID = new(*state.CommandNodeID)
 	}
 	return clone
-}
-
-func pointerTo(value string) *string {
-	return &value
 }

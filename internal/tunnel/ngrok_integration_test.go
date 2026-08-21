@@ -2,6 +2,7 @@ package tunnel_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -107,7 +108,6 @@ func TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe(t *testing.T) {
 
 	listener, err := net.Listen("tcp4", tunnel.PlayerUpstreamAddress)
 	require.NoError(t, err)
-	defer listener.Close()
 	probe := &publicStreamProbeService{upstreamArrival: make(chan time.Time, 1)}
 	rpcPath, rpcHandler := playerv1connect.NewPlayerServiceHandler(probe)
 	mux := http.NewServeMux()
@@ -171,8 +171,12 @@ func TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe(t *testing.T) {
 		base: http.DefaultTransport, username: username, password: password, headers: headers,
 	}}
 	generated := playerv1connect.NewPlayerServiceClient(authenticatedClient, publicURL.String())
-	streamContext, cancelStream := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancelStream()
+	streamDeadline, stopStreamDeadline := context.WithTimeoutCause(t.Context(), 5*time.Second, errors.New("test ngrok stream timed out"))
+	streamContext, cancelStream := context.WithCancelCause(streamDeadline)
+	defer func() {
+		cancelStream(errors.New("test ngrok stream completed"))
+		stopStreamDeadline()
+	}()
 	startedAt := time.Now()
 	stream, err := generated.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
 	require.NoError(t, err)

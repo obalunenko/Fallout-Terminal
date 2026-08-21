@@ -2,6 +2,7 @@ package player
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
@@ -10,6 +11,16 @@ import (
 )
 
 const defaultSubscriptionQueueSize = 32
+
+var (
+	errSubscriptionContextRequired   = errors.New("player subscription context is required")
+	errSubscriptionClosed            = errors.New("player subscription closed")
+	errSubscriptionReplaced          = errors.New("player subscription replaced")
+	errSubscriptionUnregistered      = errors.New("player subscription unregistered")
+	errSubscriptionHubClosed         = errors.New("player subscription hub closed")
+	errSubscriptionRevisionRegressed = errors.New("player subscription revision regressed")
+	errSubscriptionQueueOverflow     = errors.New("player subscription queue overflow")
+)
 
 // Subscription owns the bounded outbound queue and cancellation lifecycle for
 // one physical Connect server stream. Its complete snapshot is sent directly
@@ -20,7 +31,8 @@ type Subscription struct {
 	snapshot  *playerv1.SubscriptionMessage
 	updates   chan *playerv1.SubscriptionMessage
 	done      chan struct{}
-	cancel    context.CancelFunc
+	context   context.Context
+	cancel    context.CancelCauseFunc
 
 	mu           sync.Mutex
 	lastRevision uint64
@@ -31,15 +43,15 @@ type Subscription struct {
 // snapshot and a bounded queue for strictly newer compound updates.
 func NewSubscription(parent context.Context, id domain.ConnectionID, sessionID domain.LogicalSessionID, snapshot *playerv1.SubscriptionMessage, queueSize int) *Subscription {
 	if parent == nil {
-		parent = context.Background()
+		panic(errSubscriptionContextRequired)
 	}
 	if queueSize <= 0 {
 		queueSize = defaultSubscriptionQueueSize
 	}
-	ctx, cancel := context.WithCancel(parent)
+	ctx, cancel := context.WithCancelCause(parent)
 	stream := &Subscription{
 		id: id, sessionID: sessionID, snapshot: cloneSubscriptionMessage(snapshot),
-		updates: make(chan *playerv1.SubscriptionMessage, queueSize), done: make(chan struct{}), cancel: cancel,
+		updates: make(chan *playerv1.SubscriptionMessage, queueSize), done: make(chan struct{}), context: ctx, cancel: cancel,
 	}
 	if messageSnapshot := stream.snapshot.GetSnapshot(); messageSnapshot != nil {
 		stream.lastRevision = messageSnapshot.GetRevision()
@@ -99,7 +111,7 @@ func (stream *Subscription) Offer(message *playerv1.SubscriptionMessage) bool {
 	}
 	if revision < stream.lastRevision {
 		stream.mu.Unlock()
-		stream.Close()
+		stream.closeWithCause(errSubscriptionRevisionRegressed)
 		return false
 	}
 	select {
@@ -116,7 +128,7 @@ func (stream *Subscription) Offer(message *playerv1.SubscriptionMessage) bool {
 		return true
 	default:
 		stream.mu.Unlock()
-		stream.Close()
+		stream.closeWithCause(errSubscriptionQueueOverflow)
 		return false
 	}
 }
@@ -133,10 +145,14 @@ func (hub *SubscriptionHub) Count() int {
 
 // Close cancels and releases this physical stream idempotently.
 func (stream *Subscription) Close() {
+	stream.closeWithCause(errSubscriptionClosed)
+}
+
+func (stream *Subscription) closeWithCause(cause error) {
 	if stream == nil {
 		return
 	}
-	stream.cancel()
+	stream.cancel(cause)
 	stream.close()
 }
 
@@ -178,7 +194,7 @@ func (hub *SubscriptionHub) Register(stream *Subscription) {
 	hub.mu.Lock()
 	if previous := hub.byID[stream.ID()]; previous != nil {
 		hub.removeLocked(previous)
-		previous.Close()
+		previous.closeWithCause(errSubscriptionReplaced)
 	}
 	hub.byID[stream.ID()] = stream
 	siblings := hub.bySession[stream.SessionID()]
@@ -202,7 +218,7 @@ func (hub *SubscriptionHub) Unregister(id domain.ConnectionID) {
 	}
 	hub.mu.Unlock()
 	if stream != nil {
-		stream.Close()
+		stream.closeWithCause(errSubscriptionUnregistered)
 	}
 }
 
@@ -239,7 +255,7 @@ func (hub *SubscriptionHub) CloseAll() {
 	hub.bySession = make(map[domain.LogicalSessionID]map[domain.ConnectionID]*Subscription)
 	hub.mu.Unlock()
 	for _, stream := range streams {
-		stream.Close()
+		stream.closeWithCause(errSubscriptionHubClosed)
 	}
 }
 

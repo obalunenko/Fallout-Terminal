@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -35,6 +36,12 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			parentRequire: "github.com/bufbuild/buf v1.72.0",
 		},
 		{
+			name:          "golangci-lint",
+			directory:     "golangci-lint",
+			tool:          "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
+			parentRequire: "github.com/golangci/golangci-lint/v2 v2.13.1",
+		},
+		{
 			name:          "protoc-gen-go",
 			directory:     "protoc-gen-go",
 			tool:          "google.golang.org/protobuf/cmd/protoc-gen-go",
@@ -55,8 +62,10 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			module := readAcceptanceDocument(t, filepath.Join(root, "tools", test.directory, "go.mod"))
 			assert.Equal(t, 1, strings.Count(module, "\ntool "))
 			assert.Contains(t, module, "\ntool "+test.tool+"\n")
-			assert.Contains(t, module, "\nrequire "+test.parentRequire)
-			assert.Contains(t, module, "\ngo 1.26\n")
+			parentPattern := "(?m)^[[:space:]]*(require[[:space:]]+)?" +
+				regexp.QuoteMeta(test.parentRequire) + "([[:space:]]+// indirect)?$"
+			assert.Regexp(t, parentPattern, module)
+			assert.Contains(t, module, "\ngo 1.27.0\n")
 
 			sum, err := os.ReadFile(filepath.Join(root, "tools", test.directory, "go.sum"))
 			require.NoError(t, err)
@@ -67,6 +76,7 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 	applicationModule := readAcceptanceDocument(t, filepath.Join(root, "go.mod"))
 	assert.NotContains(t, applicationModule, "\ntool ")
 	assert.NotContains(t, applicationModule, "github.com/bufbuild/buf")
+	assert.NotContains(t, applicationModule, "github.com/golangci/golangci-lint")
 	assert.NotContains(t, applicationModule, "/cmd/protoc-gen-go")
 	assert.NotContains(t, applicationModule, "/cmd/protoc-gen-connect-go")
 	assert.NotContains(t, applicationModule, "/v3/cmd/wails3")
@@ -341,11 +351,11 @@ func repositoryRoot(t *testing.T) string {
 }
 
 func markdownSection(document, heading string) string {
-	start := strings.Index(document, heading)
-	if start < 0 {
+	_, after, ok := strings.Cut(document, heading)
+	if !ok {
 		return ""
 	}
-	rest := document[start+len(heading):]
+	rest := after
 	if end := strings.Index(rest, "\n## "); end >= 0 {
 		rest = rest[:end]
 	}

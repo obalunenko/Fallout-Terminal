@@ -3,11 +3,13 @@
 package control
 
 import (
+	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -78,9 +80,9 @@ type CommandStateMutation struct {
 // server-owned command execution snapshots. Coordinator transitions call it
 // in the one-way control-to-session lock order and commit only after success.
 type CommandStateStore interface {
-	ExecuteCommandState(terminalID, commandID string) (CommandStateMutation, error)
-	ResetCommandState(terminalID, commandID string) (CommandStateMutation, error)
-	ResetTerminalCommandStates(terminalID string) (CommandStateMutation, error)
+	ExecuteCommandState(context.Context, string, string) (CommandStateMutation, error)
+	ResetCommandState(context.Context, string, string) (CommandStateMutation, error)
+	ResetTerminalCommandStates(context.Context, string) (CommandStateMutation, error)
 }
 
 // TerminalCatalog resolves only detached values from the latest validated session.
@@ -983,7 +985,10 @@ func (service *Service) ResolveTerminalSwitch(switchID domain.SwitchID, choice d
 // pending state-changing command. Approve holds the coordinator transaction
 // across the one-way durable store call and publishes completed state only
 // after that call succeeds.
-func (service *Service) ResolveCommandExecution(requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+func (service *Service) ResolveCommandExecution(ctx context.Context, requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+	if ctx == nil {
+		return service.Snapshot(), nil, fmt.Errorf("command execution context is required")
+	}
 	requestID = strings.TrimSpace(requestID)
 	if requestID == "" {
 		return service.Snapshot(), nil, fmt.Errorf("command execution request ID must not be blank")
@@ -1050,7 +1055,7 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 			resolveErr = fmt.Errorf("command execution could not be persisted")
 			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
 		}
-		durable, err := service.commandStateStore.ExecuteCommandState(pending.TerminalID, pending.CommandID)
+		durable, err := service.commandStateStore.ExecuteCommandState(ctx, pending.TerminalID, pending.CommandID)
 		if err != nil {
 			resolveErr = fmt.Errorf("command execution could not be persisted")
 			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
@@ -1942,7 +1947,7 @@ func (service *Service) DispatchPlayerActionForRecognition(handle domain.Recogni
 		for candidate := range session.ConnectionIDs {
 			connections = append(connections, candidate)
 		}
-		sort.Slice(connections, func(left, right int) bool { return connections[left] < connections[right] })
+		slices.Sort(connections)
 		if len(connections) > 0 {
 			connectionID = connections[0]
 		}
@@ -2205,21 +2210,6 @@ func currentPendingCommandExecution(pending *domain.PendingCommandExecution, bro
 		terminal.CommandExecution.CommandID == pending.CommandID
 }
 
-func contentNodeByStableID(root *domain.ContentNode, nodeID string) *domain.ContentNode {
-	if root == nil {
-		return nil
-	}
-	if root.ID == nodeID {
-		return root
-	}
-	for index := range root.Children {
-		if found := contentNodeByStableID(&root.Children[index], nodeID); found != nil {
-			return found
-		}
-	}
-	return nil
-}
-
 func terminalByStableID(session *domain.Session, terminalID string) *domain.Terminal {
 	if session == nil {
 		return nil
@@ -2237,9 +2227,7 @@ func cloneCommandStates(states map[string]domain.CommandExecutionState) map[stri
 		return nil
 	}
 	clone := make(map[string]domain.CommandExecutionState, len(states))
-	for commandID, state := range states {
-		clone[commandID] = state
-	}
+	maps.Copy(clone, states)
 	return clone
 }
 
@@ -2582,7 +2570,7 @@ func sortedSessionIDs(runtime *domain.ProcessRuntime) []domain.LogicalSessionID 
 	for sessionID := range runtime.SessionsByID {
 		sessionIDs = append(sessionIDs, sessionID)
 	}
-	sort.Slice(sessionIDs, func(left, right int) bool { return sessionIDs[left] < sessionIDs[right] })
+	slices.Sort(sessionIDs)
 	return sessionIDs
 }
 
@@ -2753,7 +2741,7 @@ func orderedRosterIDs(runtime *domain.ProcessRuntime) []domain.CharacterID {
 			remainder = append(remainder, characterID)
 		}
 	}
-	sort.Slice(remainder, func(left, right int) bool { return remainder[left] < remainder[right] })
+	slices.Sort(remainder)
 	return append(ids, remainder...)
 }
 
@@ -2852,9 +2840,7 @@ func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime 
 		clone.SessionsByID[sessionID] = cloneLogicalSession(session)
 	}
 	clone.SessionIDByBrowserToken = make(map[domain.BrowserToken]domain.LogicalSessionID, len(runtime.SessionIDByBrowserToken))
-	for token, sessionID := range runtime.SessionIDByBrowserToken {
-		clone.SessionIDByBrowserToken[token] = sessionID
-	}
+	maps.Copy(clone.SessionIDByBrowserToken, runtime.SessionIDByBrowserToken)
 	clone.RosterByID = make(map[domain.CharacterID]*domain.CharacterRosterEntry, len(runtime.RosterByID))
 	for characterID, character := range runtime.RosterByID {
 		if character == nil {
@@ -2898,9 +2884,7 @@ func cloneLogicalSession(session *domain.LogicalSession) *domain.LogicalSession 
 		clone.ConnectionIDs[connectionID] = struct{}{}
 	}
 	clone.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord, len(session.RequestResults))
-	for requestID, result := range session.RequestResults {
-		clone.RequestResults[requestID] = result
-	}
+	maps.Copy(clone.RequestResults, session.RequestResults)
 	if session.Notice != nil {
 		notice := *session.Notice
 		clone.Notice = &notice
@@ -2914,13 +2898,9 @@ func cloneBroadcast(broadcast *domain.LiveBroadcast) *domain.LiveBroadcast {
 	}
 	clone := *broadcast
 	clone.AssignmentsBySession = make(map[domain.LogicalSessionID]domain.CharacterID, len(broadcast.AssignmentsBySession))
-	for sessionID, characterID := range broadcast.AssignmentsBySession {
-		clone.AssignmentsBySession[sessionID] = characterID
-	}
+	maps.Copy(clone.AssignmentsBySession, broadcast.AssignmentsBySession)
 	clone.SessionByCharacter = make(map[domain.CharacterID]domain.LogicalSessionID, len(broadcast.SessionByCharacter))
-	for characterID, sessionID := range broadcast.SessionByCharacter {
-		clone.SessionByCharacter[characterID] = sessionID
-	}
+	maps.Copy(clone.SessionByCharacter, broadcast.SessionByCharacter)
 	clone.ControllerSessionID = cloneLogicalSessionID(broadcast.ControllerSessionID)
 	clone.ActiveTerminalID = cloneString(broadcast.ActiveTerminalID)
 	clone.TerminalRuntimes = make(map[string]*domain.TerminalRuntime, len(broadcast.TerminalRuntimes))
@@ -3039,9 +3019,7 @@ func cloneHackState(state *domain.HackState) *domain.HackState {
 	clone := *state
 	if state.WordsByID != nil {
 		clone.WordsByID = make(map[string]domain.HackCandidate, len(state.WordsByID))
-		for id, candidate := range state.WordsByID {
-			clone.WordsByID[id] = candidate
-		}
+		maps.Copy(clone.WordsByID, state.WordsByID)
 	}
 	if state.UsedPatterns != nil {
 		clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(state.UsedPatterns))
