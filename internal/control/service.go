@@ -7,7 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1942,7 +1943,7 @@ func (service *Service) DispatchPlayerActionForRecognition(handle domain.Recogni
 		for candidate := range session.ConnectionIDs {
 			connections = append(connections, candidate)
 		}
-		sort.Slice(connections, func(left, right int) bool { return connections[left] < connections[right] })
+		slices.Sort(connections)
 		if len(connections) > 0 {
 			connectionID = connections[0]
 		}
@@ -2237,9 +2238,7 @@ func cloneCommandStates(states map[string]domain.CommandExecutionState) map[stri
 		return nil
 	}
 	clone := make(map[string]domain.CommandExecutionState, len(states))
-	for commandID, state := range states {
-		clone[commandID] = state
-	}
+	maps.Copy(clone, states)
 	return clone
 }
 
@@ -2582,7 +2581,7 @@ func sortedSessionIDs(runtime *domain.ProcessRuntime) []domain.LogicalSessionID 
 	for sessionID := range runtime.SessionsByID {
 		sessionIDs = append(sessionIDs, sessionID)
 	}
-	sort.Slice(sessionIDs, func(left, right int) bool { return sessionIDs[left] < sessionIDs[right] })
+	slices.Sort(sessionIDs)
 	return sessionIDs
 }
 
@@ -2753,7 +2752,7 @@ func orderedRosterIDs(runtime *domain.ProcessRuntime) []domain.CharacterID {
 			remainder = append(remainder, characterID)
 		}
 	}
-	sort.Slice(remainder, func(left, right int) bool { return remainder[left] < remainder[right] })
+	slices.Sort(remainder)
 	return append(ids, remainder...)
 }
 
@@ -2852,9 +2851,7 @@ func cloneProcessRuntime(runtime *domain.ProcessRuntime) *domain.ProcessRuntime 
 		clone.SessionsByID[sessionID] = cloneLogicalSession(session)
 	}
 	clone.SessionIDByBrowserToken = make(map[domain.BrowserToken]domain.LogicalSessionID, len(runtime.SessionIDByBrowserToken))
-	for token, sessionID := range runtime.SessionIDByBrowserToken {
-		clone.SessionIDByBrowserToken[token] = sessionID
-	}
+	maps.Copy(clone.SessionIDByBrowserToken, runtime.SessionIDByBrowserToken)
 	clone.RosterByID = make(map[domain.CharacterID]*domain.CharacterRosterEntry, len(runtime.RosterByID))
 	for characterID, character := range runtime.RosterByID {
 		if character == nil {
@@ -2898,9 +2895,7 @@ func cloneLogicalSession(session *domain.LogicalSession) *domain.LogicalSession 
 		clone.ConnectionIDs[connectionID] = struct{}{}
 	}
 	clone.RequestResults = make(map[domain.RequestID]domain.RequestResultRecord, len(session.RequestResults))
-	for requestID, result := range session.RequestResults {
-		clone.RequestResults[requestID] = result
-	}
+	maps.Copy(clone.RequestResults, session.RequestResults)
 	if session.Notice != nil {
 		notice := *session.Notice
 		clone.Notice = &notice
@@ -2914,13 +2909,9 @@ func cloneBroadcast(broadcast *domain.LiveBroadcast) *domain.LiveBroadcast {
 	}
 	clone := *broadcast
 	clone.AssignmentsBySession = make(map[domain.LogicalSessionID]domain.CharacterID, len(broadcast.AssignmentsBySession))
-	for sessionID, characterID := range broadcast.AssignmentsBySession {
-		clone.AssignmentsBySession[sessionID] = characterID
-	}
+	maps.Copy(clone.AssignmentsBySession, broadcast.AssignmentsBySession)
 	clone.SessionByCharacter = make(map[domain.CharacterID]domain.LogicalSessionID, len(broadcast.SessionByCharacter))
-	for characterID, sessionID := range broadcast.SessionByCharacter {
-		clone.SessionByCharacter[characterID] = sessionID
-	}
+	maps.Copy(clone.SessionByCharacter, broadcast.SessionByCharacter)
 	clone.ControllerSessionID = cloneLogicalSessionID(broadcast.ControllerSessionID)
 	clone.ActiveTerminalID = cloneString(broadcast.ActiveTerminalID)
 	clone.TerminalRuntimes = make(map[string]*domain.TerminalRuntime, len(broadcast.TerminalRuntimes))
@@ -3039,9 +3030,7 @@ func cloneHackState(state *domain.HackState) *domain.HackState {
 	clone := *state
 	if state.WordsByID != nil {
 		clone.WordsByID = make(map[string]domain.HackCandidate, len(state.WordsByID))
-		for id, candidate := range state.WordsByID {
-			clone.WordsByID[id] = candidate
-		}
+		maps.Copy(clone.WordsByID, state.WordsByID)
 	}
 	if state.UsedPatterns != nil {
 		clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(state.UsedPatterns))

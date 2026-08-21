@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/obalunenko/logger"
@@ -68,9 +69,7 @@ func (log *RecordingLogger) WithFields(fields logger.Fields) logger.Logger {
 	if derived.fields == nil {
 		derived.fields = make(map[string]any, len(fields))
 	}
-	for key, value := range fields {
-		derived.fields[key] = value
-	}
+	maps.Copy(derived.fields, fields)
 	return derived
 }
 
@@ -90,8 +89,6 @@ func cloneLogFields(fields map[string]any) map[string]any {
 		return nil
 	}
 	clone := make(map[string]any, len(fields))
-	for key, value := range fields {
-		clone[key] = value
-	}
+	maps.Copy(clone, fields)
 	return clone
 }

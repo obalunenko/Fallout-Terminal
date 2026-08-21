@@ -53,7 +53,6 @@ func TestConnectRPCMigrationTestConventions(t *testing.T) {
 	}
 
 	for _, relative := range files {
-		relative := relative
 		t.Run(relative, func(t *testing.T) {
 			parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, relative), nil, 0)
 			require.NoError(t, err)

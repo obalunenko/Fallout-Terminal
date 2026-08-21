@@ -47,8 +47,10 @@ func SessionFromProto(value *persistencev1.Session, template domain.Session) (do
 	if value == nil {
 		return domain.Session{}, fmt.Errorf("session contract is required")
 	}
-	result := domain.Session{Version: int(value.GetVersion()), Name: value.GetName(), PlayerConfig: value.GetPlayerConfig(), Extra: template.Extra}
-	result.Terminals = make([]domain.Terminal, 0, len(value.GetTerminals()))
+	result := domain.Session{
+		Version: int(value.GetVersion()), Name: value.GetName(), PlayerConfig: value.GetPlayerConfig(), Extra: template.Extra,
+		Terminals: make([]domain.Terminal, 0, len(value.GetTerminals())),
+	}
 	for index, terminal := range value.GetTerminals() {
 		var terminalTemplate domain.Terminal
 		if index < len(template.Terminals) {

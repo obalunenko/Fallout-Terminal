@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -351,7 +352,7 @@ func TestRosterCreationAndFreshBroadcastSelection(t *testing.T) {
 }
 
 func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		service := newUS1Service()
 		state, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
@@ -403,7 +404,7 @@ func TestConcurrentSameCharacterClaimHasExactlyOneWinnerAcross100Trials(t *testi
 }
 
 func TestConcurrentDifferentFirstAssignmentsChooseExactlyOneControllerAcross100Trials(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		service := newUS1Service()
 		state, err := addCharacter(service, "Mara")
 		require.Falsef(t, err != nil,
@@ -725,7 +726,7 @@ func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpo
 	})
 	beforeRevision := fixture.service.Revision()
 
-	for index := 0; index < 257; index++ {
+	for index := range 257 {
 		requestID := domain.RequestID(fmt.Sprintf("request-%03d", index))
 		result := fixture.service.SelectCharacter(CharacterSelection{
 			ConnectionID: fixture.controllerConnection, SessionID: fixture.controllerSession, RequestID: requestID,
@@ -785,7 +786,7 @@ func TestRequestReplayCacheBoundsDeterministicallyAt256AndClearsWithBroadcastEpo
 }
 
 func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequenceAcross100Races(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		random := &controlCountingRandom{}
 		liveRuntime := live.New(random, controlFixedWords{})
 		effects := testutil.NewFakeOrderedEffectSink[Effect]()
@@ -830,8 +831,7 @@ func TestConcurrentPatternActivationHasOneCoordinatorWinnerAndOneOutcomeSequence
 
 		start := make(chan struct{})
 		results := make(chan domain.ActionResult, 2)
-		for contender := 0; contender < 2; contender++ {
-			contender := contender
+		for contender := range 2 {
 			go func() {
 				<-start
 				results <- service.DispatchPlayerAction(connectionID, domain.RuntimeCommand{
@@ -985,7 +985,7 @@ func TestSetActiveControllerRejectsEveryIneligibleTargetWithoutMutation(t *testi
 }
 
 func TestActionAndSetActiveControllerHaveOneCoordinatorOrderAcross100Interleavings(t *testing.T) {
-	for trial := 0; trial < 100; trial++ {
+	for trial := range 100 {
 		t.Run(fmt.Sprintf("trial-%03d", trial), func(t *testing.T) {
 			actionFirst := trial%2 == 0
 			runtime := &recordingTerminalRuntime{}
@@ -3478,7 +3478,6 @@ func TestConcurrentLinkedRequestsCreateExactlyOnePendingDecision(t *testing.T) {
 	start := make(chan struct{})
 	results := make(chan domain.ActionResult, 2)
 	for _, requestID := range []string{"concurrent-a", "concurrent-b"} {
-		requestID := requestID
 		go func() {
 			<-start
 			results <- fixture.service.DispatchPlayerAction(fixture.controllerConnection, domain.RuntimeCommand{
@@ -3967,9 +3966,9 @@ func (runtime *recordingTerminalRuntime) RandomCalls() int {
 func actionResultForRequest(t *testing.T, effects *testutil.FakeOrderedEffectSink[Effect], requestID string) domain.ActionResult {
 	t.Helper()
 	recorded := effects.Values()
-	for index := len(recorded) - 1; index >= 0; index-- {
-		if recorded[index].Result != nil && recorded[index].Result.RequestID == requestID {
-			return *recorded[index].Result
+	for _, r := range slices.Backward(recorded) {
+		if r.Result != nil && r.Result.RequestID == requestID {
+			return *r.Result
 		}
 	}
 	assert.FailNowf(t, "assertion failed", "no action result effect for request %q", requestID)

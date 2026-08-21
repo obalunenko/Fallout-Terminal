@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -1744,9 +1745,7 @@ func cloneFixtureCommandStates(states map[string]domain.CommandExecutionState) m
 		return nil
 	}
 	clone := make(map[string]domain.CommandExecutionState, len(states))
-	for commandID, state := range states {
-		clone[commandID] = state
-	}
+	maps.Copy(clone, states)
 	return clone
 }
 

@@ -108,7 +108,6 @@ func TestApplyAction(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, test.want, ApplyAction(test.state, tree, test.action, test.nodeID))
@@ -135,7 +134,7 @@ func TestRevalidate(t *testing.T) {
 			name:  "truncate path at first missing folder",
 			state: navState([]string{"root", "docs", "missing"}, "list", "", "read"),
 			tree:  navigationTree(),
-			want:  domain.NavState{Path: []string{"root", "docs"}, Mode: "list", CommandNodeID: stringPointer("read")},
+			want:  domain.NavState{Path: []string{"root", "docs"}, Mode: "list", CommandNodeID: new("read")},
 		},
 		{
 			name:  "reject a non-folder path component",
@@ -170,7 +169,6 @@ func TestRevalidate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, test.want, Revalidate(test.state, test.tree))
@@ -292,14 +290,10 @@ func removeNode(parent *domain.ContentNode, nodeID string) bool {
 func navState(path []string, mode, viewEntryID, commandNodeID string) domain.NavState {
 	state := domain.NavState{Path: path, Mode: mode}
 	if viewEntryID != "" {
-		state.ViewEntryID = stringPointer(viewEntryID)
+		state.ViewEntryID = new(viewEntryID)
 	}
 	if commandNodeID != "" {
-		state.CommandNodeID = stringPointer(commandNodeID)
+		state.CommandNodeID = new(commandNodeID)
 	}
 	return state
-}
-
-func stringPointer(value string) *string {
-	return &value
 }

@@ -411,7 +411,6 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 		".mp3": {}, ".wav": {}, ".ogg": {}, ".m4a": {}, ".webm": {},
 	}
 	for _, category := range requiredCategories {
-		category := category
 		t.Run(category, func(t *testing.T) {
 			directory := filepath.Join(root, "frontend", "client", "sounds", category)
 			entries, err := os.ReadDir(directory)

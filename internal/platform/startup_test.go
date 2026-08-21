@@ -344,11 +344,11 @@ func repositoryRoot(t *testing.T) string {
 }
 
 func markdownSection(document, heading string) string {
-	start := strings.Index(document, heading)
-	if start < 0 {
+	_, after, ok := strings.Cut(document, heading)
+	if !ok {
 		return ""
 	}
-	rest := document[start+len(heading):]
+	rest := after
 	if end := strings.Index(rest, "\n## "); end >= 0 {
 		rest = rest[:end]
 	}

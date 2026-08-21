@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 
@@ -46,7 +47,6 @@ func TestValidateSessionRejectsInvalidKnownShape(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(valid)
@@ -83,7 +83,6 @@ func TestValidatePlayerConfigAcceptsIntelligenceBoundaries(t *testing.T) {
 	t.Parallel()
 
 	for _, intelligence := range []int{1, 10} {
-		intelligence := intelligence
 		t.Run(fmt.Sprintf("intelligence %d", intelligence), func(t *testing.T) {
 			t.Parallel()
 			config := PlayerConfig{
@@ -102,7 +101,6 @@ func TestValidatePlayerConfigRejectsOutOfRangeIntelligence(t *testing.T) {
 	t.Parallel()
 
 	for _, intelligence := range []int{0, 11} {
-		intelligence := intelligence
 		t.Run(fmt.Sprintf("intelligence %d", intelligence), func(t *testing.T) {
 			t.Parallel()
 			config := PlayerConfig{
@@ -165,7 +163,6 @@ func TestValidateSessionRejectsInvalidStateChangingCommandShapes(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
@@ -228,7 +225,6 @@ func TestValidateSessionRejectsInvalidCommandExecutionStates(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
@@ -253,7 +249,6 @@ func TestValidateSessionRejectsStateChangeKnownFieldsInExtras(t *testing.T) {
 			s.Terminals[0].Extra = map[string]json.RawMessage{"commandStates": json.RawMessage(`{}`)}
 		}},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			candidate := cloneSession(validStateChangingSessionForTest())
@@ -299,7 +294,6 @@ func TestValidateSessionResolvesTerminalTransitionsInTwoPasses(t *testing.T) {
 			s.Terminals[0].Root.TerminalTransition = &TerminalTransitionConfig{TargetTerminalID: "b"}
 		}},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			candidate := CloneSession(linked)
@@ -342,9 +336,7 @@ func cloneSession(session Session) Session {
 		clone.Terminals[i].Root = cloneNode(session.Terminals[i].Root)
 		if session.Terminals[i].CommandStates != nil {
 			clone.Terminals[i].CommandStates = make(map[string]CommandExecutionState, len(session.Terminals[i].CommandStates))
-			for id, state := range session.Terminals[i].CommandStates {
-				clone.Terminals[i].CommandStates[id] = state
-			}
+			maps.Copy(clone.Terminals[i].CommandStates, session.Terminals[i].CommandStates)
 		}
 	}
 	return clone

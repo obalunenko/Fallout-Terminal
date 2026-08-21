@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -282,9 +283,7 @@ func mergeEnvironment(base []string, overrides map[string]string) []string {
 			values[key] = value
 		}
 	}
-	for key, value := range overrides {
-		values[key] = value
-	}
+	maps.Copy(values, overrides)
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

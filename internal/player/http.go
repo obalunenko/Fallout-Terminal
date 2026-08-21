@@ -227,7 +227,7 @@ func unsafePlayerPath(requestURL *url.URL) bool {
 		if err != nil || strings.Contains(decoded, `\`) {
 			return true
 		}
-		for _, segment := range strings.Split(decoded, "/") {
+		for segment := range strings.SplitSeq(decoded, "/") {
 			if segment == "." || segment == ".." {
 				return true
 			}

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -909,9 +910,7 @@ func cloneSession(session domain.Session) domain.Session {
 		copy.Terminals[index].Root = cloneNode(terminal.Root)
 		if terminal.CommandStates != nil {
 			copy.Terminals[index].CommandStates = make(map[string]domain.CommandExecutionState, len(terminal.CommandStates))
-			for commandID, state := range terminal.CommandStates {
-				copy.Terminals[index].CommandStates[commandID] = state
-			}
+			maps.Copy(copy.Terminals[index].CommandStates, terminal.CommandStates)
 		}
 	}
 	return copy

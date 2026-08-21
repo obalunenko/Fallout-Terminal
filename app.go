@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"strings"
 	"sync"
@@ -1557,8 +1558,8 @@ func (app *App) RequestTerminalActivation(payload LiveTerminalPayload) TerminalS
 	target := domain.TerminalTarget{
 		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
 		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
+		CommandStates: app.canonicalCommandStates(payload.TerminalID),
 	}
-	target.CommandStates = app.canonicalCommandStates(payload.TerminalID)
 	state, err := coordination.RequestTerminalActivation(target)
 	return app.completeTerminalSwitchRequest(state, err, "activated", "terminal could not be activated")
 }
@@ -1785,8 +1786,8 @@ func (app *App) ResetFailedHack(payload LiveTerminalPayload) CoordinationCommand
 	target := domain.TerminalTarget{
 		TerminalID: payload.TerminalID, TerminalName: payload.TerminalName,
 		Tree: payload.Tree, HackLevel: payload.HackLevel, IntroText: payload.IntroText,
+		CommandStates: app.canonicalCommandStates(payload.TerminalID),
 	}
-	target.CommandStates = app.canonicalCommandStates(payload.TerminalID)
 	state, err := coordination.ResetFailedHack(target)
 	return app.completeCoordinationCommand(state, err, "failed hacking puzzle could not be reset")
 }
@@ -1907,9 +1908,7 @@ func cloneCommandExecutionStates(states map[string]domain.CommandExecutionState)
 		return nil
 	}
 	clone := make(map[string]domain.CommandExecutionState, len(states))
-	for commandID, state := range states {
-		clone[commandID] = state
-	}
+	maps.Copy(clone, states)
 	return clone
 }
 

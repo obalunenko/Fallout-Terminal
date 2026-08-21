@@ -113,7 +113,7 @@ func generateBoardAttempt(generationID string, level, wordLength int, secretWord
 
 	patternTarget := 3 + safeIntn(random, 4)
 	pairOffset := safeIntn(random, len(patternPairs))
-	for index := 0; index < patternTarget; index++ {
+	for index := range patternTarget {
 		pair := patternPairs[(pairOffset+index)%len(patternPairs)]
 		interiorLength := 0
 		if index == 0 {
@@ -129,7 +129,7 @@ func generateBoardAttempt(generationID string, level, wordLength int, secretWord
 			return nil
 		}
 	}
-	for index := 0; index < patternTarget; index++ {
+	for index := range patternTarget {
 		primary, secondary := columnA, columnB
 		if index%2 != 0 {
 			primary, secondary = columnB, columnA
@@ -345,7 +345,7 @@ func (builder *columnBuilder) placePattern(pair string, interiorLength int) bool
 	}
 	startsPerRow := boardRowWidth - spanLength + 1
 	limit := boardRows * startsPerRow
-	for attempt := 0; attempt < placementTries; attempt++ {
+	for range placementTries {
 		candidate := safeIntn(builder.random, limit)
 		row := candidate / startsPerRow
 		column := candidate % startsPerRow
@@ -355,8 +355,8 @@ func (builder *columnBuilder) placePattern(pair string, interiorLength int) bool
 			return true
 		}
 	}
-	for row := 0; row < boardRows; row++ {
-		for column := 0; column < startsPerRow; column++ {
+	for row := range boardRows {
+		for column := range startsPerRow {
 			start := row*boardRowWidth + column
 			if builder.canPlacePattern(start, spanLength) {
 				builder.writePattern(start, pair, interiorLength)
@@ -381,7 +381,7 @@ func (builder *columnBuilder) canPlacePattern(start, length int) bool {
 
 func (builder *columnBuilder) writePattern(start int, pair string, interiorLength int) {
 	builder.chars[start] = pair[0]
-	for index := 0; index < interiorLength; index++ {
+	for index := range interiorLength {
 		builder.chars[start+1+index] = fillerPool[safeIntn(builder.random, len(fillerPool))]
 	}
 	builder.chars[start+interiorLength+1] = pair[1]
@@ -391,7 +391,7 @@ func (builder *columnBuilder) writePattern(start int, pair string, interiorLengt
 }
 
 func (builder *columnBuilder) placeDelimiterDecoy(delimiter byte) bool {
-	for attempt := 0; attempt < placementTries; attempt++ {
+	for range placementTries {
 		index := safeIntn(builder.random, len(builder.used))
 		if !builder.used[index] {
 			builder.chars[index] = delimiter
@@ -417,7 +417,7 @@ func (builder *columnBuilder) randomStart(length int) int {
 			return candidate
 		}
 	}
-	for candidate := 0; candidate < limit; candidate++ {
+	for candidate := range limit {
 		if builder.canPlace(candidate, length) {
 			return candidate
 		}
@@ -719,7 +719,7 @@ func rowIntervalsOverlapPairwise(rowSets ...map[int]struct{}) bool {
 			first = false
 		}
 	}
-	for left := 0; left < len(intervals); left++ {
+	for left := range intervals {
 		for right := left + 1; right < len(intervals); right++ {
 			if intervals[left].high < intervals[right].low || intervals[right].high < intervals[left].low {
 				return false
@@ -770,7 +770,7 @@ func containsWord(words []domain.HackWord, index int) bool {
 func countMatches(candidate, secret string) int {
 	limit := min(len(candidate), len(secret))
 	matches := 0
-	for index := 0; index < limit; index++ {
+	for index := range limit {
 		if candidate[index] == secret[index] {
 			matches++
 		}

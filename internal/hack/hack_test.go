@@ -3,7 +3,9 @@ package hack
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -171,7 +173,7 @@ func TestGeneratedBoardsAtEveryDifficultyContainThreeThroughSixValidPatterns(t *
 	seenPairs := map[string]bool{}
 	generated := 0
 	for _, level := range configuredLevels {
-		for iteration := 0; iteration < boardsPerLevel; iteration++ {
+		for iteration := range boardsPerLevel {
 			generationID := fmt.Sprintf("generation-%d-%d", level, iteration)
 			state := GenerateBoard(generationID, level, newSequenceRandom(), &recordingWordSource{})
 			if state == nil {
@@ -365,7 +367,7 @@ func TestDelimiterAndInterruptedSpanTargetsUseOrdinaryGuessRules(t *testing.T) {
 func TestApplyPatternUsesExactOutcomeBuckets(t *testing.T) {
 	dudRemovals := 0
 	restores := 0
-	for roll := 0; roll < 100; roll++ {
+	for roll := range 100 {
 		state := patternTestState()
 		state.AttemptsLeft = 1
 		beforeCandidates := len(state.WordsByID)
@@ -760,9 +762,7 @@ func cloneHackState(t *testing.T, source *domain.HackState) *domain.HackState {
 		clone.Log = append([]string{}, source.Log...)
 	}
 	clone.WordsByID = make(map[string]domain.HackCandidate, len(source.WordsByID))
-	for id, candidate := range source.WordsByID {
-		clone.WordsByID[id] = candidate
-	}
+	maps.Copy(clone.WordsByID, source.WordsByID)
 	clone.UsedPatterns = make(map[domain.HackPatternIdentity]struct{}, len(source.UsedPatterns))
 	for id := range source.UsedPatterns {
 		clone.UsedPatterns[id] = struct{}{}
@@ -807,13 +807,7 @@ func containsCandidate(hack *domain.HackState, text string) bool {
 func assertLogContains(t *testing.T, log []string, lines ...string) {
 	t.Helper()
 	for _, line := range lines {
-		found := false
-		for _, got := range log {
-			if got == line {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(log, line)
 		if !found {
 			t.Errorf("log %q does not contain %q", log, line)
 		}

@@ -57,7 +57,7 @@ func TestConnectSubscribeBeginsWithCompleteSnapshotAndSelectsCharacter(t *testin
 		FallbackName:     snapshot.GetPlayerState().GetFallbackName(),
 		Role:             playerv1.PlayerRole_PLAYER_ROLE_UNASSIGNED,
 		Phase:            playerv1.PlayerPhase_PLAYER_PHASE_SELECTING,
-		BroadcastId:      pointerTo("broadcast-1"),
+		BroadcastId:      new("broadcast-1"),
 		Roster: []*playerv1.RosterEntry{{
 			CharacterId:  "character-1",
 			DisplayName:  "Lucy",
@@ -412,6 +412,7 @@ func newConnectTestCoordinator(t *testing.T, publish ...func(control.Effect)) *c
 	return coordinator
 }
 
+//go:fix inline
 func pointerTo[T any](value T) *T {
-	return &value
+	return new(value)
 }

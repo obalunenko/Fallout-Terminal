@@ -165,8 +165,8 @@ func TestSecretAndProviderRequestTypesHaveNoFormattingSurface(t *testing.T) {
 	assert.Equal(t, []byte(nil), request.AccountToken)
 	requestType := reflect.TypeOf(request)
 	fieldNames := make([]string, 0, requestType.NumField())
-	for index := range requestType.NumField() {
-		fieldNames = append(fieldNames, requestType.Field(index).Name)
+	for field := range requestType.Fields() {
+		fieldNames = append(fieldNames, field.Name)
 	}
 	assert.Equal(t, []string{"UpstreamURL", "ReservedDomain", "AccountToken", "Timeout"}, fieldNames)
 }
