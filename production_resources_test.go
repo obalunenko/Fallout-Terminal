@@ -46,7 +46,7 @@ func TestValidateProductionResources(t *testing.T) {
 	})
 }
 
-func TestWailsV3HostKeepsMasterAndPlayerResourceBoundariesSeparate(t *testing.T) {
+func TestWailsV3HostKeepsOverseerAndClientResourceBoundariesSeparate(t *testing.T) {
 	root, err := os.Getwd()
 	require.NoError(t, err)
 
@@ -57,12 +57,12 @@ func TestWailsV3HostKeepsMasterAndPlayerResourceBoundariesSeparate(t *testing.T)
 
 	mainText := string(mainSource)
 	hostText := string(hostSource)
-	require.Contains(t, mainText, `fs.Sub(frontendSource, "frontend/dist")`)
-	require.Contains(t, mainText, `fs.Sub(playerSource, "client/dist")`)
-	require.Contains(t, mainText, "composeApplication(host, playerAssets)")
-	require.Contains(t, hostText, "application.AssetFileServerFS(frontendAssets)")
+	require.Contains(t, mainText, `fs.Sub(overseerSource, "frontend/overseer/dist")`)
+	require.Contains(t, mainText, `fs.Sub(clientSource, "frontend/client/dist")`)
+	require.Contains(t, mainText, "composeApplication(host, clientAssets)")
+	require.Contains(t, hostText, "application.AssetFileServerFS(overseerAssets)")
 	require.Contains(t, hostText, "newDesktopService(core)")
-	require.NotContains(t, hostText, "playerAssets")
+	require.NotContains(t, hostText, "clientAssets")
 	require.Equal(t, 1, strings.Count(hostText, "host.Window.NewWithOptions("))
 }
 

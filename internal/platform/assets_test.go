@@ -26,6 +26,25 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+func TestCanonicalFrontendWorkspaceLayout(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	assertNonEmptyFiles(t, root, []string{
+		"frontend/package.json",
+		"frontend/package-lock.json",
+		"frontend/client/package.json",
+		"frontend/client/index.html",
+		"frontend/client/client.js",
+		"frontend/overseer/package.json",
+		"frontend/overseer/src/index.html",
+		"frontend/overseer/src/overseer.js",
+		"frontend/overseer/src/overseer.css",
+	})
+	_, err := os.Stat(filepath.Join(root, "client"))
+	assert.True(t, errors.Is(err, os.ErrNotExist), "top-level client application must be removed")
+}
+
 func TestProtobufContractShapeAndSeparation(t *testing.T) {
 	t.Parallel()
 
@@ -276,7 +295,7 @@ func checkMessageContractShape(t *testing.T, messages protoreflect.MessageDescri
 	}
 }
 
-func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *testing.T) {
+func TestOverseerPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -286,9 +305,9 @@ func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *t
 		require.NoError(t, err)
 		return string(raw)
 	}
-	html := read("frontend/src/index.html")
-	css := read("frontend/src/master.css")
-	javascript := read("frontend/src/master.js")
+	html := read("frontend/overseer/src/index.html")
+	css := read("frontend/overseer/src/overseer.css")
+	javascript := read("frontend/overseer/src/overseer.js")
 
 	for _, fragment := range []string{
 		`id="publicAccessSection"`, `for="publicAccessDomain"`, `for="publicAccessUsername"`,
@@ -310,26 +329,26 @@ func TestMasterPublicAccessControlsAreAccessibleAndNeverExposeStoredSecrets(t *t
 	assert.Contains(t, css, ".public-access")
 	assert.Contains(t, javascript, "generatePlayerPassword")
 	assert.Contains(t, javascript, "public-access-status")
-	assert.Contains(t, read("frontend/src/desktop-api.js"), "Clipboard.SetText")
+	assert.Contains(t, read("frontend/overseer/src/desktop-api.js"), "Clipboard.SetText")
 }
 
-func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
+func TestOverseerAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
 	assertNonEmptyFiles(t, root, []string{
-		"frontend/src/index.html",
-		"frontend/src/master.css",
-		"frontend/src/master.js",
-		"frontend/src/desktop-api.js",
-		"frontend/src/Fixedsys.ttf",
+		"frontend/overseer/src/index.html",
+		"frontend/overseer/src/overseer.css",
+		"frontend/overseer/src/overseer.js",
+		"frontend/overseer/src/desktop-api.js",
+		"frontend/overseer/src/Fixedsys.ttf",
 	})
 
-	distRoot := filepath.Join(root, "frontend", "dist")
+	distRoot := filepath.Join(root, "frontend", "overseer", "dist")
 	{
 		info, err := os.Stat(filepath.Join(distRoot, ".keep"))
 		require.Falsef(t, err != nil || info.IsDir(),
-			"frontend/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
+			"frontend/overseer/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
 	}
 
 	builtFiles := make([]string, 0)
@@ -361,7 +380,7 @@ func TestMasterAssetManifestSupportsCleanCheckoutAndBuiltOutput(t *testing.T) {
 		".ttf": "Fixedsys font bundle",
 	} {
 		assert.Falsef(t, !containsExtension(builtFiles, extension),
-			"built master output is missing a %s (%s); files: %v", description, extension, builtFiles)
+			"built overseer output is missing a %s (%s); files: %v", description, extension, builtFiles)
 
 	}
 }
@@ -371,11 +390,11 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 
 	root := assetRepositoryRoot(t)
 	assertNonEmptyFiles(t, root, []string{
-		"client/index.html",
-		"client/client.css",
-		"client/client.js",
-		"client/sound.js",
-		"client/fonts/Fixedsys.ttf",
+		"frontend/client/index.html",
+		"frontend/client/client.css",
+		"frontend/client/client.js",
+		"frontend/client/sound.js",
+		"frontend/client/fonts/Fixedsys.ttf",
 	})
 
 	requiredCategories := []string{
@@ -394,7 +413,7 @@ func TestRetainedPlayerAssetAndSoundManifest(t *testing.T) {
 	for _, category := range requiredCategories {
 		category := category
 		t.Run(category, func(t *testing.T) {
-			directory := filepath.Join(root, "client", "sounds", category)
+			directory := filepath.Join(root, "frontend", "client", "sounds", category)
 			entries, err := os.ReadDir(directory)
 			require.Falsef(t, err != nil,
 				"read required sound category %q: %v", category, err)
@@ -436,7 +455,7 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 		return string(raw)
 	}
 
-	soundScript := read("client/sound.js")
+	soundScript := read("frontend/client/sound.js")
 	for _, required := range []string{
 		"let webAudioEligible = false;",
 		"const folderLoads = new Map();",
@@ -464,7 +483,7 @@ func TestPlayerHackingOutcomeAudioUsesEligibleAuthoritativeTransitions(t *testin
 
 	}
 
-	playerScript := read("client/client.js")
+	playerScript := read("frontend/client/client.js")
 	outcomeStart := strings.Index(playerScript, "function playHackOutcomeTransition(previousHack, nextHack, revision = appliedSharedRevision) {")
 	require.False(t, outcomeStart < 0,
 		"player script is missing the common authoritative hacking-outcome boundary")
@@ -553,7 +572,7 @@ func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
 		return script[startIndex : startIndex+len(start)+endIndex]
 	}
 
-	soundScript := read("client/sound.js")
+	soundScript := read("frontend/client/sound.js")
 	for _, state := range []string{"ambientRequested", "ambientPlayAttempt", "webAudioEligible", "webAudioReady"} {
 		assert.Falsef(t, !strings.Contains(soundScript, state),
 			"player sound adapter is missing explicit audio state %q", state)
@@ -597,7 +616,7 @@ func TestPlayerAmbientAudioUsesExplicitRetryableLifecycleState(t *testing.T) {
 
 	}
 
-	playerScript := read("client/client.js")
+	playerScript := read("frontend/client/client.js")
 	assert.False(t, strings.Count(playerScript, "setAmbientActive(true);") != 1,
 		"accepted terminal-live dispatch must be the sole ambient activation boundary")
 	assert.False(t, strings.Count(playerScript, "setAmbientActive(false);") < 3,
@@ -615,10 +634,10 @@ func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 
 	root := assetRepositoryRoot(t)
 	paths := []string{
-		"client/client.js",
-		"client/sound.js",
-		"frontend/src/desktop-api.js",
-		"frontend/src/master.js",
+		"frontend/client/client.js",
+		"frontend/client/sound.js",
+		"frontend/overseer/src/desktop-api.js",
+		"frontend/overseer/src/overseer.js",
 	}
 	for _, relative := range paths {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
@@ -631,7 +650,7 @@ func TestBrowserJavaScriptUsesSpacesInsteadOfTabs(t *testing.T) {
 	}
 }
 
-func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
+func TestOverseerTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -644,7 +663,7 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 		return string(raw)
 	}
 
-	facade := read("frontend/src/desktop-api.js")
+	facade := read("frontend/overseer/src/desktop-api.js")
 	app := read("app.go")
 	for _, required := range []string{
 		"requestTerminalActivation: desktopService.RequestTerminalActivation",
@@ -653,12 +672,12 @@ func TestMasterTerminalCommandsCannotBypassCoordinator(t *testing.T) {
 		"forceHackSuccess: desktopService.ForceHackSuccess",
 	} {
 		assert.Falsef(t, !strings.Contains(facade, required),
-			"master desktop facade is missing coordinator-owned command %q", required)
+			"overseer desktop facade is missing coordinator-owned command %q", required)
 
 	}
 	for _, forbidden := range []string{"SetLiveTerminal", "ClearLiveTerminal", "setLiveTerminal", "clearLiveTerminal"} {
 		assert.Falsef(t, strings.Contains(facade, forbidden),
-			"master desktop facade exposes legacy terminal command %q", forbidden)
+			"overseer desktop facade exposes legacy terminal command %q", forbidden)
 
 	}
 	for _, required := range []string{
@@ -694,7 +713,7 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 		return string(raw)
 	}
 
-	html := read("client/index.html")
+	html := read("frontend/client/index.html")
 	for _, fragment := range []string{
 		`class="term-body" id="termBody"`,
 		`class="term-idle" id="termIdle"`,
@@ -706,7 +725,7 @@ func TestPlayerHiddenStatesStayOutOfInactiveLayout(t *testing.T) {
 
 	}
 
-	css := read("client/client.css")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
 		".term-body{flex:11auto;display:flex;flex-direction:column;min-height:0;overflow:hidden;}",
@@ -737,10 +756,10 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 		return string(raw)
 	}
 
-	html := read("client/index.html")
+	html := read("frontend/client/index.html")
 	for _, fragment := range []string{
-		`class="player-identity" id="playerIdentity" hidden`,
-		`class="role-badge" id="roleBadge"`,
+		`class="player-status-line" id="playerIdentity" hidden`,
+		`class="player-status-role" id="roleBadge"`,
 		`class="character-select" id="characterSelect" hidden`,
 		`class="assigned-waiting" id="assignedWaiting" hidden`,
 		`class="player-notice" id="playerNotice"`,
@@ -755,7 +774,7 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 
 	}
 
-	css := read("client/client.css")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
 		".character-select{height:100%;min-height:0;display:flex;",
@@ -774,7 +793,7 @@ func TestPlayerSessionSelectionAssetContract(t *testing.T) {
 
 	}
 
-	js := read("client/client.js")
+	js := read("frontend/client/client.js")
 	for _, fragment := range []string{
 		"const PLAYER_TOKEN_KEY = 'fallout-terminal.player-token'",
 		"localStorage.getItem(PLAYER_TOKEN_KEY)",
@@ -814,7 +833,7 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 		return string(raw)
 	}
 
-	html := read("client/index.html")
+	html := read("frontend/client/index.html")
 	assert.False(t, !strings.Contains(html, `content="width=device-width, initial-scale=1.0"`),
 		"player viewport must follow the browser width at the default zoom")
 	assert.False(t, strings.Contains(html, "maximum-scale"),
@@ -835,7 +854,7 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 
 	}
 
-	css := read("client/client.css")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
 		"--terminal-scale:clamp(8px,min(1.5625vw,2.6667vh),24px);",
@@ -864,7 +883,7 @@ func TestPlayerDesktopResponsiveLayoutContract(t *testing.T) {
 
 	}
 
-	js := read("client/client.js")
+	js := read("frontend/client/client.js")
 	for _, fragment := range []string{
 		"function paginateText(container, text)",
 		"function naturalPageBreak(text, start, fittedEnd)",
@@ -908,7 +927,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 		return string(raw)
 	}
 
-	html := read("client/index.html")
+	html := read("frontend/client/index.html")
 	for _, fragment := range []string{
 		`class="term-header" id="hackHeader" hidden`,
 		`class="hack-board" id="hackBoard" hidden`,
@@ -922,7 +941,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	}
 
-	css := read("client/client.css")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
 		"--font-body:var(--terminal-scale);",
@@ -944,7 +963,7 @@ func TestPlayerHackingSingleScreenContract(t *testing.T) {
 
 	}
 
-	js := read("client/client.js")
+	js := read("frontend/client/client.js")
 	start := strings.Index(js, "function renderHackScreen()")
 	end := strings.Index(js, "function hackRevealIdentity")
 	require.False(t, start < 0 || end <= start,
@@ -974,7 +993,7 @@ func TestPlayerHackingCheatPathsAreRemoved(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	playerScript, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1000,7 +1019,7 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	playerScript, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	playerScript, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1039,7 +1058,7 @@ func TestPlayerSharedActionPathsAreRoleAndPendingGated(t *testing.T) {
 
 	}
 
-	stylesheet, err := os.ReadFile(filepath.Join(root, "client", "client.css"))
+	stylesheet, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.css"))
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1084,7 +1103,7 @@ func TestPlayerHackingPatternInteractionContract(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -1133,7 +1152,7 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 		return string(raw)
 	}
 
-	playerScript := read("client/client.js")
+	playerScript := read("frontend/client/client.js")
 	for _, required := range []string{
 		"const pattern = patternAtCell(cell)",
 		"pattern.row === row && pattern.start === offset",
@@ -1164,7 +1183,7 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 
 	}
 
-	stylesheet := read("client/client.css")
+	stylesheet := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(stylesheet)
 	for _, required := range []string{
 		".hcell{cursor:pointer;}",
@@ -1182,7 +1201,7 @@ func TestPlayerHackingCamouflageAndDelimiterContract(t *testing.T) {
 	}
 }
 
-func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
+func TestOverseerRetainsExclusiveHackSolveControl(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -1194,11 +1213,11 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		}
 		return string(raw)
 	}
-	masterHTML := read("frontend", "src", "index.html")
-	masterJS := read("frontend", "src", "master.js")
-	desktopAPI := read("frontend", "src", "desktop-api.js")
-	playerJS := read("client", "client.js")
-	playerHTML := read("client", "index.html")
+	overseerHTML := read("frontend", "overseer", "src", "index.html")
+	overseerJS := read("frontend", "overseer", "src", "overseer.js")
+	desktopAPI := read("frontend", "overseer", "src", "desktop-api.js")
+	playerJS := read("frontend", "client", "client.js")
+	playerHTML := read("frontend", "client", "index.html")
 	playerProtocol := read("internal", "player", "handler.go")
 	appBoundary := read("app.go")
 	for _, required := range []string{
@@ -1208,8 +1227,8 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		"forceHackSuccess: desktopService.ForceHackSuccess",
 		"func (app *App) ForceHackSuccess() CommandResult",
 	} {
-		assert.Falsef(t, !strings.Contains(masterHTML+masterJS+desktopAPI+appBoundary, required),
-			"game-master bundle is missing solve-control contract %q", required)
+		assert.Falsef(t, !strings.Contains(overseerHTML+overseerJS+desktopAPI+appBoundary, required),
+			"overseer bundle is missing solve-control contract %q", required)
 
 	}
 	playerSurface := playerJS + playerHTML + playerProtocol
@@ -1222,12 +1241,12 @@ func TestGameMasterRetainsExclusiveHackSolveControl(t *testing.T) {
 		"location.search",
 	} {
 		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
-			"player surface gained game-master solve authority %q", forbidden)
+			"player surface gained overseer solve authority %q", forbidden)
 
 	}
 }
 
-func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
+func TestOverseerRetainsExclusiveFailedHackResetControl(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -1239,10 +1258,10 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		}
 		return string(raw)
 	}
-	masterHTML := read("frontend/src/index.html")
-	masterCSS := read("frontend/src/master.css")
-	masterJS := read("frontend/src/master.js")
-	desktopAPI := read("frontend/src/desktop-api.js")
+	overseerHTML := read("frontend/overseer/src/index.html")
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	overseerJS := read("frontend/overseer/src/overseer.js")
+	desktopAPI := read("frontend/overseer/src/desktop-api.js")
 	appBoundary := read("app.go")
 	contract := read("specs/004-player-sessions-control/contracts/desktop-coordination.md")
 	for _, required := range []string{
@@ -1253,12 +1272,12 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 		`func (app *App) ResetFailedHack(`,
 		`ResetFailedHack`,
 	} {
-		assert.Falsef(t, !strings.Contains(masterHTML+masterCSS+masterJS+desktopAPI+appBoundary+contract, required),
-			"game-master bundle is missing failed-hack reset contract %q", required)
+		assert.Falsef(t, !strings.Contains(overseerHTML+overseerCSS+overseerJS+desktopAPI+appBoundary+contract, required),
+			"overseer bundle is missing failed-hack reset contract %q", required)
 
 	}
 	playerSurface := strings.Join([]string{
-		read("client/index.html"), read("client/client.css"), read("client/client.js"),
+		read("frontend/client/index.html"), read("frontend/client/client.css"), read("frontend/client/client.js"),
 		read("internal/player/handler.go"), read("internal/player/server.go"),
 	}, "\n")
 	for _, forbidden := range []string{"ResetFailedHack", "resetFailedHack", "btnResetFailedHack", "HACK_RESET", "URLSearchParams", "location.search"} {
@@ -1268,7 +1287,7 @@ func TestGameMasterRetainsExclusiveFailedHackResetControl(t *testing.T) {
 	}
 }
 
-func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing.T) {
+func TestOverseerTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -1295,8 +1314,8 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		return document[start : markerAt+endOffset+1]
 	}
 
-	masterHTML := read("frontend/src/index.html")
-	dialogTag := openingTag(masterHTML, "terminalSwitchDialog")
+	overseerHTML := read("frontend/overseer/src/index.html")
+	dialogTag := openingTag(overseerHTML, "terminalSwitchDialog")
 	for _, fragment := range []string{
 		"<dialog",
 		`id="terminalSwitchDialog"`,
@@ -1315,12 +1334,12 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		`id="terminalSwitchStatus" role="status" aria-live="polite"`,
 		`id="terminalSwitchError" role="alert" aria-live="assertive"`,
 	} {
-		assert.Falsef(t, !strings.Contains(masterHTML, fragment),
+		assert.Falsef(t, !strings.Contains(overseerHTML, fragment),
 			"terminal-switch dialog is missing accessible feedback contract %q", fragment)
 
 	}
 	{
-		errorTag := openingTag(masterHTML, "terminalSwitchError")
+		errorTag := openingTag(overseerHTML, "terminalSwitchError")
 		assert.Falsef(t, !strings.Contains(errorTag, "hidden"),
 			"terminal-switch error must be hidden until populated; got %q", errorTag)
 	}
@@ -1330,7 +1349,7 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		"btnDiscardTerminalSwitch":  "discard",
 		"btnCancelTerminalSwitch":   "cancel",
 	} {
-		tag := openingTag(masterHTML, id)
+		tag := openingTag(overseerHTML, id)
 		for _, fragment := range []string{
 			"<button",
 			`type="button"`,
@@ -1341,29 +1360,29 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 
 		}
 	}
-	discardTag := openingTag(masterHTML, "btnDiscardTerminalSwitch")
+	discardTag := openingTag(overseerHTML, "btnDiscardTerminalSwitch")
 	for _, className := range []string{"btn-danger", "terminal-switch-discard"} {
 		assert.Falsef(t, !strings.Contains(discardTag, className),
 			"discard must carry destructive emphasis class %q; got %q", className, discardTag)
 
 	}
 
-	masterCSS := read("frontend/src/master.css")
-	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(overseerCSS)
 	for _, fragment := range []string{
 		".terminal-switch-dialog{",
 		".terminal-switch-dialog[hidden]{display:none;}",
 		".terminal-switch-discard{",
 	} {
 		assert.Falsef(t, !strings.Contains(compactCSS, fragment),
-			"master stylesheet is missing terminal-switch visibility/destructive contract %q", fragment)
+			"overseer stylesheet is missing terminal-switch visibility/destructive contract %q", fragment)
 
 	}
 
 	playerSurface := strings.Join([]string{
-		read("client/index.html"),
-		read("client/client.css"),
-		read("client/client.js"),
+		read("frontend/client/index.html"),
+		read("frontend/client/client.css"),
+		read("frontend/client/client.js"),
 		read("internal/player/handler.go"),
 	}, "\n")
 	for _, forbidden := range []string{
@@ -1379,12 +1398,12 @@ func TestGameMasterTerminalSwitchDecisionDialogIsAccessibleAndPrivate(t *testing
 		"forceHackSuccess",
 	} {
 		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
-			"player surface exposes game-master switch/private-puzzle capability %q", forbidden)
+			"player surface exposes overseer switch/private-puzzle capability %q", forbidden)
 
 	}
 }
 
-func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testing.T) {
+func TestOverseerEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -1411,10 +1430,10 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 		return document[start : markerAt+endOffset+1]
 	}
 
-	masterHTML := read("frontend/src/index.html")
-	masterJS := read("frontend/src/master.js")
-	masterCSS := read("frontend/src/master.css")
-	dialogTag := openingTag(masterHTML, "endBroadcastDialog")
+	overseerHTML := read("frontend/overseer/src/index.html")
+	overseerJS := read("frontend/overseer/src/overseer.js")
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	dialogTag := openingTag(overseerHTML, "endBroadcastDialog")
 	for _, fragment := range []string{
 		"<dialog",
 		`id="endBroadcastDialog"`,
@@ -1428,13 +1447,13 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 
 	}
 	for _, id := range []string{"endBroadcastDialogTitle", "endBroadcastDialogDescription", "btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
-		assert.Falsef(t, !strings.Contains(masterHTML, `id="`+id+`"`),
+		assert.Falsef(t, !strings.Contains(overseerHTML, `id="`+id+`"`),
 			"end-broadcast dialog is missing %q", id)
 
 	}
 	for _, id := range []string{"btnCancelEndBroadcast", "btnConfirmEndBroadcast"} {
 		{
-			tag := openingTag(masterHTML, id)
+			tag := openingTag(overseerHTML, id)
 			assert.Falsef(t, !strings.Contains(tag, `type="button"`),
 				"end-broadcast control %q must be an explicit button; got %q", id, tag)
 		}
@@ -1446,17 +1465,121 @@ func TestGameMasterEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm(t *testi
 		"!result.state || result.state.broadcast",
 		"btnConfirmEndBroadcast.disabled = true",
 	} {
-		assert.Falsef(t, !strings.Contains(masterJS, fragment),
-			"master script is missing end-broadcast contract %q", fragment)
+		assert.Falsef(t, !strings.Contains(overseerJS, fragment),
+			"overseer script is missing end-broadcast contract %q", fragment)
 
 	}
-	assert.False(t, strings.Contains(masterJS, "window.confirm('Завершить текущую трансляцию"),
+	assert.False(t, strings.Contains(overseerJS, "window.confirm('Завершить текущую трансляцию"),
 		"end-broadcast action still depends on the native window.confirm gate")
 
-	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(overseerCSS)
 	assert.False(t, !strings.Contains(compactCSS, ".end-broadcast-actions{"),
-		"master stylesheet is missing end-broadcast confirmation layout")
+		"overseer stylesheet is missing end-broadcast confirmation layout")
 
+}
+
+func TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs(t *testing.T) {
+	t.Parallel()
+
+	root := assetRepositoryRoot(t)
+	read := func(path string) string {
+		t.Helper()
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+		require.NoError(t, err)
+		return string(raw)
+	}
+	openingTag := func(document, id string) string {
+		t.Helper()
+		marker := `id="` + id + `"`
+		markerAt := strings.Index(document, marker)
+		if markerAt < 0 {
+			return ""
+		}
+		start := strings.LastIndex(document[:markerAt], "<")
+		endOffset := strings.Index(document[markerAt:], ">")
+		if start < 0 || endOffset < 0 {
+			return ""
+		}
+		return document[start : markerAt+endOffset+1]
+	}
+
+	overseerHTML := read("frontend/overseer/src/index.html")
+	overseerJS := read("frontend/overseer/src/overseer.js")
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	overseerSurface := strings.Join([]string{overseerHTML, overseerJS, overseerCSS}, "\n")
+
+	for _, required := range []string{
+		"+ СОЗДАТЬ ТЕРМИНАЛ",
+		"СДЕЛАТЬ АКТИВНЫМ",
+		"ОПУБЛИКОВАТЬ ИЗМЕНЕНИЯ",
+		"СНЯТЬ С ЭФИРА",
+		"ПЕРЕПРИМЕНИТЬ НАСТРОЙКИ",
+		"В ЭФИРЕ",
+		`id="terminalSettingsMenu"`,
+		`id="btnReapplySettings"`,
+		`id="createTerminalDialog"`,
+		`id="takeOffAirDialog"`,
+		"Игроки перестанут видеть активный терминал.",
+		"Трансляция, подключения, роли, назначения и сохранённый терминал останутся без изменений.",
+	} {
+		assert.Contains(t, overseerSurface, required,
+			"Overseer terminal-action surface is missing %q", required)
+	}
+	for _, superseded := range []string{
+		"+ НОВЫЙ ТЕРМИНАЛ",
+		"ОБНОВИТЬ АКТИВНЫЙ",
+		"ОБНОВИТЬ У ИГРОКОВ",
+		"УБРАТЬ АКТИВНЫЙ ТЕРМИНАЛ",
+	} {
+		assert.NotContains(t, overseerSurface, superseded,
+			"Overseer terminal-action surface retains superseded label %q", superseded)
+	}
+
+	for id, labelledBy := range map[string]string{
+		"createTerminalDialog": "createTerminalDialogTitle",
+		"takeOffAirDialog":     "takeOffAirDialogTitle",
+	} {
+		tag := openingTag(overseerHTML, id)
+		assert.Contains(t, tag, "<dialog")
+		assert.Contains(t, tag, `aria-modal="true"`)
+		assert.Contains(t, tag, `aria-labelledby="`+labelledBy+`"`)
+		assert.Contains(t, tag, "hidden")
+	}
+	for _, id := range []string{
+		"createTerminalName",
+		"createTerminalError",
+		"btnCancelCreateTerminal",
+		"btnConfirmCreateTerminal",
+		"takeOffAirError",
+		"btnCancelTakeOffAir",
+		"btnConfirmTakeOffAir",
+	} {
+		assert.Contains(t, overseerHTML, `id="`+id+`"`,
+			"Overseer terminal-action dialog is missing %q", id)
+	}
+	for _, id := range []string{"createTerminalError", "takeOffAirError"} {
+		tag := openingTag(overseerHTML, id)
+		assert.Contains(t, tag, `role="alert"`)
+		assert.Contains(t, tag, `aria-live="assertive"`)
+		assert.Contains(t, tag, "hidden")
+	}
+
+	playerSurface := strings.Join([]string{
+		read("frontend/client/index.html"),
+		read("frontend/client/client.css"),
+		read("frontend/client/client.js"),
+	}, "\n")
+	for _, privateControl := range []string{
+		"btnReapplySettings",
+		"createTerminalDialog",
+		"takeOffAirDialog",
+		"RequestTerminalActivation",
+		"RequestTerminalClear",
+		"UpdateLiveTerminal",
+	} {
+		assert.NotContains(t, playerSurface, privateControl,
+			"player surface exposes private Overseer action %q", privateControl)
+	}
 }
 
 func TestPlayerHackingColumnFontFitContract(t *testing.T) {
@@ -1472,7 +1595,7 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 		return string(raw)
 	}
 
-	css := read("client/client.css")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 	for _, fragment := range []string{
 		"--font-hack:var(--terminal-scale);",
@@ -1486,7 +1609,7 @@ func TestPlayerHackingColumnFontFitContract(t *testing.T) {
 	assert.False(t, !strings.Contains(css, "'Fixedsys', 'Consolas', monospace"),
 		"hacking-row fit must retain the production fallback font stack for metric remeasurement")
 
-	js := read("client/client.js")
+	js := read("frontend/client/client.js")
 	for _, fragment := range []string{
 		"function hackRowsFitColumns(board = hackBoard)",
 		"const tolerance = 0.5",
@@ -1525,8 +1648,8 @@ func TestPlayerCRTVisualShellAssetContract(t *testing.T) {
 		return string(raw)
 	}
 
-	html := read("client/index.html")
-	css := read("client/client.css")
+	html := read("frontend/client/index.html")
+	css := read("frontend/client/client.css")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 
 	for _, fragment := range []string{
@@ -1573,8 +1696,8 @@ func TestPlayerCRTMotionAndRevealAssetContract(t *testing.T) {
 		return string(raw)
 	}
 
-	css := read("client/client.css")
-	js := read("client/client.js")
+	css := read("frontend/client/client.css")
+	js := read("frontend/client/client.js")
 	compactCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(css)
 
 	for _, fragment := range []string{
@@ -1609,7 +1732,7 @@ func TestPlayerCRTHackingRevealAssetContract(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	require.NoError(t, err)
 	js := string(raw)
 
@@ -1637,7 +1760,7 @@ func TestPlayerCRTHackingRevealFontStabilityAssetContract(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	require.NoError(t, err)
 	js := string(raw)
 
@@ -1666,7 +1789,7 @@ func TestPlayerCRTDudReconciliationAssetContract(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	require.NoError(t, err)
 	js := string(raw)
 
@@ -1696,7 +1819,7 @@ func TestPlayerCRTRevealSkipAssetContract(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "client", "client.js"))
+	raw, err := os.ReadFile(filepath.Join(root, "frontend", "client", "client.js"))
 	require.NoError(t, err)
 	js := string(raw)
 
@@ -1733,16 +1856,16 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	adapter, err := os.ReadFile(filepath.Join(root, "frontend", "src", "desktop-api.js"))
+	adapter, err := os.ReadFile(filepath.Join(root, "frontend", "overseer", "src", "desktop-api.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
-	master, err := os.ReadFile(filepath.Join(root, "frontend", "src", "master.js"))
+	overseer, err := os.ReadFile(filepath.Join(root, "frontend", "overseer", "src", "overseer.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
 
-	activeSource := string(adapter) + "\n" + string(master)
+	activeSource := string(adapter) + "\n" + string(overseer)
 	assert.False(t, strings.Contains(activeSource, "window.electronAPI") || strings.Contains(activeSource, "'electronAPI'") || strings.Contains(activeSource, `"electronAPI"`),
 		"active production frontend still defines or consumes the transitional Electron-specific bridge global")
 
@@ -1755,21 +1878,21 @@ func TestActiveFrontendUsesRuntimeNeutralDesktopFacade(t *testing.T) {
 
 	}
 	adapterSource := string(adapter)
-	masterSource := string(master)
+	overseerSource := string(overseer)
 	for _, forbidden := range []string{"window.go", "window.runtime", "frontend/wailsjs", "../wailsjs", "CopyDemo", "copyDemo"} {
 		assert.NotContains(t, activeSource, forbidden,
 			"active production frontend exposes legacy/global or unauthored capability %q", forbidden)
 	}
 	assert.Contains(t, adapterSource, "import * as desktopService from '../bindings/")
 	assert.Contains(t, adapterSource, "import { Clipboard, Events } from '@wailsio/runtime'")
-	assert.NotContains(t, masterSource, "@wailsio/runtime")
-	assert.NotContains(t, masterSource, "desktopService.")
-	assert.Contains(t, masterSource, "const desktopAPI = window.desktopAPI")
+	assert.NotContains(t, overseerSource, "@wailsio/runtime")
+	assert.NotContains(t, overseerSource, "desktopService.")
+	assert.Contains(t, overseerSource, "const desktopAPI = window.desktopAPI")
 	for _, presentation := range []string{"ready-local", "ready-public", "warning", "failed", "startupError", "tunnelError"} {
-		assert.Contains(t, masterSource, presentation,
-			"master startup presentation is missing existing-status projection %q", presentation)
+		assert.Contains(t, overseerSource, presentation,
+			"overseer startup presentation is missing existing-status projection %q", presentation)
 	}
-	assert.NotContains(t, masterSource, "status.phase")
+	assert.NotContains(t, overseerSource, "status.phase")
 }
 
 func TestPackagedCompositionIgnoresExactDevelopmentPublicAccessEnvironment(t *testing.T) {
@@ -1830,7 +1953,7 @@ func TestBundledDemoManifestIsValidAndResolvesFromResources(t *testing.T) {
 
 }
 
-func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
+func TestProductionEmbedsOverseerAndPlayerAsSeparateFilesystems(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
@@ -1840,31 +1963,31 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	}
 	source := string(raw)
 	requiredFragments := []string{
-		"//go:embed all:frontend/dist\nvar frontendSource embed.FS",
-		"//go:embed all:client/dist\nvar playerSource embed.FS",
-		`fs.Sub(frontendSource, "frontend/dist")`,
-		`fs.Sub(playerSource, "client/dist")`,
-		"composeApplication(host, playerAssets)",
+		"//go:embed all:frontend/overseer/dist\nvar overseerSource embed.FS",
+		"//go:embed all:frontend/client/dist\nvar clientSource embed.FS",
+		`fs.Sub(overseerSource, "frontend/overseer/dist")`,
+		`fs.Sub(clientSource, "frontend/client/dist")`,
+		"composeApplication(host, clientAssets)",
 	}
 	for _, fragment := range requiredFragments {
 		assert.Falsef(t, !strings.Contains(source, fragment),
 			"main.go is missing production asset wiring %q", fragment)
 
 	}
-	assert.True(t, regexp.MustCompile(`Assets:\s+playerAssets`).MatchString(source),
+	assert.True(t, regexp.MustCompile(`Assets:\s+clientAssets`).MatchString(source),
 		"main.go is missing production player asset wiring")
-	assert.False(t, strings.Contains(source, "//go:embed all:frontend/dist all:client/dist") ||
-		strings.Contains(source, "//go:embed all:client/dist all:frontend/dist"),
-		"master and remote-player assets share one embed directive; their serving boundaries must remain separate")
+	assert.False(t, strings.Contains(source, "//go:embed all:frontend/overseer/dist all:frontend/client/dist") ||
+		strings.Contains(source, "//go:embed all:frontend/client/dist all:frontend/overseer/dist"),
+		"overseer and remote-player assets share one embed directive; their serving boundaries must remain separate")
 
 	hostRaw, err := os.ReadFile(filepath.Join(root, "wails_host.go"))
 	require.NoError(t, err)
 	hostSource := string(hostRaw)
 	for _, fragment := range []string{
-		"application.New(wailsApplicationOptions(frontendAssets))",
-		"Handler: application.AssetFileServerFS(frontendAssets)",
+		"application.New(wailsApplicationOptions(overseerAssets))",
+		"Handler: application.AssetFileServerFS(overseerAssets)",
 		"ApplicationShouldTerminateAfterLastWindowClosed: true",
-		"host.Window.NewWithOptions(masterWindowOptions())",
+		"host.Window.NewWithOptions(overseerWindowOptions())",
 		"host.RegisterService(application.NewService(newWailsLifecycleService(core)))",
 		"host.RegisterService(application.NewService(newDesktopService(core)))",
 	} {
@@ -1874,12 +1997,12 @@ func TestProductionEmbedsMasterAndPlayerAsSeparateFilesystems(t *testing.T) {
 	assert.NotContains(t, hostSource, "PlayerService")
 	assert.Equal(t, 1, strings.Count(hostSource, "host.Window.NewWithOptions("))
 
-	viteConfig, err := os.ReadFile(filepath.Join(root, "frontend", "vite.config.js"))
+	viteConfig, err := os.ReadFile(filepath.Join(root, "frontend", "overseer", "vite.config.js"))
 	if err != nil {
 		require.NoError(t, err)
 	}
 	assert.False(t, !strings.Contains(string(viteConfig), `./dist/.keep`),
-		"Vite build does not restore frontend/dist/.keep after emptyOutDir")
+		"Vite build does not restore frontend/overseer/dist/.keep after emptyOutDir")
 
 }
 
@@ -1887,10 +2010,10 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 	t.Parallel()
 
 	root := assetRepositoryRoot(t)
-	dist := filepath.Join(root, "client", "dist")
+	dist := filepath.Join(root, "frontend", "client", "dist")
 	entries, err := os.ReadDir(dist)
 	require.Falsef(t, err != nil,
-		"client/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
+		"frontend/client/dist/.keep must preserve the go:embed root on a clean checkout: %v", err)
 
 	if len(entries) == 1 && entries[0].Name() == ".keep" {
 		return
@@ -1942,7 +2065,7 @@ func TestPackagedPlayerBuildIsCompleteAndOffline(t *testing.T) {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	assert.False(t, !strings.Contains(string(mainSource), "//go:embed all:client/dist") || !strings.Contains(string(mainSource), `fs.Sub(playerSource, "client/dist")`),
+	assert.False(t, !strings.Contains(string(mainSource), "//go:embed all:frontend/client/dist") || !strings.Contains(string(mainSource), `fs.Sub(clientSource, "frontend/client/dist")`),
 		"production does not embed only the complete built player application")
 
 }
@@ -2024,12 +2147,12 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		return string(raw)
 	}
 
-	masterHTML := read("frontend/src/index.html")
-	masterJS := read("frontend/src/master.js")
-	masterCSS := read("frontend/src/master.css")
-	playerHTML := read("client/index.html")
-	playerJS := read("client/client.js")
-	playerCSS := read("client/client.css")
+	overseerHTML := read("frontend/overseer/src/index.html")
+	overseerJS := read("frontend/overseer/src/overseer.js")
+	overseerCSS := read("frontend/overseer/src/overseer.css")
+	playerHTML := read("frontend/client/index.html")
+	playerJS := read("frontend/client/client.js")
+	playerCSS := read("frontend/client/client.css")
 	playerHTTP := read("internal/player/http.go")
 	playerProtocol := read("internal/player/handler.go")
 
@@ -2040,8 +2163,8 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`base-uri 'none'`,
 		`form-action 'none'`,
 	} {
-		assert.Falsef(t, !strings.Contains(masterHTML, directive),
-			"master CSP is missing restrictive directive %q", directive)
+		assert.Falsef(t, !strings.Contains(overseerHTML, directive),
+			"overseer CSP is missing restrictive directive %q", directive)
 
 	}
 	for _, fragment := range []string{
@@ -2063,14 +2186,14 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`row.querySelector('.session-character-name').textContent = assigned`,
 		`row.querySelector('.session-fallback-label').textContent = `,
 	} {
-		assert.Falsef(t, !strings.Contains(masterJS, fragment),
-			"master asset is missing text-only name rendering %q", fragment)
+		assert.Falsef(t, !strings.Contains(overseerJS, fragment),
+			"overseer asset is missing text-only name rendering %q", fragment)
 
 	}
 	for _, fragment := range []string{
 		`option.textContent = entry.name`,
-		`playerCharacterName.textContent = playerState.character.name`,
-		`playerFallbackName.textContent = playerState.fallbackName`,
+		`playerCharacterName.textContent = characterName`,
+		`playerFallbackName.textContent = compactPlayerInputLabel(playerState.fallbackName || '')`,
 	} {
 		assert.Falsef(t, !strings.Contains(playerJS, fragment),
 			"player asset is missing text-only name rendering %q", fragment)
@@ -2082,15 +2205,15 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"innerHTML = entry.name",
 		"innerHTML = playerState.fallbackName",
 	} {
-		assert.Falsef(t, strings.Contains(masterJS, forbidden) || strings.Contains(playerJS, forbidden),
+		assert.Falsef(t, strings.Contains(overseerJS, forbidden) || strings.Contains(playerJS, forbidden),
 			"coordination assets interpolate an unescaped name through %q", forbidden)
 
 	}
 
-	masterSurface := masterHTML + "\n" + masterJS + "\n" + masterCSS
+	overseerSurface := overseerHTML + "\n" + overseerJS + "\n" + overseerCSS
 	for _, forbidden := range []string{"browserToken", "PLAYER_TOKEN_KEY", "fallout-terminal.player-token"} {
-		assert.Falsef(t, strings.Contains(masterSurface, forbidden),
-			"master assets expose player resume-token detail %q", forbidden)
+		assert.Falsef(t, strings.Contains(overseerSurface, forbidden),
+			"overseer assets expose player resume-token detail %q", forbidden)
 
 	}
 	for _, fragment := range []string{
@@ -2149,15 +2272,15 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"desktopAPI.resolveTerminalSwitch({ switchId: pendingTerminalSwitch, decision })",
 		"if (!pendingTerminalSwitch || coordinationCommandPending) return",
 	} {
-		assert.Falsef(t, !strings.Contains(masterJS, fragment),
-			"master asset is missing terminal-switch resolution contract %q", fragment)
+		assert.Falsef(t, !strings.Contains(overseerJS, fragment),
+			"overseer asset is missing terminal-switch resolution contract %q", fragment)
 
 	}
-	startBroadcast := strings.Index(masterJS, "btnStartBroadcast.addEventListener")
-	require.NotEqual(t, -1, startBroadcast, "master asset is missing the start-broadcast handler")
-	endBroadcast := strings.Index(masterJS[startBroadcast:], "btnEndBroadcast.addEventListener")
-	require.NotEqual(t, -1, endBroadcast, "master asset is missing the end-broadcast handler")
-	startBroadcastHandler := masterJS[startBroadcast : startBroadcast+endBroadcast]
+	startBroadcast := strings.Index(overseerJS, "btnStartBroadcast.addEventListener")
+	require.NotEqual(t, -1, startBroadcast, "overseer asset is missing the start-broadcast handler")
+	endBroadcast := strings.Index(overseerJS[startBroadcast:], "btnEndBroadcast.addEventListener")
+	require.NotEqual(t, -1, endBroadcast, "overseer asset is missing the end-broadcast handler")
+	startBroadcastHandler := overseerJS[startBroadcast : startBroadcast+endBroadcast]
 	assert.Contains(t, startBroadcastHandler, "renderTreeHeader()",
 		"start-broadcast success must refresh terminal controls after authoritative broadcast state changes")
 	for _, fragment := range []string{
@@ -2166,21 +2289,21 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		`id="btnNewPlayerConfig"`,
 		`id="playerConfigError"`,
 	} {
-		assert.Falsef(t, !strings.Contains(masterHTML, fragment),
-			"master asset is missing player-config recovery control %q", fragment)
+		assert.Falsef(t, !strings.Contains(overseerHTML, fragment),
+			"overseer asset is missing player-config recovery control %q", fragment)
 
 	}
 	for _, fragment := range []string{
 		`.player-management-dialog[aria-readonly="true"] .player-management-mode`,
 		`.player-config-error[hidden]`,
 	} {
-		assert.Falsef(t, !strings.Contains(masterCSS, fragment),
-			"master stylesheet is missing player-config gating contract %q", fragment)
+		assert.Falsef(t, !strings.Contains(overseerCSS, fragment),
+			"overseer stylesheet is missing player-config gating contract %q", fragment)
 
 	}
 
 	compactPlayerCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(playerCSS)
-	compactMasterCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(masterCSS)
+	compactOverseerCSS := strings.NewReplacer(" ", "", "\t", "", "\r", "", "\n", "").Replace(overseerCSS)
 	for _, fragment := range []string{
 		"--terminal-scale:clamp(",
 		".screen{position:relative;width:100%;max-width:1500px;height:100%;",
@@ -2197,8 +2320,8 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"@media(max-width:620px),(max-height:560px){",
 		".terminal-switch-dialog{width:calc(100vw-20px);max-height:calc(100dvh-20px);",
 	} {
-		assert.Falsef(t, !strings.Contains(compactMasterCSS, fragment),
-			"master stylesheet is missing responsive layout boundary %q", fragment)
+		assert.Falsef(t, !strings.Contains(compactOverseerCSS, fragment),
+			"overseer stylesheet is missing responsive layout boundary %q", fragment)
 
 	}
 
@@ -2212,7 +2335,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 		"ResolveTerminalSwitch",
 	} {
 		assert.Falsef(t, strings.Contains(playerSurface, forbidden),
-			"player surface exposes private game-master capability %q", forbidden)
+			"player surface exposes private overseer capability %q", forbidden)
 
 	}
 }
@@ -2220,7 +2343,7 @@ func TestPlayerSessionsControlCrossCuttingAssetContract(t *testing.T) {
 func TestPlayerBundleImportsOnlyPublicGeneratedContractsAndNoGenericPrivateCarriers(t *testing.T) {
 	t.Parallel()
 	root := assetRepositoryRoot(t)
-	for _, relative := range []string{"client/client.js", "client/sound.js", "client/index.html"} {
+	for _, relative := range []string{"frontend/client/client.js", "frontend/client/sound.js", "frontend/client/index.html"} {
 		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 		if err != nil {
 			require.NoError(t, err)
@@ -2243,7 +2366,7 @@ func TestOneProtocolCutoverHasNoActiveLegacyPlayerSurface(t *testing.T) {
 
 	root := assetRepositoryRoot(t)
 	paths := []string{
-		"client/client.js", "client/sound.js", "client/index.html",
+		"frontend/client/client.js", "frontend/client/sound.js", "frontend/client/index.html",
 		"internal/player", "internal/testutil/testdata", "tests/browser/fixture-server",
 		"README.md", "docs",
 	}

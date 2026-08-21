@@ -1,0 +1,547 @@
+{
+  "workflow": "companion",
+  "specName": "overseer action clarity",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T16:01:42.343Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T16:03:20.010Z"
+    },
+    {
+      "step": "clarify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:11:55.299Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T16:14:39.417Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:15:55.889Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:17:20.834Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T16:17:31.045Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T16:24:05.083Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:24:52.668Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T16:25:01.570Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T16:25:08.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:25:59.718Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:27:12.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:27:12.625Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:28:03.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:29:09.210Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:29:38.748Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:30:00.361Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:30:26.823Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:32:00.908Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:32:40.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:33:43.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T16:37:49.323Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T16:37:49.487Z"
+    }
+  ],
+  "last_action": "all tasks done — 12/12 complete; 120 browser tests and all Go/build gates pass",
+  "coverage": {
+    "FR-001": {
+      "title": "Place each terminal action with the state it owns.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T003",
+        "T004",
+        "T005"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs",
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal actions follow selected-terminal editor and broadcast context"
+      ]
+    },
+    "FR-002": {
+      "title": "Use the exact accepted visible action labels.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T004",
+        "T005",
+        "T007"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs",
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal actions follow selected-terminal editor and broadcast context"
+      ]
+    },
+    "FR-003": {
+      "title": "Create a non-live terminal only after confirming a non-blank name.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal creation validates a name and mutates the session only after confirmation"
+      ]
+    },
+    "FR-004": {
+      "title": "Offer activation for an inactive selected terminal during a broadcast.",
+      "tasks": [
+        "T004",
+        "T005"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal actions follow selected-terminal editor and broadcast context"
+      ]
+    },
+    "FR-005": {
+      "title": "Show active status and keep full reapplication in an explained additional menu.",
+      "tasks": [
+        "T002",
+        "T003",
+        "T004",
+        "T005"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal actions follow selected-terminal editor and broadcast context"
+      ]
+    },
+    "FR-006": {
+      "title": "Publish active-terminal content through one primary live-update action.",
+      "tasks": [
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::publishing uses only the live-content command and preserves active identity"
+      ]
+    },
+    "FR-007": {
+      "title": "Always confirm take-off-air and explain preserved broadcast and saved state.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T003",
+        "T008",
+        "T009",
+        "T011"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::take-off-air always confirms exposes failures and chains unfinished progress",
+        "tests/browser/state-changing-command-authoring.spec.mjs::take-off-air prevents duplicates and focuses the surviving broadcast control"
+      ]
+    },
+    "FR-008": {
+      "title": "Keep durable terminal deletion separate from taking a terminal off air.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T009",
+        "T011"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs",
+        "tests/browser/terminal-navigation.spec.mjs::deleting a referenced terminal is blocked before local mutation"
+      ]
+    },
+    "FR-009": {
+      "title": "Expose accurate disabled, pending, success, and failure live-action states.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T007",
+        "T008",
+        "T009",
+        "T011"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::publishing uses only the live-content command and preserves active identity",
+        "tests/browser/state-changing-command-authoring.spec.mjs::take-off-air prevents duplicates and focuses the surviving broadcast control"
+      ]
+    },
+    "FR-010": {
+      "title": "Keep revised controls keyboard accessible and restore relevant focus.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T009",
+        "T010",
+        "T011"
+      ],
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal actions follow selected-terminal editor and broadcast context",
+        "tests/browser/state-changing-command-authoring.spec.mjs::terminal creation validates a name and mutates the session only after confirmation",
+        "tests/browser/state-changing-command-authoring.spec.mjs::take-off-air always confirms exposes failures and chains unfinished progress"
+      ]
+    },
+    "FR-011": {
+      "title": "Preserve existing persistence, runtime, player synchronization, and broadcast semantics.",
+      "tasks": [
+        "T001",
+        "T005",
+        "T007",
+        "T008",
+        "T010",
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "internal/platform/assets_test.go::TestOverseerTerminalCommandsCannotBypassCoordinator",
+        "tests/browser/state-changing-command-authoring.spec.mjs::publishing uses only the live-content command and preserves active identity"
+      ]
+    }
+  },
+  "size": "normal",
+  "classification": {
+    "projectedFiles": 6,
+    "projectedTasks": 7,
+    "scopeSignal": "none",
+    "verdict": "normal"
+  },
+  "context": [
+    "area: Overseer terminal editor and live controls",
+    "constraint: preserve current player, persistence, and runtime contracts",
+    "input: user reports ambiguous action names and placement"
+  ],
+  "intent": "Make every Overseer terminal action unambiguous by separating session editing, live selection, publication, taking off air, and deletion.",
+  "expectations": [
+    "No session-format, player-transport, or terminal-runtime redesign."
+  ],
+  "approach": "Reorganize existing Overseer controls by state ownership, add accessible local creation and take-off-air dialogs, and reuse the current activation, publication, and clear commands without changing contracts.",
+  "decisions": [
+    {
+      "decision": "Place creation, activation/settings, publication, and take-off-air in their owning list, selected-terminal, editor, and broadcast contexts.",
+      "why": "Location communicates scope before activation and prevents durable and live actions from appearing equivalent.",
+      "rejected": "One shared toolbar or menu-only layout."
+    },
+    {
+      "decision": "Keep publication as the only primary update action and relocate complete reapplication to an explained additional menu.",
+      "why": "Publication matches the common live-editing intent while the broader capability remains available.",
+      "rejected": "Remove reapplication or keep two neighboring update buttons."
+    },
+    {
+      "decision": "Use accessible application dialogs for named creation and mandatory take-off-air confirmation.",
+      "why": "Dialogs make durable creation and player-facing interruption deliberate and testable.",
+      "rejected": "Immediate creation, native browser confirmation, or conditional-only confirmation."
+    },
+    {
+      "decision": "Chain take-off-air confirmation into the existing unfinished-progress decision only when the coordinator requires it.",
+      "why": "The dialogs answer separate questions while backend state remains authoritative.",
+      "rejected": "Combine speculative decisions or silently preserve/discard progress."
+    },
+    {
+      "decision": "Preserve existing desktop, player, persistence, and generated contracts.",
+      "why": "The feature is a UI clarity change and current explicit commands already provide every required outcome.",
+      "rejected": "Add a generic UI dispatcher or new boundary DTOs."
+    },
+    {
+      "decision": "Keep reapplication behind a native details disclosure and use local accessible dialogs for creation and take-off-air.",
+      "why": "This makes scope visible while preserving existing Wails command boundaries and keyboard behavior.",
+      "rejected": "A shared primary toolbar and native browser confirmation."
+    },
+    {
+      "decision": "Use deterministic queued and deferred browser-fixture results for all three existing terminal commands.",
+      "why": "Pending, failure, success, and decision-required behavior can be tested without changing production contracts.",
+      "rejected": "Adding test-only backend methods or new application APIs."
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Designed contextual Overseer actions, accessible creation and take-off-air dialogs, a secondary reapplication menu, and focused verification without contract changes.",
+      "key_finding": "Mandatory take-off-air confirmation must precede and hand off to the existing authoritative unfinished-progress decision when required."
+    },
+    "tasks": {
+      "summary": "12 tasks across setup, shared UI foundations, three user-story phases, and one integrated validation phase."
+    },
+    "implement": {
+      "summary": "Shipped contextual Overseer terminal actions, named creation, safe take-off-air confirmation, and complete static/browser/build verification."
+    }
+  },
+  "currentTask": "T012",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added red static UI contracts for canonical action labels, dialog accessibility, and Overseer-only command surfaces.",
+      "files": [
+        "internal/platform/assets_test.go"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Reorganized Overseer markup by terminal-list, selected-terminal, editor, and broadcast ownership and added accessible creation and take-off-air dialogs.",
+      "files": [
+        "frontend/overseer/src/index.html"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Styled contextual action groups, additional settings disclosure, responsive dialogs, validation feedback, and keyboard focus states.",
+      "files": [
+        "frontend/overseer/src/overseer.css"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added red Playwright coverage for no-broadcast, inactive, active, publication, on-air status, additional-settings keyboard flow, and activation/reapply command mapping.",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Derived activation, on-air status, secondary reapplication, publication, and take-off visibility from selected terminal and authoritative broadcast state.",
+      "files": [
+        "frontend/overseer/src/overseer.js"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added red publication journey covering exact live-update payload, pending duplicate prevention, acknowledgement, failure, active identity, and inactive selection.",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Made publication the selected active editor's sole primary update action with explicit live-content command, pending guard, acknowledgement, and failure-safe state.",
+      "files": [
+        "frontend/overseer/src/overseer.js"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Added deterministic queued and deferred results for activation, publication, and clear fixture calls, including failures and decision-required responses.",
+      "files": [
+        "tests/browser/fixtures/desktop-bindings.js"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Added red browser journeys for named draft creation, validation, cancellation/autosave, mandatory take-off confirmation, failures, decision chaining, duplicate prevention, Escape, and focus restoration.",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Implemented accessible named terminal creation with trimmed required input, cancellation, exactly-once draft append/autosave, selection, and focus restoration.",
+      "files": [
+        "frontend/overseer/src/overseer.js"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Implemented mandatory take-off-air confirmation with preserved-state copy, pending/error behavior, one clear request, unfinished-progress handoff, and focus recovery.",
+      "files": [
+        "frontend/overseer/src/overseer.js"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Validated syntax, formatting, static contracts, 120 browser tests, full Go tests/vet, Overseer production build, and native application build against SC-001–SC-006.",
+      "files": [
+        "specs/013-overseer-action-clarity/tasks.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "JavaScript syntax, diff whitespace, and Go formatting",
+      "command": "git diff --check; gofmt -l .; node --check changed JavaScript",
+      "result": "passed with no output",
+      "warnings": []
+    },
+    {
+      "what": "Focused Overseer static contracts",
+      "command": "go test ./internal/platform -run TestOverseerTerminalActionsExposeCanonicalContextAndAccessibleDialogs|TestOverseerEndBroadcastDialogIsAccessibleAndAvoidsNativeConfirm|TestOverseerTerminalCommandsCannotBypassCoordinator -count=1",
+      "result": "passed",
+      "warnings": [
+        "macOS linker emitted pre-existing deployment-target warnings"
+      ]
+    },
+    {
+      "what": "Full browser acceptance suite",
+      "command": "npm test --prefix tests/browser",
+      "result": "120 passed, 2 external ngrok tests skipped",
+      "warnings": [
+        "NO_COLOR/FORCE_COLOR notice only"
+      ]
+    },
+    {
+      "what": "Full Go tests and static analysis",
+      "command": "go test ./...; go vet ./...",
+      "result": "passed",
+      "warnings": [
+        "Initial parallel run raced Vite hash replacement; serialized rerun passed",
+        "macOS linker emitted deployment-target warnings"
+      ]
+    },
+    {
+      "what": "Overseer production frontend build",
+      "command": "npm run build:overseer",
+      "result": "passed with 40 modules transformed",
+      "warnings": []
+    },
+    {
+      "what": "Native application build",
+      "command": "go run ./cmd/build build",
+      "result": "passed including locked install, schemas, Wails bindings, both frontends, and macOS arm64 compile",
+      "warnings": []
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Frontend production build and Go embed compilation must be serialized because Vite replaces hashed assets atomically during build; the serialized validation passed.",
+      "step": "implement"
+    }
+  ]
+}

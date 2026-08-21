@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 const TOKEN_KEY = 'fallout-terminal.player-token';
 const FIXTURE = '/__fixture/state-changing-command-approval';
-const MASTER_URL = `${FIXTURE}/master`;
+const OVERSEER_URL = `${FIXTURE}/overseer`;
 const REQUEST_ID = 'approval-request-1';
 const COMMAND_NAME = 'Открыть двери';
 const CONFIRMATION_TEXT = 'Разрешить доступ в защищённый сектор?';
@@ -27,14 +27,14 @@ async function installPlayerDiagnostics(context) {
 }
 
 async function openApprovalJourney(browser) {
-  const masterContext = await browser.newContext();
+  const overseerContext = await browser.newContext();
   const playerContext = await browser.newContext();
   await installPlayerDiagnostics(playerContext);
 
-  const master = await masterContext.newPage();
-  await master.goto(MASTER_URL);
-  await master.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
-  await expect(master.locator('#mainLayout')).toBeVisible();
+  const overseer = await overseerContext.newPage();
+  await overseer.goto(OVERSEER_URL);
+  await overseer.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
+  await expect(overseer.locator('#mainLayout')).toBeVisible();
 
   const player = await playerContext.newPage();
   await player.goto('/');
@@ -43,15 +43,15 @@ async function openApprovalJourney(browser) {
   const character = player.locator('#characterOptions button:not([disabled])').first();
   await expect(character).toBeVisible();
   await character.click();
-  await expect(player.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+  await expect(player.locator('#roleBadge')).toContainText('АКТИВЕН');
   await expect(player.locator('.term-row', { hasText: 'Открыть двери' })).toBeVisible();
 
-  return { master, masterContext, player, playerContext };
+  return { overseer, overseerContext, player, playerContext };
 }
 
 async function closeApprovalJourney(journey) {
   await journey.playerContext.close();
-  await journey.masterContext.close();
+  await journey.overseerContext.close();
 }
 
 async function openApprovalParticipant(browser, token = '') {
@@ -68,7 +68,7 @@ async function openApprovalParticipant(browser, token = '') {
   if (await page.locator('#characterSelect').isVisible()) {
     await page.locator('#characterOptions button:not([disabled])').first().click();
   }
-  await expect(page.locator('#roleBadge')).toContainText(/АКТИВНЫЙ|НАБЛЮДАТЕЛЬ/);
+  await expect(page.locator('#roleBadge')).toContainText(/АКТИВЕН|НАБЛЮДАТЕЛЬ/);
   return { context, page };
 }
 
@@ -76,7 +76,7 @@ async function chooseStateChangingCommand(journey) {
   await journey.player.locator('.term-row', { hasText: COMMAND_NAME }).click();
   await expectFullScreenCommandSurface(journey.player, 'Выполняется запрос');
 
-  const dialogs = journey.master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
+  const dialogs = journey.overseer.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
   await expect(dialogs).toHaveCount(1);
   const dialog = dialogs.first();
   await expect(dialog).toBeVisible();
@@ -150,8 +150,8 @@ async function pageCount(page) {
   return Number.parseInt(value.split('/')[1], 10);
 }
 
-async function resolveCalls(master) {
-  return master.evaluate(() => __desktopFixture.calls
+async function resolveCalls(overseer) {
+  return overseer.evaluate(() => __desktopFixture.calls
     .filter(call => call.method === 'ResolveCommandExecution'));
 }
 
@@ -179,18 +179,18 @@ test('canonical approval input has explicit folder, entry, and only initial stat
   }
 });
 
-test('one pending request opens exactly one master dialog and approve publishes a full-screen durable result', async ({ browser, request }) => {
+test('one pending request opens exactly one overseer dialog and approve publishes a full-screen durable result', async ({ browser, request }) => {
   const journey = await openApprovalJourney(browser);
   try {
     const dialog = await chooseStateChangingCommand(journey);
 
     const replay = await request.post(`${FIXTURE}/reemit-pending`);
     expect(replay.status()).toBe(204);
-    await expect(journey.master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' })).toHaveCount(1);
-    expect(await resolveCalls(journey.master)).toEqual([]);
+    await expect(journey.overseer.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' })).toHaveCount(1);
+    expect(await resolveCalls(journey.overseer)).toEqual([]);
 
     await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
-    await expect.poll(() => resolveCalls(journey.master)).toEqual([
+    await expect.poll(() => resolveCalls(journey.overseer)).toEqual([
       expect.objectContaining({
         args: [{ requestId: REQUEST_ID, decision: 'approve' }],
       }),
@@ -240,7 +240,7 @@ test('initial state-changing approval converges for controller, two observers, a
       await expectFullScreenCommandSurface(participant.page, 'Выполняется запрос');
     }
     await expect(dialog).toBeVisible();
-    expect(await resolveCalls(journey.master)).toEqual([]);
+    expect(await resolveCalls(journey.overseer)).toEqual([]);
   } finally {
     await firstObserver.context.close();
     await secondObserver.context.close();
@@ -248,7 +248,7 @@ test('initial state-changing approval converges for controller, two observers, a
   }
 });
 
-test('pending full-screen request ignores Enter and Back until the master decides', async ({ browser }) => {
+test('pending full-screen request ignores Enter and Back until the overseer decides', async ({ browser }) => {
   const journey = await openApprovalJourney(browser);
   try {
     const dialog = await chooseStateChangingCommand(journey);
@@ -257,7 +257,7 @@ test('pending full-screen request ignores Enter and Back until the master decide
 
     await expectFullScreenCommandSurface(journey.player, 'Выполняется запрос');
     await expect(dialog).toBeVisible();
-    expect(await resolveCalls(journey.master)).toEqual([]);
+    expect(await resolveCalls(journey.overseer)).toEqual([]);
     await expect(journey.player.locator('#backBtn')).toBeHidden();
   } finally {
     await closeApprovalJourney(journey);
@@ -270,7 +270,7 @@ test('reject leaves the command initial and lets the controller return to the sa
     const dialog = await chooseStateChangingCommand(journey);
     await dialog.getByRole('button', { name: 'ОТКЛОНИТЬ' }).click();
 
-    await expect.poll(() => resolveCalls(journey.master)).toEqual([
+    await expect.poll(() => resolveCalls(journey.overseer)).toEqual([
       expect.objectContaining({
         args: [{ requestId: REQUEST_ID, decision: 'reject' }],
       }),
@@ -288,13 +288,13 @@ test('reject leaves the command initial and lets the controller return to the sa
   }
 });
 
-test('closing the master dialog is exactly one rejection and never leaves players pending', async ({ browser }) => {
+test('closing the overseer dialog is exactly one rejection and never leaves players pending', async ({ browser }) => {
   const journey = await openApprovalJourney(browser);
   try {
     const dialog = await chooseStateChangingCommand(journey);
     await dialog.press('Escape');
 
-    await expect.poll(() => resolveCalls(journey.master)).toEqual([
+    await expect.poll(() => resolveCalls(journey.overseer)).toEqual([
       expect.objectContaining({
         args: [{ requestId: REQUEST_ID, decision: 'reject' }],
       }),
@@ -320,15 +320,15 @@ test('approve persistence failure exposes no completed result and reports safe e
     const dialog = await chooseStateChangingCommand(journey);
     await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
 
-    await expect.poll(() => resolveCalls(journey.master)).toEqual([
+    await expect.poll(() => resolveCalls(journey.overseer)).toEqual([
       expect.objectContaining({
         args: [{ requestId: REQUEST_ID, decision: 'approve' }],
       }),
     ]);
     await expect(dialog).toBeHidden();
-    const masterError = journey.master.getByRole('alert').filter({ hasText: /сохран|состояни/i });
-    await expect(masterError).toBeVisible();
-    await expect(masterError).not.toContainText(/\/private\/|rename|fsync|temporary file/i);
+    const overseerError = journey.overseer.getByRole('alert').filter({ hasText: /сохран|состояни/i });
+    await expect(overseerError).toBeVisible();
+    await expect(overseerError).not.toContainText(/\/private\/|rename|fsync|temporary file/i);
 
     await expect(journey.player.locator('#playerNotice')).toContainText(/сохран|состояние команды не изменено/i);
     await expect(journey.player.locator('#entryBody')).not.toContainText('Доступ в сектор разрешён.');
@@ -387,12 +387,12 @@ test('pending, rejected, and completed command states match the selected-record 
     expect(await pageCount(journey.player)).toBe(completedNarrowPages);
     await journey.player.locator('#backBtn').click();
 
-    await journey.master.reload();
-    await journey.master.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
-    await expect(journey.master.locator('#mainLayout')).toBeVisible();
+    await journey.overseer.reload();
+    await journey.overseer.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
+    await expect(journey.overseer.locator('#mainLayout')).toBeVisible();
     await journey.player.locator('.term-row', { hasText: 'Двери открыты' }).click();
     await expectFullScreenCommandSurface(journey.player, 'Выполняется запрос');
-    dialog = journey.master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' }).first();
+    dialog = journey.overseer.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' }).first();
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('#commandExecutionDialogStatus')).toHaveText(
       `ЗАПРОС: ${REQUEST_ID} · РЕЖИМ: ЗАВЕРШЁННОЕ ИЗМЕНЕНИЕ СОСТОЯНИЯ · КОМАНДА: Двери открыты`,

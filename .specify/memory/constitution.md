@@ -1,8 +1,11 @@
 <!--
 Sync Impact Report
-- Version change: 5.0.0 -> 5.0.1
+- Version change: 5.0.1 -> 5.1.0
 - Modified principles:
-  - Project Identity (accepted Wails runtime pin updated from v3.0.0-beta.8 to v3.0.0-beta.10)
+  - Project Identity (all frontend code now lives in one workspace with client and Overseer members)
+  - Govern the Accepted Desktop Runtime (nested role boundaries and Overseer terminology)
+  - Dependency Rules (one workspace install with isolated application packages)
+  - Testing and Quality Gates (canonical nested build and generation paths)
 - Added principles: None
 - Added sections: None
 - Removed sections: None
@@ -13,7 +16,7 @@ Sync Impact Report
 
 ## Project Identity
 
-Fallout Terminal is a desktop application for tabletop RPG game masters. The native master
+Fallout Terminal is a desktop application for tabletop RPG Overseers. The native Overseer
 interface edits and publishes Fallout-style terminal content, while the embedded Go player server
 synchronizes authoritative content and state with browser-based player clients. Saved campaign
 state uses the portable version-1 JSON session document; live terminal, navigation, hacking,
@@ -25,11 +28,12 @@ frontend, and generated-binding versions MUST remain mutually compatible and rep
 in their owning dependency graphs.
 
 The root Go module owns application composition, the trusted desktop bridge, and the embedded
-player server. `frontend/` is the Vite-built browser-JavaScript game-master interface, `client/` is
-the separately embedded browser-JavaScript player interface, and `internal/` contains application
-services, domain logic, adapters, and platform integrations. Node.js is build, code-generation,
-and browser-test tooling, not an application runtime. The supported deployment profile is macOS
-13+ on Apple Silicon (`arm64`).
+player server. `frontend/` is the single npm workspace: `frontend/overseer/` owns the Vite-built
+browser-JavaScript Overseer interface and private Wails bindings, while `frontend/client/` owns the
+separately built and embedded browser-JavaScript player interface and public generated contracts.
+`internal/` contains application services, domain logic, adapters, and platform integrations.
+Node.js is build, code-generation, and browser-test tooling, not an application runtime. The
+supported deployment profile is macOS 13+ on Apple Silicon (`arm64`).
 
 The Electron-to-Wails and Wails-v2-to-Wails-v3 migrations are complete. Their rollback and migration
 records MUST be preserved only as clearly labeled historical materials. Legacy Electron and Wails
@@ -47,11 +51,11 @@ dependencies, compatibility, acceptance, rollback, or release decisions.
   servers, lifecycle hooks, generated bindings, and `@wailsio/runtime` imports MUST remain platform
   adapters or composition concerns. Domain, control, session, player-configuration, live, and
   player services MUST remain independent of Wails.
-- `frontend/` MUST access privileged desktop operations only through one narrow, explicitly
+- `frontend/overseer/` MUST access privileged desktop operations only through one narrow, explicitly
   registered desktop service and named events. Wails v3 generated bindings and
   `@wailsio/runtime` MAY implement this private transport. They MUST NOT expose a generic
   dispatcher or arbitrary filesystem, process, or environment access.
-- `client/` owns the browser player experience and MUST operate without Wails, native desktop, or
+- `frontend/client/` owns the browser player experience and MUST operate without Wails, native desktop, or
   filesystem APIs and MUST have no path to desktop capabilities.
 - `internal/domain/`, `internal/nav/`, `internal/hack/`, `internal/live/`, and
   `internal/control/` own domain, navigation, hacking, live-state, and coordination behavior.
@@ -140,7 +144,7 @@ services; they MUST NOT own domain rules or authoritative mutable state.
 
 ### IV. Separate Public and Private Capabilities
 
-Public player services and private game-master capabilities MUST remain separate at schema,
+Public player services and private Overseer capabilities MUST remain separate at schema,
 service, adapter, listener, and authorization boundaries. The player Connect service and every
 public-access endpoint MUST NEVER expose native dialogs, arbitrary file access, external URL
 opening, `ForceHackSuccess`, provider credentials, private hacking candidates, passwords, random
@@ -148,7 +152,7 @@ outcomes, secret words, or any equivalent trusted capability or secret state.
 
 The private Wails bridge MAY remain the transport for trusted desktop-only operations, but every
 structured request, result, event, runtime-status payload, and serializable configuration value
-crossing it MUST have a protobuf-defined contract and an explicit adapter. The master frontend
+crossing it MUST have a protobuf-defined contract and an explicit adapter. The Overseer frontend
 MUST reach privileged operations only through one narrow, explicitly registered desktop service
 and named events. Wails v3 generated bindings and `@wailsio/runtime` MAY implement that transport,
 but the bridge MUST NOT expose a generic dispatcher, arbitrary filesystem, process, or environment
@@ -237,8 +241,8 @@ accepted.
   contract types through explicit JSON adapters; protobuf definitions MUST NOT replace the portable
   version-1 JSON persistence format.
 - `internal/player/` MAY depend on ConnectRPC, generated Go service code, HTTP asset delivery, and
-  narrow application-service interfaces. It MUST NOT depend on the master frontend or expose
-  private game-master services.
+  narrow application-service interfaces. It MUST NOT depend on the Overseer frontend or expose
+  private Overseer services.
 - `internal/platform/` contains Wails, OS secure-store, and other platform adapters behind testable
   interfaces. `internal/tunnel/` contains provider-neutral optional public-access lifecycle and MAY
   own an embedded provider SDK or a separately authorized external-process adapter. It MUST NOT
@@ -246,11 +250,11 @@ accepted.
   or domain packages MUST NOT depend on Wails, a provider SDK, Keychain, or another concrete secure
   store. Only serializable application-owned configuration crossing a boundary belongs in
   protobuf.
-- `frontend/` MAY call only the narrow registered desktop service through generated Wails bindings
+- `frontend/overseer/` MAY call only the narrow registered desktop service through generated Wails bindings
   and consume named events through `@wailsio/runtime`. Every structured bridge payload MUST
   originate from a protobuf schema and pass through an explicit adapter; a generic dispatch surface
   is prohibited.
-- `client/` MAY use browser APIs, generated ECMAScript Connect clients, server-streaming responses,
+- `frontend/client/` MAY use browser APIs, generated ECMAScript Connect clients, server-streaming responses,
   and static HTTP assets. It MUST NOT depend on Wails, filesystem APIs, private services, or
   handwritten RPC envelopes.
 - Repository Go build orchestration, package manifests, plist files, framework-generated binding
@@ -290,7 +294,7 @@ an enabled preference, and opaque indicators or references that show whether a s
 MUST NOT persist the secret value. A stored secret MUST NOT be read back through the UI or any
 private API; supported operations are limited to presence indication, replacement, and deletion.
 
-A narrow, trusted, master-only mutation request MAY accept a new user-entered secret and pass it to
+A narrow, trusted, Overseer-only mutation request MAY accept a new user-entered secret and pass it to
 the privileged Go boundary. A newly and cryptographically generated player password MAY be returned
 through a narrow private protobuf-defined result exactly once before or during its initial storage
 to support an explicit Copy action. This one-time result MUST NOT permit readback of an existing
@@ -324,7 +328,7 @@ development workflow. Operating-system tools and non-Go tools remain governed by
 installation and lock mechanisms.
 
 The dependency-free `cmd/build` command and `internal/buildtool` package are the sole owners of the
-application build and package graph and its protobuf -> player -> bindings -> master -> native or
+application build and package graph and its protobuf -> player -> bindings -> Overseer -> native or
 package order. Direct `go run ./cmd/build dev|build|package` commands are canonical owned entrypoints
 and MUST continue to work without Make.
 
@@ -405,19 +409,20 @@ Applicable commands MUST succeed before a change is considered complete:
 - `go test ./...` succeeds.
 - `go test -race ./...` succeeds for changes affecting concurrent runtime, player, live, control,
   session, stream, startup, or tunnel behavior.
-- `npm ci --prefix frontend` and `npm run build --prefix frontend` succeed for frontend, bridge,
-  embedding, generated ECMAScript, or packaging changes.
-- `npm ci --prefix client` and `npm run build --prefix client` succeed for player-client,
-  embedding, asset, or packaging changes.
+- `npm ci --prefix frontend` installs the single locked frontend workspace, and
+  `npm run build:overseer --prefix frontend` succeeds for Overseer, bridge, embedding, or packaging
+  changes.
+- `npm run build:client --prefix frontend` succeeds for player-client, embedding, generated
+  ECMAScript, asset, or packaging changes.
 - `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` succeed for affected player
   journeys when the required local environment is available.
 - `go run ./cmd/build dev` is the canonical owned repository-root development entrypoint and passes
-  affected interactive master/player journeys without a separately started frontend or player
+  affected interactive Overseer/client journeys without a separately started frontend or player
   server. A verified thin `make dev` alias MAY invoke it without changing ownership.
-- `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...` succeeds and produces
+- `go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean -d frontend/overseer/bindings ./...` succeeds and produces
   no unexplained working-tree drift; both generated bindings and protobuf generation remain
   deterministic and MUST NOT be edited manually.
-- `go run ./cmd/build build` succeeds after both `frontend/` and `client/`
+- `go run ./cmd/build build` succeeds after both `frontend/overseer/` and `frontend/client/`
   production builds succeed.
 - `go run ./cmd/build package` succeeds and
   produces a self-contained macOS Apple Silicon application for packaging-sensitive changes.
@@ -530,4 +535,4 @@ manually edited generated files, schema-breaking field reuse, public capability 
 stored-secret readback, generic bridge dispatchers, Make-owned build graphs, and permanent dual
 protocols without an explicit compatibility requirement.
 
-**Version**: 5.0.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-20
+**Version**: 5.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-20

@@ -29,7 +29,7 @@ SPECKIT_VERSION_ENV = \
 	SPECKIT_FEATURE_NUMBERING_VERSION="$(SPECKIT_FEATURE_NUMBERING_VERSION)"
 
 .PHONY: help dev run prepare build package \
-	deps deps-client deps-frontend deps-browser \
+	deps deps-frontend deps-browser \
 	speckit-install speckit-update-check \
 	fmt fmt-check vet test test-race check \
 	proto-generate proto-check proto-breaking bindings-check browser-test \
@@ -44,7 +44,7 @@ dev: ## Build and run the complete application in development mode.
 run: ## Build and run the application, forwarding APP_ARGS.
 	$(BUILD_TOOL) run $(APP_ARGS)
 
-prepare: ## Verify and build protobuf, player, bindings, and master assets.
+prepare: ## Verify and build protobuf, client, bindings, and Overseer assets.
 	$(BUILD_TOOL) prepare
 
 build: ## Build the macOS arm64 application binary.
@@ -53,12 +53,9 @@ build: ## Build the macOS arm64 application binary.
 package: ## Build the ad-hoc signed macOS application bundle.
 	$(BUILD_TOOL) package
 
-deps: deps-client deps-frontend deps-browser ## Install all locked Node.js dependencies.
+deps: deps-frontend deps-browser ## Install all locked Node.js dependencies.
 
-deps-client: ## Install locked player dependencies.
-	$(NPM) ci --prefix client
-
-deps-frontend: ## Install locked master frontend dependencies.
+deps-frontend: ## Install the locked client and Overseer workspace dependencies.
 	$(NPM) ci --prefix frontend
 
 deps-browser: ## Install locked browser-test dependencies.

@@ -31,7 +31,7 @@ scan_canary_file() {
       file="$scan_root/$file"
     fi
     case "$relative" in
-      .git/*|specs/*|node_modules/*|frontend/node_modules/*|client/node_modules/*|tests/browser/node_modules/*|scripts/secret-leak-check.sh)
+      .git/*|specs/*|node_modules/*|frontend/node_modules/*|frontend/client/node_modules/*|frontend/overseer/node_modules/*|tests/browser/node_modules/*|scripts/secret-leak-check.sh)
         continue
         ;;
     esac
@@ -80,13 +80,13 @@ check_active_sources() {
   }
 
   if grep -E '(localStorage|sessionStorage).*(providerToken|playerPassword|generatedPassword)|(providerToken|playerPassword|generatedPassword).*(localStorage|sessionStorage)' \
-    "$repository_root/frontend/src/"*.js >/dev/null 2>&1; then
-    fail 'master frontend persists a public-access secret in browser storage'
+    "$repository_root/frontend/overseer/src/"*.js >/dev/null 2>&1; then
+    fail 'Overseer frontend persists a public-access secret in browser storage'
   fi
 
-  grep -Fq 'replacementProviderToken' "$repository_root/frontend/src/master.js" ||
-    fail 'master secret mutation flow is not implemented yet'
-  grep -Fq 'generatedPassword' "$repository_root/frontend/src/master.js" ||
+  grep -Fq 'replacementProviderToken' "$repository_root/frontend/overseer/src/overseer.js" ||
+    fail 'Overseer secret mutation flow is not implemented yet'
+  grep -Fq 'generatedPassword' "$repository_root/frontend/overseer/src/overseer.js" ||
     fail 'one-time generated-password presentation is not implemented yet'
 }
 
@@ -96,7 +96,7 @@ check_generated_password_scope() {
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     case "$file" in
-      app.go|app_contract.go|internal/tunnel/secret.go|proto/fallout/terminal/private/v1/public_access.proto|internal/gen/fallout/terminal/private/v1/public_access.pb.go|frontend/src/desktop-api.js|frontend/src/master.js|frontend/src/index.html|frontend/src/master.css|frontend/bindings/github.com/obalunenko/Fallout-Terminal/models.js)
+      app.go|app_contract.go|internal/tunnel/secret.go|proto/fallout/terminal/private/v1/public_access.proto|internal/gen/fallout/terminal/private/v1/public_access.pb.go|frontend/overseer/src/desktop-api.js|frontend/overseer/src/overseer.js|frontend/overseer/src/index.html|frontend/overseer/src/overseer.css|frontend/overseer/bindings/github.com/obalunenko/Fallout-Terminal/models.js)
         ;;
       *)
         unexpected="${unexpected}${file}"$'\n'
@@ -121,9 +121,9 @@ check_generated_password_scope() {
     return 1
   fi
 
-  grep -Fq "generatedPasswordValue.textContent = '';" "$repository_root/frontend/src/master.js" ||
+  grep -Fq "generatedPasswordValue.textContent = '';" "$repository_root/frontend/overseer/src/overseer.js" ||
     fail 'one-time generated-password presentation is not cleared on completion'
-  grep -Fq 'btnCopyGeneratedPassword.onclick = null;' "$repository_root/frontend/src/master.js" ||
+  grep -Fq 'btnCopyGeneratedPassword.onclick = null;' "$repository_root/frontend/overseer/src/overseer.js" ||
     fail 'one-time generated-password callback retains its value after completion'
   grep -Fq 'afterGenerated.generatedPassword).toBeUndefined()' \
     "$repository_root/tests/browser/desktop-api.spec.mjs" ||

@@ -11,10 +11,10 @@ plugins:
       - npm
       - exec
       - --prefix
-      - client
+      - frontend
       - --
       - protoc-gen-es
-    out: client/gen
+    out: frontend/client/gen
     opt:
       - target=js
       - import_extension=js

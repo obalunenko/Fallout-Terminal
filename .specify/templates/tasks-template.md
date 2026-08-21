@@ -29,10 +29,10 @@ description: "Task list template for Fallout Terminal feature implementation"
 - Player HTTP/WebSocket boundary: `internal/player/`
 - Platform and optional public access: `internal/platform/`, `internal/tunnel/`
 - Shared Go test support: `internal/testutil/`
-- Game-master interface: `frontend/src/index.html`, `frontend/src/desktop-api.js`, `frontend/src/master.js`, `frontend/src/master.css`
-- Player interface: `client/index.html`, `client/client.js`, `client/sound.js`, `client/client.css`
+- Overseer interface: `frontend/overseer/src/index.html`, `frontend/overseer/src/desktop-api.js`, `frontend/overseer/src/overseer.js`, `frontend/overseer/src/overseer.css`
+- Player interface: `frontend/client/index.html`, `frontend/client/client.js`, `frontend/client/sound.js`, `frontend/client/client.css`
 - Browser journeys: `tests/browser/*.spec.mjs`, `tests/browser/fixture-server/main.go`
-- Build configuration: `go.mod`, `go.sum`, `frontend/package.json`, `frontend/package-lock.json`, `wails.json`
+- Build configuration: `go.mod`, `go.sum`, `frontend/package.json`, `frontend/package-lock.json`, `frontend/client/package.json`, `frontend/overseer/package.json`
 - macOS packaging/release: `build/`, `scripts/build-macos.sh`, `.github/workflows/wails-macos.yml`
 
 <!--
@@ -79,15 +79,15 @@ setup tasks unless the approved feature actually introduces those changes.
 
 - [ ] T011 [P] [US1] Add focused Go tests in [exact package/test path]
 - [ ] T012 [P] [US1] Add or update a Playwright journey in `tests/browser/[exact].spec.mjs` when player behavior changes
-- [ ] T013 [US1] Document the `go run ./cmd/build dev` master/player journey in `specs/[###-feature]/quickstart.md`
+- [ ] T013 [US1] Document the `go run ./cmd/build dev` Overseer/player journey in `specs/[###-feature]/quickstart.md`
 
 ### Implementation for User Story 1
 
-- [ ] T014 [P] [US1] Implement game-master changes in `frontend/src/[exact file]`
-- [ ] T015 [P] [US1] Implement player changes in `client/[exact file]`
+- [ ] T014 [P] [US1] Implement Overseer changes in `frontend/overseer/src/[exact file]`
+- [ ] T015 [P] [US1] Implement player changes in `frontend/client/[exact file]`
 - [ ] T016 [US1] Integrate Wails/WebSocket producers and consumers in [exact Go and JavaScript paths]
 - [ ] T017 [US1] Update JSON defaults, validation, versioning, references, or `sessions/demo.json` if the persistent contract changes
-- [ ] T018 [US1] Verify the independent journey with one master and [client count] player browsers
+- [ ] T018 [US1] Verify the independent journey with one Overseer and [client count] player browsers
 
 **Checkpoint**: User Story 1 works independently and all connected clients converge on authoritative state.
 
@@ -107,7 +107,7 @@ setup tasks unless the approved feature actually introduces those changes.
 ### Implementation for User Story 2
 
 - [ ] T021 [P] [US2] Implement domain/runtime changes in `internal/[exact package]/[exact file]`
-- [ ] T022 [P] [US2] Implement presentation changes in `frontend/src/[exact file]` or `client/[exact file]`
+- [ ] T022 [P] [US2] Implement presentation changes in `frontend/overseer/src/[exact file]` or `frontend/client/[exact file]`
 - [ ] T023 [US2] Integrate and validate changed contracts in [producer path] and [consumer path]
 - [ ] T024 [US2] Verify initial connection, multiple tabs/clients, controller authority, and reconnection as applicable
 
@@ -134,14 +134,14 @@ setup tasks unless the approved feature actually introduces those changes.
 
 ## Final Phase: Cross-Cutting Verification and Polish
 
-- [ ] T029 [P] Review Wails method exposure, CSP, external URL handling, and privileged input validation in `app.go` and `frontend/src/`
-- [ ] T030 [P] Review WebSocket origin/input validation, public projections, revisions, and reconnect synchronization in `internal/player/` and `client/`
+- [ ] T029 [P] Review Wails method exposure, CSP, external URL handling, and privileged input validation in `app.go` and `frontend/overseer/src/`
+- [ ] T030 [P] Review WebSocket origin/input validation, public projections, revisions, and reconnect synchronization in `internal/player/` and `frontend/client/`
 - [ ] T031 [P] Open and save existing compatible files from `sessions/` without data loss when persistence changes
 - [ ] T032 Run `gofmt -l .`, `go vet ./...`, and `go test ./...`
 - [ ] T033 Run `go test -race ./...` when concurrent runtime behavior changes
-- [ ] T034 Run `npm ci --prefix frontend` and `npm run build --prefix frontend` when the master UI, bridge, embedding, or package changes
+- [ ] T034 Run `npm ci --prefix frontend` and `npm run build --prefix frontend` when the Overseer UI, bridge, embedding, or package changes
 - [ ] T035 Run `npm ci --prefix tests/browser` and `npm test --prefix tests/browser` when affected browser journeys are available
-- [ ] T036 Run `go run ./cmd/build dev` and complete the documented master/player smoke journeys
+- [ ] T036 Run `go run ./cmd/build dev` and complete the documented Overseer/player smoke journeys
 - [ ] T037 Run `go run ./cmd/build package` for packaging-sensitive changes when the required macOS environment is available
 - [ ] T038 Run approved credential-gated public-provider or signing/notarization/DMG gates when affected and prerequisites are available; otherwise record them as unavailable
 - [ ] T039 Update `README.md`, contracts, fixtures, and CI configuration when setup, operation, protocol, or user-visible workflows changed
@@ -159,7 +159,7 @@ setup tasks unless the approved feature actually introduces those changes.
 
 ## Parallel Opportunities
 
-- Independent `frontend/src/` and `client/` presentation work may run in parallel after their shared contract is fixed.
+- Independent `frontend/overseer/src/` and `frontend/client/` presentation work may run in parallel after their shared contract is fixed.
 - Pure Go tests may run in parallel with isolated CSS/HTML work when their files and prerequisites do not overlap.
 - Security, documentation, fixtures, and packaging review may run in parallel when they touch different files.
 - Tasks changing `main.go`, `app.go`, `internal/control/`, `internal/player/`, shared frontend state, or the same contract are not parallel merely because they have different story labels.
@@ -167,7 +167,7 @@ setup tasks unless the approved feature actually introduces those changes.
 ## Implementation Strategy
 
 1. Deliver the smallest P1 vertical slice across every required Go and browser boundary.
-2. Verify it with focused automated checks and the documented master/player journey.
+2. Verify it with focused automated checks and the documented Overseer/player journey.
 3. Add P2 and P3 stories incrementally without breaking earlier journeys.
 4. Finish with race, multi-client, reconnection, persistent-data, security, shutdown, and packaging checks proportional to the change.
 

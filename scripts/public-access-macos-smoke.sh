@@ -57,14 +57,14 @@ launch_via_finder_semantics() {
   wait_for_local || fail 'double-click launch did not make local mode ready within five seconds'
 }
 
-wait_for_deferred_master_window() {
+wait_for_deferred_overseer_window() {
   # Wails v3 defers native window creation until App.Run. The player service
   # can make port 3690 ready just before Cocoa has installed that window, so a
   # close Apple Event sent at the HTTP readiness edge can race and be dropped.
   # Keep this synchronization outside the measured close budget; the launch
   # itself has already met its independent five-second readiness assertion.
   sleep 1
-  [[ -n "$(process_ids)" ]] || fail 'packaged process exited before its deferred master window was ready'
+  [[ -n "$(process_ids)" ]] || fail 'packaged process exited before its deferred Overseer window was ready'
 }
 
 send_window_close() {
@@ -162,7 +162,7 @@ cleanup
 wait_for_exit || fail 'pre-existing packaged process did not exit within five seconds'
 
 launch_via_finder_semantics
-wait_for_deferred_master_window
+wait_for_deferred_overseer_window
 if [[ "${FALLOUT_PUBLIC_ACCESS_MANUAL_CLOSE_NOT_RUN:-0}" == 1 ]]; then
   not_run 'interactive normal-close automation was explicitly deferred for manual follow-up by the user'
   manual_close_cleanup_started_at=${SECONDS}

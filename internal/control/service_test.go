@@ -3138,7 +3138,7 @@ func assertPresenceOnlyEffects(t *testing.T, effects []Effect, revision uint64) 
 	}
 }
 
-func TestGameMasterRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
+func TestOverseerRosterAndAssignmentCorrectionsPreserveRuntime(t *testing.T) {
 	runtime := &recordingTerminalRuntime{}
 	service := New(Config{IDs: &counterIDSource{}, Runtime: runtime})
 	state, err := addCharacter(service, "Mara")

@@ -21,16 +21,16 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-func TestWailsV3ApplicationOptionsServeOnlyMasterAssetsAndQuitWithLastWindow(t *testing.T) {
+func TestWailsV3ApplicationOptionsServeOnlyOverseerAssetsAndQuitWithLastWindow(t *testing.T) {
 	t.Parallel()
 
 	assets := fstest.MapFS{
-		"index.html": {Data: []byte("<!doctype html><title>MASTER</title>")},
-		"master.js":  {Data: []byte("export const master = true;")},
+		"index.html":  {Data: []byte("<!doctype html><title>OVERSEER</title>")},
+		"overseer.js": {Data: []byte("export const overseer = true;")},
 	}
 	options := wailsApplicationOptions(assets)
 	require.Equal(t, "Fallout Terminal", options.Name)
-	require.Equal(t, "Fallout Terminal — Master Control", options.Description)
+	require.Equal(t, "Fallout Terminal — Overseer Control", options.Description)
 	require.True(t, options.Mac.ApplicationShouldTerminateAfterLastWindowClosed)
 	require.NotNil(t, options.Assets.Handler)
 	require.Empty(t, options.Services, "services are registered only after core composition")
@@ -41,7 +41,7 @@ func TestWailsV3ApplicationOptionsServeOnlyMasterAssetsAndQuitWithLastWindow(t *
 	require.Equal(t, 200, response.Code)
 	body, err := io.ReadAll(response.Result().Body)
 	require.NoError(t, err)
-	assert.Contains(t, string(body), "MASTER")
+	assert.Contains(t, string(body), "OVERSEER")
 	assert.NotContains(t, string(body), "characterSelect", "the private Wails asset host must not serve the public player application")
 }
 
@@ -82,11 +82,11 @@ func TestWailsSaveSessionBindingRetainsBothRealDemoTerminals(t *testing.T) {
 	require.Equal(t, "t_demo2", reopened.Session.Terminals[0].Root.Children[4].TerminalTransition.TargetTerminalID)
 }
 
-func TestMasterWindowOptionsPreserveAcceptedSingleWindowContract(t *testing.T) {
+func TestOverseerWindowOptionsPreserveAcceptedSingleWindowContract(t *testing.T) {
 	t.Parallel()
 
-	options := masterWindowOptions()
-	require.Equal(t, "Fallout Terminal — Master Control", options.Title)
+	options := overseerWindowOptions()
+	require.Equal(t, "Fallout Terminal — Overseer Control", options.Title)
 	require.Equal(t, 1200, options.Width)
 	require.Equal(t, 780, options.Height)
 	require.Equal(t, 900, options.MinWidth)
@@ -96,15 +96,15 @@ func TestMasterWindowOptionsPreserveAcceptedSingleWindowContract(t *testing.T) {
 	require.False(t, options.AllowSimpleEventEmit)
 }
 
-func TestMasterWindowCloseExplicitlyRequestsApplicationQuit(t *testing.T) {
+func TestOverseerWindowCloseExplicitlyRequestsApplicationQuit(t *testing.T) {
 	t.Parallel()
 
-	window := &recordingMasterWindowCloseRegistrar{}
+	window := &recordingOverseerWindowCloseRegistrar{}
 	quit := &blockingApplicationQuitter{
 		entered: make(chan struct{}, 1),
 		release: make(chan struct{}),
 	}
-	registerMasterWindowQuitOnClose(window, quit)
+	registerOverseerWindowQuitOnClose(window, quit)
 
 	require.Equal(t, events.Common.WindowClosing, window.hookEventType)
 	require.NotNil(t, window.hookCallback)
@@ -254,14 +254,14 @@ func TestWailsEventSinkUsesInjectedManagerForExactTypedEventNames(t *testing.T) 
 
 type lifecycleContextKey struct{}
 
-type recordingMasterWindowCloseRegistrar struct {
+type recordingOverseerWindowCloseRegistrar struct {
 	hookEventType   events.WindowEventType
 	hookCallback    func(*application.WindowEvent)
 	nativeEventType events.WindowEventType
 	nativeCallback  func(*application.WindowEvent)
 }
 
-func (registrar *recordingMasterWindowCloseRegistrar) RegisterHook(
+func (registrar *recordingOverseerWindowCloseRegistrar) RegisterHook(
 	eventType events.WindowEventType,
 	callback func(*application.WindowEvent),
 ) func() {
@@ -270,7 +270,7 @@ func (registrar *recordingMasterWindowCloseRegistrar) RegisterHook(
 	return func() {}
 }
 
-func (registrar *recordingMasterWindowCloseRegistrar) OnWindowEvent(
+func (registrar *recordingOverseerWindowCloseRegistrar) OnWindowEvent(
 	eventType events.WindowEventType,
 	callback func(*application.WindowEvent),
 ) func() {

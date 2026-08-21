@@ -1,0 +1,285 @@
+{
+  "workflow": "companion",
+  "specName": "logical sessions popup",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T17:19:41.402Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T17:21:52.025Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T17:22:01.776Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T17:22:01.831Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T17:22:01.887Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T17:22:01.954Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-20T17:24:30.196Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T17:25:30.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T17:26:12.603Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T17:27:00.649Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T17:27:56.955Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T17:28:23.138Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T17:28:23.193Z"
+    }
+  ],
+  "last_action": "all 5 tasks done — 25 affected browser tests and the Overseer production build pass",
+  "coverage": {
+    "FR-001": {
+      "title": "Главное окно показывает только число активных логических сессий и элемент открытия попапа без деталей отдельных сессий.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-002": {
+      "title": "Счётчик учитывает только распознанные логические сессии с текущим состоянием «подключена».",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::counts zero through seven sessions and keeps a seven-session mobile dialog scrollable"
+      ]
+    },
+    "FR-003": {
+      "title": "Счётчик обновляется при каждом новом подтверждённом состоянии координации без перезагрузки.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog",
+        "tests/browser/state-changing-command-authoring.spec.mjs::counts zero through seven sessions and keeps a seven-session mobile dialog scrollable"
+      ]
+    },
+    "FR-004": {
+      "title": "Попап можно открыть из главного окна независимо от значения счётчика.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-005": {
+      "title": "Попап показывает все распознанные сессии с меткой, подключённостью, ролью и персонажем.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-006": {
+      "title": "Попап сохраняет все существующие действия управления и их правила доступности.",
+      "tests": [
+        "tests/browser/player-management.spec.mjs::keeps assignment",
+        "release",
+        "controller",
+        "and claimed transfer corrections in logical-session rows during broadcast"
+      ]
+    },
+    "FR-007": {
+      "title": "Попап показывает состояние выполнения, успех и ошибку операций управления.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-008": {
+      "title": "Попап показывает однозначное пустое состояние при отсутствии распознанных сессий.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-009": {
+      "title": "Открытый попап актуализирует список по подтверждённому состоянию и удаляет устаревшие строки.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog"
+      ]
+    },
+    "FR-010": {
+      "title": "Попап поддерживает доступное открытие и закрытие с восстановлением фокуса.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs::logical-session details and controls live in a reactive keyboard-accessible dialog",
+        "tests/browser/state-changing-command-authoring.spec.mjs::counts zero through seven sessions and keeps a seven-session mobile dialog scrollable"
+      ]
+    },
+    "FR-011": {
+      "title": "Перенос интерфейса сохраняет существующие правила, операции, форматы и результаты действий.",
+      "tests": [
+        "tests/browser/state-changing-command-authoring.spec.mjs",
+        "tests/browser/player-management.spec.mjs"
+      ]
+    }
+  },
+  "size": "simple",
+  "classification": {
+    "projectedFiles": 4,
+    "projectedTasks": 5,
+    "scopeSignal": "none",
+    "verdict": "simple"
+  },
+  "context": [
+    "area: frontend/overseer/src logical-session UI",
+    "area: tests/browser/state-changing-command-authoring.spec.mjs",
+    "constraint: main window exposes only the active-session count; all session details and controls live in the popup"
+  ],
+  "intent": "Освободить главное окно Overseer, сохранив полный просмотр и управление логическими сессиями в отдельном попапе.",
+  "expectations": [
+    "Не изменять серверную модель, распознавание или жизненный цикл логических сессий.",
+    "Не изменять правила назначения персонажей, ролей, передачи управления и трансляции.",
+    "Не добавлять новые операции управления или форматы сохраняемых данных."
+  ],
+  "approach": "Перенести существующий список и его действия в доступный модальный попап, а в главном окне оставить реактивный счётчик подключённых логических сессий.",
+  "currentTask": "T005",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Replaced the inline logical-session list with a compact active count and moved the full list, controls, and feedback into a labelled modal dialog.",
+      "files": [
+        "frontend/overseer/src/index.html"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added compact active-count styling and a responsive, scrollable logical-session dialog with visible focus and feedback states.",
+      "files": [
+        "frontend/overseer/src/overseer.css"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Implemented connected-session counting, live dialog rendering, mirrored operation feedback, modal lifecycle, Escape handling, and opener-focus restoration.",
+      "files": [
+        "frontend/overseer/src/overseer.js"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added browser coverage for connected-session counting, main-window detail removal, complete dialog content and controls, live updates, and focus restoration.",
+      "files": [
+        "tests/browser/state-changing-command-authoring.spec.mjs"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Validated the complete change with all 12 focused browser scenarios and a successful Overseer production build.",
+      "files": [
+        "tests/browser/package.json",
+        "frontend/overseer/package.json"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Logical-session authoring browser coverage",
+      "command": "npm test --prefix tests/browser -- state-changing-command-authoring.spec.mjs",
+      "result": "13 passed",
+      "warnings": [
+        "Playwright web server reported the benign NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    },
+    {
+      "what": "Existing player and logical-session management regression coverage",
+      "command": "npm test --prefix tests/browser -- player-management.spec.mjs",
+      "result": "12 passed",
+      "warnings": [
+        "Playwright web server reported the benign NO_COLOR/FORCE_COLOR environment warning"
+      ]
+    },
+    {
+      "what": "Overseer production build",
+      "command": "npm run build --prefix frontend/overseer",
+      "result": "passed; 40 modules transformed",
+      "warnings": []
+    },
+    {
+      "what": "Syntax and patch hygiene",
+      "command": "node --check affected scripts; git diff --check",
+      "result": "passed",
+      "warnings": []
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Treat a logical session as active only when its authoritative connected flag is true.",
+      "why": "This matches the accepted specification assumption and keeps recognized disconnected sessions available only in the detailed dialog.",
+      "rejected": "Counting every recognized session regardless of current connectivity."
+    },
+    {
+      "decision": "Use a native modal dialog and keep the existing logical-session row template and command handlers.",
+      "why": "Native modality provides focus containment and Escape behavior while preserving every established management operation.",
+      "rejected": "Create a second session model or duplicate the management implementation."
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Moved logical-session details and all existing controls into a reactive accessible dialog while leaving only the connected-session count in the main Overseer panel."
+    }
+  }
+}

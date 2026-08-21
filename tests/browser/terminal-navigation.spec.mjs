@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 const FIXTURE = '/__fixture/terminal-navigation';
-const MASTER = `${FIXTURE}/master`;
+const OVERSEER = `${FIXTURE}/overseer`;
 
-async function openMaster(page) {
-  await page.goto(MASTER);
+async function openOverseer(page) {
+  await page.goto(OVERSEER);
   await page.getByRole('button', { name: 'ОТКРЫТЬ СЕССИЮ' }).click();
   await expect(page.locator('#mainLayout')).toBeVisible();
 }
@@ -24,7 +24,7 @@ async function openPlayer(browser) {
   await page.goto('/');
   await expect(page.locator('#connOverlay')).toBeHidden();
   await page.locator('#characterOptions button:not([disabled])').first().click();
-  await expect(page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+  await expect(page.locator('#roleBadge')).toContainText('АКТИВЕН');
   return { context, page };
 }
 
@@ -43,22 +43,22 @@ async function openParticipant(browser, token = '') {
   if (await page.locator('#characterSelect').isVisible()) {
     await page.locator('#characterOptions button:not([disabled])').first().click();
   }
-  await expect(page.locator('#roleBadge')).toContainText(/АКТИВНЫЙ|НАБЛЮДАТЕЛЬ/);
+  await expect(page.locator('#roleBadge')).toContainText(/АКТИВЕН|НАБЛЮДАТЕЛЬ/);
   return { context, page };
 }
 
-async function approveForwardTransition(master, player) {
+async function approveForwardTransition(overseer, player) {
   await player.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).click();
   await expectPendingTransitionSurface(player);
-  const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+  const dialog = overseer.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
   await expect(dialog).toHaveCount(1);
   await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
   await expect(player.locator('#hackHeader')).toBeVisible();
   await expect(player.locator('#playerNotice')).toBeHidden();
 }
 
-async function decideNavigation(master, decision) {
-  const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+async function decideNavigation(overseer, decision) {
+  const dialog = overseer.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
   await expect(dialog).toHaveCount(1);
   await dialog.getByRole('button', { name: decision === 'approve' ? 'ОДОБРИТЬ' : 'ОТКЛОНИТЬ' }).click();
   await expect(dialog).toBeHidden();
@@ -86,8 +86,101 @@ test.beforeEach(async ({ request }) => {
   expect(response.ok()).toBe(true);
 });
 
+test('active player identity is an immersive lower system line', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('/');
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  await page.locator('#characterOptions button:not([disabled])').first().click();
+
+  const status = page.locator('#playerIdentity');
+  await expect(status).toBeVisible();
+  await expect(status).toHaveText(/^\s*\[СИСТЕМА\] ВВОД\s+P\d+\s+\/\/\s+Mara\s+\/\/\s+АКТИВЕН\s*$/);
+  await expect(status).not.toContainText('PLAYER');
+  await expect(status).toHaveAttribute('role', 'status');
+  await expect(page.locator('#roleBadge')).toHaveText('АКТИВЕН');
+  await expect(page.locator('.player-identity, .role-badge')).toHaveCount(0);
+
+  const presentation = await status.evaluate(element => {
+    const statusBounds = element.getBoundingClientRect();
+    const promptBounds = document.querySelector('#termPrompt').getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      beforePrompt: statusBounds.bottom <= promptBounds.top,
+      borderStyle: style.borderStyle,
+      backgroundColor: style.backgroundColor,
+      textTransform: style.textTransform,
+    };
+  });
+  expect(presentation).toEqual({
+    beforePrompt: true,
+    borderStyle: 'none',
+    backgroundColor: 'rgba(0, 0, 0, 0)',
+    textTransform: 'uppercase',
+  });
+
+  await context.close();
+});
+
+test('lower status stays contained on narrow, short, and hacking surfaces', async ({ browser }) => {
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
+
+  const playerContext = await browser.newContext({ viewport: { width: 520, height: 640 } });
+  const player = await playerContext.newPage();
+  await player.goto('/');
+  await expect(player.locator('#connOverlay')).toBeHidden();
+  await player.locator('#characterOptions button:not([disabled])').first().click();
+  await expect(player.locator('#roleBadge')).toHaveText('АКТИВЕН');
+
+  const statusGeometry = async contentSelector => player.evaluate(selector => {
+    const screen = document.querySelector('#screen').getBoundingClientRect();
+    const content = document.querySelector(selector).getBoundingClientRect();
+    const status = document.querySelector('#playerIdentity').getBoundingClientRect();
+    const promptElement = document.querySelector('#termPrompt');
+    const prompt = promptElement.hidden ? null : promptElement.getBoundingClientRect();
+    return {
+      insideScreen: status.left >= screen.left && status.right <= screen.right &&
+        status.top >= screen.top && status.bottom <= screen.bottom,
+      afterContent: status.top >= content.bottom,
+      beforePrompt: prompt === null || status.bottom <= prompt.top,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  }, contentSelector);
+
+  await expect(player.locator('#termList')).toBeVisible();
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await player.setViewportSize({ width: 1180, height: 420 });
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await player.setViewportSize({ width: 820, height: 600 });
+  await approveForwardTransition(overseer, player);
+  await expect(player.locator('#termPrompt')).toBeHidden();
+  expect(await statusGeometry('#termBody')).toEqual({
+    insideScreen: true,
+    afterContent: true,
+    beforePrompt: true,
+    pageOverflow: false,
+  });
+
+  await playerContext.close();
+  await overseerContext.close();
+});
+
 test('command authoring exposes one exclusive behavior selector', async ({ page }) => {
-  await openMaster(page);
+  await openOverseer(page);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
 
   const form = page.locator('#nodeForm');
@@ -113,7 +206,7 @@ test('command authoring exposes one exclusive behavior selector', async ({ page 
 });
 
 test('transition authoring is mutually exclusive, validates locally, and survives reopen', async ({ page }) => {
-  await openMaster(page);
+  await openOverseer(page);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
   const form = page.locator('#nodeForm');
   const mode = form.getByLabel('РЕЖИМ КОМАНДЫ');
@@ -130,7 +223,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   expect(stateChangeSave).not.toHaveProperty('terminalTransition');
 
   await page.reload();
-  await openMaster(page);
+  await openOverseer(page);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
   await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('state-change');
 
@@ -145,7 +238,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
     ?.terminals?.map(terminal => terminal.id))).toEqual(['residential', 'security', 'vault']);
 
   await page.reload();
-  await openMaster(page);
+  await openOverseer(page);
   await expect(page.locator('.term-row')).toHaveCount(3);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
   await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('terminal-transition');
@@ -159,7 +252,7 @@ test('transition authoring is mutually exclusive, validates locally, and survive
   expect(ordinarySave).not.toHaveProperty('terminalTransition');
 
   await page.reload();
-  await openMaster(page);
+  await openOverseer(page);
   await selectCommand(page, 'ПЕРЕЙТИ В ОХРАНУ');
   await expect(page.getByLabel('РЕЖИМ КОМАНДЫ')).toHaveValue('ordinary');
 
@@ -168,15 +261,15 @@ test('transition authoring is mutually exclusive, validates locally, and survive
 });
 
 test('deleting a referenced terminal is blocked before local mutation', async ({ page }) => {
-  await openMaster(page);
+  await openOverseer(page);
 	const security = page.locator('.term-row', { hasText: 'Терминал охраны' });
   await security.getByRole('button', { name: 'УДАЛИТЬ' }).click();
 	await expect(page.locator('#coordinationError')).toContainText(/ссыла|переход/i);
 	await expect(page.locator('.term-row', { hasText: 'Терминал охраны' })).toHaveCount(1);
 });
 
-test('one forward request opens one exact master dialog and close rejects it', async ({ page, request }) => {
-  await openMaster(page);
+test('one forward request opens one exact overseer dialog and close rejects it', async ({ page, request }) => {
+  await openOverseer(page);
   const armed = await request.post(`${FIXTURE}/pending-forward`);
   expect(armed.ok()).toBe(true);
   const dialog = page.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
@@ -195,17 +288,17 @@ test('one forward request opens one exact master dialog and close rejects it', a
 });
 
 test('approved first entry opens the destination hack at root without a terminal-switch decision', async ({ browser }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
-    await approveForwardTransition(master, player.page);
-    await expect(master.getByRole('dialog', { name: /СМЕНА ТЕРМИНАЛА/i })).toHaveCount(0);
+    await approveForwardTransition(overseer, player.page);
+    await expect(overseer.getByRole('dialog', { name: /СМЕНА ТЕРМИНАЛА/i })).toHaveCount(0);
     await expect(player.page.locator('#attemptsLine')).toContainText('ОСТАЛОСЬ');
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
@@ -215,14 +308,14 @@ for (const command of [
 ]) {
   test(`${command.mode} command preserves its approve/reject/close result across controller, observers, and reconnect`, async ({ browser, request }) => {
     const runDecision = async decision => {
-      const masterContext = await browser.newContext();
-      const master = await masterContext.newPage();
-      await openMaster(master);
+      const overseerContext = await browser.newContext();
+      const overseer = await overseerContext.newPage();
+      await openOverseer(overseer);
       const controller = await openParticipant(browser);
       const firstObserver = await openParticipant(browser);
       let secondObserver = await openParticipant(browser);
       try {
-        await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+        await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
         await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
         await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
         const sourceMenu = await controller.page.locator('#termList').textContent();
@@ -231,7 +324,7 @@ for (const command of [
         await Promise.all([controller, firstObserver, secondObserver].map(participant =>
           expectPendingTransitionSurface(participant.page)));
 
-        const dialog = master.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
+        const dialog = overseer.getByRole('dialog', { name: 'ПОДТВЕРЖДЕНИЕ КОМАНДЫ' });
         await expect(dialog).toHaveCount(1);
 
         const stateResponse = await request.get(`${FIXTURE}/state`);
@@ -264,7 +357,7 @@ for (const command of [
           await expect(dialog.getByRole('button', { name: 'ОДОБРИТЬ' })).toBeFocused();
           await dialog.press('ArrowRight');
           await expect(dialog.getByRole('button', { name: 'ОТКЛОНИТЬ' })).toBeFocused();
-          await master.keyboard.press('Enter');
+          await overseer.keyboard.press('Enter');
         } else {
           await dialog.getByRole('button', { name: 'ОДОБРИТЬ' }).click();
         }
@@ -288,7 +381,7 @@ for (const command of [
         await controller.context.close();
         await firstObserver.context.close();
         await secondObserver.context.close();
-        await masterContext.close();
+        await overseerContext.close();
       }
     };
 
@@ -302,14 +395,14 @@ for (const command of [
 
 test('direct pending replaces every player menu with the inert record surface across reconnect and decisions', async ({ browser, request }) => {
   const runDecision = async decision => {
-    const masterContext = await browser.newContext();
-    const master = await masterContext.newPage();
-    await openMaster(master);
+    const overseerContext = await browser.newContext();
+    const overseer = await overseerContext.newPage();
+    await openOverseer(overseer);
     const controller = await openParticipant(browser);
     const firstObserver = await openParticipant(browser);
     let secondObserver = await openParticipant(browser);
     try {
-      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
       await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       const sourceMenu = await controller.page.locator('#termList').textContent();
@@ -330,7 +423,7 @@ test('direct pending replaces every player menu with the inert record surface ac
         await expectPendingTransitionSurface(participant.page);
       }
 
-      const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+      const dialog = overseer.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
       await expect(dialog).toBeVisible();
       if (decision === 'close') await dialog.press('Escape');
       else await dialog.getByRole('button', { name: decision === 'approve' ? 'ОДОБРИТЬ' : 'ОТКЛОНИТЬ' }).click();
@@ -350,7 +443,7 @@ test('direct pending replaces every player menu with the inert record surface ac
       await controller.context.close();
       await firstObserver.context.close();
       await secondObserver.context.close();
-      await masterContext.close();
+      await overseerContext.close();
     }
   };
 
@@ -363,19 +456,19 @@ test('direct pending replaces every player menu with the inert record surface ac
 
 test('return pending replaces every player menu with the inert record surface across reconnect and decisions', async ({ browser, request }) => {
   const runDecision = async decision => {
-    const masterContext = await browser.newContext();
-    const master = await masterContext.newPage();
-    await openMaster(master);
+    const overseerContext = await browser.newContext();
+    const overseer = await overseerContext.newPage();
+    await openOverseer(overseer);
     const controller = await openParticipant(browser);
     const firstObserver = await openParticipant(browser);
     let secondObserver = await openParticipant(browser);
     try {
-      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+      await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
       await expect(firstObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
       await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
 
       await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
-      await decideNavigation(master, 'approve');
+      await decideNavigation(overseer, 'approve');
       await expect(controller.page.locator('#hackHeader')).toBeVisible();
       await finishHack(request, controller.page);
       await Promise.all([firstObserver, secondObserver].map(participant =>
@@ -400,7 +493,7 @@ test('return pending replaces every player menu with the inert record surface ac
         await expectPendingTransitionSurface(participant.page);
       }
 
-      const dialog = master.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
+      const dialog = overseer.getByRole('dialog', { name: 'ПЕРЕХОД МЕЖДУ ТЕРМИНАЛАМИ' });
       await expect(dialog).toBeVisible();
       if (decision === 'close') await dialog.press('Escape');
       else await dialog.getByRole('button', { name: decision === 'approve' ? 'ОДОБРИТЬ' : 'ОТКЛОНИТЬ' }).click();
@@ -424,7 +517,7 @@ test('return pending replaces every player menu with the inert record surface ac
       await controller.context.close();
       await firstObserver.context.close();
       await secondObserver.context.close();
-      await masterContext.close();
+      await overseerContext.close();
     }
   };
 
@@ -436,12 +529,12 @@ test('return pending replaces every player menu with the inert record surface ac
 });
 
 test('an unfinished destination hack resumes with the exact retained progress', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
-    await approveForwardTransition(master, player.page);
+    await approveForwardTransition(overseer, player.page);
     const words = player.page.locator('.hcell.word');
     await expect(words.first()).toBeVisible();
     const initialAttempts = await player.page.locator('#attemptsLine').textContent();
@@ -458,19 +551,19 @@ test('an unfinished destination hack resumes with the exact retained progress', 
     await expect(player.page.locator('#hackLog')).toHaveText(retainedLog);
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
 test('root return stays pending on reject, then restores the nested source menu on approve', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
     await player.page.locator('.term-row', { hasText: 'НАВИГАЦИЯ' }).click();
     await player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ' }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await expect(player.page.locator('#hackHeader')).toBeVisible();
     await finishHack(request, player.page);
 		expect((await request.post(`${FIXTURE}/move-source-folder`)).ok()).toBe(true);
@@ -479,52 +572,52 @@ test('root return stays pending on reject, then restores the nested source menu 
     await expect(returnButton).toBeVisible();
     await returnButton.click();
     await expectPendingTransitionSurface(player.page);
-    await decideNavigation(master, 'reject');
+    await decideNavigation(overseer, 'reject');
     await expect(player.page.locator('#termList')).toBeVisible();
     await expect(returnButton).toBeVisible();
     await expect(returnButton).toBeEnabled();
     await returnButton.click();
     await expectPendingTransitionSurface(player.page);
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
 
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ' })).toBeVisible();
     await expect(player.page.getByRole('button', { name: /НАЗАД В/i })).toHaveCount(0);
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
 test('deleted source folder falls back to root without losing the terminal route', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
     await player.page.locator('.term-row', { hasText: 'НАВИГАЦИЯ' }).click();
     await player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ ИЗ ПАПКИ' }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await finishHack(request, player.page);
     expect((await request.post(`${FIXTURE}/delete-source-folder`)).ok()).toBe(true);
     await player.page.getByRole('button', { name: /НАЗАД В Жилой терминал/i }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first()).toBeVisible();
     await expect(player.page.locator('.term-row', { hasText: 'НАВИГАЦИЯ' })).toHaveCount(0);
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
 test('controller and two observers reconnect during pending and converge before new-broadcast cleanup', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const controller = await openParticipant(browser);
   let observer = await openParticipant(browser);
   const secondObserver = await openParticipant(browser);
   try {
-    await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВНЫЙ');
+    await expect(controller.page.locator('#roleBadge')).toContainText('АКТИВЕН');
     await expect(observer.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
     await expect(secondObserver.page.locator('#roleBadge')).toContainText('НАБЛЮДАТЕЛЬ');
     await controller.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
@@ -540,7 +633,7 @@ test('controller and two observers reconnect during pending and converge before 
     await observer.context.close();
     observer = await openParticipant(browser, token);
     await expectPendingTransitionSurface(observer.page);
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await Promise.all([controller, observer, secondObserver].map(participant =>
       expect(participant.page.locator('#hackHeader')).toBeVisible({ timeout: 2000 })));
 
@@ -553,49 +646,49 @@ test('controller and two observers reconnect during pending and converge before 
     await controller.context.close();
     await observer.context.close();
     await secondObserver.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
 test('stale target approval fails safely and keeps the source terminal active', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
     await player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
     expect((await request.post(`${FIXTURE}/remove-target`)).ok()).toBe(true);
-    await decideNavigation(master, 'approve');
-    await expect(master.locator('#coordinationError')).toContainText(/ИЗМЕНИЛАСЬ|НЕ СУЩЕСТВУЕТ|no longer|changed/i);
+    await decideNavigation(overseer, 'approve');
+    await expect(overseer.locator('#coordinationError')).toContainText(/ИЗМЕНИЛАСЬ|НЕ СУЩЕСТВУЕТ|no longer|changed/i);
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first()).toBeVisible();
     await expect(player.page.locator('#hackHeader')).toBeHidden();
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });
 
 test('A to B to C returns unwind exactly B then A', async ({ browser, request }) => {
-  const masterContext = await browser.newContext();
-  const master = await masterContext.newPage();
-  await openMaster(master);
+  const overseerContext = await browser.newContext();
+  const overseer = await overseerContext.newPage();
+  await openOverseer(overseer);
   const player = await openPlayer(browser);
   try {
     await player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first().click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await finishHack(request, player.page);
     await player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ХРАНИЛИЩЕ' }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
 
     await player.page.getByRole('button', { name: /НАЗАД В Терминал охраны/i }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ХРАНИЛИЩЕ' })).toBeVisible();
     await player.page.getByRole('button', { name: /НАЗАД В Жилой терминал/i }).click();
-    await decideNavigation(master, 'approve');
+    await decideNavigation(overseer, 'approve');
     await expect(player.page.locator('.term-row', { hasText: 'ПЕРЕЙТИ В ОХРАНУ' }).first()).toBeVisible();
     await expect(player.page.getByRole('button', { name: /НАЗАД В/i })).toHaveCount(0);
   } finally {
     await player.context.close();
-    await masterContext.close();
+    await overseerContext.close();
   }
 });

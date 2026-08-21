@@ -79,7 +79,7 @@ check_active_commands() {
     fi
 
     case "$relative_file" in
-      scripts/tool-modules-check.sh|specs/*|docs/wails-migration-rollback.md|node_modules/*|frontend/node_modules/*|client/node_modules/*|tests/browser/node_modules/*)
+      scripts/tool-modules-check.sh|specs/*|docs/wails-migration-rollback.md|node_modules/*|frontend/node_modules/*|frontend/client/node_modules/*|frontend/overseer/node_modules/*|tests/browser/node_modules/*)
         continue
         ;;
     esac

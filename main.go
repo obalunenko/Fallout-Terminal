@@ -29,43 +29,43 @@ import (
 // compilation. The checked-in .keep keeps ordinary Go tooling compile-safe on a
 // clean checkout.
 //
-//go:embed all:frontend/dist
-var frontendSource embed.FS
+//go:embed all:frontend/overseer/dist
+var overseerSource embed.FS
 
 // The player remains a distinct browser application but is owned and served
 // by the same Go process.
 //
-//go:embed all:client/dist
-var playerSource embed.FS
+//go:embed all:frontend/client/dist
+var clientSource embed.FS
 
 func main() {
-	frontendAssets, err := fs.Sub(frontendSource, "frontend/dist")
+	overseerAssets, err := fs.Sub(overseerSource, "frontend/overseer/dist")
 	if err != nil {
 		log.Fatal(err)
 	}
-	playerAssets, err := fs.Sub(playerSource, "client/dist")
+	clientAssets, err := fs.Sub(clientSource, "frontend/client/dist")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	host := newWailsApplication(frontendAssets)
-	core, err := composeApplication(host, playerAssets)
+	host := newWailsApplication(overseerAssets)
+	core, err := composeApplication(host, clientAssets)
 	if err != nil {
 		log.Fatal(err)
 	}
 	registerWailsServices(host, core)
-	newMasterWindow(host)
+	newOverseerWindow(host)
 	if err := host.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func composeApplication(host *application.App, playerAssets fs.FS) (*App, error) {
+func composeApplication(host *application.App, clientAssets fs.FS) (*App, error) {
 	locations, err := platform.DefaultSessionLocations(applicationResourceRoot())
 	if err != nil {
 		return nil, err
 	}
-	if err := validateProductionResources(playerAssets, locations.BundledDemo); err != nil {
+	if err := validateProductionResources(clientAssets, locations.BundledDemo); err != nil {
 		return nil, err
 	}
 	publicAccessSettingsPath, err := platform.PublicAccessSettingsPath(locations.ApplicationSupport)
@@ -101,11 +101,11 @@ func composeApplication(host *application.App, playerAssets fs.FS) (*App, error)
 	})
 	playerConfig := playerserver.Config{
 		Address: runtimeConfig.PlayerServer.Address,
-		Assets:  playerAssets,
+		Assets:  clientAssets,
 	}
 	connectPlayer, err := playerserver.NewConnectService(playerserver.ConnectServiceConfig{
 		Coordinator: coordination,
-		Assets:      playerAssets,
+		Assets:      clientAssets,
 		QueueSize:   int(runtimeConfig.PlayerServer.DeliveryQueueSize),
 		OnClientCount: func(count int) {
 			if app := effectRouter.App(); app != nil {

@@ -39,7 +39,7 @@ type PlayerConfigHandle struct {
 	ContentDigest string
 }
 
-// PlayerConfigMetadata is the detached game-master view of the active config.
+// PlayerConfigMetadata is the detached Overseer view of the active config.
 type PlayerConfigMetadata struct {
 	Status   string `json:"status"`
 	Name     string `json:"name"`
@@ -309,7 +309,7 @@ const (
 	TerminalLifecycleSuspended TerminalLifecycle = "suspended"
 )
 
-// TerminalSwitchChoice is the game master's explicit unfinished-puzzle decision.
+// TerminalSwitchChoice is the Overseer's explicit unfinished-puzzle decision.
 type TerminalSwitchChoice string
 
 const (
@@ -318,7 +318,7 @@ const (
 	TerminalSwitchCancel   TerminalSwitchChoice = "cancel"
 )
 
-// CommandExecutionDecision is the trusted game-master resolution for the
+// CommandExecutionDecision is the trusted Overseer resolution for the
 // exact currently pending state-changing command request.
 type CommandExecutionDecision string
 
@@ -328,7 +328,7 @@ const (
 )
 
 // CommandApprovalMode records the exact behavior that will run after the
-// game master approves a pending command. Completed state-changing commands
+// Overseer approves a pending command. Completed state-changing commands
 // remain distinct because approval must show their frozen result without a
 // second durable write.
 type CommandApprovalMode string
@@ -379,7 +379,7 @@ type TerminalReturnPoint struct {
 	CommandName       string
 }
 
-// PendingTerminalNavigation is the exact private decision awaiting the game master.
+// PendingTerminalNavigation is the exact private decision awaiting the Overseer.
 type PendingTerminalNavigation struct {
 	RequestID           string
 	BroadcastID         BroadcastID
@@ -508,7 +508,7 @@ type LogicalSession struct {
 }
 
 // CharacterCreatePayload is the complete trusted roster profile requested by
-// the game master. ExpectedRevision makes retries and concurrent edits
+// the Overseer. ExpectedRevision makes retries and concurrent edits
 // explicit at the coordinator transaction boundary.
 type CharacterCreatePayload struct {
 	Name                string
@@ -600,7 +600,7 @@ type TerminalTransitionTarget struct {
 }
 
 // PendingCommandExecution is the single broadcast-scoped request awaiting a
-// private game-master decision. ControllerSessionID is coordinator-private.
+// private Overseer decision. ControllerSessionID is coordinator-private.
 type PendingCommandExecution struct {
 	RequestID           string
 	BroadcastID         BroadcastID
@@ -757,7 +757,7 @@ func (state PlayerState) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// MasterRosterEntry is the game-master view of one roster claim.
+// MasterRosterEntry is the Overseer view of one roster claim.
 type MasterRosterEntry struct {
 	ID                  CharacterID       `json:"id"`
 	Name                string            `json:"name"`
@@ -766,7 +766,7 @@ type MasterRosterEntry struct {
 	ClaimedBySessionID  *LogicalSessionID `json:"claimedBySessionId"`
 }
 
-// MasterSessionEntry is the game-master view of one recognized logical session.
+// MasterSessionEntry is the Overseer view of one recognized logical session.
 type MasterSessionEntry struct {
 	ID           LogicalSessionID `json:"id"`
 	FallbackName string           `json:"fallbackName"`
@@ -775,7 +775,7 @@ type MasterSessionEntry struct {
 	Role         PlayerRole       `json:"role"`
 }
 
-// MasterBroadcastState is the game-master view of the current broadcast epoch.
+// MasterBroadcastState is the Overseer view of the current broadcast epoch.
 type MasterBroadcastState struct {
 	ID                  BroadcastID       `json:"id"`
 	ControllerSessionID *LogicalSessionID `json:"controllerSessionId"`
@@ -1054,7 +1054,7 @@ func clonePlayerCharacter(value *PlayerCharacter) *PlayerCharacter {
 	return &clone
 }
 
-// ServerInfo is safe status displayed to the game master.
+// ServerInfo is safe status displayed to the Overseer.
 type ServerInfo struct {
 	IP          string `json:"ip"`
 	Port        int    `json:"port"`

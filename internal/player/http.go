@@ -27,7 +27,7 @@ var (
 	}
 )
 
-// NewHTTPHandler serves a player filesystem rooted at client/. The supplied
+// NewHTTPHandler serves a player filesystem rooted at frontend/client/. The supplied
 // filesystem is the handler's complete namespace; no host filesystem paths are
 // opened or derived from requests.
 func NewHTTPHandler(assets fs.FS) http.Handler {
