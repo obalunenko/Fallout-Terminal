@@ -46,7 +46,7 @@ scan_tree() {
   [[ -f "${root}/docs/wails-migration-rollback.md" ]] || { fail 'historical Electron-to-Wails rollback record is missing'; return 1; }
   grep -Eq 'specs/006-wails-v3-migration/quickstart\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 quickstart'; return 1; }
   grep -Eq 'docs/wails-v3-migration-rollback\.md' "${root}/README.md" || { fail 'README does not link the active Wails v3 rollback record'; return 1; }
-  grep -Eqi 'histor' "${root}/README.md" || { fail 'README does not identify earlier migration records as history'; return 1; }
+  grep -Eqi 'histor|истор' "${root}/README.md" || { fail 'README does not identify earlier migration records as history'; return 1; }
 }
 
 self_test() {
@@ -56,7 +56,7 @@ self_test() {
   mkdir -p "${fixture}/build/darwin" "${fixture}/frontend/overseer/src" "${fixture}/frontend/overseer/bindings" "${fixture}/frontend/overseer/dist" \
     "${fixture}/internal/app" "${fixture}/scripts" "${fixture}/.github/workflows" \
     "${fixture}/specs/001-wails-v2-migration" "${fixture}/docs"
-  printf 'module example.test/app\n\ngo 1.26\n\nrequire github.com/wailsapp/wails/v3 v3.0.0-beta.10\n' >"${fixture}/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n\nrequire github.com/wailsapp/wails/v3 v3.0.0-beta.10\n' >"${fixture}/go.mod"
   : >"${fixture}/go.sum"
   printf 'package main\nimport _ "github.com/wailsapp/wails/v3/pkg/application"\n' >"${fixture}/main.go"
   printf 'export const ready = true;\n' >"${fixture}/frontend/overseer/src/app.js"

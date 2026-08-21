@@ -124,12 +124,12 @@ scan_lifecycle_schema() {
   runtime_digest="$(shasum -a 256 "$runtime_schema" | awk '{print $1}')"
   revision_digest="$(shasum -a 256 "$scan_root/proto/schema-revision.txt" | awk '{print $1}')"
   baseline_digest="$(shasum -a 256 "$scan_root/proto/compatibility-baseline.binpb" | awk '{print $1}')"
-  [[ "$runtime_digest" == 41aa8bd54b20ef826fec72607b9991cb30b7b2e2e23854c9bf36aafa28cb6741 ]] || {
-    fail 'feature-005 private runtime schema changed during the Wails migration'
+  [[ "$runtime_digest" == 4fd0b3ef31bd7ada1101ae36bfbd749acd36c53c4bc2da185d33dec4d4c669a9 ]] || {
+    fail 'reviewed private runtime schema changed unexpectedly'
     return 1
   }
-  [[ "$revision_digest" == 1c2da2faf5683239b88248d58b1b30a86a20953637689f177f598ef32a34ea06 ]] || {
-    fail 'reviewed feature-007 schema revision record changed unexpectedly'
+  [[ "$revision_digest" == 79b2445eb0ffc5873f774772ae5e0337623c36706b5f5d24f997c7c3ea0156ba ]] || {
+    fail 'reviewed schema revision record changed unexpectedly'
     return 1
   }
   [[ "$baseline_digest" == 50b88cc9e08a189012925e1a97094d1e097b223e591aca8acb856ba0daf099f3 ]] || {
@@ -154,7 +154,7 @@ self_test() {
   trap 'rm -rf "$fixture_root"' RETURN
 
   mkdir -p "$fixture_root/proto/fallout/terminal/private/v1" "$fixture_root/docs"
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
   cp "$repository_root/proto/fallout/terminal/private/v1/runtime.proto" "$fixture_root/proto/fallout/terminal/private/v1/runtime.proto"
   cp "$repository_root/proto/schema-revision.txt" "$fixture_root/proto/schema-revision.txt"
   cp "$repository_root/proto/compatibility-baseline.binpb" "$fixture_root/proto/compatibility-baseline.binpb"
@@ -172,12 +172,12 @@ self_test() {
   fi
 
   printf 'go run ./cmd/build dev\n' >"$fixture_root/docs/commands.md"
-  printf 'module example.test/app\n\ngo 1.26\n\ntool github.com/bufbuild/buf/cmd/buf\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n\ntool github.com/bufbuild/buf/cmd/buf\n' >"$fixture_root/go.mod"
   if check_tree "$fixture_root" >/dev/null 2>&1; then
     fail 'self-test accepted a root tool declaration'
   fi
 
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
   printf '\nmessage LifecycleFixture { string lifecycle_phase = 1; }\n' >>"$fixture_root/proto/fallout/terminal/private/v1/runtime.proto"
   if check_tree "$fixture_root" >/dev/null 2>&1; then
     fail 'self-test accepted a serialized lifecycle phase'

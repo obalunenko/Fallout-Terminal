@@ -1,11 +1,8 @@
 <!--
 Sync Impact Report
-- Version change: 5.0.1 -> 5.1.0
+- Version change: 5.1.0 -> 5.1.1
 - Modified principles:
-  - Project Identity (all frontend code now lives in one workspace with client and Overseer members)
-  - Govern the Accepted Desktop Runtime (nested role boundaries and Overseer terminology)
-  - Dependency Rules (one workspace install with isolated application packages)
-  - Testing and Quality Gates (canonical nested build and generation paths)
+  - Project Identity (supported Go baseline advanced to 1.27)
 - Added principles: None
 - Added sections: None
 - Removed sections: None
@@ -22,7 +19,7 @@ synchronizes authoritative content and state with browser-based player clients. 
 state uses the portable version-1 JSON session document; live terminal, navigation, hacking,
 connection, startup, and tunnel state is owned by the running application.
 
-The production architecture is a Go 1.26 modular monolith whose sole accepted production desktop
+The production architecture is a Go 1.27 modular monolith whose sole accepted production desktop
 runtime MUST be the repository's exactly pinned Wails v3.0.0-beta.10 implementation. Runtime, CLI,
 frontend, and generated-binding versions MUST remain mutually compatible and reproducibly pinned
 in their owning dependency graphs.
@@ -535,4 +532,4 @@ manually edited generated files, schema-breaking field reuse, public capability 
 stored-secret readback, generic bridge dispatchers, Make-owned build graphs, and permanent dual
 protocols without an explicit compatibility requirement.
 
-**Version**: 5.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-20
+**Version**: 5.1.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-21

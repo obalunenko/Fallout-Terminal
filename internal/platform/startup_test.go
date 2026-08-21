@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -55,8 +56,10 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			module := readAcceptanceDocument(t, filepath.Join(root, "tools", test.directory, "go.mod"))
 			assert.Equal(t, 1, strings.Count(module, "\ntool "))
 			assert.Contains(t, module, "\ntool "+test.tool+"\n")
-			assert.Contains(t, module, "\nrequire "+test.parentRequire)
-			assert.Contains(t, module, "\ngo 1.26\n")
+			parentPattern := "(?m)^[[:space:]]*(require[[:space:]]+)?" +
+				regexp.QuoteMeta(test.parentRequire) + "([[:space:]]+// indirect)?$"
+			assert.Regexp(t, parentPattern, module)
+			assert.Contains(t, module, "\ngo 1.27.0\n")
 
 			sum, err := os.ReadFile(filepath.Join(root, "tools", test.directory, "go.sum"))
 			require.NoError(t, err)

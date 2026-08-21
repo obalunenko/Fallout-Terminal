@@ -20,7 +20,7 @@
 Требуются:
 
 - Xcode Command Line Tools;
-- Go 1.26.x;
+- Go 1.27.x;
 - Node.js 20.19+ и npm.
 
 Из корня репозитория запустите:

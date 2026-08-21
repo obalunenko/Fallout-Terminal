@@ -86,10 +86,10 @@ test: ## Run the Go test suite.
 test-race: ## Run the Go test suite with the race detector.
 	$(GO) test -race ./...
 
-proto-generate: deps-client ## Regenerate protobuf code and update the reviewed revision.
+proto-generate: deps-frontend ## Regenerate protobuf code and update the reviewed revision.
 	scripts/proto-generate.sh --sync-revision
 
-proto-check: deps-client ## Verify protobuf formatting, generation, and generated clients.
+proto-check: deps-frontend ## Verify protobuf formatting, generation, and generated clients.
 	scripts/proto-check.sh
 
 proto-breaking: ## Verify protobuf compatibility and negative fixtures.
@@ -98,7 +98,7 @@ proto-breaking: ## Verify protobuf compatibility and negative fixtures.
 bindings-check: ## Verify deterministic Wails bindings and their public surface.
 	scripts/wails-bindings-check.sh
 
-browser-test: deps-client deps-browser ## Install Chromium and run Playwright journeys.
+browser-test: deps-frontend deps-browser ## Install Chromium and run Playwright journeys.
 	$(NPM) exec --prefix tests/browser -- playwright install chromium
 	$(NPM) test --prefix tests/browser
 

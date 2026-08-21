@@ -34,7 +34,7 @@ check_tool_module() {
     fail "tools/$directory/go.mod does not own $command_package"
     return 1
   }
-  grep -Eq "^require[[:space:]]+${parent_module//\//\\/}[[:space:]]+${version//./\\.}([[:space:]]+// indirect)?$" "$module_file" || {
+  grep -Eq "^[[:space:]]*(require[[:space:]]+)?${parent_module//\//\\/}[[:space:]]+${version//./\\.}([[:space:]]+// indirect)?$" "$module_file" || {
     fail "tools/$directory/go.mod does not pin $parent_module $version"
     return 1
   }
@@ -117,7 +117,7 @@ write_fixture_module() {
   local version="$5"
 
   mkdir -p "$scan_root/tools/$directory"
-  printf 'module example.test/tools/%s\n\ngo 1.26\n\ntool %s\n\nrequire %s %s\n' \
+  printf 'module example.test/tools/%s\n\ngo 1.27.0\n\ntool %s\n\nrequire %s %s\n' \
     "$directory" "$command_package" "$parent_module" "$version" >"$scan_root/tools/$directory/go.mod"
   printf '%s %s/go.mod h1:fixture\n' "$parent_module" "$version" >"$scan_root/tools/$directory/go.sum"
 }
@@ -127,7 +127,7 @@ self_test() {
   fixture_root="$(mktemp -d)"
   trap 'rm -rf "$fixture_root"' RETURN
 
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
   mkdir -p "$fixture_root/docs"
   printf 'go tool -modfile=tools/wails/go.mod wails3 generate bindings -clean ./...\n' >"$fixture_root/docs/commands.md"
   write_fixture_module "$fixture_root" wails github.com/wailsapp/wails/v3/cmd/wails3 github.com/wailsapp/wails/v3 v3.0.0-beta.10
@@ -140,7 +140,7 @@ self_test() {
   if check_tree "$fixture_root" >/dev/null 2>&1; then
     fail 'self-test accepted a root tool declaration'
   fi
-  printf 'module example.test/app\n\ngo 1.26\n' >"$fixture_root/go.mod"
+  printf 'module example.test/app\n\ngo 1.27.0\n' >"$fixture_root/go.mod"
 
   printf 'go install github.com/wailsapp/wails/v3/cmd/wails3@latest\n' >"$fixture_root/docs/commands.md"
   if check_tree "$fixture_root" >/dev/null 2>&1; then
