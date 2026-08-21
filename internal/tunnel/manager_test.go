@@ -753,8 +753,12 @@ func TestPublicAccessManagerShutdownBoundsContextIgnoringCloseAndRetainsRetryOwn
 	t.Cleanup(func() { closeGateOnce.Do(func() { close(closeGate) }) })
 	service.setCloseGate(1, closeGate, true)
 
-	shutdownContext, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
-	defer cancel()
+	shutdownDeadline, stopShutdownDeadline := context.WithTimeoutCause(t.Context(), 25*time.Millisecond, errors.New("test manager shutdown timed out"))
+	shutdownContext, cancelShutdown := context.WithCancelCause(shutdownDeadline)
+	defer func() {
+		cancelShutdown(errors.New("test manager shutdown completed"))
+		stopShutdownDeadline()
+	}()
 	finished := make(chan error, 1)
 	go func() { finished <- manager.Shutdown(shutdownContext) }()
 

@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"os"
@@ -23,7 +24,7 @@ func TestDarwinKeychainAdapterOptInRoundTripWithoutReadbackSurface(t *testing.T)
 	require.NoError(t, err)
 	service := "com.vaulttec.fallout-terminal.dev.public-access.integration." + hex.EncodeToString(suffix)
 	store := newDarwinKeychainSecretStoreWithService(service)
-	t.Cleanup(func() { _ = store.Delete(t.Context(), tunnel.ProviderAccountToken) })
+	t.Cleanup(func() { _ = store.Delete(context.WithoutCancel(t.Context()), tunnel.ProviderAccountToken) })
 
 	value := make([]byte, 24)
 	_, err = rand.Read(value)

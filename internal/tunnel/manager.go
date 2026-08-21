@@ -13,6 +13,16 @@ const (
 	publicAccessCleanupTimeout = 5 * time.Second
 )
 
+var (
+	errPublicAccessContextRequired = errors.New("public-access context is required")
+	errPublicAccessStartCompleted  = errors.New("public-access startup completed")
+	errPublicAccessStartTimedOut   = errors.New("public-access startup timed out")
+	errPublicAccessStopped         = errors.New("public access stopped")
+	errPublicAccessReconfigured    = errors.New("public access reconfigured")
+	errPublicAccessCleanupComplete = errors.New("public-access cleanup complete")
+	errPublicAccessCleanupTimedOut = errors.New("public-access cleanup timed out")
+)
+
 type PublicAccessSettings interface {
 	Load() (PublicAccessPreferences, error)
 	Save(PublicAccessPreferences) error
@@ -45,7 +55,8 @@ type startOperation struct {
 	settleOnce sync.Once
 	generation uint64
 	revision   uint64
-	cancel     context.CancelFunc
+	context    context.Context
+	cancel     context.CancelCauseFunc
 	result     PublicAccessResult
 }
 
@@ -144,7 +155,9 @@ func NewPublicAccessManager(config ManagerConfig) (*PublicAccessManager, error) 
 
 func (manager *PublicAccessManager) Initialize(ctx context.Context) PublicAccessSnapshot {
 	if ctx == nil {
-		ctx = context.Background()
+		snapshot := manager.Snapshot()
+		snapshot.Status = failedStatus(snapshot.Status, ErrorValidation)
+		return snapshot
 	}
 	preferences, settingsErr := manager.settings.Load()
 	if settingsErr == nil {
@@ -196,7 +209,7 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 		return PublicAccessResult{Error: ErrorProviderFailure.SafeMessage()}
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return PublicAccessResult{Error: errPublicAccessContextRequired.Error(), Snapshot: manager.Snapshot()}
 	}
 
 	manager.mu.Lock()
@@ -295,8 +308,11 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 	generation := manager.status.Generation
 	revision := manager.preferences.Revision
 	preferences := manager.preferences
-	startContext, cancel := context.WithCancel(ctx)
-	operation := &startOperation{done: make(chan struct{}), settled: make(chan struct{}), generation: generation, revision: revision, cancel: cancel}
+	startContext, cancel := context.WithCancelCause(ctx)
+	operation := &startOperation{
+		done: make(chan struct{}), settled: make(chan struct{}), generation: generation, revision: revision,
+		context: startContext, cancel: cancel,
+	}
 	manager.start = operation
 	manager.pendingStart = operation
 	manager.status = PublicAccessStatus{State: LifecycleStarting, Generation: generation, SettingsRevision: revision}
@@ -344,15 +360,15 @@ func (manager *PublicAccessManager) startPublicAccess(ctx context.Context, expec
 
 	select {
 	case started := <-response:
-		cancel()
+		cancel(errPublicAccessStartCompleted)
 		return manager.finishStart(operation, started.endpoint, started.ingress, started.canonicalURL, started.err)
 	case <-manager.clock.After(PublicAccessStartupTimeout):
-		cancel()
+		cancel(errPublicAccessStartTimedOut)
 		manager.failCurrentStart(operation, ErrorTimeout)
 		go manager.disposeLateStart(operation, response)
 		return manager.completedStartResult(operation)
 	case <-ctx.Done():
-		cancel()
+		cancel(context.Cause(ctx))
 		manager.failCurrentStart(operation, ErrorTimeout)
 		go manager.disposeLateStart(operation, response)
 		return manager.completedStartResult(operation)
@@ -379,7 +395,7 @@ func (manager *PublicAccessManager) finishStart(
 		if ingress != nil {
 			ingress.Deny()
 		}
-		if closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress); closeErr != nil {
+		if closeErr := closePublicAccessRuntime(operation.context, endpoint, ingress); closeErr != nil {
 			manager.retainRuntimeAfterFailedCleanup(endpoint, ingress)
 		}
 		manager.mu.Lock()
@@ -397,7 +413,7 @@ func (manager *PublicAccessManager) finishStart(
 		if ingress != nil {
 			ingress.Deny()
 		}
-		if closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress); closeErr != nil {
+		if closeErr := closePublicAccessRuntime(operation.context, endpoint, ingress); closeErr != nil {
 			manager.retainRuntimeAfterFailedCleanup(endpoint, ingress)
 		}
 		manager.mu.Lock()
@@ -416,7 +432,7 @@ func (manager *PublicAccessManager) finishStart(
 	manager.settleStartLocked(operation)
 	manager.mu.Unlock()
 	manager.emit(result.Snapshot)
-	go manager.monitor(operation.generation, endpoint, ingress)
+	go manager.monitor(operation.context, operation.generation, endpoint, ingress)
 	return result
 }
 
@@ -425,7 +441,7 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 		return PublicAccessResult{Error: ErrorProviderFailure.SafeMessage()}
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return PublicAccessResult{Error: errPublicAccessContextRequired.Error(), Snapshot: manager.Snapshot()}
 	}
 	manager.mu.Lock()
 	if manager.reconfigure != nil {
@@ -472,7 +488,7 @@ func (manager *PublicAccessManager) Stop(ctx context.Context, expectedRevision u
 	manager.status.Generation++
 	generation := manager.status.Generation
 	if manager.start != nil && manager.start.cancel != nil {
-		manager.start.cancel()
+		manager.start.cancel(errPublicAccessStopped)
 	}
 	pendingStart := manager.pendingStart
 	endpoint := manager.endpoint
@@ -542,7 +558,8 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 		return PublicAccessResult{Error: ErrorProviderFailure.SafeMessage()}
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		mutation.clear()
+		return PublicAccessResult{Error: errPublicAccessContextRequired.Error(), Snapshot: manager.Snapshot()}
 	}
 	owned := PublicAccessMutation{
 		ExpectedRevision:        mutation.ExpectedRevision,
@@ -606,7 +623,7 @@ func (manager *PublicAccessManager) Reconfigure(ctx context.Context, mutation Pu
 	wasActive := manager.status.State == LifecycleStarting || manager.status.State == LifecycleReady ||
 		manager.endpoint != nil || manager.ingress != nil || manager.pendingStart != nil
 	if manager.start != nil && manager.start.cancel != nil {
-		manager.start.cancel()
+		manager.start.cancel(errPublicAccessReconfigured)
 	}
 	pendingStart := manager.pendingStart
 	endpoint := manager.endpoint
@@ -724,7 +741,7 @@ func savePublicAccessMutation(settings PublicAccessSettings, preferences PublicA
 
 func (manager *PublicAccessManager) Shutdown(ctx context.Context) error {
 	if ctx == nil {
-		ctx = context.Background()
+		return errPublicAccessContextRequired
 	}
 	for {
 		result := manager.Stop(ctx, manager.Snapshot().Preferences.Revision)
@@ -737,7 +754,7 @@ func (manager *PublicAccessManager) Shutdown(ctx context.Context) error {
 	}
 }
 
-func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEndpoint, ingress PublicIngress) {
+func (manager *PublicAccessManager) monitor(parent context.Context, generation uint64, endpoint TunnelEndpoint, ingress PublicIngress) {
 	<-endpoint.Done()
 	manager.mu.Lock()
 	if manager.endpoint != endpoint || manager.ingress != ingress || manager.status.State != LifecycleReady || manager.status.Generation != generation {
@@ -755,7 +772,7 @@ func (manager *PublicAccessManager) monitor(generation uint64, endpoint TunnelEn
 	manager.mu.Unlock()
 	manager.emit(snapshot)
 
-	closeErr := closePublicAccessRuntime(context.Background(), endpoint, ingress)
+	closeErr := closePublicAccessRuntime(parent, endpoint, ingress)
 	manager.mu.Lock()
 	if closeErr == nil {
 		if manager.endpoint == endpoint {
@@ -784,16 +801,25 @@ func publicAccessEndpointFailure(endpoint TunnelEndpoint) (ErrorCategory, string
 	return redactedPublicAccessFailure(failure)
 }
 
-func boundedPublicAccessCleanupContext(parent context.Context) (context.Context, context.CancelFunc) {
-	if parent == nil {
-		parent = context.Background()
+func boundedPublicAccessCleanupContext(parent context.Context) (context.Context, context.CancelCauseFunc) {
+	detached := context.WithoutCancel(parent)
+	deadline := time.Now().Add(publicAccessCleanupTimeout)
+	if parent.Err() == nil {
+		if parentDeadline, ok := parent.Deadline(); ok && parentDeadline.Before(deadline) {
+			deadline = parentDeadline
+		}
 	}
-	return context.WithTimeout(parent, publicAccessCleanupTimeout)
+	deadlineContext, stopDeadline := context.WithDeadlineCause(detached, deadline, errPublicAccessCleanupTimedOut)
+	ctx, cancel := context.WithCancelCause(deadlineContext)
+	return ctx, func(cause error) {
+		cancel(cause)
+		stopDeadline()
+	}
 }
 
 func closePublicAccessRuntime(parent context.Context, endpoint TunnelEndpoint, ingress PublicIngress) error {
 	ctx, cancel := boundedPublicAccessCleanupContext(parent)
-	defer cancel()
+	defer cancel(errPublicAccessCleanupComplete)
 	if ingress != nil {
 		ingress.Deny()
 	}
@@ -854,7 +880,7 @@ func (manager *PublicAccessManager) disposeLateStart(operation *startOperation, 
 	if started.ingress != nil {
 		started.ingress.Deny()
 	}
-	if closeErr := closePublicAccessRuntime(context.Background(), started.endpoint, started.ingress); closeErr != nil {
+	if closeErr := closePublicAccessRuntime(operation.context, started.endpoint, started.ingress); closeErr != nil {
 		manager.retainRuntimeAfterFailedCleanup(started.endpoint, started.ingress)
 	}
 	manager.mu.Lock()
@@ -982,15 +1008,6 @@ func applySecretMutation(ctx context.Context, store SecretStore, ref SecretRef, 
 		return DeleteSecret(ctx, store, ref)
 	}
 	return nil
-}
-
-func (manager *PublicAccessManager) preferencesForOperation(operation *startOperation) PublicAccessPreferences {
-	manager.mu.Lock()
-	defer manager.mu.Unlock()
-	if manager.preferences.Revision != operation.revision {
-		return PublicAccessPreferences{Version: PublicAccessSettingsVersion, Username: DefaultPlayerUsername, Revision: operation.revision}
-	}
-	return manager.preferences
 }
 
 func (manager *PublicAccessManager) snapshotLocked() PublicAccessSnapshot {

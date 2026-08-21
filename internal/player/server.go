@@ -17,6 +17,11 @@ import (
 
 const defaultAddress = "0.0.0.0:3690"
 
+var (
+	errPlayerContextRequired = errors.New("player context is required")
+	errPlayerServerStopped   = errors.New("player server stopped")
+)
+
 // Config contains the generated Connect player server's process-local
 // dependencies. Assets are the complete built player application.
 type Config struct {
@@ -30,12 +35,15 @@ type Config struct {
 type Server struct {
 	config Config
 	log    logger.Logger
+	root   context.Context
 
 	mu         sync.Mutex
 	listener   net.Listener
 	httpServer *http.Server
 	info       domain.ServerInfo
-	cancel     context.CancelFunc
+	context    context.Context
+	cancel     context.CancelCauseFunc
+	stopParent func() bool
 	started    bool
 	stopping   bool
 	stopped    bool
@@ -46,7 +54,10 @@ type Server struct {
 
 // NewServer validates construction-only dependencies without acquiring a
 // listener. A generated handler is mandatory: there is no legacy fallback.
-func NewServer(config Config) (*Server, error) {
+func NewServer(ctx context.Context, config Config) (*Server, error) {
+	if ctx == nil {
+		return nil, errPlayerContextRequired
+	}
 	if config.Address == "" {
 		config.Address = defaultAddress
 	}
@@ -58,13 +69,22 @@ func NewServer(config Config) (*Server, error) {
 	}
 	serverLogger := config.Logger
 	if serverLogger == nil {
-		serverLogger = logger.FromContext(nil)
+		serverLogger = logger.FromContext(ctx)
 	}
-	return &Server{config: config, log: serverLogger}, nil
+	return &Server{config: config, log: serverLogger, root: ctx}, nil
 }
 
 // Start acquires the listener before returning its usable local address.
-func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
+func (server *Server) Start(ctx context.Context) (domain.ServerInfo, error) {
+	if ctx == nil {
+		return domain.ServerInfo{}, errPlayerContextRequired
+	}
+	if err := ctx.Err(); err != nil {
+		return domain.ServerInfo{}, err
+	}
+	if err := server.root.Err(); err != nil {
+		return domain.ServerInfo{}, err
+	}
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	if server.started {
@@ -78,9 +98,14 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 	if err != nil {
 		return domain.ServerInfo{}, fmt.Errorf("listen on %s: %w", server.config.Address, err)
 	}
-	serverContext, cancel := context.WithCancel(context.Background())
+	serverContext, cancel := context.WithCancelCause(server.root)
+	stopParent := context.AfterFunc(ctx, func() {
+		cancel(context.Cause(ctx))
+	})
 	server.listener = listener
+	server.context = serverContext
 	server.cancel = cancel
+	server.stopParent = stopParent
 	server.info = listenerInfo(listener, server.config.Address)
 	server.started = true
 	server.stopDone = make(chan struct{})
@@ -102,10 +127,18 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 }
 
 func (server *Server) recordServeExit(err error) {
-	if server == nil || server.log == nil || err == nil || errors.Is(err, http.ErrServerClosed) {
+	if server == nil || err == nil || errors.Is(err, http.ErrServerClosed) {
 		return
 	}
-	server.log.WithError(err).WithField("operation", "player.serve").Error("player server stopped unexpectedly")
+	server.mu.Lock()
+	cancel := server.cancel
+	server.mu.Unlock()
+	if cancel != nil {
+		cancel(err)
+	}
+	if server.log != nil {
+		server.log.WithError(err).WithField("operation", "player.serve").Error("player server stopped unexpectedly")
+	}
 }
 
 // Info returns the detached address acquired by Start.
@@ -133,7 +166,7 @@ func (server *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return errPlayerContextRequired
 	}
 
 	server.mu.Lock()
@@ -163,11 +196,15 @@ func (server *Server) Stop(ctx context.Context) error {
 
 	server.stopping = true
 	cancel := server.cancel
+	stopParent := server.stopParent
 	httpServer := server.httpServer
 	server.mu.Unlock()
 
+	if stopParent != nil {
+		stopParent()
+	}
 	if cancel != nil {
-		cancel()
+		cancel(errPlayerServerStopped)
 	}
 	server.config.Connect.CloseSubscriptions()
 	var shutdownErr error

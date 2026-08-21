@@ -3,6 +3,7 @@
 package control
 
 import (
+	"context"
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -79,9 +80,9 @@ type CommandStateMutation struct {
 // server-owned command execution snapshots. Coordinator transitions call it
 // in the one-way control-to-session lock order and commit only after success.
 type CommandStateStore interface {
-	ExecuteCommandState(terminalID, commandID string) (CommandStateMutation, error)
-	ResetCommandState(terminalID, commandID string) (CommandStateMutation, error)
-	ResetTerminalCommandStates(terminalID string) (CommandStateMutation, error)
+	ExecuteCommandState(context.Context, string, string) (CommandStateMutation, error)
+	ResetCommandState(context.Context, string, string) (CommandStateMutation, error)
+	ResetTerminalCommandStates(context.Context, string) (CommandStateMutation, error)
 }
 
 // TerminalCatalog resolves only detached values from the latest validated session.
@@ -984,7 +985,10 @@ func (service *Service) ResolveTerminalSwitch(switchID domain.SwitchID, choice d
 // pending state-changing command. Approve holds the coordinator transaction
 // across the one-way durable store call and publishes completed state only
 // after that call succeeds.
-func (service *Service) ResolveCommandExecution(requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+func (service *Service) ResolveCommandExecution(ctx context.Context, requestID string, decision domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *CommandStateMutation, error) {
+	if ctx == nil {
+		return service.Snapshot(), nil, fmt.Errorf("command execution context is required")
+	}
 	requestID = strings.TrimSpace(requestID)
 	if requestID == "" {
 		return service.Snapshot(), nil, fmt.Errorf("command execution request ID must not be blank")
@@ -1051,7 +1055,7 @@ func (service *Service) ResolveCommandExecution(requestID string, decision domai
 			resolveErr = fmt.Errorf("command execution could not be persisted")
 			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
 		}
-		durable, err := service.commandStateStore.ExecuteCommandState(pending.TerminalID, pending.CommandID)
+		durable, err := service.commandStateStore.ExecuteCommandState(ctx, pending.TerminalID, pending.CommandID)
 		if err != nil {
 			resolveErr = fmt.Errorf("command execution could not be persisted")
 			return service.failPendingCommandExecution(runtime, terminal, pending, &state)
@@ -2204,21 +2208,6 @@ func currentPendingCommandExecution(pending *domain.PendingCommandExecution, bro
 		terminal != nil && terminal.TerminalID == pending.TerminalID && terminal.Lifecycle == domain.TerminalLifecycleActive &&
 		terminal.CommandExecution != nil && terminal.CommandExecution.Phase == domain.CommandExecutionPhasePending &&
 		terminal.CommandExecution.CommandID == pending.CommandID
-}
-
-func contentNodeByStableID(root *domain.ContentNode, nodeID string) *domain.ContentNode {
-	if root == nil {
-		return nil
-	}
-	if root.ID == nodeID {
-		return root
-	}
-	for index := range root.Children {
-		if found := contentNodeByStableID(&root.Children[index], nodeID); found != nil {
-			return found
-		}
-	}
-	return nil
 }
 
 func terminalByStableID(session *domain.Session, terminalID string) *domain.Terminal {

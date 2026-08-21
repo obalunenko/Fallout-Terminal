@@ -1966,7 +1966,7 @@ func TestProductionEmbedsOverseerAndPlayerAsSeparateFilesystems(t *testing.T) {
 		"//go:embed all:frontend/client/dist\nvar clientSource embed.FS",
 		`fs.Sub(overseerSource, "frontend/overseer/dist")`,
 		`fs.Sub(clientSource, "frontend/client/dist")`,
-		"composeApplication(host, clientAssets)",
+		"composeApplication(rootContext, host, clientAssets)",
 	}
 	for _, fragment := range requiredFragments {
 		assert.Falsef(t, !strings.Contains(source, fragment),
@@ -1987,7 +1987,7 @@ func TestProductionEmbedsOverseerAndPlayerAsSeparateFilesystems(t *testing.T) {
 		"Handler: application.AssetFileServerFS(overseerAssets)",
 		"ApplicationShouldTerminateAfterLastWindowClosed: true",
 		"host.Window.NewWithOptions(overseerWindowOptions())",
-		"host.RegisterService(application.NewService(newWailsLifecycleService(core)))",
+		"host.RegisterService(application.NewService(newWailsLifecycleService(ctx, core, host.Quit)))",
 		"host.RegisterService(application.NewService(newDesktopService(core)))",
 	} {
 		assert.Contains(t, hostSource, fragment)

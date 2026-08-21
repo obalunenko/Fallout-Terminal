@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -25,12 +26,6 @@ const (
 	edgeTestUsername = "players"
 	edgeTestPassword = "synthetic-player-input"
 )
-
-type endpointAuthTransport struct {
-	base     http.RoundTripper
-	username string
-	password string
-}
 
 type publicIngressTransport struct {
 	base     http.RoundTripper
@@ -155,7 +150,8 @@ func commandLifecycleLiveState(phase domain.CommandExecutionPhase, completed boo
 	if phase != "" {
 		live.CommandExecution = &domain.CommandExecutionPresentation{Phase: phase, CommandID: commandID}
 	} else if completed {
-		live.Nav.CommandNodeID = pointerTo(commandID)
+		commandNodeID := commandID
+		live.Nav.CommandNodeID = &commandNodeID
 	}
 	return live
 }
@@ -167,12 +163,6 @@ func (transport publicIngressTransport) RoundTrip(request *http.Request) (*http.
 	targetURL.Host = transport.target.Host
 	forwarded.URL = &targetURL
 	forwarded.Host = transport.host
-	forwarded.SetBasicAuth(transport.username, transport.password)
-	return transport.base.RoundTrip(forwarded)
-}
-
-func (transport endpointAuthTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	forwarded := request.Clone(request.Context())
 	forwarded.SetBasicAuth(transport.username, transport.password)
 	return transport.base.RoundTrip(forwarded)
 }
@@ -250,8 +240,8 @@ func TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBounda
 	require.NoError(t, err)
 	require.NotNil(t, manifest.Msg)
 
-	streamContext, cancelStream := context.WithCancel(t.Context())
-	defer cancelStream()
+	streamContext, cancelStream := context.WithCancelCause(t.Context())
+	defer cancelStream(errors.New("test public stream completed"))
 	stream, err := client.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
 	require.NoError(t, err)
 	require.True(t, stream.Receive(), "stream error: %v", stream.Err())

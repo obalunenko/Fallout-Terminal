@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -32,6 +33,7 @@ func TestWailsV3ApplicationOptionsServeOnlyOverseerAssetsAndQuitWithLastWindow(t
 	options := wailsApplicationOptions(assets)
 	require.Equal(t, "Fallout Terminal", options.Name)
 	require.Equal(t, "Fallout Terminal — Overseer Control", options.Description)
+	require.True(t, options.DisableDefaultSignalHandler, "signal.NotifyContext is the sole production signal owner")
 	require.True(t, options.Mac.ApplicationShouldTerminateAfterLastWindowClosed)
 	require.NotNil(t, options.Assets.Handler)
 	require.Empty(t, options.Services, "services are registered only after core composition")
@@ -61,7 +63,7 @@ func TestWailsSaveSessionBindingRetainsBothRealDemoTerminals(t *testing.T) {
 		},
 	)
 	t.Cleanup(func() { require.NoError(t, sessions.Shutdown(context.WithoutCancel(t.Context()))) })
-	core := NewAppWithDependencies(AppDependencies{Sessions: sessions})
+	core := NewAppWithDependencies(t.Context(), AppDependencies{Sessions: sessions})
 	require.True(t, core.OpenSession().OK)
 
 	_ = application.New(application.Options{})
@@ -148,12 +150,12 @@ func TestWailsLifecycleStartupClassifiesApplicationFailuresAsStatusVisible(t *te
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			core := &recordingWailsLifecycleCore{startErr: test.startErr}
-			service := newWailsLifecycleService(core)
+			service := newWailsLifecycleService(t.Context(), core, nil)
 			ctx := context.WithValue(t.Context(), lifecycleContextKey{}, "application-lifetime")
 
 			require.NoError(t, service.ServiceStartup(ctx, application.ServiceOptions{}))
 			require.Equal(t, 1, core.startCalls)
-			require.Same(t, ctx, core.startContext)
+			require.NotSame(t, ctx, core.startContext)
 			require.Equal(t, "application-lifetime", core.startContext.Value(lifecycleContextKey{}))
 			require.NoError(t, core.startContext.Err())
 		})
@@ -166,7 +168,7 @@ func TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce(t *testing.T) {
 	startErr := errors.New("PROVIDER-SECRET-CANARY")
 	core := &recordingWailsLifecycleCore{startErr: startErr}
 	logs := testutil.NewRecordingLogger()
-	service := newWailsLifecycleService(core, logs)
+	service := newWailsLifecycleService(t.Context(), core, nil, logs)
 
 	require.NoError(t, service.ServiceStartup(t.Context(), application.ServiceOptions{}))
 
@@ -182,11 +184,12 @@ func TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce(t *testing.T) {
 func TestWailsLifecycleShutdownUsesFreshBoundedContext(t *testing.T) {
 	t.Parallel()
 
-	startupContext, cancelStartup := context.WithCancel(t.Context())
+	root := context.WithValue(t.Context(), lifecycleContextKey{}, "process-root")
+	startupContext, cancelStartup := context.WithCancelCause(t.Context())
 	core := &recordingWailsLifecycleCore{}
-	service := newWailsLifecycleService(core)
+	service := newWailsLifecycleService(root, core, nil)
 	require.NoError(t, service.ServiceStartup(startupContext, application.ServiceOptions{}))
-	cancelStartup()
+	cancelStartup(errors.New("test startup context closed"))
 
 	started := time.Now()
 	require.NoError(t, service.ServiceShutdown())
@@ -194,19 +197,44 @@ func TestWailsLifecycleShutdownUsesFreshBoundedContext(t *testing.T) {
 	require.NoError(t, core.shutdownContextErr)
 	require.True(t, core.shutdownHasDeadline)
 	require.WithinDuration(t, started.Add(wailsShutdownTimeout), core.shutdownDeadline, time.Second)
+	require.Equal(t, "process-root", core.shutdownContext.Value(lifecycleContextKey{}))
+	require.ErrorIs(t, context.Cause(core.shutdownContext), errWailsShutdownComplete)
+}
+
+func TestWailsLifecycleRootCancellationStopsRuntimeAndRequestsHostQuit(t *testing.T) {
+	root, cancelRoot := context.WithCancelCause(t.Context())
+	core := &recordingWailsLifecycleCore{}
+	quit := make(chan struct{})
+	var quitOnce sync.Once
+	service := newWailsLifecycleService(root, core, func() {
+		quitOnce.Do(func() { close(quit) })
+	})
+	startupContext := context.WithValue(t.Context(), lifecycleContextKey{}, "wails-runtime")
+	require.NoError(t, service.ServiceStartup(startupContext, application.ServiceOptions{}))
+
+	shutdownCause := errors.New("test process signal received")
+	cancelRoot(shutdownCause)
+	select {
+	case <-quit:
+	case <-time.After(time.Second):
+		t.Fatal("root cancellation did not request Wails host shutdown")
+	}
+	require.Equal(t, "wails-runtime", core.startContext.Value(lifecycleContextKey{}))
+	require.ErrorIs(t, context.Cause(core.startContext), shutdownCause)
+	require.NoError(t, service.ServiceShutdown())
 }
 
 func TestWailsLifecyclePartialStartupUnwindsOnceAndRepeatedShutdownIsSafe(t *testing.T) {
 	t.Parallel()
 
 	recorder := &callRecorder{}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
 			IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
 		}},
 		Events: &recordingEventSink{recorder: recorder, err: errors.New("desktop event bridge unavailable")},
 	})
-	service := newWailsLifecycleService(app)
+	service := newWailsLifecycleService(t.Context(), app, nil)
 
 	require.NoError(t, service.ServiceStartup(t.Context(), application.ServiceOptions{}))
 	require.Equal(t, "failed", app.lifecyclePhase())
@@ -229,14 +257,14 @@ func TestWailsLifecycleRepeatedQuitRetriesFailedPublicCleanupWithFreshFiveSecond
 		},
 		shutdownErrors: []error{errors.New("synthetic first cleanup failure"), nil},
 	}
-	app := NewAppWithDependencies(AppDependencies{
+	app := NewAppWithDependencies(t.Context(), AppDependencies{
 		PublicAccess: core,
 		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
 			URL: "http://127.0.0.1:3690", LocalURL: "http://127.0.0.1:3690", Port: 3690,
 		}},
 		Events: &recordingEventSink{recorder: recorder},
 	})
-	service := newWailsLifecycleService(app)
+	service := newWailsLifecycleService(t.Context(), app, nil)
 	require.NoError(t, service.ServiceStartup(t.Context(), application.ServiceOptions{}))
 
 	started := time.Now()

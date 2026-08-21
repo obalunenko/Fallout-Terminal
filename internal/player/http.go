@@ -3,6 +3,7 @@ package player
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -104,10 +105,13 @@ func bufferBoundedRequestBody(request *http.Request) error {
 	if request == nil || request.Body == nil {
 		return nil
 	}
-	defer request.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(request.Body, MaxEncodedBodyBytes+1))
+	closeErr := request.Body.Close()
 	if err != nil {
 		return err
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close encoded request body: %w", closeErr)
 	}
 	if len(body) > MaxEncodedBodyBytes {
 		return errors.New("encoded request body exceeds limit")

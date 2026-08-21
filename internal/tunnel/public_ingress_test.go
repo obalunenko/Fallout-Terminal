@@ -2,6 +2,7 @@ package tunnel_test
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -62,7 +63,7 @@ func TestPublicIngressStartsDeniedAndProtectsStaticUnaryAndStreaming(t *testing.
 
 	ingress, err := tunnel.NewPublicIngressFactory().Start(t.Context(), upstream.URL)
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, ingress.Close(t.Context())) })
+	t.Cleanup(func() { require.NoError(t, ingress.Close(context.WithoutCancel(t.Context()))) })
 	client := &http.Client{Timeout: time.Second}
 
 	denied, err := client.Do(publicIngressRequest(t, ingress.URL().String(), http.MethodGet, "/", publicIngressHost, publicIngressUsername, publicIngressPassword))

@@ -26,6 +26,8 @@ const (
 	SaveStateFailed SaveState = "failed"
 )
 
+var errContextRequired = errors.New("session context is required")
+
 // Locations separates user session suggestions, the immutable bundled demo,
 // and application-owned metadata. Session content is never written to
 // ApplicationSupport.
@@ -664,7 +666,7 @@ func (service *Service) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	if ctx == nil {
-		ctx = context.Background()
+		return errContextRequired
 	}
 	service.mu.Lock()
 	service.closed = true
@@ -870,7 +872,7 @@ func samePath(left, right string) bool {
 
 func contextError(ctx context.Context) error {
 	if ctx == nil {
-		return nil
+		return errContextRequired
 	}
 	return ctx.Err()
 }

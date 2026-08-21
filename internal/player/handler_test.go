@@ -39,8 +39,8 @@ func TestConnectSubscribeBeginsWithCompleteSnapshotAndSelectsCharacter(t *testin
 	t.Cleanup(server.Close)
 
 	client := playerv1connect.NewPlayerServiceClient(server.Client(), server.URL)
-	streamContext, cancelStream := context.WithCancel(t.Context())
-	t.Cleanup(cancelStream)
+	streamContext, cancelStream := context.WithCancelCause(t.Context())
+	t.Cleanup(func() { cancelStream(errors.New("test subscription closed")) })
 	stream, err := client.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
 	require.NoError(t, err)
 	require.True(t, stream.Receive())
@@ -410,9 +410,4 @@ func newConnectTestCoordinator(t *testing.T, publish ...func(control.Effect)) *c
 	_, err = coordinator.StartBroadcast()
 	require.NoError(t, err)
 	return coordinator
-}
-
-//go:fix inline
-func pointerTo[T any](value T) *T {
-	return new(value)
 }

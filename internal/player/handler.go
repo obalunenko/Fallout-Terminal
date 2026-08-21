@@ -53,7 +53,7 @@ type ConnectService struct {
 // NewConnectService validates the public service's narrow dependencies.
 func NewConnectService(config ConnectServiceConfig) (*ConnectService, error) {
 	if config.Coordinator == nil {
-		return nil, fmt.Errorf("Connect player coordinator is not configured")
+		return nil, fmt.Errorf("connect player coordinator is not configured")
 	}
 	if config.QueueSize <= 0 {
 		config.QueueSize = defaultSubscriptionQueueSize
@@ -86,7 +86,7 @@ func (service *ConnectService) CloseSubscriptions() {
 // Subscribe attaches before capturing and sending exactly one complete first
 // snapshot, then drains only strictly newer queued compound updates.
 func (service *ConnectService) Subscribe(ctx context.Context, request *connect.Request[playerv1.SubscribeRequest], stream *connect.ServerStream[playerv1.SubscriptionMessage]) error {
-	if service == nil || request == nil || stream == nil {
+	if ctx == nil || service == nil || request == nil || stream == nil {
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("subscribe request is required"))
 	}
 	handle, err := SubscribeRecognition(request.Msg)

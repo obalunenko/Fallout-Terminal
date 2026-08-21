@@ -10,11 +10,12 @@ import (
 const keychainServiceBase = "com.vaulttec.fallout-terminal"
 
 var (
-	errCredentialNotFound      = errors.New("credential item not found")
-	errCredentialLocked        = errors.New("credential store locked")
-	errCredentialDenied        = errors.New("credential store access denied")
-	errCredentialUnavailable   = errors.New("credential store unavailable")
-	errCredentialUserCancelled = errors.New("credential store interaction cancelled")
+	errCredentialNotFound        = errors.New("credential item not found")
+	errCredentialLocked          = errors.New("credential store locked")
+	errCredentialDenied          = errors.New("credential store access denied")
+	errCredentialUnavailable     = errors.New("credential store unavailable")
+	errCredentialUserCancelled   = errors.New("credential store interaction cancelled")
+	errCredentialContextRequired = errors.New("credential store context is required")
 )
 
 type credentialBackend interface {
@@ -53,6 +54,9 @@ func NewPlatformKeychainSecretStore(production bool) tunnel.SecretStore {
 }
 
 func (store *KeychainSecretStore) Presence(ctx context.Context, ref tunnel.SecretRef) (tunnel.SecretPresence, error) {
+	if err := credentialContextError(ctx); err != nil {
+		return tunnel.SecretUnknown, err
+	}
 	account, err := keychainAccount(ref)
 	if err != nil {
 		return tunnel.SecretUnknown, err
@@ -71,6 +75,9 @@ func (store *KeychainSecretStore) Presence(ctx context.Context, ref tunnel.Secre
 }
 
 func (store *KeychainSecretStore) Replace(ctx context.Context, ref tunnel.SecretRef, value []byte) error {
+	if err := credentialContextError(ctx); err != nil {
+		return err
+	}
 	account, err := keychainAccount(ref)
 	if err != nil {
 		return err
@@ -91,6 +98,9 @@ func (store *KeychainSecretStore) Replace(ctx context.Context, ref tunnel.Secret
 }
 
 func (store *KeychainSecretStore) Delete(ctx context.Context, ref tunnel.SecretRef) error {
+	if err := credentialContextError(ctx); err != nil {
+		return err
+	}
 	account, err := keychainAccount(ref)
 	if err != nil {
 		return err
@@ -109,6 +119,9 @@ func (store *KeychainSecretStore) Delete(ctx context.Context, ref tunnel.SecretR
 }
 
 func (store *KeychainSecretStore) WithSecrets(ctx context.Context, refs []tunnel.SecretRef, callback func(*tunnel.SecretUse) error) error {
+	if err := credentialContextError(ctx); err != nil {
+		return err
+	}
 	if store == nil || store.backend == nil || callback == nil {
 		return tunnel.ErrSecretStoreUnavailable
 	}
@@ -133,6 +146,13 @@ func (store *KeychainSecretStore) WithSecrets(ctx context.Context, refs []tunnel
 		}
 	}
 	return callback(use)
+}
+
+func credentialContextError(ctx context.Context) error {
+	if ctx == nil {
+		return errCredentialContextRequired
+	}
+	return ctx.Err()
 }
 
 func keychainAccount(ref tunnel.SecretRef) (string, error) {

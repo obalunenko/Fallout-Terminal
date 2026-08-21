@@ -1,0 +1,659 @@
+{
+  "workflow": "companion",
+  "specName": "context propagation refactor",
+  "branch": "develop",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T11:35:07.573Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T11:38:21.085Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T11:38:50.717Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:39:19.100Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:40:20.270Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T11:40:20.874Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T11:40:32.959Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:41:24.832Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T11:41:24.971Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T11:41:42.973Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:42:56.658Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:43:58.356Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:44:38.725Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:45:18.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:46:11.744Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:46:25.701Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:47:42.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:48:21.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:49:04.807Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:51:27.860Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:52:02.010Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:54:42.429Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T11:58:20.562Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T12:00:10.025Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T12:04:40.199Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T12:20:47.152Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T12:23:41.337Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T12:24:17.100Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-21T12:24:17.260Z"
+    }
+  ],
+  "unattended": true,
+  "coverage": {
+    "FR-008": {
+      "title": "The refactor MUST preserve existing user-visible behavior, persistence formats, network contracts, public/private boundaries, and configured timeout budgets.",
+      "tasks": [
+        "T006",
+        "T012",
+        "T015",
+        "T017",
+        "T018"
+      ],
+      "tests": [
+        "go test ./...",
+        "go test -race ./...",
+        "scripts/secret-leak-check.sh"
+      ]
+    },
+    "FR-001": {
+      "title": "The application MUST propagate a non-absent process or lifecycle context from composition through every application-owned context-aware dependency.",
+      "tasks": [
+        "T002",
+        "T007",
+        "T009",
+        "T010",
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild",
+        "TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams"
+      ]
+    },
+    "FR-002": {
+      "title": "Request-triggered context-aware work MUST use the initiating request or application context through persistence, networking, and platform boundaries.",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005",
+        "T008",
+        "T009",
+        "T010",
+        "T012"
+      ],
+      "tests": [
+        "TestCompletedStateChangingCommandRequiresFreshApprovalWithoutSecondDurableExecution",
+        "TestPublicIngressStartsDeniedAndProtectsStaticUnaryAndStreaming"
+      ]
+    },
+    "FR-003": {
+      "title": "Context-aware production APIs MUST reject an absent context rather than silently substitute an unrelated background context below an executable entry point.",
+      "tasks": [
+        "T001",
+        "T007",
+        "T008",
+        "T009",
+        "T010",
+        "T011",
+        "T016"
+      ],
+      "tests": [
+        "TestConnectRPCMigrationTestConventions"
+      ]
+    },
+    "FR-004": {
+      "title": "Every explicitly canceled application-owned context MUST be created with causal cancellation and canceled with a stable, non-empty semantic reason.",
+      "tasks": [
+        "T002",
+        "T004",
+        "T005",
+        "T013",
+        "T014",
+        "T015"
+      ],
+      "tests": [
+        "TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild",
+        "TestEmbeddedNgrokEndpointLifetimeSurvivesCompletedStartupContext"
+      ]
+    },
+    "FR-005": {
+      "title": "Cleanup that must survive an already-canceled initiating context MUST preserve that context's values, apply the existing bounded cleanup duration, and expose the cleanup termination reason.",
+      "tasks": [
+        "T005",
+        "T007",
+        "T010",
+        "T013",
+        "T014",
+        "T015"
+      ],
+      "tests": [
+        "TestWailsLifecycleShutdownUsesFreshBoundedContext",
+        "TestPublicAccessManagerShutdownBoundsContextIgnoringCloseAndRetainsRetryOwnership"
+      ]
+    },
+    "FR-006": {
+      "title": "Repeated or concurrent close paths MUST remain safe and MUST preserve the first applicable cancellation cause.",
+      "tasks": [
+        "T002",
+        "T004",
+        "T005",
+        "T013",
+        "T014",
+        "T015"
+      ],
+      "tests": [
+        "TestEmbeddedNgrokEndpointConcurrentCloseIsBoundedAndReleasesReferences",
+        "TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams"
+      ]
+    },
+    "FR-007": {
+      "title": "Every affected Go test that needs a context MUST use the active test context as its root and derive values, cancellation, or deadlines from it.",
+      "tasks": [
+        "T001",
+        "T002",
+        "T003",
+        "T004",
+        "T005",
+        "T006",
+        "T012",
+        "T016"
+      ],
+      "tests": [
+        "TestConnectRPCMigrationTestConventions"
+      ]
+    }
+  },
+  "size": "oversized",
+  "classification": {
+    "projectedFiles": 18,
+    "projectedTasks": 14,
+    "scopeSignal": "none",
+    "verdict": "oversized"
+  },
+  "context": [
+    "area: main.go, app.go, and wails_host.go lifecycle composition",
+    "area: internal/player, internal/control, and internal/session context flow",
+    "area: internal/tunnel owned lifetimes and cleanup",
+    "constraint: context.WithCancelCause for explicitly canceled owned contexts",
+    "constraint: testing.T.Context roots for tests"
+  ],
+  "intent": "Preserve application and request context end to end while making every owned cancellation reason observable.",
+  "expectations": [
+    "No public wire, protobuf, persistence, or user-interface contract changes.",
+    "No new dependency or timeout-budget change."
+  ],
+  "approach": "Require application/request contexts at ownership boundaries, thread them through the one durable coordinator seam, and replace manual cancellation with stable causal cancellation while keeping cleanup bounded and value-preserving.",
+  "decisions": [
+    {
+      "decision": "Create roots only at executable entry points",
+      "why": "Lower layers must preserve caller cancellation and values",
+      "rejected": "Defensive context.Background fallbacks"
+    },
+    {
+      "decision": "Use causal cancellation for manually owned lifetimes",
+      "why": "context.Cause makes shutdown and race outcomes diagnosable",
+      "rejected": "Bare CancelFunc plus inferred state"
+    },
+    {
+      "decision": "Detach only cancellation for bounded cleanup",
+      "why": "Cleanup must survive cancellation without losing context values",
+      "rejected": "Fresh background cleanup roots"
+    },
+    {
+      "decision": "Add context only to the durable coordinator seam",
+      "why": "Persistence needs operation ownership while pure in-memory transitions do not",
+      "rejected": "Adding context to every coordinator method"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Cross-cutting context ownership design across composition, application, player, session/control, and tunnel lifetimes",
+      "key_finding": "Only executable entry points may create roots; lower cleanup must preserve values through WithoutCancel and causal bounded children."
+    },
+    "tasks": {
+      "summary": "18 tasks across setup, foundational tests, three user-story phases, and two validation waves"
+    },
+    "implement": {
+      "summary": "Propagated process, lifecycle, request, and test contexts end to end; replaced manual cancellation with stable causes; retained bounded value-preserving cleanup; all validation gates passed.",
+      "key_finding": "Executable roots are now the only Background contexts; owned lifetimes expose semantic context.Cause values and tests are rooted in testing.T.Context."
+    }
+  },
+  "currentTask": "T018",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added AST gates for test-owned context roots and forbidden lower-layer replacement roots; confirmed the production gate is red on existing fallbacks.",
+      "files": [
+        "internal/platform/test_conventions_test.go"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added red root/application lifecycle tests for composition values, startup propagation, bounded shutdown lineage, and explicit Wails shutdown cause.",
+      "files": [
+        "app_test.go",
+        "wails_host_test.go"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added red coordinator persistence-context coverage, made the fake context-aware, and supplied t.Context-derived operation contexts to all decision tests.",
+      "files": [
+        "internal/control/service_test.go"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added red player server/subscription tests for root values, queue/revision close causes, shutdown cause, and t.Context-derived manual cancellation.",
+      "files": [
+        "internal/player/stream_test.go",
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added red tunnel tests for ingress root-value propagation and embedded endpoint causal close while deriving test cancellation from t.Context().",
+      "files": [
+        "internal/tunnel/public_ingress_test.go",
+        "internal/tunnel/ngrok_test.go"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Formatted and reconciled the foundational test wave; remaining failures are the intentionally missing context-aware production signatures, fields, and causes.",
+      "files": [
+        "app_test.go",
+        "wails_host_test.go",
+        "internal/control/service_test.go",
+        "internal/player/stream_test.go",
+        "internal/player/handler_test.go",
+        "internal/tunnel/public_ingress_test.go",
+        "internal/tunnel/ngrok_test.go",
+        "internal/platform/test_conventions_test.go"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Threaded the process root through composition, application construction, loggers, retained lifecycle state, Wails services, and bounded value-preserving shutdown contexts.",
+      "files": [
+        "main.go",
+        "app.go",
+        "wails_host.go"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Threaded operation context through coordinator command-state persistence and made session/player-config context-aware operations reject absent contexts.",
+      "files": [
+        "main.go",
+        "app.go",
+        "internal/control/service.go",
+        "internal/session/service.go",
+        "internal/playerconfig/service.go"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Made player server and subscription lifetimes require real parents, retain request/startup values, and cancel with semantic server, unregister, replacement, revision, overflow, or hub-close causes.",
+      "files": [
+        "internal/player/server.go",
+        "internal/player/stream.go",
+        "internal/player/handler.go"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Removed tunnel replacement roots, propagated start values into ingress/provider lifetimes, and made late/monitor cleanup detach cancellation only while retaining values and bounds.",
+      "files": [
+        "internal/tunnel/manager.go",
+        "internal/tunnel/public_ingress.go",
+        "internal/tunnel/ngrok.go"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Made retained desktop and credential-store boundaries require explicit lifecycle/operation contexts across all platform implementations.",
+      "files": [
+        "internal/platform/desktop.go",
+        "internal/platform/keychain.go",
+        "internal/platform/keychain_darwin.go"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Updated application, Wails, desktop, control, player, platform, and browser-fixture call sites to pass root, request, or testing contexts through the new APIs",
+      "files": [
+        "app_test.go",
+        "wails_host_test.go",
+        "production_resources_test.go",
+        "internal/platform/assets_test.go",
+        "internal/platform/desktop_test.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Implemented causal cancellation for application runtime, Wails cleanup, player server lifetimes, and player subscription close/replacement/failure paths with stable package-local causes",
+      "files": [
+        "app.go",
+        "wails_host.go",
+        "internal/player/server.go",
+        "internal/player/stream.go",
+        "app_test.go",
+        "wails_host_test.go",
+        "internal/player/stream_test.go",
+        "internal/player/handler_test.go"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Implemented causal public-access startup, timeout, stop/reconfigure, late-cleanup, ingress, and embedded endpoint cancellation with bounded value-preserving cleanup contexts",
+      "files": [
+        "internal/tunnel/manager.go",
+        "internal/tunnel/ngrok.go",
+        "internal/tunnel/public_ingress.go",
+        "internal/tunnel/manager_test.go",
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/public_ingress_test.go"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Reconciled bounded shutdown and idempotent close seams, preserved parent deadlines during detached cleanup, bridged player start cancellation into the retained root context, and passed focused race tests",
+      "files": [
+        "app.go",
+        "internal/player/server.go",
+        "internal/tunnel/manager.go",
+        "internal/tunnel/ngrok.go"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Moved every affected test lifetime to t.Context-derived roots, replaced manual cancellation with WithCancelCause and explicit test reasons, preserved cleanup values with WithoutCancel, and updated context-aware wiring assertions",
+      "files": [
+        "app_test.go",
+        "wails_host_test.go",
+        "production_resources_test.go",
+        "internal/platform/assets_test.go",
+        "internal/platform/desktop_test.go",
+        "internal/platform/keychain_darwin_integration_test.go",
+        "internal/player/stream_test.go",
+        "internal/player/public_stream_test.go",
+        "internal/control/service_test.go",
+        "internal/tunnel/service_test.go",
+        "internal/tunnel/ngrok_test.go",
+        "internal/tunnel/ngrok_integration_test.go",
+        "internal/tunnel/manager_test.go",
+        "internal/tunnel/public_ingress_test.go"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Passed gofmt, go vet ./..., the complete go test ./... suite, diff whitespace validation, and context scans; only executable entry points create Background roots and no bare WithCancel/WithTimeout or logger.FromContext(nil) remains",
+      "files": [
+        "app.go",
+        "main.go",
+        "wails_host.go",
+        "internal/control/service.go",
+        "internal/platform/desktop.go",
+        "internal/platform/keychain.go",
+        "internal/player/server.go",
+        "internal/player/stream.go",
+        "internal/playerconfig/service.go",
+        "internal/session/service.go",
+        "internal/tunnel/manager.go",
+        "internal/tunnel/ngrok.go",
+        "internal/tunnel/public_ingress.go",
+        "tests/browser/fixture-server/main.go"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Passed the complete go test -race ./... suite and scripts/secret-leak-check.sh with no races or forbidden secret leakage",
+      "files": [
+        "specs/018-context-propagation-refactor/tasks.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Formatting and static analysis",
+      "result": "passed",
+      "command": "gofmt -l .; go vet ./..."
+    },
+    {
+      "what": "Complete Go test suite",
+      "result": "passed",
+      "command": "go test ./...",
+      "warnings": "macOS linker deployment-target warnings only"
+    },
+    {
+      "what": "Complete race-enabled Go test suite",
+      "result": "passed",
+      "command": "go test -race ./...",
+      "warnings": "macOS linker deployment-target warnings only"
+    },
+    {
+      "what": "Context ownership scans",
+      "result": "passed",
+      "command": "rg context.Background/TODO, bare WithCancel/WithTimeout, logger.FromContext(nil), and nil context call sites",
+      "warnings": "Background remains only at executable entry points"
+    },
+    {
+      "what": "Secret leak safety check",
+      "result": "passed",
+      "command": "scripts/secret-leak-check.sh"
+    },
+    {
+      "what": "Go quality and simplification review",
+      "result": "passed",
+      "command": "go-code-quality-review; code-simplification-review",
+      "warnings": "No remaining actionable findings in changed code"
+    },
+    {
+      "what": "Graceful shutdown signal lifecycle",
+      "result": "passed",
+      "command": "signal.NotifyContext root; Wails default signal handler disabled; root cancellation requests host quit"
+    },
+    {
+      "what": "Graceful shutdown and ngrok race suite",
+      "result": "passed",
+      "command": "FALLOUT_NGROK_INTEGRATION=0 go test -race ./...",
+      "warnings": "macOS linker deployment-target warnings only"
+    },
+    {
+      "what": "Real ngrok SDK lifecycle integration",
+      "result": "passed",
+      "command": "go test ./internal/tunnel -run TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe -count=1"
+    }
+  ]
+}

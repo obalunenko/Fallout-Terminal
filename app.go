@@ -29,6 +29,15 @@ const (
 	publicAccessStatusEvent = "public-access-status"
 )
 
+var (
+	errApplicationContextRequired = errors.New("application context is required")
+	errApplicationShutdown        = errors.New("application shutdown")
+	errApplicationStartupComplete = errors.New("application startup complete")
+	errApplicationStartupTimeout  = errors.New("application startup timed out")
+	errApplicationCleanupComplete = errors.New("application cleanup complete")
+	errApplicationCleanupTimeout  = errors.New("application cleanup timed out")
+)
+
 // SessionService is the lifecycle boundary for the ordered persistence worker.
 // Session commands extend this interface when they are introduced.
 type SessionService interface {
@@ -111,7 +120,7 @@ type coordinationTerminalDecisionService interface {
 }
 
 type coordinationCommandExecutionService interface {
-	ResolveCommandExecution(string, domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *controlservice.CommandStateMutation, error)
+	ResolveCommandExecution(context.Context, string, domain.CommandExecutionDecision) (*domain.MasterCoordinationState, *controlservice.CommandStateMutation, error)
 }
 
 type coordinationTerminalNavigationService interface {
@@ -446,9 +455,11 @@ type App struct {
 	publicAccessCommandMu sync.Mutex
 	mu                    sync.RWMutex
 
-	deps AppDependencies
-	ctx  context.Context
-	log  logger.Logger
+	deps   AppDependencies
+	root   context.Context
+	ctx    context.Context
+	cancel context.CancelCauseFunc
+	log    logger.Logger
 
 	phase                    string
 	serverInfo               *domain.ServerInfo
@@ -485,19 +496,22 @@ func (app *App) lifecyclePhase() string {
 }
 
 // NewApp constructs the application without acquiring external resources.
-func NewApp() *App {
-	return NewAppWithDependencies(AppDependencies{})
+func NewApp(ctx context.Context) *App {
+	return NewAppWithDependencies(ctx, AppDependencies{})
 }
 
 // NewAppWithDependencies constructs a testable composition root.
-func NewAppWithDependencies(deps AppDependencies) *App {
+func NewAppWithDependencies(ctx context.Context, deps AppDependencies) *App {
+	if ctx == nil {
+		panic(errApplicationContextRequired)
+	}
 	preferences := tunnelservice.DefaultPublicAccessPreferences()
 	applicationLogger := deps.Logger
 	if applicationLogger == nil {
-		applicationLogger = logger.FromContext(nil)
+		applicationLogger = logger.FromContext(ctx)
 	}
 	app := &App{
-		deps: deps, log: applicationLogger, phase: "constructed", saveState: string(sessionservice.SaveStateIdle),
+		deps: deps, root: ctx, ctx: ctx, log: applicationLogger, phase: "constructed", saveState: string(sessionservice.SaveStateIdle),
 		publicAccessPreferences: preferences,
 		providerTokenPresence:   tunnelservice.SecretUnknown,
 		playerPasswordPresence:  tunnelservice.SecretUnknown,
@@ -701,7 +715,6 @@ func (app *App) GeneratePlayerPassword(payload PublicAccessCommandPayload) (resu
 		})
 		app.acceptPublicAccessSnapshot(result.Snapshot, true)
 		if !result.OK {
-			oneTimeValue = ""
 			return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{Error: result.Error, SettingsRevision: result.Snapshot.Preferences.Revision})
 		}
 		return routeGeneratedPlayerPasswordResult(GeneratedPlayerPasswordResult{OK: true, GeneratedPassword: oneTimeValue, SettingsRevision: result.Snapshot.Preferences.Revision})
@@ -920,7 +933,7 @@ func (app *App) acceptPublicAccessSnapshot(snapshot tunnelservice.PublicAccessSn
 	if app.serverInfo != nil {
 		if snapshot.Status.State == tunnelservice.LifecycleReady && snapshot.Status.PublicURL != "" {
 			localURL := app.serverInfo.LocalURL
-			if localURL == "" || app.serverInfo.Tunnel == false {
+			if localURL == "" || !app.serverInfo.Tunnel {
 				localURL = app.serverInfo.URL
 			}
 			if app.serverInfo.URL != snapshot.Status.PublicURL || !app.serverInfo.Tunnel {
@@ -966,9 +979,8 @@ func (app *App) Start(ctx context.Context) error {
 	app.lifecycleMu.Lock()
 	defer app.lifecycleMu.Unlock()
 	if ctx == nil {
-		ctx = context.Background()
+		return errApplicationContextRequired
 	}
-
 	app.mu.RLock()
 	alreadyStarted := app.playerStarted
 	app.mu.RUnlock()
@@ -981,23 +993,29 @@ func (app *App) Start(ctx context.Context) error {
 	if app.deps.Player == nil {
 		return app.failLocked(errors.New("player server is not configured"))
 	}
+	runtimeContext, cancel := context.WithCancelCause(ctx)
 	if setter, ok := app.deps.Events.(interface{ SetContext(context.Context) }); ok {
-		setter.SetContext(ctx)
+		setter.SetContext(runtimeContext)
 	}
 	app.mu.Lock()
-	app.ctx = ctx
+	app.ctx = runtimeContext
+	app.cancel = cancel
 	app.stopped = false
 	app.mu.Unlock()
 	if app.deps.PublicAccess == nil {
 		app.publicAccessCommandMu.Lock()
-		app.loadPublicAccessLocked(ctx)
+		app.loadPublicAccessLocked(runtimeContext)
 		app.publicAccessCommandMu.Unlock()
 	}
 
-	acquisitionContext := ctx
+	acquisitionContext := runtimeContext
 	if app.deps.StartupTimeout > 0 {
-		bounded, cancel := context.WithTimeout(ctx, app.deps.StartupTimeout)
-		defer cancel()
+		deadlineContext, stopDeadline := context.WithTimeoutCause(runtimeContext, app.deps.StartupTimeout, errApplicationStartupTimeout)
+		bounded, cancel := context.WithCancelCause(deadlineContext)
+		defer func() {
+			cancel(errApplicationStartupComplete)
+			stopDeadline()
+		}()
 		acquisitionContext = bounded
 	}
 
@@ -1014,7 +1032,7 @@ func (app *App) Start(ctx context.Context) error {
 		app.log.WithField("port", info.Port).Info("player server ready")
 	}
 	if app.deps.PublicAccess != nil {
-		app.acceptPublicAccessSnapshot(app.deps.PublicAccess.Initialize(ctx), false)
+		app.acceptPublicAccessSnapshot(app.deps.PublicAccess.Initialize(runtimeContext), false)
 	}
 
 	if app.deps.Events != nil {
@@ -1025,7 +1043,7 @@ func (app *App) Start(ctx context.Context) error {
 
 	app.setPhase("desktop-loading")
 	if app.deps.Desktop != nil {
-		if err := app.deps.Desktop.Ready(ctx); err != nil {
+		if err := app.deps.Desktop.Ready(runtimeContext); err != nil {
 			return app.failLocked(fmt.Errorf("make desktop ready: %w", err))
 		}
 		app.mu.Lock()
@@ -1053,12 +1071,16 @@ func (app *App) Start(ctx context.Context) error {
 func (app *App) Shutdown(ctx context.Context) error {
 	app.lifecycleMu.Lock()
 	defer app.lifecycleMu.Unlock()
+	if ctx == nil {
+		return errApplicationContextRequired
+	}
 	app.mu.RLock()
 	alreadyStopped := app.stopped
 	app.mu.RUnlock()
 	if alreadyStopped {
 		return nil
 	}
+	app.cancelRuntime(errApplicationShutdown)
 	if app.log != nil {
 		app.log.WithField("phase", "stopping").Info("application shutdown started")
 	}
@@ -1628,7 +1650,7 @@ func (app *App) ResolveCommandExecution(payload CommandExecutionDecisionPayload)
 		return app.commandExecutionFailure("coordination service is unavailable", nil)
 	}
 
-	state, mutation, err := coordination.ResolveCommandExecution(routed.RequestID, routed.Decision)
+	state, mutation, err := coordination.ResolveCommandExecution(app.contextSnapshot(), routed.RequestID, routed.Decision)
 	if state != nil {
 		app.publishCoordinationStateIfNewer(state)
 	}
@@ -2016,8 +2038,9 @@ func (app *App) failLocked(cause error) error {
 	app.startupError = cause.Error()
 	app.phase = "failed"
 	app.mu.Unlock()
+	app.cancelRuntime(cause)
 	cleanupContext, cancel := app.freshShutdownContext()
-	defer cancel()
+	defer cancel(errApplicationCleanupComplete)
 	cleanupErr := app.shutdownLocked(cleanupContext, true)
 	if cleanupErr != nil {
 		return errors.Join(cause, cleanupErr)
@@ -2038,7 +2061,6 @@ func (app *App) shutdownLocked(ctx context.Context, preserveFailure bool) error 
 	publicAccessOpen := app.deps.PublicAccess != nil && !app.publicAccessClosed
 	clearProcessState := !app.processStateCleared
 	app.processStateCleared = true
-	app.ctx = nil
 	app.mu.Unlock()
 
 	var cleanupErrors []error
@@ -2119,12 +2141,37 @@ func (app *App) setPhase(phase string) {
 	app.stopped = false
 }
 
-func (app *App) freshShutdownContext() (context.Context, context.CancelFunc) {
+func (app *App) freshShutdownContext() (context.Context, context.CancelCauseFunc) {
 	timeout := app.deps.ShutdownTimeout
 	if timeout <= 0 {
 		timeout = wailsShutdownTimeout
 	}
-	return context.WithTimeout(context.Background(), timeout)
+	return boundedCleanupContext(app.root, timeout, errApplicationCleanupTimeout)
+}
+
+func boundedCleanupContext(parent context.Context, timeout time.Duration, timeoutCause error) (context.Context, context.CancelCauseFunc) {
+	detached := context.WithoutCancel(parent)
+	deadline := time.Now().Add(timeout)
+	if parent.Err() == nil {
+		if parentDeadline, ok := parent.Deadline(); ok && parentDeadline.Before(deadline) {
+			deadline = parentDeadline
+		}
+	}
+	deadlineContext, stopDeadline := context.WithDeadlineCause(detached, deadline, timeoutCause)
+	ctx, cancel := context.WithCancelCause(deadlineContext)
+	return ctx, func(cause error) {
+		cancel(cause)
+		stopDeadline()
+	}
+}
+
+func (app *App) cancelRuntime(cause error) {
+	app.mu.RLock()
+	cancel := app.cancel
+	app.mu.RUnlock()
+	if cancel != nil {
+		cancel(cause)
+	}
 }
 
 func cloneServerInfo(info domain.ServerInfo) *domain.ServerInfo {
@@ -2142,9 +2189,6 @@ func cloneServerInfoPointer(info *domain.ServerInfo) *domain.ServerInfo {
 func (app *App) contextSnapshot() context.Context {
 	app.mu.RLock()
 	defer app.mu.RUnlock()
-	if app.ctx == nil {
-		return context.Background()
-	}
 	return app.ctx
 }
 

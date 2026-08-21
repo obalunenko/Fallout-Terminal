@@ -36,6 +36,12 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 			parentRequire: "github.com/bufbuild/buf v1.72.0",
 		},
 		{
+			name:          "golangci-lint",
+			directory:     "golangci-lint",
+			tool:          "github.com/golangci/golangci-lint/v2/cmd/golangci-lint",
+			parentRequire: "github.com/golangci/golangci-lint/v2 v2.13.1",
+		},
+		{
 			name:          "protoc-gen-go",
 			directory:     "protoc-gen-go",
 			tool:          "google.golang.org/protobuf/cmd/protoc-gen-go",
@@ -70,6 +76,7 @@ func TestWailsV3GoToolsAreIsolatedFromApplicationModule(t *testing.T) {
 	applicationModule := readAcceptanceDocument(t, filepath.Join(root, "go.mod"))
 	assert.NotContains(t, applicationModule, "\ntool ")
 	assert.NotContains(t, applicationModule, "github.com/bufbuild/buf")
+	assert.NotContains(t, applicationModule, "github.com/golangci/golangci-lint")
 	assert.NotContains(t, applicationModule, "/cmd/protoc-gen-go")
 	assert.NotContains(t, applicationModule, "/cmd/protoc-gen-connect-go")
 	assert.NotContains(t, applicationModule, "/v3/cmd/wails3")

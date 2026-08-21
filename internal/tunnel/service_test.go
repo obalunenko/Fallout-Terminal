@@ -95,19 +95,19 @@ func TestEmbeddedTunnelServiceLifecycleContract(t *testing.T) {
 	t.Run("timeout and cancellation disconnect without an endpoint", func(t *testing.T) {
 		for _, test := range []struct {
 			name    string
-			prepare func(*TunnelStartRequest) (context.Context, context.CancelFunc)
+			prepare func(*TunnelStartRequest) (context.Context, context.CancelCauseFunc)
 		}{
 			{
 				name: "timeout",
-				prepare: func(request *TunnelStartRequest) (context.Context, context.CancelFunc) {
+				prepare: func(request *TunnelStartRequest) (context.Context, context.CancelCauseFunc) {
 					request.Timeout = time.Millisecond
-					return t.Context(), func() {}
+					return t.Context(), func(error) {}
 				},
 			},
 			{
 				name: "cancellation",
-				prepare: func(*TunnelStartRequest) (context.Context, context.CancelFunc) {
-					return context.WithCancel(t.Context())
+				prepare: func(*TunnelStartRequest) (context.Context, context.CancelCauseFunc) {
+					return context.WithCancelCause(t.Context())
 				},
 			},
 		} {
@@ -115,9 +115,9 @@ func TestEmbeddedTunnelServiceLifecycleContract(t *testing.T) {
 				request := contractStartRequest()
 				ctx, cancel := test.prepare(&request)
 				if test.name == "cancellation" {
-					cancel()
+					cancel(errors.New("test tunnel startup canceled"))
 				} else {
-					defer cancel()
+					defer cancel(errors.New("test tunnel timeout case completed"))
 				}
 				agent := &contractAgent{forward: func(ctx context.Context) error {
 					<-ctx.Done()

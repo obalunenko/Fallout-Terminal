@@ -114,6 +114,101 @@ func TestConnectRPCMigrationTestConventions(t *testing.T) {
 			})
 		})
 	}
+
+	t.Run("test context roots", func(t *testing.T) {
+		contextFiles := []string{
+			"app_test.go",
+			"wails_host_test.go",
+			"internal/control/service_test.go",
+			"internal/platform/desktop_test.go",
+			"internal/player/handler_test.go",
+			"internal/player/stream_test.go",
+			"internal/playerconfig/service_test.go",
+			"internal/session/service_test.go",
+			"internal/tunnel/manager_test.go",
+			"internal/tunnel/ngrok_integration_test.go",
+			"internal/tunnel/ngrok_test.go",
+			"internal/tunnel/public_ingress_test.go",
+			"internal/tunnel/service_test.go",
+		}
+		for _, relative := range contextFiles {
+			parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, relative), nil, 0)
+			require.NoError(t, err)
+			for _, spec := range parsed.Imports {
+				path, unquoteErr := strconv.Unquote(spec.Path.Value)
+				require.NoError(t, unquoteErr)
+				if path != "context" {
+					continue
+				}
+				contextName := "context"
+				if spec.Name != nil {
+					contextName = spec.Name.Name
+				}
+				ast.Inspect(parsed, func(node ast.Node) bool {
+					call, ok := node.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					selector, ok := call.Fun.(*ast.SelectorExpr)
+					if !ok {
+						return true
+					}
+					owner, ok := selector.X.(*ast.Ident)
+					if ok && owner.Name == contextName && (selector.Sel.Name == "Background" || selector.Sel.Name == "TODO") {
+						assert.Fail(t, "%s creates a root context with context.%s; derive from t.Context()", relative, selector.Sel.Name)
+					}
+					return true
+				})
+			}
+		}
+	})
+
+	t.Run("production context roots", func(t *testing.T) {
+		productionFiles := []string{
+			"app.go",
+			"wails_host.go",
+			"internal/player/server.go",
+			"internal/player/stream.go",
+			"internal/playerconfig/service.go",
+			"internal/session/service.go",
+			"internal/tunnel/manager.go",
+			"internal/tunnel/ngrok.go",
+			"internal/tunnel/public_ingress.go",
+		}
+		for _, relative := range productionFiles {
+			parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, relative), nil, 0)
+			require.NoError(t, err)
+			imports := make(map[string]string, len(parsed.Imports))
+			for _, spec := range parsed.Imports {
+				path, unquoteErr := strconv.Unquote(spec.Path.Value)
+				require.NoError(t, unquoteErr)
+				name := filepath.Base(path)
+				if spec.Name != nil {
+					name = spec.Name.Name
+				}
+				imports[path] = name
+			}
+			contextName := imports["context"]
+			ast.Inspect(parsed, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				selector, ok := call.Fun.(*ast.SelectorExpr)
+				if !ok {
+					return true
+				}
+				owner, ok := selector.X.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				if owner.Name == contextName && (selector.Sel.Name == "Background" || selector.Sel.Name == "TODO") {
+					assert.Fail(t, "%s creates a replacement root with context.%s; propagate the owner context", relative, selector.Sel.Name)
+				}
+				return true
+			})
+		}
+	})
 }
 
 func testParameterNames(file *ast.File, testingImport string) map[string]bool {

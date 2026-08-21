@@ -85,6 +85,12 @@ func (agent *fakeSDKAgent) Disconnect() error {
 	return nil
 }
 
+func (agent *fakeSDKAgent) disconnectCalls() int {
+	agent.mu.Lock()
+	defer agent.mu.Unlock()
+	return agent.disconnects
+}
+
 type fakeSDKForwarder struct {
 	mu                         sync.Mutex
 	endpoint                   *url.URL
@@ -210,10 +216,10 @@ func TestEmbeddedNgrokEndpointDoneAndIdempotentBoundedCloseDisconnect(t *testing
 func TestEmbeddedNgrokEndpointLifetimeSurvivesCompletedStartupContext(t *testing.T) {
 	forwarder := newFakeSDKForwarder("https://random.example")
 	agent := &fakeSDKAgent{forwarder: forwarder, trackContext: true}
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancelCause(t.Context())
 	endpoint, err := newNgrokServiceWithFactory(&fakeSDKFactory{agent: agent}).Start(ctx, protectedStartRequest(""))
 	require.NoError(t, err)
-	cancel()
+	cancel(errors.New("test startup request complete"))
 
 	require.Never(t, func() bool {
 		select {
@@ -224,6 +230,7 @@ func TestEmbeddedNgrokEndpointLifetimeSurvivesCompletedStartupContext(t *testing
 		}
 	}, 25*time.Millisecond, time.Millisecond, "completed startup context stopped the owned endpoint")
 	require.NoError(t, endpoint.Close(t.Context()))
+	require.ErrorIs(t, context.Cause(agent.forwardContext), errEmbeddedEndpointClosed)
 }
 
 func TestEmbeddedNgrokEndpointCloseUsesSDKCloseBeforeCancelingOwnedLifetime(t *testing.T) {
@@ -327,7 +334,7 @@ func TestEmbeddedNgrokStartCancellationAfterLateForwardClosesAcquiredResources(t
 	forwardGate := make(chan struct{})
 	forwarder := newFakeSDKForwarder("https://late.example")
 	agent := &fakeSDKAgent{forwarder: forwarder, forwardGate: forwardGate}
-	ctx, cancel := context.WithCancel(t.Context())
+	ctx, cancel := context.WithCancelCause(t.Context())
 	result := make(chan struct {
 		endpoint TunnelEndpoint
 		err      error
@@ -344,7 +351,7 @@ func TestEmbeddedNgrokStartCancellationAfterLateForwardClosesAcquiredResources(t
 		defer agent.mu.Unlock()
 		return agent.request.UpstreamURL != ""
 	}, time.Second, time.Millisecond)
-	cancel()
+	cancel(errors.New("test late forward canceled"))
 	close(forwardGate)
 	started := <-result
 	require.Error(t, started.err)
@@ -393,8 +400,12 @@ func TestEmbeddedNgrokEndpointCloseDoesNotTrustBlockingSDKComponentsToHonorConte
 	endpoint, err := newNgrokServiceWithFactory(&fakeSDKFactory{agent: agent}).Start(t.Context(), protectedStartRequest(""))
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
-	defer cancel()
+	deadline, stopDeadline := context.WithTimeoutCause(t.Context(), 25*time.Millisecond, errors.New("test endpoint close timed out"))
+	ctx, cancel := context.WithCancelCause(deadline)
+	defer func() {
+		cancel(errors.New("test endpoint close completed"))
+		stopDeadline()
+	}()
 	finished := make(chan error, 1)
 	go func() { finished <- endpoint.Close(ctx) }()
 	var closeErr error
@@ -408,6 +419,9 @@ func TestEmbeddedNgrokEndpointCloseDoesNotTrustBlockingSDKComponentsToHonorConte
 	}, 250*time.Millisecond, time.Millisecond, "endpoint Close exceeded its bound when the SDK forwarder ignored context")
 	require.Error(t, closeErr)
 	assert.Equal(t, ErrorShutdownTimeout.SafeMessage(), closeErr.Error())
+	require.Eventually(t, func() bool {
+		return agent.disconnectCalls() == 1
+	}, time.Second, time.Millisecond, "agent disconnect was not attempted while forwarder Close was blocked")
 
 	closeGateOnce.Do(func() { close(closeGate) })
 	require.NoError(t, endpoint.Close(t.Context()))

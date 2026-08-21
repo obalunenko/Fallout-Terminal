@@ -9,6 +9,14 @@ import (
 	ngrok "golang.ngrok.com/ngrok/v2"
 )
 
+var (
+	errEmbeddedContextRequired       = errors.New("embedded tunnel context is required")
+	errEmbeddedEndpointStartComplete = errors.New("embedded tunnel endpoint startup complete")
+	errEmbeddedEndpointStartAborted  = errors.New("embedded tunnel endpoint startup aborted")
+	errEmbeddedEndpointClosed        = errors.New("embedded tunnel endpoint closed")
+	errEmbeddedEndpointCloseTimedOut = errors.New("embedded tunnel endpoint close timed out")
+)
+
 type ngrokForwardRequest struct {
 	UpstreamURL    string
 	ReservedDomain string
@@ -40,7 +48,6 @@ func (sdkAgentFactory) New(accountToken []byte) (ngrokAgent, error) {
 	agent, err := ngrok.NewAgent(
 		ngrok.WithAuthtoken(token), ngrok.WithAutoConnect(false), ngrok.WithEventHandler(wrapped.handleEvent),
 	)
-	token = ""
 	if err != nil {
 		return nil, newRedactedPublicAccessError(err)
 	}
@@ -108,7 +115,7 @@ type embeddedNgrokService struct {
 type embeddedEndpointLifetime struct {
 	startup   context.Context
 	context   context.Context
-	cancel    context.CancelFunc
+	cancel    context.CancelCauseFunc
 	settled   chan struct{}
 	settle    sync.Once
 	mu        sync.Mutex
@@ -116,7 +123,7 @@ type embeddedEndpointLifetime struct {
 }
 
 func newEmbeddedEndpointLifetime(startup context.Context) *embeddedEndpointLifetime {
-	ctx, cancel := context.WithCancel(context.WithoutCancel(startup))
+	ctx, cancel := context.WithCancelCause(context.WithoutCancel(startup))
 	lifetime := &embeddedEndpointLifetime{
 		startup: startup, context: ctx, cancel: cancel, settled: make(chan struct{}),
 	}
@@ -125,7 +132,7 @@ func newEmbeddedEndpointLifetime(startup context.Context) *embeddedEndpointLifet
 		case <-startup.Done():
 			lifetime.mu.Lock()
 			if !lifetime.committed {
-				lifetime.cancel()
+				lifetime.cancel(context.Cause(startup))
 			}
 			lifetime.mu.Unlock()
 		case <-lifetime.settled:
@@ -137,7 +144,7 @@ func newEmbeddedEndpointLifetime(startup context.Context) *embeddedEndpointLifet
 func (lifetime *embeddedEndpointLifetime) Commit() bool {
 	lifetime.mu.Lock()
 	if lifetime.startup.Err() != nil {
-		lifetime.cancel()
+		lifetime.cancel(context.Cause(lifetime.startup))
 		lifetime.mu.Unlock()
 		lifetime.settle.Do(func() { close(lifetime.settled) })
 		return false
@@ -148,8 +155,8 @@ func (lifetime *embeddedEndpointLifetime) Commit() bool {
 	return true
 }
 
-func (lifetime *embeddedEndpointLifetime) Abort() {
-	lifetime.cancel()
+func (lifetime *embeddedEndpointLifetime) Abort(cause error) {
+	lifetime.cancel(cause)
 	lifetime.settle.Do(func() { close(lifetime.settled) })
 }
 
@@ -163,7 +170,8 @@ func newNgrokServiceWithFactory(factory ngrokAgentFactory) *embeddedNgrokService
 
 func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelStartRequest) (TunnelEndpoint, error) {
 	if ctx == nil {
-		ctx = context.Background()
+		request.Clear()
+		return nil, errEmbeddedContextRequired
 	}
 	ownedToken := append([]byte(nil), request.AccountToken...)
 	request.Clear()
@@ -184,9 +192,13 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 		return nil, errors.New(ErrorCredentialMissing.SafeMessage())
 	}
 	if request.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, request.Timeout)
-		defer cancel()
+		deadlineContext, stopDeadline := context.WithTimeoutCause(ctx, request.Timeout, errPublicAccessStartTimedOut)
+		var cancel context.CancelCauseFunc
+		ctx, cancel = context.WithCancelCause(deadlineContext)
+		defer func() {
+			cancel(errEmbeddedEndpointStartComplete)
+			stopDeadline()
+		}()
 	}
 
 	agent, err := service.factory.New(ownedToken)
@@ -199,33 +211,33 @@ func (service *embeddedNgrokService) Start(ctx context.Context, request TunnelSt
 		ReservedDomain: reservedDomain,
 	})
 	if err != nil {
-		lifetime.Abort()
+		lifetime.Abort(errEmbeddedEndpointStartAborted)
 		_ = agent.Disconnect()
 		return nil, newRedactedPublicAccessError(err)
 	}
 	ownedEndpoint := newEmbeddedNgrokEndpoint(nil, forwarder, agent, lifetime.cancel)
 	if ctx.Err() != nil {
-		_ = ownedEndpoint.Close(context.Background())
+		_ = ownedEndpoint.Close(ctx)
 		return nil, publicAccessCategorizedError{category: ErrorTimeout}
 	}
 
 	publicURL := forwarder.URL()
 	if publicURL == nil {
-		_ = ownedEndpoint.Close(context.Background())
+		_ = ownedEndpoint.Close(ctx)
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
 	}
 	canonicalURL, _, err := NormalizeEndpointURL(publicURL.String(), reservedDomain)
 	if err != nil {
-		_ = ownedEndpoint.Close(context.Background())
+		_ = ownedEndpoint.Close(ctx)
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
 	}
 	parsed, err := url.Parse(canonicalURL)
 	if err != nil {
-		_ = ownedEndpoint.Close(context.Background())
+		_ = ownedEndpoint.Close(ctx)
 		return nil, errors.New(ErrorProviderFailure.SafeMessage())
 	}
 	if !lifetime.Commit() {
-		_ = ownedEndpoint.Close(context.Background())
+		_ = ownedEndpoint.Close(ctx)
 		return nil, publicAccessCategorizedError{category: ErrorTimeout}
 	}
 	ownedEndpoint.stateMu.Lock()
@@ -244,7 +256,7 @@ type embeddedNgrokEndpoint struct {
 	agentDisconnected bool
 	closeAttempt      *embeddedNgrokCloseAttempt
 	done              <-chan struct{}
-	lifetimeCancel    context.CancelFunc
+	lifetimeCancel    context.CancelCauseFunc
 	cancelOnce        sync.Once
 }
 
@@ -256,7 +268,7 @@ type embeddedNgrokCloseAttempt struct {
 	agentDisconnectError error
 }
 
-func newEmbeddedNgrokEndpoint(publicURL *url.URL, forwarder ngrokForwarder, agent ngrokAgent, lifetimeCancel ...context.CancelFunc) *embeddedNgrokEndpoint {
+func newEmbeddedNgrokEndpoint(publicURL *url.URL, forwarder ngrokForwarder, agent ngrokAgent, lifetimeCancel ...context.CancelCauseFunc) *embeddedNgrokEndpoint {
 	endpoint := &embeddedNgrokEndpoint{
 		url: publicURL, forwarder: forwarder, agent: agent,
 		done: forwarder.Done(),
@@ -307,8 +319,11 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	if endpoint == nil {
 		return nil
 	}
+	if ctx == nil {
+		return errEmbeddedContextRequired
+	}
 	ctx, cancel := boundedPublicAccessCleanupContext(ctx)
-	defer cancel()
+	defer cancel(errPublicAccessCleanupComplete)
 
 	endpoint.closeMu.Lock()
 	endpoint.stateMu.Lock()
@@ -317,7 +332,7 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	endpoint.stateMu.Unlock()
 	if complete {
 		endpoint.closeMu.Unlock()
-		endpoint.cancelLifetime()
+		endpoint.cancelLifetime(errEmbeddedEndpointClosed)
 		return nil
 	}
 	attempt := endpoint.closeAttempt
@@ -336,9 +351,9 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 
 	select {
 	case <-attempt.done:
-		endpoint.cancelLifetime()
+		endpoint.cancelLifetime(errEmbeddedEndpointClosed)
 	case <-ctx.Done():
-		endpoint.cancelLifetime()
+		endpoint.cancelLifetime(errEmbeddedEndpointCloseTimedOut)
 		return publicAccessCategorizedError{category: ErrorShutdownTimeout}
 	}
 
@@ -372,10 +387,10 @@ func (endpoint *embeddedNgrokEndpoint) Close(ctx context.Context) error {
 	return nil
 }
 
-func (endpoint *embeddedNgrokEndpoint) cancelLifetime() {
+func (endpoint *embeddedNgrokEndpoint) cancelLifetime(cause error) {
 	endpoint.cancelOnce.Do(func() {
 		if endpoint.lifetimeCancel != nil {
-			endpoint.lifetimeCancel()
+			endpoint.lifetimeCancel(cause)
 		}
 	})
 }
@@ -389,7 +404,17 @@ func runEmbeddedNgrokCloseAttempt(
 	agentDisconnected bool,
 ) {
 	if !forwarderClosed {
-		attempt.forwarderError = forwarder.Close(ctx)
+		forwarderResult := make(chan error, 1)
+		go func() { forwarderResult <- forwarder.Close(ctx) }()
+		select {
+		case attempt.forwarderError = <-forwarderResult:
+		case <-ctx.Done():
+			if !agentDisconnected {
+				attempt.agentDisconnectError = agent.Disconnect()
+				agentDisconnected = attempt.agentDisconnectError == nil
+			}
+			attempt.forwarderError = <-forwarderResult
+		}
 	}
 	if !agentDisconnected {
 		attempt.agentDisconnectError = agent.Disconnect()
