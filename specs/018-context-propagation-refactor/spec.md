@@ -5,6 +5,8 @@
 **Status**: Draft
 **Input**: Refactor context handling so operations receive the application or request context instead of an absent context, owned contexts carry an explicit cancellation cause, and tests derive contexts from the active test.
 
+**Bugfix**: 2026-08-21 — [BUG-001] Clarified that successful player-listener acquisition hands ownership to the application lifetime and added post-start streaming acceptance.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Preserve operation lifetime end to end (Priority: P1)
@@ -20,6 +22,7 @@ As an operator, I need startup, desktop actions, player requests, persistence, a
 1. **Given** the application is composed from its process context, **When** startup and application-owned work acquire resources, **Then** context-aware dependencies observe a context derived from that process or lifecycle context.
 2. **Given** a player or desktop operation has an available request/application context, **When** it reaches persistence, networking, or platform boundaries, **Then** the operation uses that context throughout the call chain.
 3. **Given** a context-aware API receives no context, **When** the API begins work, **Then** it fails explicitly instead of silently replacing the missing context with an unrelated root.
+4. **Given** the player listener is acquired under a bounded startup operation, **When** startup commits the listener and the operation context completes, **Then** the committed HTTP server and later player request contexts remain active under the application-owned lifetime until explicit server stop, serve failure, parent application cancellation, or application shutdown.
 
 ---
 
@@ -60,6 +63,7 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - Shutdown cleanup starts after the normal application/request context has already been canceled.
 - Repeated close and shutdown calls must remain idempotent and must not overwrite the first meaningful cancellation cause.
 - A partial startup failure must cancel acquired resource lifetimes with the startup failure while still allowing bounded cleanup.
+- A bounded startup operation completes successfully after handing off an acquired listener while the application runtime remains active.
 
 ## Requirements
 
@@ -74,6 +78,8 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - **FR-007**: Every affected Go test that needs a context MUST use the active test context as its root and derive values, cancellation, or deadlines from it.
 - **FR-008**: The refactor MUST preserve existing user-visible behavior, persistence formats, network contracts, public/private boundaries, and configured timeout budgets.
 
+**BUG-001 clarification (FR-001, FR-004, FR-008)**: A bounded startup context owns player-listener acquisition only until commit. Successful startup completion MUST NOT cancel the committed player-server lifetime or any HTTP/ConnectRPC request derived after the handoff; only the documented application/player-server owner outcomes may do so.
+
 ## Success Criteria
 
 ### Measurable Outcomes
@@ -83,6 +89,7 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - **SC-003**: A repository scan finds zero affected tests using background or placeholder roots for test-owned context work.
 - **SC-004**: Formatting, static analysis, the complete Go test suite, and the race-enabled Go test suite all pass.
 - **SC-005**: Existing application startup, shutdown, player-stream, session, and public-access tests continue to pass without contract or persistence drift.
+- **SC-006**: With the production non-zero startup timeout, successful `App.Start` completion leaves the committed player-server context active, and a later `Subscribe` receives one complete snapshot plus a subsequent authoritative update before explicit shutdown supplies the documented cancellation cause.
 
 ## Assumptions
 

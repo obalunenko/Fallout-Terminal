@@ -108,7 +108,6 @@ func TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe(t *testing.T) {
 
 	listener, err := net.Listen("tcp4", tunnel.PlayerUpstreamAddress)
 	require.NoError(t, err)
-	defer func() { require.NoError(t, listener.Close()) }()
 	probe := &publicStreamProbeService{upstreamArrival: make(chan time.Time, 1)}
 	rpcPath, rpcHandler := playerv1connect.NewPlayerServiceHandler(probe)
 	mux := http.NewServeMux()

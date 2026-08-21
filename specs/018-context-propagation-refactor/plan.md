@@ -1,5 +1,7 @@
 # Implementation Plan: Context Propagation and Causal Cancellation
 
+**Bugfix**: 2026-08-21 — [BUG-001] Updated from bugfix patch.
+
 ## Summary
 
 Refactor application-owned Go lifetimes so context values and cancellation travel from the process root or initiating request to every context-aware boundary. Composition and lifecycle constructors will require a context, the coordinator persistence seam will carry the application context instead of manufacturing a background root, and manually canceled resource contexts will use causal cancellation with stable reasons. Tests will pass `t.Context()` or a direct derivative and will assert both context propagation and cancellation causes.
@@ -54,9 +56,14 @@ The ownership model and state transitions are defined in [data-model.md](./data-
 
 The design changes no public RPC, protobuf, persistence, browser, or desktop payload contract. Context values remain native dependency/lifecycle inputs as required by the constitution.
 
+### BUG-001 Player-listener ownership handoff
+
+The context passed to player-server `Start` bounds acquisition only. Before listener commit, its cancellation aborts startup and releases partial resources. After commit, the HTTP server base context is owned by the application/player-server lifetime established at composition; normal startup-operation completion is not a server cancellation cause. Explicit stop, serve failure, parent application cancellation, and application shutdown retain their existing causal and bounded-cleanup behavior.
+
 ## Verification Strategy
 
 - Add focused propagation tests at composition/lifecycle, coordinator persistence, player server/subscription, and tunnel/provider boundaries.
+- Add a real player-server regression with the production non-zero startup timeout: complete `App.Start`, cancel the successful acquisition operation, then prove a later `Subscribe` receives a complete snapshot and subsequent update while the server context remains active until explicit shutdown.
 - Assert explicit causes with `context.Cause` and idempotent first-cause preservation.
 - Run the repository convention scan to prove affected test contexts derive from `t.Context()` and production lower layers do not create replacement roots.
 - Run `gofmt -l .`, `go vet ./...`, `go test ./...`, and `go test -race ./...`.

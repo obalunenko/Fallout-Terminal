@@ -43,7 +43,6 @@ type Server struct {
 	info       domain.ServerInfo
 	context    context.Context
 	cancel     context.CancelCauseFunc
-	stopParent func() bool
 	started    bool
 	stopping   bool
 	stopped    bool
@@ -98,14 +97,18 @@ func (server *Server) Start(ctx context.Context) (domain.ServerInfo, error) {
 	if err != nil {
 		return domain.ServerInfo{}, fmt.Errorf("listen on %s: %w", server.config.Address, err)
 	}
+	if err := ctx.Err(); err != nil {
+		_ = listener.Close()
+		return domain.ServerInfo{}, err
+	}
+	if err := server.root.Err(); err != nil {
+		_ = listener.Close()
+		return domain.ServerInfo{}, err
+	}
 	serverContext, cancel := context.WithCancelCause(server.root)
-	stopParent := context.AfterFunc(ctx, func() {
-		cancel(context.Cause(ctx))
-	})
 	server.listener = listener
 	server.context = serverContext
 	server.cancel = cancel
-	server.stopParent = stopParent
 	server.info = listenerInfo(listener, server.config.Address)
 	server.started = true
 	server.stopDone = make(chan struct{})
@@ -196,13 +199,9 @@ func (server *Server) Stop(ctx context.Context) error {
 
 	server.stopping = true
 	cancel := server.cancel
-	stopParent := server.stopParent
 	httpServer := server.httpServer
 	server.mu.Unlock()
 
-	if stopParent != nil {
-		stopParent()
-	}
 	if cancel != nil {
 		cancel(errPlayerServerStopped)
 	}

@@ -225,6 +225,74 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-21T12:24:17.260Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T17:42:31.044Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:44:44.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:45:37.288Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:45:55.862Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:46:04.104Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:46:30.078Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:48:20.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T17:54:32.287Z"
     }
   ],
   "unattended": true,
@@ -239,9 +307,8 @@
         "T018"
       ],
       "tests": [
-        "go test ./...",
-        "go test -race ./...",
-        "scripts/secret-leak-check.sh"
+        "internal/player/public_stream_test.go::TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary",
+        "tests/browser/player-sessions-control.spec.mjs::active navigation applies the authoritative compound update"
       ]
     },
     "FR-001": {
@@ -255,8 +322,8 @@
         "T012"
       ],
       "tests": [
-        "TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild",
-        "TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams"
+        "app_test.go::TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild",
+        "internal/player/stream_test.go::TestConnectServerLifetimeSurvivesCompletedStartupContext"
       ]
     },
     "FR-002": {
@@ -301,8 +368,8 @@
         "T015"
       ],
       "tests": [
-        "TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild",
-        "TestEmbeddedNgrokEndpointLifetimeSurvivesCompletedStartupContext"
+        "internal/player/stream_test.go::TestConnectServerLifetimeSurvivesCompletedStartupContext",
+        "internal/player/stream_test.go::TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams"
       ]
     },
     "FR-005": {
@@ -350,6 +417,12 @@
       "tests": [
         "TestConnectRPCMigrationTestConventions"
       ]
+    },
+    "SC-006": {
+      "tests": [
+        "internal/player/stream_test.go::TestConnectServerLifetimeSurvivesCompletedStartupContext",
+        "internal/player/public_stream_test.go::TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary"
+      ]
     }
   },
   "size": "oversized",
@@ -392,6 +465,16 @@
       "decision": "Add context only to the durable coordinator seam",
       "why": "Persistence needs operation ownership while pure in-memory transitions do not",
       "rejected": "Adding context to every coordinator method"
+    },
+    {
+      "decision": "Treat player Start context as acquisition-only after listener commit",
+      "why": "The constructor root owns the committed HTTP and ConnectRPC lifetime, so normal startup completion cannot disconnect players while pre-commit cancellation still aborts acquisition",
+      "rejected": "Retaining context.AfterFunc from the bounded startup child into the committed server context"
+    },
+    {
+      "decision": "Let http.Server.Shutdown solely own integration-listener teardown",
+      "why": "Shutdown already closes the listener and a second required close produced a false teardown failure",
+      "rejected": "Ignoring or special-casing net.ErrClosed from redundant listener cleanup"
     }
   ],
   "step_summaries": {
@@ -403,11 +486,11 @@
       "summary": "18 tasks across setup, foundational tests, three user-story phases, and two validation waves"
     },
     "implement": {
-      "summary": "Propagated process, lifecycle, request, and test contexts end to end; replaced manual cancellation with stable causes; retained bounded value-preserving cleanup; all validation gates passed.",
+      "summary": "Fixed BUG-001 by handing the committed player listener from bounded startup acquisition to the retained server lifetime; added local, authenticated ingress, and browser regressions.",
       "key_finding": "Executable roots are now the only Background contexts; owned lifetimes expose semantic context.Cause values and tests are rooted in testing.T.Context."
     }
   },
-  "currentTask": "T018",
+  "currentTask": "T021",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -483,11 +566,10 @@
     },
     "T009": {
       "status": "DONE",
-      "did": "Made player server and subscription lifetimes require real parents, retain request/startup values, and cancel with semantic server, unregister, replacement, revision, overflow, or hub-close causes.",
+      "did": "Limited player Start context ownership to pre-commit listener acquisition and rooted the committed HTTP/stream lifetime in the retained player-server context.",
       "files": [
         "internal/player/server.go",
-        "internal/player/stream.go",
-        "internal/player/handler.go"
+        "internal/player/stream_test.go"
       ]
     },
     "T010": {
@@ -510,28 +592,19 @@
     },
     "T012": {
       "status": "DONE",
-      "did": "Updated application, Wails, desktop, control, player, platform, and browser-fixture call sites to pass root, request, or testing contexts through the new APIs",
+      "did": "Reconciled production context roles: NewServer retains the composition root, App.Start passes the bounded acquisition child, and focused assertions prove only the child completes.",
       "files": [
         "app_test.go",
-        "wails_host_test.go",
-        "production_resources_test.go",
-        "internal/platform/assets_test.go",
-        "internal/platform/desktop_test.go",
-        "tests/browser/fixture-server/main.go"
+        "internal/player/server.go"
       ]
     },
     "T013": {
       "status": "DONE",
-      "did": "Implemented causal cancellation for application runtime, Wails cleanup, player server lifetimes, and player subscription close/replacement/failure paths with stable package-local causes",
+      "did": "Removed successful startup completion from committed player-server cancellation causes while retaining explicit server-stop and serve-failure causal cancellation.",
       "files": [
-        "app.go",
-        "wails_host.go",
         "internal/player/server.go",
-        "internal/player/stream.go",
-        "app_test.go",
-        "wails_host_test.go",
         "internal/player/stream_test.go",
-        "internal/player/handler_test.go"
+        "app_test.go"
       ]
     },
     "T014": {
@@ -548,12 +621,10 @@
     },
     "T015": {
       "status": "DONE",
-      "did": "Reconciled bounded shutdown and idempotent close seams, preserved parent deadlines during detached cleanup, bridged player start cancellation into the retained root context, and passed focused race tests",
+      "did": "Reconciled the startup handoff race with post-listen cancellation checks and verified committed-stream plus bounded-shutdown seams under the race detector.",
       "files": [
-        "app.go",
         "internal/player/server.go",
-        "internal/tunnel/manager.go",
-        "internal/tunnel/ngrok.go"
+        "internal/player/stream_test.go"
       ]
     },
     "T016": {
@@ -601,6 +672,34 @@
       "did": "Passed the complete go test -race ./... suite and scripts/secret-leak-check.sh with no races or forbidden secret leakage",
       "files": [
         "specs/018-context-propagation-refactor/tasks.md"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Added application and real-player-server regressions proving startup-operation completion must not cancel the committed server; captured the expected pre-fix failure.",
+      "files": [
+        "app_test.go",
+        "internal/player/stream_test.go"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Extended authenticated ingress coverage through selection and a later on-air stream update, plus a browser assertion that the reconnect overlay stays hidden.",
+      "files": [
+        "internal/player/public_stream_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Passed formatting, vet, gopls, focused lifecycle/public-stream/browser, full Go, full race, and secret-leak gates; isolated and reran one transient real-ngrok edge response.",
+      "files": [
+        "app_test.go",
+        "internal/player/server.go",
+        "internal/player/stream_test.go",
+        "internal/player/public_stream_test.go",
+        "internal/tunnel/ngrok_integration_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
       ]
     }
   },
@@ -654,6 +753,103 @@
       "what": "Real ngrok SDK lifecycle integration",
       "result": "passed",
       "command": "go test ./internal/tunnel -run TestEmbeddedNgrokSDKOptInAuthenticatedGeneratedSubscribe -count=1"
+    },
+    {
+      "what": "BUG-001 RED regression",
+      "command": "go test ./internal/player -run TestConnectServerLifetimeSurvivesCompletedStartupContext -count=1",
+      "result": "Expected pre-fix failure reproduced: startup completion canceled the committed player server",
+      "warnings": []
+    },
+    {
+      "what": "Focused player lifecycle tests",
+      "command": "go test ./internal/player -run TestConnectServer... -count=1",
+      "result": "Passed after the ownership fix",
+      "warnings": []
+    },
+    {
+      "what": "Focused player lifecycle race tests",
+      "command": "go test -race ./internal/player -run TestConnectServer... -count=1",
+      "result": "Passed",
+      "warnings": []
+    },
+    {
+      "what": "Application lifecycle context test",
+      "command": "go test . -run TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild -count=1",
+      "result": "Passed",
+      "warnings": [
+        "Raw go test emitted known macOS deployment-target linker warnings; canonical make test was warning-free"
+      ]
+    },
+    {
+      "what": "Authenticated public stream test",
+      "command": "go test ./internal/player -run TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary -count=1",
+      "result": "Passed selection and later on-air update",
+      "warnings": []
+    },
+    {
+      "what": "Targeted browser player journey",
+      "command": "npm test -- --grep active navigation applies the authoritative compound update",
+      "result": "Passed; reconnect overlay remained hidden after later update",
+      "warnings": [
+        "Node reported NO_COLOR ignored because FORCE_COLOR is set"
+      ]
+    },
+    {
+      "what": "Formatting",
+      "command": "make fmt-check",
+      "result": "Passed",
+      "warnings": []
+    },
+    {
+      "what": "Static analysis",
+      "command": "go vet ./...",
+      "result": "Passed",
+      "warnings": []
+    },
+    {
+      "what": "Go language diagnostics",
+      "command": "gopls check changed Go files",
+      "result": "Passed",
+      "warnings": []
+    },
+    {
+      "what": "Complete Go suite",
+      "command": "make test",
+      "result": "Passed including opted-in authenticated ngrok stream",
+      "warnings": []
+    },
+    {
+      "what": "Race-enabled Go suite",
+      "command": "make test-race",
+      "result": "Passed on canonical rerun",
+      "warnings": [
+        "First live-ngrok race run received a transient unauthenticated 404; isolated retry and full rerun passed while authenticated streaming delivered both frames"
+      ]
+    },
+    {
+      "what": "Secret leak gate",
+      "command": "scripts/secret-leak-check.sh",
+      "result": "Passed",
+      "warnings": []
+    },
+    {
+      "what": "Extra complete browser suite",
+      "command": "npm test",
+      "result": "122 passed, 2 skipped, 3 failed outside BUG-001 scope",
+      "warnings": [
+        "Three pre-existing CRT focused-character-option snapshot mismatches at compact, medium, and large viewports"
+      ]
     }
-  ]
+  ],
+  "concerns": [
+    {
+      "note": "The live ngrok race gate transiently returned 404 for one unauthenticated probe; isolated retry and the canonical full rerun passed, and authenticated snapshot plus later update evidence remained green.",
+      "step": "implement"
+    },
+    {
+      "note": "An extra non-gating full browser run had three pre-existing CRT focused-character-option snapshot mismatches; the targeted BUG-001 browser regression and 122 other browser tests passed.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "BUG-001 fixed — all 21 tasks complete; required Go, race, focused browser, and secret gates pass"
 }

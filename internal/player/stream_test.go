@@ -289,6 +289,49 @@ func TestConnectServerShutdownIsBoundedWithBlockedAndCanceledPhysicalStreams(t *
 	}, time.Second, time.Millisecond)
 }
 
+func TestConnectServerLifetimeSurvivesCompletedStartupContext(t *testing.T) {
+	coordinator := newConnectTestCoordinator(t)
+	hub := NewSubscriptionHub()
+	connectPlayer, err := NewConnectService(ConnectServiceConfig{Coordinator: coordinator, QueueSize: 1, Hub: hub})
+	require.NoError(t, err)
+	assets := fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("<!doctype html><title>Player</title>")}}
+	serverRoot := context.WithValue(t.Context(), playerContextKey{}, "player-server")
+	server, err := NewServer(serverRoot, Config{
+		Address: "127.0.0.1:0", Assets: fs.FS(assets), Connect: connectPlayer,
+	})
+	require.NoError(t, err)
+	startupContext, completeStartup := context.WithCancelCause(t.Context())
+	_, err = server.Start(startupContext)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		cleanupContext, cancelCleanup := context.WithTimeoutCause(
+			context.WithoutCancel(t.Context()), time.Second, errors.New("test player cleanup timed out"),
+		)
+		defer cancelCleanup()
+		require.NoError(t, server.Stop(cleanupContext))
+	})
+
+	completeStartup(errors.New("test player startup completed"))
+	require.Never(t, func() bool { return server.context.Err() != nil }, 50*time.Millisecond, time.Millisecond,
+		"completed startup context canceled the committed player server")
+
+	client := playerv1connect.NewPlayerServiceClient(http.DefaultClient, server.Info().LocalURL)
+	streamContext, cancelStream := context.WithCancelCause(t.Context())
+	t.Cleanup(func() { cancelStream(errors.New("test post-start stream closed")) })
+	stream, err := client.Subscribe(streamContext, connect.NewRequest(&playerv1.SubscribeRequest{}))
+	require.NoError(t, err)
+	require.True(t, stream.Receive(), "initial snapshot error: %v", stream.Err())
+	snapshot := stream.Msg().GetSnapshot()
+	require.NotNil(t, snapshot)
+	sessionID := snapshot.GetPlayerState().GetLogicalSessionId()
+	require.NotEmpty(t, sessionID)
+
+	hub.Offer(domain.LogicalSessionID(sessionID), subscriptionUpdate(snapshot.GetRevision()+1))
+	require.True(t, stream.Receive(), "post-start update error: %v", stream.Err())
+	require.Equal(t, snapshot.GetRevision()+1, stream.Msg().GetUpdate().GetRevision())
+	require.NoError(t, server.context.Err())
+}
+
 type playerContextKey struct{}
 
 func subscriptionSnapshot(revision uint64) *playerv1.SubscriptionMessage {

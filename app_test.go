@@ -308,6 +308,8 @@ func TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild(t 
 	require.NoError(t, player.contextErrAtStart)
 	_, bounded := player.startContext.Deadline()
 	require.True(t, bounded, "player acquisition must receive the startup-timeout child")
+	require.ErrorIs(t, context.Cause(player.startContext), errApplicationStartupComplete)
+	require.NoError(t, app.contextSnapshot().Err(), "successful acquisition completion must not cancel the application lifetime")
 	require.NoError(t, app.Shutdown(t.Context()))
 	require.ErrorIs(t, context.Cause(app.contextSnapshot()), errApplicationShutdown)
 }

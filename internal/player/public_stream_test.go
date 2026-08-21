@@ -260,6 +260,20 @@ func TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBounda
 	update := stream.Msg().GetUpdate()
 	require.NotNil(t, update)
 	assert.Equal(t, selected.Msg.GetRevision(), update.GetRevision())
+
+	onAirRevision := update.GetRevision() + 1
+	service.PublishEffect(control.Effect{
+		SessionID: domain.LogicalSessionID(snapshot.GetPlayerState().GetLogicalSessionId()),
+		Update: &domain.CompoundUpdate{
+			Revision: onAirRevision,
+			Terminal: &domain.TerminalPresentation{Live: commandLifecycleLiveState("", false)},
+		},
+	})
+	require.True(t, stream.Receive(), "post-selection on-air stream error: %v", stream.Err())
+	onAir := stream.Msg().GetUpdate()
+	require.NotNil(t, onAir)
+	assert.Equal(t, onAirRevision, onAir.GetRevision())
+	assert.Equal(t, "terminal-1", onAir.GetTerminalPresentation().GetLiveTerminal().GetTerminalId())
 }
 
 func TestAuthenticatedForwardingStillAppliesOriginAndBodyLimitsInsidePlayer(t *testing.T) {

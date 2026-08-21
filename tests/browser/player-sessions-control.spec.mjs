@@ -110,7 +110,10 @@ test('active navigation applies the authoritative compound update while awaiting
 
   await expect(page.locator('.term-row', { hasText: 'REPORT' })).toBeVisible();
   await expect(page.locator('#screen')).not.toHaveClass(/shared-input-pending/);
-  expect(requests.map(request => request.procedure)).toContain('Navigate');
+  await expect(page.locator('#connOverlay')).toBeHidden();
+  expect(requests.map(request => request.procedure)).toEqual(expect.arrayContaining([
+    'Subscribe', 'SelectCharacter', 'Navigate',
+  ]));
 });
 
 test('three tabs share one recognition handle and converge after one generated selection', async ({ browser }) => {

@@ -1,5 +1,7 @@
 # Tasks: Context Propagation and Causal Cancellation
 
+**Bugfix**: 2026-08-21 — [BUG-001] Updated from bugfix patch.
+
 ## Phase 1: Setup
 
 **Wave 1:**
@@ -37,7 +39,7 @@
 
 - [x] **T007** [P] [US1] Require and propagate the process context through composition, application construction, logger lookup, retained application context, and Wails lifecycle cleanup · `main.go`, `app.go`, `wails_host.go`
 - [x] **T008** [P] [US1] Thread the application operation context through command-execution coordination and the command-state persistence adapter; reject absent session/player-config operation contexts · `internal/control/service.go`, `internal/session/service.go`, `internal/playerconfig/service.go`
-- [x] **T009** [P] [US1] Require the startup/request parent in the player server and subscription lifetimes and preserve it as the HTTP/stream parent · `internal/player/server.go`, `internal/player/stream.go`, `internal/player/handler.go`
+- [x] **T009** [P] [US1] ⚠️ Reopened: Require the startup/request parent in the player server and subscription lifetimes, but limit the bounded startup context to pre-commit acquisition and preserve the application/player-server owned context as the committed HTTP/stream parent (reopened — BUG-001) · `internal/player/server.go`, `internal/player/stream.go`, `internal/player/handler.go`
 - [x] **T010** [P] [US1] Remove lower-layer replacement roots from public-access manager, ingress, and embedded-provider operations; carry initiating values into bounded cleanup · `internal/tunnel/manager.go`, `internal/tunnel/public_ingress.go`, `internal/tunnel/ngrok.go`
 - [x] **T011** [P] [US1] Require the lifecycle context in the retained desktop adapter and operation contexts at the Darwin credential boundary · `internal/platform/desktop.go`, `internal/platform/keychain_darwin.go`
 
@@ -45,7 +47,7 @@
 
 **Wave 2:**
 
-- [x] **T012** [US1] Update root/application, coordinator, player, platform, and tunnel call sites so production supplies the process/request context and tests supply `t.Context()` derivatives · `main.go`, `app_test.go`, `wails_host_test.go`, `internal/**/*_test.go`
+- [x] **T012** [US1] ⚠️ Reopened: Update root/application, coordinator, player, platform, and tunnel call sites so production supplies the correct acquisition versus owned-lifetime context and tests supply equivalent `t.Context()` derivatives (reopened — BUG-001) · `main.go`, `app.go`, `app_test.go`, `wails_host_test.go`, `internal/**/*_test.go`
 
 **Checkpoint**: User Story 1 is independently functional; no context-aware path passes an absent context or creates a lower-layer replacement root.
 
@@ -59,14 +61,14 @@
 
 **Wave 1 — independent (different files):**
 
-- [x] **T013** [P] [US2] Convert application, Wails cleanup, player server, and player subscription ownership to causal cancellation with stable shutdown/failure/overflow/replacement reasons · `app.go`, `wails_host.go`, `internal/player/server.go`, `internal/player/stream.go`
+- [x] **T013** [P] [US2] ⚠️ Reopened: Convert application, Wails cleanup, player server, and player subscription ownership to causal cancellation with stable shutdown/failure/overflow/replacement reasons, excluding successful startup completion from committed player-server causes (reopened — BUG-001) · `app.go`, `wails_host.go`, `internal/player/server.go`, `internal/player/stream.go`
 - [x] **T014** [P] [US2] Convert public-access start and embedded endpoint ownership to causal cancellation; apply explicit causes to completion, timeout, request cancellation, abort, and cleanup · `internal/tunnel/manager.go`, `internal/tunnel/ngrok.go`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
 **Wave 2:**
 
-- [x] **T015** [US2] Reconcile shutdown and race seams so cleanup remains bounded, first-cause wins, and partial-start/repeated-close behavior stays idempotent · `app.go`, `internal/player/server.go`, `internal/tunnel/manager.go`, `internal/tunnel/ngrok.go`
+- [x] **T015** [US2] ⚠️ Reopened: Reconcile successful player-listener handoff, shutdown, and race seams so cleanup remains bounded, first-cause wins, and partial-start/repeated-close behavior stays idempotent (reopened — BUG-001) · `app.go`, `internal/player/server.go`, `internal/tunnel/manager.go`, `internal/tunnel/ngrok.go`
 
 **Checkpoint**: User Story 2 is independently functional and causal cancellation is observable across all owned lifecycle classes.
 
@@ -96,6 +98,24 @@
 
 - [x] **T018** Run concurrency and public-access safety validation, including `go test -race ./...` and the secret-leak check, then record any unavailable check honestly · `go test -race ./...`, `scripts/secret-leak-check.sh`
 
+## Phase 7: BUG-001 Player-listener Handoff Correction
+
+**Wave 1:**
+
+- [x] **T019** [US1] Add a RED real-server regression using the production non-zero application startup timeout; after `App.Start` completes and its acquisition context is canceled, prove a later `Subscribe` receives a complete snapshot and a subsequent authoritative update while the committed server context remains active · `app_test.go`, `internal/player/stream_test.go`
+
+**⟶ T019 must fail for the reported lifecycle bug; then complete reopened T009, T012, T013, and T015 before Wave 2.**
+
+**Wave 2:**
+
+- [x] **T020** [US1] Add public-ingress/browser regression coverage proving an authenticated player can remain connected after character selection and receive a later on-air update without the lost-connection overlay · `internal/player/public_stream_test.go`, `tests/browser/player-sessions-control.spec.mjs`
+
+**⟶ Wait for T009, T012, T013, T015, and T020 to finish, then:**
+
+**Wave 3:**
+
+- [x] **T021** [US1] Validate BUG-001 with focused player/application/public-stream tests, formatting, vet, the complete Go suite, the race-enabled Go suite, and the secret-leak check · `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, `scripts/secret-leak-check.sh`
+
 ## Dependencies & Execution Order
 
 - Setup T001 establishes the red convention gate before foundational tests.
@@ -104,3 +124,5 @@
 - User Story 2 Wave 1 runs T013–T014 independently; T015 joins their lifecycle and race behavior.
 - User Story 3 T016 follows the production API/cause changes so every test uses the final signatures.
 - Polish T017 runs functional verification before the heavier race and secret-safety validation in T018.
+- BUG-001 correction begins with RED regression T019; reopened T009 and T013 correct the player-server ownership/cause implementation, reopened T012 reconciles production call sites, and reopened T015 joins the handoff and race seams.
+- T020 follows the reopened implementation work and proves public-player behavior; T021 runs only after T009, T012, T013, T015, and T020 complete.

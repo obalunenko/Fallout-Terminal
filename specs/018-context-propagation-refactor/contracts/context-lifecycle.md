@@ -1,5 +1,7 @@
 # Internal Contract: Context Lifecycle
 
+**Bugfix**: 2026-08-21 — [BUG-001] Clarified player-listener acquisition-to-runtime ownership handoff.
+
 ## Required context
 
 - Every constructor or operation that retains a context, derives a child, waits on cancellation, performs I/O, or crosses a context-aware adapter boundary receives a non-absent `context.Context`.
@@ -11,6 +13,7 @@
 - `main` passes its process context into application composition, logger lookup, the application constructor, the player server, the desktop adapter, and the Wails lifecycle adapter.
 - Wails startup passes its lifecycle callback context into the application runtime.
 - The application passes its runtime context to desktop actions, public-access work, player startup, session operations, and the coordinator's durable command-state decision.
+- The context supplied to player-server `Start` may abort acquisition before listener commit. After commit, normal completion or cancellation of that startup operation does not cancel the HTTP server base context; the committed server remains a child of the application/player-server owned lifetime.
 - Connect handlers keep their request context for stream and request-aware work.
 - Tests substitute `t.Context()` at the same roots and derive values, causes, or deadlines from it.
 
@@ -32,6 +35,8 @@ Minimum semantic outcomes:
 | Embedded endpoint | aborted startup or endpoint close |
 | Bounded cleanup | cleanup completed or cleanup budget expired |
 
+Successful player-listener handoff is not a player-server cancellation outcome. Startup completion ends only the bounded acquisition operation; the committed server accepts new HTTP/ConnectRPC requests until an explicit documented server/application outcome occurs.
+
 ## Cleanup
 
 - Cleanup that must survive an already-canceled initiator uses `context.WithoutCancel(parent)` only to detach cancellation; values remain inherited.
@@ -42,4 +47,5 @@ Minimum semantic outcomes:
 
 - Context propagation tests place a private marker in `t.Context()` and assert that the marker reaches the targeted fake dependency.
 - Cancellation tests assert `context.Cause` against the expected semantic error and verify first-cause preservation under repeated close.
+- Player-server handoff tests complete and cancel a bounded startup context, then establish a new `Subscribe`, receive its complete snapshot and a later update, and assert the committed server context remains uncanceled until explicit shutdown.
 - The convention test rejects background/placeholder roots in affected tests and lower-layer production fallback creation.
