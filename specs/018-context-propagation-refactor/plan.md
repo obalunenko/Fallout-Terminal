@@ -2,6 +2,8 @@
 
 **Bugfix**: 2026-08-21 — [BUG-001] Updated from bugfix patch.
 
+**Bugfix**: 2026-08-21 — [BUG-002] Updated from bugfix patch.
+
 ## Summary
 
 Refactor application-owned Go lifetimes so context values and cancellation travel from the process root or initiating request to every context-aware boundary. Composition and lifecycle constructors will require a context, the coordinator persistence seam will carry the application context instead of manufacturing a background root, and manually canceled resource contexts will use causal cancellation with stable reasons. Tests will pass `t.Context()` or a direct derivative and will assert both context propagation and cancellation causes.
@@ -16,21 +18,27 @@ internal/control/service.go                  # context-aware durable command-sta
 internal/session/service.go                  # required context validation
 internal/player/
 ├── handler.go                               # request-context use
+├── http.go                                  # player CSP response and static-asset behavior
 ├── server.go                                # server lifetime and shutdown cause
 └── stream.go                                # subscription lifetime and close cause
 internal/platform/
 ├── desktop.go                               # required retained lifecycle context
 ├── keychain_darwin.go                       # required operation context validation
+├── assets_test.go                           # player HTML/security source contract
 └── test_conventions_test.go                 # test-context regression gate
 internal/playerconfig/service.go             # required operation context validation
 internal/tunnel/
 ├── manager.go                               # public-access operation and cleanup ownership
 ├── ngrok.go                                 # embedded endpoint lifetime and cleanup
 └── public_ingress.go                        # request-derived server base and close context
+frontend/client/index.html                   # supported meta CSP and explicit favicon strategy
+tests/browser/player-sessions-control.spec.mjs # clean first-party console/request journey
 *_test.go and internal/**/*_test.go           # t.Context roots, propagation/cause assertions
 ```
 
 **Structure Decision**: Keep ownership changes inside existing composition, service, adapter, and test files; introduce no package or dependency and do not alter generated or serialized contracts.
+
+BUG-002 remains inside the existing player document, static handler, source-contract test, and browser journey. It adds no dependency, generated artifact, public RPC, or persistence change.
 
 ## Constitution Check
 
@@ -60,15 +68,23 @@ The design changes no public RPC, protobuf, persistence, browser, or desktop pay
 
 The context passed to player-server `Start` bounds acquisition only. Before listener commit, its cancellation aborts startup and releases partial resources. After commit, the HTTP server base context is owned by the application/player-server lifetime established at composition; normal startup-operation completion is not a server cancellation cause. Explicit stop, serve failure, parent application cancellation, and application shutdown retain their existing causal and bounded-cleanup behavior.
 
+### BUG-002 Player-page console and static-request hygiene
+
+Keep the server-supplied player CSP authoritative for directives that require HTTP delivery: the response header retains `frame-ancestors 'none'`, while the HTML meta policy retains only directives browsers support through meta delivery. Declare an intentional empty data favicon in the player document so Chromium does not synthesize a failing `/favicon.ico` request and no new binary asset or dependency is required.
+
+Extend the existing extension-free Playwright player journey to capture first-party page console warnings/errors and failed same-origin responses from before navigation. Treat only repository-owned page activity as acceptance evidence; scripts injected by a user's browser extensions remain outside the shipped application unless they reproduce in the governed clean browser context. Keep focused Go/source tests proving the response header still enforces anti-framing and the meta policy does not contain `frame-ancestors`.
+
 ## Verification Strategy
 
 - Add focused propagation tests at composition/lifecycle, coordinator persistence, player server/subscription, and tunnel/provider boundaries.
 - Add a real player-server regression with the production non-zero startup timeout: complete `App.Start`, cancel the successful acquisition operation, then prove a later `Subscribe` receives a complete snapshot and subsequent update while the server context remains active until explicit shutdown.
 - Assert explicit causes with `context.Cause` and idempotent first-cause preservation.
 - Run the repository convention scan to prove affected test contexts derive from `t.Context()` and production lower layers do not create replacement roots.
+- Add focused source/HTTP assertions for the supported meta CSP, the response-header-only `frame-ancestors` directive, and the explicit favicon declaration.
+- Add a clean Playwright page-load assertion that records zero first-party console warnings/errors and zero failed same-origin static-resource responses, including no `/favicon.ico` 404.
 - Run `gofmt -l .`, `go vet ./...`, `go test ./...`, and `go test -race ./...`.
-- Run the existing secret-leak and context-sensitive public-access checks when the focused suites are green; no frontend or schema build is required because their inputs and outputs are unchanged.
+- Run the existing secret-leak and context-sensitive public-access checks when the focused suites are green; ~~no frontend or schema build is required because their inputs and outputs are unchanged~~ BUG-002 changes the player HTML input, so the client build and focused browser journey are required while schema generation remains unnecessary.
 
 ## Post-Design Constitution Re-check
 
-PASS. The final design keeps Wails at the adapter boundary, keeps context native and non-serialized, preserves the single authoritative player/coordinator state owner, changes no public/private capability surface, changes no schema or session JSON, introduces no protocol coexistence, and explicitly includes governed test and race gates.
+PASS. The final design keeps Wails at the adapter boundary, keeps context native and non-serialized, preserves the single authoritative player/coordinator state owner, changes no public/private capability surface, changes no schema or session JSON, introduces no protocol coexistence, and explicitly includes governed test and race gates. BUG-002 removes an unsupported duplicate meta directive without weakening the authoritative HTTP anti-framing policy and adds no public capability.

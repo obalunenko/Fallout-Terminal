@@ -7,6 +7,8 @@
 
 **Bugfix**: 2026-08-21 — [BUG-001] Clarified that successful player-listener acquisition hands ownership to the application lifetime and added post-start streaming acceptance.
 
+**Bugfix**: 2026-08-21 — [BUG-002] Added first-party player console and static-request cleanliness requirements while preserving HTTP-header anti-framing enforcement.
+
 ## User Scenarios & Testing
 
 ### User Story 1 - Preserve operation lifetime end to end (Priority: P1)
@@ -23,6 +25,7 @@ As an operator, I need startup, desktop actions, player requests, persistence, a
 2. **Given** a player or desktop operation has an available request/application context, **When** it reaches persistence, networking, or platform boundaries, **Then** the operation uses that context throughout the call chain.
 3. **Given** a context-aware API receives no context, **When** the API begins work, **Then** it fails explicitly instead of silently replacing the missing context with an unrelated root.
 4. **Given** the player listener is acquired under a bounded startup operation, **When** startup commits the listener and the operation context completes, **Then** the committed HTTP server and later player request contexts remain active under the application-owned lifetime until explicit server stop, serve failure, parent application cancellation, or application shutdown.
+5. **Given** the committed player server is active, **When** its first-party page loads in a clean extension-free browser, **Then** application-owned documents and resources produce no console warning or error and no failed same-origin static-resource request while anti-framing remains enforced by the HTTP response policy.
 
 ---
 
@@ -64,6 +67,7 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - Repeated close and shutdown calls must remain idempotent and must not overwrite the first meaningful cancellation cause.
 - A partial startup failure must cancel acquired resource lifetimes with the startup failure while still allowing bounded cleanup.
 - A bounded startup operation completes successfully after handing off an acquired listener while the application runtime remains active.
+- Browser or extension-injected diagnostics that do not originate from repository-owned player assets must be separated from first-party console and request failures.
 
 ## Requirements
 
@@ -77,8 +81,11 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - **FR-006**: Repeated or concurrent close paths MUST remain safe and MUST preserve the first applicable cancellation cause.
 - **FR-007**: Every affected Go test that needs a context MUST use the active test context as its root and derive values, cancellation, or deadlines from it.
 - **FR-008**: The refactor MUST preserve existing user-visible behavior, persistence formats, network contracts, public/private boundaries, and configured timeout budgets.
+- **FR-009**: The first-party player page MUST load in a clean extension-free browser without application-owned console warnings or errors and without failed same-origin static-resource requests; unsupported meta-delivered CSP directives MUST be omitted, anti-framing MUST remain enforced by the HTTP `Content-Security-Policy` header, and the document MUST declare a favicon strategy that prevents an automatic missing-resource request.
 
 **BUG-001 clarification (FR-001, FR-004, FR-008)**: A bounded startup context owns player-listener acquisition only until commit. Successful startup completion MUST NOT cancel the committed player-server lifetime or any HTTP/ConnectRPC request derived after the handoff; only the documented application/player-server owner outcomes may do so.
+
+**BUG-002 clarification (FR-008, FR-009)**: `frame-ancestors 'none'` remains mandatory in the player HTTP response header but MUST NOT appear in the HTML meta CSP, where browsers ignore it. Diagnostics from scripts absent from repository-owned player assets are out of scope unless they reproduce in the governed extension-free browser journey.
 
 ## Success Criteria
 
@@ -90,6 +97,7 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - **SC-004**: Formatting, static analysis, the complete Go test suite, and the race-enabled Go test suite all pass.
 - **SC-005**: Existing application startup, shutdown, player-stream, session, and public-access tests continue to pass without contract or persistence drift.
 - **SC-006**: With the production non-zero startup timeout, successful `App.Start` completion leaves the committed player-server context active, and a later `Subscribe` receives one complete snapshot plus a subsequent authoritative update before explicit shutdown supplies the documented cancellation cause.
+- **SC-007**: In the governed extension-free browser journey, one initial player-page load records zero application-owned console warnings/errors, zero failed same-origin static-resource responses, no `/favicon.ico` 404, and an HTTP CSP response header containing `frame-ancestors 'none'` while the HTML meta policy omits that directive.
 
 ## Assumptions
 
@@ -97,6 +105,7 @@ As a contributor, I need context-sensitive tests to be rooted in the running tes
 - Cleanup may detach cancellation from an already-canceled parent only to finish bounded resource release; parent values remain available.
 - Stable internal error values are sufficient cancellation causes; no public wire or persistence contract needs to change.
 - The change is a cross-cutting internal lifecycle refactor and does not add user-facing behavior or dependencies.
+- Browser-extension content scripts are not part of the shipped player application; only diagnostics reproducible in the governed extension-free browser context are first-party acceptance failures.
 
 ## Verbatim Constraints
 

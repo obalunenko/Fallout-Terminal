@@ -293,6 +293,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-21T17:54:32.287Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-21T18:18:15.074Z",
+      "reopened": true
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T18:20:06.276Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T18:20:38.707Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T18:21:08.637Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-21T18:22:57.906Z"
     }
   ],
   "unattended": true,
@@ -423,6 +463,20 @@
         "internal/player/stream_test.go::TestConnectServerLifetimeSurvivesCompletedStartupContext",
         "internal/player/public_stream_test.go::TestPublicIngressProtectsStaticUnaryAndStreamingBeforeUnchangedPlayerBoundary"
       ]
+    },
+    "FR-009": {
+      "tests": [
+        "internal/player/http_test.go::TestHTTPHandlerSetsPlayerSecurityHeaders",
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/player-sessions-control.spec.mjs::initial player page has no first-party console or static-request diagnostics"
+      ]
+    },
+    "SC-007": {
+      "tests": [
+        "internal/player/http_test.go::TestHTTPHandlerSetsPlayerSecurityHeaders",
+        "internal/platform/assets_test.go::TestPlayerCRTVisualShellAssetContract",
+        "tests/browser/player-sessions-control.spec.mjs::initial player page has no first-party console or static-request diagnostics"
+      ]
     }
   },
   "size": "oversized",
@@ -475,6 +529,16 @@
       "decision": "Let http.Server.Shutdown solely own integration-listener teardown",
       "why": "Shutdown already closes the listener and a second required close produced a false teardown failure",
       "rejected": "Ignoring or special-casing net.ErrClosed from redundant listener cleanup"
+    },
+    {
+      "decision": "Keep frame-ancestors only in the server-supplied CSP header and use an explicit empty data favicon",
+      "why": "Browsers ignore frame-ancestors in meta CSP, and data:, prevents the automatic favicon request without adding an asset or dependency",
+      "rejected": "Duplicating frame-ancestors in meta CSP or adding an otherwise unnecessary binary favicon"
+    },
+    {
+      "decision": "Treat empty-location and same-origin warnings as first-party while excluding non-HTTP extension origins",
+      "why": "The clean Playwright journey catches browser-generated document warnings and shipped page failures without assigning extension-injected scripts to the application",
+      "rejected": "Ignoring all empty-source diagnostics or treating every browser extension message as application-owned"
     }
   ],
   "step_summaries": {
@@ -486,11 +550,11 @@
       "summary": "18 tasks across setup, foundational tests, three user-story phases, and two validation waves"
     },
     "implement": {
-      "summary": "Fixed BUG-001 by handing the committed player listener from bounded startup acquisition to the retained server lifetime; added local, authenticated ingress, and browser regressions.",
+      "summary": "Removed unsupported meta CSP noise, prevented favicon 404s, and added clean first-party browser diagnostics coverage",
       "key_finding": "Executable roots are now the only Background contexts; owned lifetimes expose semantic context.Cause values and tests are rooted in testing.T.Context."
     }
   },
-  "currentTask": "T021",
+  "currentTask": "T025",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -701,6 +765,41 @@
         "internal/tunnel/ngrok_integration_test.go",
         "tests/browser/player-sessions-control.spec.mjs"
       ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added RED Go/source and Playwright coverage for response-header CSP, unsupported meta CSP, favicon requests, and first-party diagnostics",
+      "files": [
+        "internal/player/http_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Removed frame-ancestors from the player meta CSP while retaining and verifying the authoritative HTTP response directive",
+      "files": [
+        "frontend/client/index.html"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Declared an empty data favicon and satisfied clean browser console, page-error, and same-origin response diagnostics",
+      "files": [
+        "frontend/client/index.html",
+        "internal/platform/assets_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Validated BUG-002 with client build, focused Go and browser tests, formatting, vet, full Go tests, and the race suite",
+      "files": [
+        "frontend/client/index.html",
+        "internal/player/http_test.go",
+        "internal/platform/assets_test.go",
+        "tests/browser/player-sessions-control.spec.mjs"
+      ]
     }
   },
   "verified": [
@@ -839,6 +938,50 @@
       "warnings": [
         "Three pre-existing CRT focused-character-option snapshot mismatches at compact, medium, and large viewports"
       ]
+    },
+    {
+      "what": "player production build",
+      "command": "npm run build:client --prefix frontend",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "focused player HTTP and platform tests",
+      "command": "go test ./internal/player ./internal/platform",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker deployment-version warnings"
+      ]
+    },
+    {
+      "what": "player session browser journeys",
+      "command": "npm test --prefix tests/browser -- player-sessions-control.spec.mjs",
+      "result": "PASS: 9 tests",
+      "warnings": [
+        "npm NO_COLOR notice"
+      ]
+    },
+    {
+      "what": "formatting, LSP, and diff hygiene",
+      "command": "gofmt -l .; gopls check changed Go tests; git diff --check",
+      "result": "PASS",
+      "warnings": []
+    },
+    {
+      "what": "static analysis and complete Go suite",
+      "command": "go vet ./...; go test ./...",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker deployment-version warnings"
+      ]
+    },
+    {
+      "what": "race-enabled Go suite",
+      "command": "go test -race ./...",
+      "result": "PASS",
+      "warnings": [
+        "macOS linker deployment-version warnings"
+      ]
     }
   ],
   "concerns": [
@@ -851,5 +994,5 @@
       "step": "implement"
     }
   ],
-  "last_action": "BUG-001 fixed — all 21 tasks complete; required Go, race, focused browser, and secret gates pass"
+  "last_action": "BUG-002 fixed — all 25 tasks complete; client, focused browser, Go, vet, and race gates pass"
 }

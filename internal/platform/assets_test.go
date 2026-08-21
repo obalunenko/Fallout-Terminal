@@ -1659,10 +1659,12 @@ func TestPlayerCRTVisualShellAssetContract(t *testing.T) {
 		`class="conn-overlay" id="connOverlay"`,
 		`default-src 'self'`,
 		`object-src 'none'`,
-		`frame-ancestors 'none'`,
+		`<link rel="icon" href="data:,">`,
 	} {
 		assert.Contains(t, html, fragment)
 	}
+	assert.NotContains(t, html, `frame-ancestors`,
+		"player HTML meta CSP must omit directives that require HTTP-header delivery")
 
 	for _, fragment := range []string{
 		".screen{position:relative;",

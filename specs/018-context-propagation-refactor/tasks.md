@@ -2,6 +2,8 @@
 
 **Bugfix**: 2026-08-21 — [BUG-001] Updated from bugfix patch.
 
+**Bugfix**: 2026-08-21 — [BUG-002] Updated from bugfix patch.
+
 ## Phase 1: Setup
 
 **Wave 1:**
@@ -116,6 +118,30 @@
 
 - [x] **T021** [US1] Validate BUG-001 with focused player/application/public-stream tests, formatting, vet, the complete Go suite, the race-enabled Go suite, and the secret-leak check · `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`, `scripts/secret-leak-check.sh`
 
+## Phase 8: BUG-002 Player-page Console Hygiene
+
+**Wave 1:**
+
+- [x] **T022** [US1] Add RED source/HTTP and clean Playwright regressions that capture page diagnostics before navigation, require zero first-party console warnings/errors and failed same-origin static-resource responses, prove `/favicon.ico` does not return 404, require `frame-ancestors 'none'` only in the HTTP CSP header, and keep extension-injected script diagnostics outside first-party attribution · `internal/player/http_test.go`, `internal/platform/assets_test.go`, `tests/browser/player-sessions-control.spec.mjs`
+
+**⟶ T022 must fail for the reported CSP-meta warning and favicon request before implementation.**
+
+**Wave 2:**
+
+- [x] **T023** [US1] Remove the unsupported `frame-ancestors 'none'` directive from the player HTML meta CSP while retaining it in the server-supplied `Content-Security-Policy` header and updating the static source contract accordingly · `frontend/client/index.html`, `internal/player/http_test.go`, `internal/platform/assets_test.go`
+
+**⟶ T023 must pass the CSP portion of T022 before Wave 3.**
+
+**Wave 3:**
+
+- [x] **T024** [US1] Declare an intentional empty data favicon in the player document so clean Chromium navigation makes no failing `/favicon.ico` request, then satisfy the source and browser request assertions without adding a dependency or binary asset · `frontend/client/index.html`, `internal/platform/assets_test.go`, `tests/browser/player-sessions-control.spec.mjs`
+
+**⟶ T024 must pass all focused T022 regressions before Wave 4.**
+
+**Wave 4:**
+
+- [x] **T025** [US1] Validate BUG-002 with the client production build, focused player HTTP/platform tests, the focused Playwright player journey, formatting, vet, the complete Go suite, and the race-enabled Go suite · `npm run build:client --prefix frontend`, `go test ./internal/player ./internal/platform`, `npm test --prefix tests/browser -- player-sessions-control.spec.mjs`, `gofmt -l .`, `go vet ./...`, `go test ./...`, `go test -race ./...`
+
 ## Dependencies & Execution Order
 
 - Setup T001 establishes the red convention gate before foundational tests.
@@ -126,3 +152,4 @@
 - Polish T017 runs functional verification before the heavier race and secret-safety validation in T018.
 - BUG-001 correction begins with RED regression T019; reopened T009 and T013 correct the player-server ownership/cause implementation, reopened T012 reconciles production call sites, and reopened T015 joins the handoff and race seams.
 - T020 follows the reopened implementation work and proves public-player behavior; T021 runs only after T009, T012, T013, T015, and T020 complete.
+- BUG-002 begins with RED console/request coverage in T022; T023 corrects CSP delivery before T024 resolves the overlapping player-document favicon behavior, and T025 runs only after all focused T022 assertions pass.
