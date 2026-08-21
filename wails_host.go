@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/logger"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -121,17 +122,27 @@ func (sink *wailsEventSink) Emit(name string, payload any) error {
 // core. Its method names are Wails lifecycle hooks, not authored bridge calls.
 type wailsLifecycleService struct {
 	core coreLifecycle
+	log  logger.Logger
 }
 
-func newWailsLifecycleService(core coreLifecycle) *wailsLifecycleService {
-	return &wailsLifecycleService{core: core}
+func newWailsLifecycleService(core coreLifecycle, logs ...logger.Logger) *wailsLifecycleService {
+	applicationLogger := logger.FromContext(nil)
+	if len(logs) > 0 && logs[0] != nil {
+		applicationLogger = logs[0]
+	}
+	return &wailsLifecycleService{core: core, log: applicationLogger}
 }
 
 func (service *wailsLifecycleService) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	// Application-owned failures are recorded by the core in RuntimeStatus and
 	// leave the Overseer window available to explain the failure. Returning them
 	// here would make Wails abort before that status can be presented.
-	_ = service.core.Start(ctx)
+	if err := service.core.Start(ctx); err != nil {
+		service.log.WithFields(logger.Fields{
+			"operation": "application.start",
+			"outcome":   "failed",
+		}).Error("application startup failed")
+	}
 	return nil
 }
 

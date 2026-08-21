@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -157,6 +158,25 @@ func TestWailsLifecycleStartupClassifiesApplicationFailuresAsStatusVisible(t *te
 			require.NoError(t, core.startContext.Err())
 		})
 	}
+}
+
+func TestWailsLifecycleRecordsAbsorbedStartupFailureExactlyOnce(t *testing.T) {
+	t.Parallel()
+
+	startErr := errors.New("PROVIDER-SECRET-CANARY")
+	core := &recordingWailsLifecycleCore{startErr: startErr}
+	logs := testutil.NewRecordingLogger()
+	service := newWailsLifecycleService(core, logs)
+
+	require.NoError(t, service.ServiceStartup(t.Context(), application.ServiceOptions{}))
+
+	records := logs.Records()
+	require.Len(t, records, 1)
+	record := requireLogRecord(t, records, "application startup failed")
+	require.Equal(t, "error", record.Level)
+	require.Equal(t, "application.start", record.Fields["operation"])
+	require.Equal(t, "failed", record.Fields["outcome"])
+	require.NotContains(t, fmt.Sprintf("%#v", records), startErr.Error())
 }
 
 func TestWailsLifecycleShutdownUsesFreshBoundedContext(t *testing.T) {

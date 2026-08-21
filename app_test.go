@@ -59,6 +59,236 @@ func TestApplicationStartsPlayerBeforePublishingReady(t *testing.T) {
 
 }
 
+func TestApplicationLifecycleEmitsStructuredOperationalLogs(t *testing.T) {
+	t.Parallel()
+
+	logs := testutil.NewRecordingLogger()
+	recorder := &callRecorder{}
+	app := NewAppWithDependencies(AppDependencies{
+		Logger: logs,
+		Player: &recordingPlayerServer{recorder: recorder, info: domain.ServerInfo{
+			IP: "127.0.0.1", Port: 3690, URL: "http://127.0.0.1:3690",
+		}},
+		Events:  &recordingEventSink{recorder: recorder},
+		Desktop: &recordingDesktop{recorder: recorder},
+	})
+
+	require.NoError(t, app.Start(t.Context()))
+	require.NoError(t, app.Shutdown(t.Context()))
+
+	records := logs.Records()
+	for _, message := range []string{
+		"application startup started",
+		"player server ready",
+		"desktop runtime ready",
+		"application ready",
+		"application shutdown started",
+		"application shutdown completed",
+	} {
+		requireLogRecord(t, records, message)
+	}
+	ready := requireLogRecord(t, records, "application ready")
+	require.Equal(t, "ready-local", ready.Fields["phase"])
+	player := requireLogRecord(t, records, "player server ready")
+	require.Equal(t, 3690, player.Fields["port"])
+	require.Equal(t, []string{
+		"player:start", "event:server-info", "desktop:ready", "player:stop", "desktop:close",
+	}, recorder.Calls())
+}
+
+func TestProductionLoggingUsesRequiredLoggerInitializedOnce(t *testing.T) {
+	t.Parallel()
+
+	mainSource, err := os.ReadFile("main.go")
+	require.NoError(t, err)
+	moduleSource, err := os.ReadFile("go.mod")
+	require.NoError(t, err)
+
+	require.Equal(t, 1, strings.Count(string(mainSource), "logger.Init("))
+	require.Contains(t, string(mainSource), `"github.com/obalunenko/logger"`)
+	require.NotContains(t, string(mainSource), `"log"`)
+	require.Contains(t, string(moduleSource), "github.com/obalunenko/logger v1.2.0")
+}
+
+func requireLogRecord(t *testing.T, records []testutil.LogRecord, message string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "message "+message, func(record testutil.LogRecord) bool {
+		return record.Message == message
+	})
+}
+
+func TestApplicationCommandLogsRecordSafeOutcomesAndSwallowedEventErrors(t *testing.T) {
+	t.Parallel()
+
+	const (
+		providerCanary  = "PROVIDER-SECRET-CANARY-0123456789"
+		passwordCanary  = "PLAYER-PASSWORD-CANARY"
+		contentCanary   = "SESSION-CONTENT-CANARY"
+		characterCanary = "CHARACTER-NAME-CANARY"
+	)
+
+	t.Run("session outcomes", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		sessions := &loggingSessionCommands{
+			createResult: sessionservice.SessionResult{OK: true, Session: &domain.Session{Version: 1, Name: contentCanary}},
+			openResult:   sessionservice.SessionResult{Canceled: true},
+			copyResult:   sessionservice.SessionResult{Error: contentCanary},
+			saveResult:   sessionservice.SaveResult{Error: contentCanary, RequestedRevision: 1},
+		}
+		app := NewAppWithDependencies(AppDependencies{Logger: logs, Sessions: sessions})
+
+		require.True(t, app.NewSession().OK)
+		require.True(t, app.OpenSession().Canceled)
+		require.False(t, app.CopyDemo().OK)
+		require.False(t, app.SaveSession(domain.Session{Version: 1, Name: contentCanary}).OK)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "session.create", "succeeded")
+		requireOperationRecord(t, records, "session.open", "cancelled")
+		requireOperationRecord(t, records, "session.copy-demo", "failed")
+		save := requireOperationRecord(t, records, "session.save", "failed")
+		require.Equal(t, uint64(1), save.Fields["revision"])
+		require.NotContains(t, fmt.Sprintf("%#v", records), contentCanary)
+	})
+
+	t.Run("player config and broadcast outcomes", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		sessions := &recordingPlayerConfigSession{snapshot: sessionservice.ActiveSession{
+			Path: "/Campaigns/game.json",
+			Session: &domain.Session{
+				Version: 1, Name: contentCanary, Terminals: []domain.Terminal{},
+			},
+		}}
+		configs := &recordingPlayerConfigService{next: playerconfigservice.Result{
+			OK: true, FilePath: "/Campaigns/players/private.json", ContentDigest: "digest",
+			Config: &domain.PlayerConfig{Version: 1, Name: contentCanary, Roster: []domain.CharacterRosterEntry{{
+				ID: "private-character", Name: characterCanary,
+			}}},
+		}}
+		coordination := &loggingPlayerConfigBroadcastCoordination{
+			recordingPlayerConfigCoordination: recordingPlayerConfigCoordination{recordingCoordinationService: recordingCoordinationService{
+				state:      &domain.MasterCoordinationState{Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}},
+				startState: &domain.MasterCoordinationState{Revision: 1, Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}, Broadcast: &domain.MasterBroadcastState{}},
+			}},
+			endState: &domain.MasterCoordinationState{Revision: 2, Roster: []domain.MasterRosterEntry{}, Sessions: []domain.MasterSessionEntry{}},
+		}
+		app := NewAppWithDependencies(AppDependencies{
+			Logger: logs, Sessions: sessions, PlayerConfigs: configs, Coordination: coordination,
+		})
+
+		require.True(t, app.OpenPlayerConfig().OK)
+		require.True(t, app.StartBroadcast().OK)
+		require.True(t, app.EndBroadcast().OK)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "player-config.open", "succeeded")
+		requireOperationRecord(t, records, "broadcast.start", "succeeded")
+		requireOperationRecord(t, records, "broadcast.end", "succeeded")
+		captured := fmt.Sprintf("%#v", records)
+		require.NotContains(t, captured, contentCanary)
+		require.NotContains(t, captured, characterCanary)
+		require.NotContains(t, captured, "/Campaigns")
+	})
+
+	t.Run("public access and event delivery", func(t *testing.T) {
+		t.Parallel()
+		logs := testutil.NewRecordingLogger()
+		recorder := &callRecorder{}
+		preferences := tunnelservice.DefaultPublicAccessPreferences()
+		preferences.Revision = 7
+		disabled := tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences,
+			Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: 7},
+		}
+		preferences8 := preferences
+		preferences8.Revision = 8
+		failed := tunnelservice.PublicAccessSnapshot{
+			Preferences: preferences8,
+			Status: tunnelservice.PublicAccessStatus{
+				State: tunnelservice.LifecycleFailed, Generation: 2, SettingsRevision: 8,
+				ErrorCategory: tunnelservice.ErrorProviderAuthentication,
+				ErrorMessage:  tunnelservice.ErrorProviderAuthentication.SafeMessage(),
+			},
+		}
+		core := &recordingPublicAccessCore{
+			recorder: recorder, snapshot: disabled,
+			reconfigureResults: []tunnelservice.PublicAccessResult{{
+				OK: true, Snapshot: tunnelservice.PublicAccessSnapshot{
+					Preferences: preferences8,
+					Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, SettingsRevision: 8},
+				},
+			}},
+			start: tunnelservice.PublicAccessResult{Error: tunnelservice.ErrorProviderAuthentication.SafeMessage(), Snapshot: failed},
+			stop: tunnelservice.PublicAccessResult{OK: true, Snapshot: tunnelservice.PublicAccessSnapshot{
+				Preferences: preferences8,
+				Status:      tunnelservice.PublicAccessStatus{State: tunnelservice.LifecycleDisabled, Generation: 3, SettingsRevision: 8},
+			}},
+		}
+		eventErr := errors.New("event transport unavailable")
+		app := NewAppWithDependencies(AppDependencies{
+			Logger: logs, PublicAccess: core,
+			Events: &recordingEventSink{recorder: recorder, err: eventErr},
+		})
+
+		saved := app.SavePublicAccessSettings(SavePublicAccessSettingsPayload{
+			ExpectedRevision: 7, EnabledPreference: true, ReservedDomain: "private.example", Username: "private-user",
+			ReplacementProviderToken: providerCanary, ReplacementPlayerPassword: passwordCanary,
+		})
+		require.True(t, saved.OK)
+		require.False(t, app.StartPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 8}).OK)
+		require.True(t, app.StopPublicAccess(PublicAccessCommandPayload{ExpectedRevision: 8}).OK)
+		app.updateClientCount(3)
+
+		records := logs.Records()
+		requireOperationRecord(t, records, "public-access.settings", "succeeded")
+		started := requireOperationRecord(t, records, "public-access.start", "failed")
+		require.Equal(t, "error", started.Fields["state"])
+		require.Equal(t, "provider_authentication", started.Fields["error_category"])
+		requireOperationRecord(t, records, "public-access.stop", "succeeded")
+		eventRecord := requireEventLogRecord(t, records, clientCountEvent)
+		require.ErrorIs(t, eventRecord.Fields["error"].(error), eventErr)
+
+		captured := fmt.Sprintf("%#v", records)
+		for _, forbidden := range []string{providerCanary, passwordCanary, "private.example", "private-user"} {
+			require.NotContains(t, captured, forbidden)
+		}
+	})
+}
+
+func requireOperationRecord(t *testing.T, records []testutil.LogRecord, operation, outcome string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "operation "+operation+" with outcome "+outcome, func(record testutil.LogRecord) bool {
+		return record.Fields["operation"] == operation && record.Fields["outcome"] == outcome
+	})
+}
+
+func requireEventLogRecord(t *testing.T, records []testutil.LogRecord, event string) testutil.LogRecord {
+	t.Helper()
+	return requireMatchingLogRecord(t, records, "failed event delivery for "+event, func(record testutil.LogRecord) bool {
+		return record.Message == "desktop event delivery failed" && record.Fields["event"] == event
+	})
+}
+
+func requireMatchingLogRecord(
+	t *testing.T,
+	records []testutil.LogRecord,
+	description string,
+	matches func(testutil.LogRecord) bool,
+) testutil.LogRecord {
+	t.Helper()
+	var match *testutil.LogRecord
+	for index := range records {
+		if matches(records[index]) {
+			match = &records[index]
+			break
+		}
+	}
+	require.NotNilf(t, match, "matching log record: %s; records=%#v", description, records)
+	return *match
+}
+
 func TestApplicationLifetimeContextIsRetainedWhileAcquisitionUsesBoundedChild(t *testing.T) {
 	t.Parallel()
 
@@ -2161,6 +2391,36 @@ type recordingSessionService struct {
 	shutdownCalls int
 }
 
+type loggingSessionCommands struct {
+	recordingSessionService
+	createResult sessionservice.SessionResult
+	openResult   sessionservice.SessionResult
+	copyResult   sessionservice.SessionResult
+	saveResult   sessionservice.SaveResult
+	active       sessionservice.ActiveSession
+}
+
+func (service *loggingSessionCommands) Create(context.Context) sessionservice.SessionResult {
+	service.active.Session = service.createResult.Session
+	return service.createResult
+}
+
+func (service *loggingSessionCommands) Open(context.Context) sessionservice.SessionResult {
+	return service.openResult
+}
+
+func (service *loggingSessionCommands) CopyDemo(context.Context) sessionservice.SessionResult {
+	return service.copyResult
+}
+
+func (service *loggingSessionCommands) Save(context.Context, domain.Session, uint64) sessionservice.SaveResult {
+	return service.saveResult
+}
+
+func (service *loggingSessionCommands) Snapshot() sessionservice.ActiveSession {
+	return service.active
+}
+
 type recordingCommandStateSession struct {
 	recordingSessionService
 	resetOneResult      sessionservice.CommandStateResult
@@ -2245,6 +2505,16 @@ func (service *recordingPlayerConfigService) LoadReferenced(string, string) play
 type recordingPlayerConfigCoordination struct {
 	recordingCoordinationService
 	installs []string
+}
+
+type loggingPlayerConfigBroadcastCoordination struct {
+	recordingPlayerConfigCoordination
+	endState *domain.MasterCoordinationState
+}
+
+func (service *loggingPlayerConfigBroadcastCoordination) EndBroadcast() (*domain.MasterCoordinationState, error) {
+	service.state = domain.CloneMasterCoordinationState(service.endState)
+	return domain.CloneMasterCoordinationState(service.state), nil
 }
 
 func (service *recordingPlayerConfigCoordination) InstallPlayerConfig(handle domain.PlayerConfigHandle, roster []domain.CharacterRosterEntry) (*domain.MasterCoordinationState, error) {

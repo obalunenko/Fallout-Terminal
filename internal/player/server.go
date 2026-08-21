@@ -12,6 +12,7 @@ import (
 
 	"github.com/obalunenko/Fallout-Terminal/internal/control"
 	"github.com/obalunenko/Fallout-Terminal/internal/domain"
+	"github.com/obalunenko/logger"
 )
 
 const defaultAddress = "0.0.0.0:3690"
@@ -22,11 +23,13 @@ type Config struct {
 	Address string
 	Assets  fs.FS
 	Connect *ConnectService
+	Logger  logger.Logger
 }
 
 // Server owns the LAN HTTP listener and generated Connect stream lifecycle.
 type Server struct {
 	config Config
+	log    logger.Logger
 
 	mu         sync.Mutex
 	listener   net.Listener
@@ -53,7 +56,11 @@ func NewServer(config Config) (*Server, error) {
 	if config.Connect == nil {
 		return nil, errors.New("generated Connect player service is not configured")
 	}
-	return &Server{config: config}, nil
+	serverLogger := config.Logger
+	if serverLogger == nil {
+		serverLogger = logger.FromContext(nil)
+	}
+	return &Server{config: config, log: serverLogger}, nil
 }
 
 // Start acquires the listener before returning its usable local address.
@@ -89,9 +96,16 @@ func (server *Server) Start(_ context.Context) (domain.ServerInfo, error) {
 	server.workers.Add(1)
 	go func(httpServer *http.Server, activeListener net.Listener) {
 		defer server.workers.Done()
-		_ = httpServer.Serve(activeListener)
+		server.recordServeExit(httpServer.Serve(activeListener))
 	}(server.httpServer, listener)
 	return server.info, nil
+}
+
+func (server *Server) recordServeExit(err error) {
+	if server == nil || server.log == nil || err == nil || errors.Is(err, http.ErrServerClosed) {
+		return
+	}
+	server.log.WithError(err).WithField("operation", "player.serve").Error("player server stopped unexpectedly")
 }
 
 // Info returns the detached address acquired by Start.
